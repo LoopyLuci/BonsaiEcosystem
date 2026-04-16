@@ -11,10 +11,19 @@ $ErrorActionPreference = 'Stop'
 
 $workspaceRoot = $PSScriptRoot
 $launcherCmd = Join-Path $workspaceRoot 'Launch-BonsaiWorkspace.cmd'
+$launcherPs1 = Join-Path $workspaceRoot 'Launch-BonsaiWorkspace.ps1'
 $iconPath = Join-Path $workspaceRoot 'bonsai-workspace\src-tauri\icons\icon.ico'
 
 if (-not (Test-Path $launcherCmd)) {
   throw "Launcher script not found: $launcherCmd"
+}
+if (-not (Test-Path $launcherPs1)) {
+  throw "Launcher script not found: $launcherPs1"
+}
+
+$powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+if (-not (Test-Path $powershellExe)) {
+  $powershellExe = 'powershell.exe'
 }
 
 $desktopTargets = @()
@@ -43,8 +52,9 @@ foreach ($desktop in $desktopTargets) {
   }
 
   $shortcut = $wsh.CreateShortcut($shortcutPath)
-  $shortcut.TargetPath = $launcherCmd
-  $shortcut.Arguments = $LaunchArgs
+  $shortcut.TargetPath = $powershellExe
+  $argTail = if ([string]::IsNullOrWhiteSpace($LaunchArgs)) { '' } else { " $LaunchArgs" }
+  $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$launcherPs1`"$argTail"
   $shortcut.WorkingDirectory = $workspaceRoot
   $shortcut.Description = 'Launch Bonsai Workspace'
   if (Test-Path $iconPath) {

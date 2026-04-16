@@ -164,6 +164,72 @@ function isPortActivelyListening(port) {
   }
 }
 
+function getListeningPidsOnPort(port) {
+  try {
+    const out = spawnSync(toolCmd('netstat'), ['-ano'], { encoding: 'utf8' });
+    const dump = `${out.stdout || ''}\n${out.stderr || ''}`;
+    const pids = new Set();
+    const needle = `:${port}`;
+
+    for (const rawLine of dump.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || !line.includes(needle) || !/LISTEN|LISTENING/i.test(line)) continue;
+      const parts = line.split(/\s+/);
+      const maybePid = Number(parts[parts.length - 1]);
+      if (Number.isFinite(maybePid) && maybePid > 0) {
+        pids.add(maybePid);
+      }
+    }
+    return [...pids];
+  } catch {
+    return [];
+  }
+}
+
+function getProcessImageName(pid) {
+  if (process.platform !== 'win32') return '';
+  try {
+    const out = spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { encoding: 'utf8' });
+    const text = `${out.stdout || ''}`.trim();
+    if (!text || /No tasks are running/i.test(text)) return '';
+    // CSV first field is image name
+    const first = text.split(',')[0] || '';
+    return first.replace(/^"|"$/g, '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function isReclaimableBonsaiProcess(imageName) {
+  const n = String(imageName || '').toLowerCase();
+  return n === 'bonsai-workspace.exe' || n === 'bonsai-workspace';
+}
+
+function tryReleasePortFromStaleBonsai(port) {
+  if (process.platform !== 'win32') return false;
+  const pids = getListeningPidsOnPort(port);
+  if (pids.length === 0) return false;
+
+  let killedAny = false;
+  for (const pid of pids) {
+    const image = getProcessImageName(pid);
+    if (!isReclaimableBonsaiProcess(image)) {
+      continue;
+    }
+    log(`[preflight] reclaiming stale Bonsai listener on port ${port} (PID ${pid}, ${image})...`);
+    try {
+      const kill = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { encoding: 'utf8' });
+      if (kill.status === 0) {
+        killedAny = true;
+      }
+    } catch {
+      // best effort
+    }
+  }
+
+  return killedAny;
+}
+
 function ensurePathExists(absPath, label) {
   if (!fs.existsSync(absPath)) {
     throw new Error(`${label} not found: ${absPath}`);
@@ -325,6 +391,18 @@ async function run() {
     }
 
     // In desktop mode, transient listeners can briefly hold the port while exiting.
+    if (!apiFree && !report.api_healthy && !cfg.allowPortInUse && !cfg.preflightOnly) {
+      // Windows stale-process recovery for taskbar/shortcut relaunch edge-cases.
+      const reclaimed = tryReleasePortFromStaleBonsai(cfg.apiPort);
+      if (reclaimed) {
+        const releasedAfterKill = await waitForPortToBecomeAvailable(cfg.apiPort, 8000);
+        if (releasedAfterKill) {
+          apiFree = true;
+          log(`[preflight] port ${cfg.apiPort} reclaimed from stale Bonsai process.`);
+        }
+      }
+    }
+
     if (!apiFree && !report.api_healthy && !cfg.allowPortInUse && !cfg.preflightOnly) {
       log(`[preflight] port ${cfg.apiPort} is occupied by a non-healthy listener; waiting briefly for release...`);
       const released = await waitForPortToBecomeAvailable(cfg.apiPort, 8000);
