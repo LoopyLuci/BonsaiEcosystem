@@ -31,6 +31,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio_stream::wrappers::IntervalStream;
 use tower_http::cors::{Any, CorsLayer};
+use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 
 use crate::model_orchestrator::ModelOrchestrator;
 use crate::model_registry::ModelInfo;
@@ -55,6 +57,30 @@ struct ApiState {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
+pub struct ApiServerHandle {
+    shutdown_tx: Option<oneshot::Sender<()>>,
+    join:        JoinHandle<()>,
+    pub host:    String,
+    pub port:    u16,
+}
+
+impl ApiServerHandle {
+    pub async fn stop(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
+        let _ = (&mut self.join).await;
+    }
+}
+
+impl Drop for ApiServerHandle {
+    fn drop(&mut self) {
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
+    }
+}
+
 pub async fn start(
     orchestrator: Arc<ModelOrchestrator>,
     remote_manager: Arc<RemoteManager>,
@@ -62,7 +88,7 @@ pub async fn start(
     pair_token: String,
     host: String,
     port: u16,
-) {
+) -> Result<ApiServerHandle, String> {
     let state = ApiState {
         orchestrator,
         client: reqwest::Client::builder()
@@ -105,16 +131,29 @@ pub async fn start(
         .with_state(state);
 
     let addr = format!("{host}:{port}");
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .map_err(|e| format!("Failed to bind {addr}: {e}"))?;
+
     eprintln!("[api] Bonsai API server listening on http://{addr}");
 
-    match tokio::net::TcpListener::bind(&addr).await {
-        Ok(listener) => {
-            if let Err(e) = axum::serve(listener, app).await {
-                eprintln!("[api] Server error: {e}");
-            }
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+    let join = tokio::spawn(async move {
+        let server = axum::serve(listener, app).with_graceful_shutdown(async move {
+            let _ = shutdown_rx.await;
+        });
+        if let Err(e) = server.await {
+            eprintln!("[api] Server error: {e}");
         }
-        Err(e) => eprintln!("[api] Failed to bind {addr}: {e}"),
-    }
+        eprintln!("[api] Bonsai API server stopped");
+    });
+
+    Ok(ApiServerHandle {
+        shutdown_tx: Some(shutdown_tx),
+        join,
+        host,
+        port,
+    })
 }
 
 // ── Health ────────────────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@ use std::sync::{
     Mutex as StdMutex,
 };
 use tauri::Emitter;
+use tauri::Manager;
 use tokio::sync::Mutex;
 
 pub struct PtySession {
@@ -55,11 +56,19 @@ pub struct AppState {
     pub swarm_orchestrator: Arc<swarm_orchestrator::SwarmOrchestrator>,
     /// Per-run per-slot cancel flags for in-flight swarm agents.
     pub swarm_cancels:    Arc<StdMutex<HashMap<String, Vec<Arc<AtomicBool>>>>>,
+    /// Managed API server runtime for controlled restart/shutdown.
+    pub api_server:       Arc<Mutex<Option<api_server::ApiServerHandle>>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init());
@@ -126,6 +135,24 @@ pub fn run() {
 
             let ws_router = Arc::new(ws_router::WsRouter::new());
 
+            let api_config = config::load_config(&app_handle).unwrap_or_default();
+
+            let api_runtime = {
+                let orch   = orchestrator.clone();
+                let remote = remote_manager.clone();
+                let ws     = ws_router.clone();
+                let token  = pair_token.clone();
+                let host   = api_config.api_host.clone();
+                let port   = api_config.api_port;
+                match tauri::async_runtime::block_on(api_server::start(orch, remote, ws, token, host, port)) {
+                    Ok(handle) => Some(handle),
+                    Err(e) => {
+                        eprintln!("[api] {e}");
+                        None
+                    }
+                }
+            };
+
             app.manage(AppState {
                 orchestrator:     orchestrator.clone(),
                 whisper:          whisper.clone(),
@@ -141,22 +168,9 @@ pub fn run() {
                 agent_store,
                 swarm_orchestrator: swarm_orch,
                 swarm_cancels:      Arc::new(StdMutex::new(HashMap::new())),
+                api_server:         Arc::new(Mutex::new(api_runtime)),
             });
             app.manage(remote_manager.clone());
-
-            // Spawn the OpenAI-compatible API server on the configured host/port.
-            let api_config = config::load_config(&app_handle).unwrap_or_default();
-            {
-                let orch   = orchestrator.clone();
-                let remote = remote_manager.clone();
-                let ws     = ws_router.clone();
-                let token  = pair_token.clone();
-                let host   = api_config.api_host.clone();
-                let port   = api_config.api_port;
-                tauri::async_runtime::spawn(async move {
-                    api_server::start(orch, remote, ws, token, host, port).await;
-                });
-            }
 
             // Register mDNS service so Android can discover this desktop on the LAN.
             {

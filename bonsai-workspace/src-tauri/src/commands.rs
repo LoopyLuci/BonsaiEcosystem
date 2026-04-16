@@ -8,12 +8,13 @@ use std::process::Command;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex as StdMutex};
 use sysinfo::System;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tokio::sync::oneshot;
 use walkdir::WalkDir;
 
 use crate::action_parser::handle_agent_response;
+use crate::api_server;
 use crate::agent_connect::{AgentConnectEvent, AgentConnectSession};
 use crate::bootstrap;
 use crate::model_orchestrator::{InferRequest, InferStats};
@@ -1762,11 +1763,38 @@ pub async fn get_api_config(app_handle: AppHandle) -> Result<serde_json::Value, 
 }
 
 #[tauri::command]
-pub async fn set_api_config(app_handle: AppHandle, api_host: String, api_port: u16) -> Result<serde_json::Value, String> {
+pub async fn set_api_config(
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+    api_host: String,
+    api_port: u16,
+) -> Result<serde_json::Value, String> {
     let mut config = crate::config::load_config(&app_handle)?;
     config.api_host = api_host;
     config.api_port = api_port;
     let config = crate::config::save_config(&app_handle, &config)?;
+
+    // Apply API host/port changes immediately by replacing the running server.
+    let remote_manager = app_handle.state::<Arc<RemoteManager>>().inner().clone();
+    let mut api_guard = state.api_server.lock().await;
+
+    if let Some(mut running) = api_guard.take() {
+        running.stop().await;
+    }
+
+    let new_server = api_server::start(
+        state.orchestrator.clone(),
+        remote_manager,
+        state.ws_router.clone(),
+        state.pair_token.clone(),
+        config.api_host.clone(),
+        config.api_port,
+    )
+    .await
+    .map_err(|e| format!("Saved API config but failed to restart API server: {e}"))?;
+
+    *api_guard = Some(new_server);
+
     Ok(serde_json::json!({
         "api_host": config.api_host,
         "api_port": config.api_port,
