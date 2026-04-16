@@ -1845,8 +1845,10 @@ pub async fn generate_pair_qr(state: State<'_, AppState>) -> Result<String, Stri
 
     let ip   = local_ip_address::local_ip().map(|i| i.to_string()).unwrap_or_else(|_| "127.0.0.1".into());
     let data = format!(
-        "bonsai://connect?ip={}&port=11369&token={}",
-        ip, state.pair_token
+        "bonsai://connect?ip={}&port={}&token={}",
+        ip,
+        crate::config::DEFAULT_API_PORT,
+        state.pair_token
     );
     let code = QrCode::new(data.as_bytes()).map_err(|e| e.to_string())?;
     let svg  = code.render::<svg::Color>()
@@ -2081,7 +2083,10 @@ mod tests {
         use qrcode::QrCode;
         use qrcode::render::svg;
 
-        let data = "bonsai://connect?ip=192.168.1.100&port=11369&token=ABCD1234";
+        let data = format!(
+            "bonsai://connect?ip=192.168.1.100&port={}&token=ABCD1234",
+            crate::config::DEFAULT_API_PORT
+        );
         let code = QrCode::new(data.as_bytes()).expect("QR code creation failed");
         let svg_str = code.render::<svg::Color>().min_dimensions(200, 200).build();
 

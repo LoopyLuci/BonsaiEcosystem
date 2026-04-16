@@ -5,8 +5,9 @@
   import { currentWorkspace }   from '$lib/stores/workspace';
   import { isThinking }         from '$lib/stores/chat';
   import { orchestratorStatus } from '$lib/stores/models';
+  import { DEFAULT_API_PORT }   from '$lib/constants/network';
 
-  let apiPort     = 11369;
+  let apiPort     = DEFAULT_API_PORT;
   let tokenSpeed  = 0;
   let lowMemory   = false;
   let gitBranch   = '';

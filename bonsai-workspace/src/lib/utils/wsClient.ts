@@ -1,7 +1,8 @@
 /**
  * Desktop-side WebSocket client for Bonsai → VSCode bidirectional relay.
  *
- * The desktop app connects to its own WS server (ws://127.0.0.1:11369/ws)
+ * The desktop app connects to its own WS server using the default
+ * host/port constants from $lib/constants/network.
  * so that it can receive state pushed by the VSCode extension and forward
  * commands from the Bonsai UI back to VSCode.
  *
@@ -18,6 +19,7 @@ import {
   applyDelta,
 } from '$lib/stores/vscodeState';
 import type { VscodeDiagnostic } from '$lib/stores/vscodeState';
+import { buildDefaultWsUrl } from '$lib/constants/network';
 import { get } from 'svelte/store';
 
 type VscodeCmd = 'open_file' | 'cursor_set' | 'text_edit' | 'execute_command' | 'show_diff';
@@ -51,7 +53,7 @@ export function sendVscodeCmd(cmd: VscodeCmd, args: Record<string, unknown>): vo
 function tryConnect(token: string): void {
   if (stopped) return;
 
-  const url = 'ws://127.0.0.1:11369/ws';
+  const url = buildDefaultWsUrl();
   try {
     ws = new WebSocket(url);
   } catch {

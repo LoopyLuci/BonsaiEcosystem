@@ -2,6 +2,7 @@
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { addAssistantMessage } from '$lib/stores/chat';
+  import { DEFAULT_API_PORT } from '$lib/constants/network';
   import { availableModels, activeModel, activeModelId, orchestratorStatus, refreshStatus, refreshModels, modelSwitchStatus } from '$lib/stores/models';
   import { apiHost, apiPort, apiBaseUrl, loadApiSettings, saveApiSettings } from '$lib/stores/settings';
   import {
@@ -497,7 +498,7 @@
             </div>
             <div class="pair-field">
               <span class="pair-label">WebSocket</span>
-              <code class="pair-token">ws://{localIp || '…'}:11369/ws</code>
+              <code class="pair-token">ws://{localIp || '…'}:{DEFAULT_API_PORT}/ws</code>
             </div>
             <div class="pair-field">
               <span class="pair-label">WS clients</span>

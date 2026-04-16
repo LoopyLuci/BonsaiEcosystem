@@ -3,6 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
+pub const DEFAULT_API_HOST: &str = "127.0.0.1";
+pub const DEFAULT_API_PORT: u16 = 11369;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub api_host: String,
@@ -20,8 +23,8 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            api_host: "127.0.0.1".into(),
-            api_port: 11369,
+            api_host: DEFAULT_API_HOST.into(),
+            api_port: DEFAULT_API_PORT,
             current_session_id: None,
             current_session_title: None,
             desktop_connection_ip: None,

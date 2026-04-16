@@ -1,8 +1,9 @@
 import { writable, derived } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
+import { DEFAULT_API_HOST, DEFAULT_API_PORT } from '$lib/constants/network';
 
-export const apiHost = writable('127.0.0.1');
-export const apiPort = writable(11369);
+export const apiHost = writable(DEFAULT_API_HOST);
+export const apiPort = writable(DEFAULT_API_PORT);
 export const apiBaseUrl = derived([apiHost, apiPort], ([$apiHost, $apiPort]) => `http://${$apiHost}:${$apiPort}`);
 
 export async function loadApiSettings() {
@@ -13,7 +14,7 @@ export async function loadApiSettings() {
     return config;
   } catch (e) {
     console.error('Failed to load API settings:', e);
-    return { api_host: '127.0.0.1', api_port: 11369 };
+    return { api_host: DEFAULT_API_HOST, api_port: DEFAULT_API_PORT };
   }
 }
 

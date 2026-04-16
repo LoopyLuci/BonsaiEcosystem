@@ -4,6 +4,7 @@
  */
 
 import * as vscode from 'vscode';
+import { DEFAULT_BONSAI_WS_URL } from './constants';
 
 export type MessageHandler = (msg: BonsaiMessage) => void;
 
@@ -69,7 +70,7 @@ export class BonsaiClient {
     if (this.stopped) return;
 
     const config = vscode.workspace.getConfiguration('bonsai');
-    const url    = config.get<string>('wsUrl') ?? 'ws://127.0.0.1:11369/ws';
+    const url    = config.get<string>('wsUrl') ?? DEFAULT_BONSAI_WS_URL;
     const token  = config.get<string>('pairToken') ?? '';
 
     this.updateStatus('connecting');
