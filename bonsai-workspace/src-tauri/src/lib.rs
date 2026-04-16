@@ -135,7 +135,7 @@ pub fn run() {
 
             let ws_router = Arc::new(ws_router::WsRouter::new());
 
-            let api_config = config::load_config(&app_handle).unwrap_or_default();
+            let mut api_config = config::load_config(&app_handle).unwrap_or_default();
 
             let api_runtime = {
                 let orch   = orchestrator.clone();
@@ -144,7 +144,15 @@ pub fn run() {
                 let token  = pair_token.clone();
                 let host   = api_config.api_host.clone();
                 let port   = api_config.api_port;
-                match tauri::async_runtime::block_on(api_server::start(orch, remote, ws, token, host, port)) {
+                match tauri::async_runtime::block_on(api_server::start_with_fallback(
+                    orch,
+                    remote,
+                    ws,
+                    token,
+                    host,
+                    port,
+                    20,
+                )) {
                     Ok(handle) => Some(handle),
                     Err(e) => {
                         eprintln!("[api] {e}");
@@ -152,6 +160,14 @@ pub fn run() {
                     }
                 }
             };
+
+            if let Some(ref handle) = api_runtime {
+                if handle.port != api_config.api_port || handle.host != api_config.api_host {
+                    api_config.api_host = handle.host.clone();
+                    api_config.api_port = handle.port;
+                    let _ = config::save_config(&app_handle, &api_config);
+                }
+            }
 
             app.manage(AppState {
                 orchestrator:     orchestrator.clone(),

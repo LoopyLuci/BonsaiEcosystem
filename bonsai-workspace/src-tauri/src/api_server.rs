@@ -186,6 +186,52 @@ pub async fn start(
     })
 }
 
+pub async fn start_with_fallback(
+    orchestrator: Arc<ModelOrchestrator>,
+    remote_manager: Arc<RemoteManager>,
+    ws_router: Arc<WsRouter>,
+    pair_token: String,
+    host: String,
+    preferred_port: u16,
+    max_extra_attempts: u16,
+) -> Result<ApiServerHandle, String> {
+    let mut ports = Vec::with_capacity(max_extra_attempts as usize + 1);
+    ports.push(preferred_port);
+    for i in 1..=max_extra_attempts {
+        if let Some(p) = preferred_port.checked_add(i) {
+            ports.push(p);
+        } else {
+            break;
+        }
+    }
+
+    let mut last_err = String::new();
+    for p in ports {
+        match start(
+            orchestrator.clone(),
+            remote_manager.clone(),
+            ws_router.clone(),
+            pair_token.clone(),
+            host.clone(),
+            p,
+        )
+        .await
+        {
+            Ok(handle) => return Ok(handle),
+            Err(e) => last_err = e,
+        }
+    }
+
+    Err(if last_err.is_empty() {
+        format!(
+            "Failed to start API server on {}:{} and fallback ports",
+            host, preferred_port
+        )
+    } else {
+        last_err
+    })
+}
+
 async fn is_api_healthy(host: &str, port: u16) -> bool {
     let url = format!("http://{host}:{port}/health");
     match reqwest::Client::builder()

@@ -1769,10 +1769,7 @@ pub async fn set_api_config(
     api_host: String,
     api_port: u16,
 ) -> Result<serde_json::Value, String> {
-    let mut config = crate::config::load_config(&app_handle)?;
-    config.api_host = api_host;
-    config.api_port = api_port;
-    let config = crate::config::save_config(&app_handle, &config)?;
+    let old_config = crate::config::load_config(&app_handle)?;
 
     // Apply API host/port changes immediately by replacing the running server.
     let remote_manager = app_handle.state::<Arc<RemoteManager>>().inner().clone();
@@ -1782,16 +1779,43 @@ pub async fn set_api_config(
         running.stop().await;
     }
 
-    let new_server = api_server::start(
+    let started = api_server::start_with_fallback(
         state.orchestrator.clone(),
         remote_manager,
         state.ws_router.clone(),
         state.pair_token.clone(),
-        config.api_host.clone(),
-        config.api_port,
+        api_host.clone(),
+        api_port,
+        20,
     )
-    .await
-    .map_err(|e| format!("Saved API config but failed to restart API server: {e}"))?;
+    .await;
+
+    let new_server = match started {
+        Ok(s) => s,
+        Err(e) => {
+            // Try to restore previous config runtime so the app keeps working.
+            let rollback_remote = app_handle.state::<Arc<RemoteManager>>().inner().clone();
+            if let Ok(restored) = api_server::start_with_fallback(
+                state.orchestrator.clone(),
+                rollback_remote,
+                state.ws_router.clone(),
+                state.pair_token.clone(),
+                old_config.api_host.clone(),
+                old_config.api_port,
+                20,
+            )
+            .await
+            {
+                *api_guard = Some(restored);
+            }
+            return Err(format!("Failed to restart API server: {e}"));
+        }
+    };
+
+    let mut config = old_config;
+    config.api_host = new_server.host.clone();
+    config.api_port = new_server.port;
+    let config = crate::config::save_config(&app_handle, &config)?;
 
     *api_guard = Some(new_server);
 
