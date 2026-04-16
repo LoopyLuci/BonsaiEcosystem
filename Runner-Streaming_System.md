@@ -209,7 +209,7 @@ const isMobile = (await platform()) === 'android';
 - QR scan uses `@tauri-apps/plugin-barcode-scanner`.
 
 ### Android-Specific Commands
-- `scan_qr() -> String` — invokes barcode scanner plugin, returns URL string.
+- `scan_qr() -> String` — retained as a compatibility command; mobile QR scanning is handled in the frontend via `@tauri-apps/plugin-barcode-scanner`.
 - `save_desktop_connection(ip, token)` — persist to DB.
 - `load_desktop_connection() -> Option<{ip, token}>` — load from DB.
 

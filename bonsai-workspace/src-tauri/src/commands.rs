@@ -1876,7 +1876,10 @@ pub async fn ws_client_count(state: State<'_, AppState>) -> Result<usize, String
     Ok(state.ws_router.client_count())
 }
 
-/// Placeholder command for Android QR scanning flow.
+/// Compatibility command retained for legacy invoke surfaces.
+///
+/// Mobile QR scanning is handled in the frontend via
+/// `@tauri-apps/plugin-barcode-scanner` (see SettingsPanel scan action).
 /// Desktop builds return a clear guidance error.
 #[tauri::command]
 pub async fn scan_qr() -> Result<String, String> {
