@@ -13,6 +13,7 @@
 //! Default port is 11369.
 
 use std::convert::Infallible;
+use std::process::Command;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use axum::{
@@ -131,9 +132,38 @@ pub async fn start(
         .with_state(state);
 
     let addr = format!("{host}:{port}");
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .map_err(|e| format!("Failed to bind {addr}: {e}"))?;
+
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                // If a healthy Bonsai API is already bound, attach instead of failing.
+                if is_api_healthy(&host, port).await {
+                    eprintln!("[api] Port {addr} already in use by healthy API; attaching to existing runtime");
+                    return Ok(ApiServerHandle {
+                        shutdown_tx: None,
+                        join: tokio::spawn(async {}),
+                        host,
+                        port,
+                    });
+                }
+
+                // Direct EXE launches can inherit stale listeners from old Bonsai processes.
+                // On Windows, reclaim those stale listeners and retry bind once.
+                if try_reclaim_stale_bonsai_listener(port) {
+                    tokio::time::sleep(Duration::from_millis(300)).await;
+                    match tokio::net::TcpListener::bind(&addr).await {
+                        Ok(l2) => l2,
+                        Err(e2) => return Err(format!("Failed to bind {addr}: {e2}")),
+                    }
+                } else {
+                    return Err(format!("Failed to bind {addr}: {e}"));
+                }
+            } else {
+                return Err(format!("Failed to bind {addr}: {e}"));
+            }
+        }
+    };
 
     eprintln!("[api] Bonsai API server listening on http://{addr}");
 
@@ -154,6 +184,103 @@ pub async fn start(
         host,
         port,
     })
+}
+
+async fn is_api_healthy(host: &str, port: u16) -> bool {
+    let url = format!("http://{host}:{port}/health");
+    match reqwest::Client::builder()
+        .timeout(Duration::from_millis(1200))
+        .build()
+    {
+        Ok(client) => client
+            .get(url)
+            .send()
+            .await
+            .is_ok_and(|r| r.status().is_success()),
+        Err(_) => false,
+    }
+}
+
+fn try_reclaim_stale_bonsai_listener(port: u16) -> bool {
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = port;
+        false
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let pids = listening_pids_on_port(port);
+        if pids.is_empty() {
+            return false;
+        }
+
+        let mut killed_any = false;
+        for pid in pids {
+            let image = process_image_name(pid);
+            let img = image.to_ascii_lowercase();
+            if img != "bonsai-workspace.exe" && img != "bonsai-workspace" {
+                continue;
+            }
+            if let Ok(out) = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output()
+            {
+                if out.status.success() {
+                    killed_any = true;
+                }
+            }
+        }
+        killed_any
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn listening_pids_on_port(port: u16) -> Vec<u32> {
+    let out = match Command::new("netstat").args(["-ano"]).output() {
+        Ok(o) => o,
+        Err(_) => return vec![],
+    };
+    let dump = String::from_utf8_lossy(&out.stdout);
+    let mut pids = std::collections::BTreeSet::new();
+    let needle = format!(":{port}");
+
+    for line in dump.lines() {
+        let l = line.trim();
+        if l.is_empty() || !l.contains(&needle) || !l.to_ascii_uppercase().contains("LISTEN") {
+            continue;
+        }
+        let parts: Vec<&str> = l.split_whitespace().collect();
+        if let Some(last) = parts.last() {
+            if let Ok(pid) = last.parse::<u32>() {
+                if pid > 0 {
+                    pids.insert(pid);
+                }
+            }
+        }
+    }
+
+    pids.into_iter().collect()
+}
+
+#[cfg(target_os = "windows")]
+fn process_image_name(pid: u32) -> String {
+    let out = match Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+        .output()
+    {
+        Ok(o) => o,
+        Err(_) => return String::new(),
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let line = text.trim();
+    if line.is_empty() || line.contains("No tasks are running") {
+        return String::new();
+    }
+    line.split(',')
+        .next()
+        .map(|s| s.trim_matches('"').to_string())
+        .unwrap_or_default()
 }
 
 // ── Health ────────────────────────────────────────────────────────────────────
