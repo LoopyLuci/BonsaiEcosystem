@@ -289,6 +289,44 @@ jobs:
           path: bonsai-workspace/ci-artifacts/
           if-no-files-found: ignore
 
+  android-target-check:
+    name: Android Target Check (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust (with Android target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            bonsai-workspace/src-tauri
+
+      - name: Cargo check (Android target)
+        shell: bash
+        run: |
+          mkdir -p bonsai-workspace/ci-artifacts
+          set -o pipefail
+          cargo check \
+            --manifest-path "bonsai-workspace/src-tauri/Cargo.toml" \
+            --target aarch64-linux-android \
+            2>&1 | tee bonsai-workspace/ci-artifacts/cargo-check-android-target.log
+
+      - name: Upload Android target artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-target-check-logs
+          path: bonsai-workspace/ci-artifacts/
+          if-no-files-found: ignore
+
   required-checks:
     name: Required Checks Gate
     runs-on: ubuntu-latest
@@ -298,6 +336,7 @@ jobs:
       - rust-quality
       - routing-deterministic
       - api-smoke-orchestrated
+      - android-target-check
     if: always()
 
     steps:
@@ -308,12 +347,14 @@ jobs:
           echo "rust-quality=${{ needs.rust-quality.result }}"
           echo "routing-deterministic=${{ needs.routing-deterministic.result }}"
           echo "api-smoke-orchestrated=${{ needs.api-smoke-orchestrated.result }}"
+           echo "android-target-check=${{ needs.android-target-check.result }}"
 
           if [ "${{ needs.frontend-quality.result }}" != "success" ] || \
              [ "${{ needs.vscode-extension-quality.result }}" != "success" ] || \
              [ "${{ needs.rust-quality.result }}" != "success" ] || \
              [ "${{ needs.routing-deterministic.result }}" != "success" ] || \
-             [ "${{ needs.api-smoke-orchestrated.result }}" != "success" ]; then
+             [ "${{ needs.api-smoke-orchestrated.result }}" != "success" ] || \
+             [ "${{ needs.android-target-check.result }}" != "success" ]; then
             echo "One or more required checks failed"
             exit 1
           fi
