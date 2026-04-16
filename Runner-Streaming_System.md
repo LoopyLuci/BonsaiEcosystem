@@ -11,7 +11,7 @@ Both systems share the same WebSocket infrastructure added to the existing Axum 
 
 ---
 
-## Phase 1 — WebSocket Server (Axum, port 11371)
+## Phase 1 — WebSocket Server (Axum, port 11369)
 
 **File:** `bonsai-workspace/src-tauri/src/api_server.rs`
 
@@ -58,8 +58,8 @@ Add a new Axum route `/ws` that upgrades to WebSocket. The server maintains a `W
 ### Flow
 1. Desktop generates a random 6-character alphanumeric token on startup, stored in `AppState.pair_token: String`.
 2. Tauri command `get_pair_token()` returns the token.
-3. Desktop Settings panel shows: token in large text + QR code encoding `bonsai://connect?ip=192.168.x.x:11371&token=ABC123`.
-4. Android scans QR → extracts IP + token → connects to `ws://IP:11371/ws` → sends `{"type":"auth","payload":{"token":"ABC123"}}`.
+3. Desktop Settings panel shows: token in large text + QR code encoding `bonsai://connect?ip=192.168.x.x:11369&token=ABC123`.
+4. Android scans QR → extracts IP + token → connects to `ws://IP:11369/ws` → sends `{"type":"auth","payload":{"token":"ABC123"}}`.
 5. Server validates token → sends `auth_ok` → client is registered.
 
 ### QR Code
@@ -121,7 +121,7 @@ vscode-extension/
 | `show_diff` | `vscode.diff(original, modified, title)` |
 
 ### Connection
-- On `activate()`: attempt WebSocket connect to `ws://127.0.0.1:11371/ws`.
+- On `activate()`: attempt WebSocket connect to `ws://127.0.0.1:11369/ws`.
 - Send `{"type":"auth","payload":{"token":"..."}}` — token configured in VSCode settings (`bonsai.pairToken`).
 - Reconnect with exponential backoff on disconnect.
 - Status bar item shows connection state.
@@ -155,7 +155,7 @@ export const vscodeConnected = writable<boolean>(false);
 ### WebSocket Client (Desktop)
 **New file:** `src/lib/utils/wsClient.ts`
 ```typescript
-// Manages ws://127.0.0.1:11371/ws connection
+// Manages ws://127.0.0.1:11369/ws connection
 // On message: routes to appropriate store update
 // Exports: sendVscodeCmd(cmd, args)
 ```
@@ -203,7 +203,7 @@ const isMobile = (await platform()) === 'android';
 ```
 
 ### Android Networking
-- Android app connects to desktop `ws://[desktop-ip]:11371/ws` using the token from QR scan.
+- Android app connects to desktop `ws://[desktop-ip]:11369/ws` using the token from QR scan.
 - Tauri command `save_desktop_connection(ip: String, token: String)` persists to SQLite.
 - On startup, loads saved connection and auto-reconnects.
 - QR scan uses `@tauri-apps/plugin-barcode-scanner`.
@@ -227,7 +227,7 @@ tauri-plugin-os = "2"
 Instead of QR code only, allow Android to auto-discover desktop on same LAN.
 
 - Add `mdns-sd = "0.11"` to `Cargo.toml`.
-- Desktop registers `_bonsai._tcp.local.` service on port 11371 at startup.
+- Desktop registers `_bonsai._tcp.local.` service on port 11369 at startup.
 - Android browses for `_bonsai._tcp.local.` services and lists found desktops by hostname.
 - User taps a desktop → token entry dialog (or QR scan to get token).
 
@@ -277,3 +277,165 @@ Recommended order: 1 → 2 → 4 → 3 → 5 → 6
 | `src-tauri/Cargo.toml` | Add `qrcode`, `local-ip-address`, `mdns-sd`; add feature flags for desktop-only deps |
 | `src/App.svelte` | Add VSCode tab, mobile layout detection |
 | `src/lib/components/SettingsPanel.svelte` | Add Connection section (QR display, token, IP) |
+
+
+
+I’m going to do a focused evidence-based audit across backend, frontend, extension, and CI so I can give you a prioritized gap list with an execution path to production-grade confidence.
+
+Ran terminal command: git status --short
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/Runner-Streaming_System.md#1-1), lines 1 to 260
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/.github/workflows/ci.yml)
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/.github/workflows/nightly-soak.yml)
+
+I’m now validating the current build/test baseline and pulling exact code evidence for remaining gaps so the audit is actionable rather than theoretical.
+
+Ran terminal command: Set-Location "z:\Projects\BonsaiWorkspace\bonsai-workspace"; cargo check --manifest-path "src-tauri/Cargo.toml"
+
+Ran terminal command: Set-Location "z:\Projects\BonsaiWorkspace\bonsai-workspace\src"; npm run test:agent-routing-ci
+
+Read [](file:///c%3A/Users/limpi/AppData/Roaming/Code/User/workspaceStorage/690560126d5bfaef4e7a4ce1fac11581/GitHub.copilot-chat/chat-session-resources/feda5104-870f-4d9f-b8c7-b9f870fd6fd6/call_dvUO2Pt2hPyDnc9KlHZGEMOB__vscode-1776288642822/content.txt)
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src-tauri/src/commands.rs#1885-1885), lines 1885 to 1995
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src-tauri/Cargo.toml)
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src/lib/utils/wsClient.ts)
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/vscode-extension/src/bonsai-client.ts)
+
+Searched for regex `pub async fn scan_qr|save_desktop_connection|load_desktop_connection|browse_bonsai_services|std::thread::sleep` (`**/bonsai-workspace/src-tauri/src/commands.rs`), 6 results
+
+Searched for regex `tauri-plugin-barcode-scanner|tauri-plugin-os|cfg\(not\(target_os = "android"\)\)|\[features\]` (`**/bonsai-workspace/src-tauri/Cargo.toml`), no results
+
+Searched for regex `11369|/ws` (`**/Runner-Streaming_System.md`), 19 results
+
+Searched for regex `ws://127.0.0.1:11369/ws|bonsai.wsUrl` (`**/vscode-extension/**`), 3 results
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src-tauri/src/commands.rs#1868-1868), lines 1868 to 1894
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src-tauri/src/config.rs#1-1), lines 1 to 50
+
+Searched for regex `\[features\]|target_os = "android"|tauri-plugin-barcode-scanner|tauri-plugin-os` (`**/bonsai-workspace/src-tauri/Cargo.toml`), no results
+
+Searched for regex `BONSAI_SKIP_API|agent-api-smoke|Skipping API smoke` (`**/bonsai-workspace/src/agent-routing-ci.mjs`), 2 results
+
+Audit completed. Current baseline is healthy, but there are still important delivery gaps before claiming end-to-end production readiness.
+
+Current state snapshot
+1. Working tree is clean.
+2. Backend compile passes.
+3. Deterministic routing regression passes (8/8).
+4. Core Runner-Streaming architecture exists across backend, desktop UI, and VSCode extension.
+
+Priority findings (ordered by risk)
+
+1. Critical: Android QR scan is still a stub, not implemented
+- Evidence: commands.rs
+- Impact: Mobile pairing flow is incomplete; users cannot actually scan and onboard via native QR from app.
+- Gap vs plan: Runner-Streaming Phase 5 expected a working scan command.
+
+2. Critical: Android-specific dependency and feature gating from the plan is missing
+- Evidence: 
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src-tauri/src/commands.rs#1885-1885), lines 1885 to 1995
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src-tauri/Cargo.toml)
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/bonsai-workspace/src/lib/utils/wsClient.ts)
+
+Read [](file:///z%3A/Projects/BonsaiWorkspace/vscode-extension/src/bonsai-client.ts)
+
+Cargo.toml
+- Impact: Mobile build readiness is uncertain; desktop-only dependencies are not explicitly gated for Android as specified.
+- Gap vs plan: Runner-Streaming Phase 5 calls for Android feature gates and mobile plugin wiring.
+
+3. High: Port contract drift between spec and implementation
+- Spec says 11369:
+  - Runner-Streaming_System.md
+  - Runner-Streaming_System.md
+  - Runner-Streaming_System.md
+- Implementation uses 11369:
+  - config.rs
+  - wsClient.ts
+  - package.json
+  - bonsai-client.ts
+- Impact: Integration confusion, wrong defaults in external clients, and onboarding failures if teams follow the spec doc literally.
+
+4. High: CI deterministic suite skips API smoke coverage
+- Evidence: agent-routing-ci.mjs
+- Impact: API regression risk in remote/session endpoints; current CI validates UI scripted flow but not API smoke path in that lane.
+
+5. High: CI does not validate VSCode extension build/tests
+- Extension tests exist:
+  - state-streamer.test.ts
+- CI workflows currently focus on bonsai-workspace jobs:
+  - ci.yml
+- Impact: Extension can silently break while desktop remains green.
+
+6. Medium: mDNS browse command uses blocking sleep in an async command
+- Evidence: commands.rs
+- Impact: Potential runtime responsiveness issues under load; low immediate risk, but suboptimal implementation pattern.
+
+7. Medium: Nightly soak is single-platform
+- Evidence: nightly-soak.yml
+- Impact: OS-specific flaky behavior may go undetected (especially Linux/macOS differences).
+
+8. Medium: Functional parity claim is ahead of verification scope
+- The plan includes full mobile functionality and discovery paths:
+  - Runner-Streaming_System.md
+- Current verification evidence is strong for desktop routing and backend compile, but not yet for mobile runtime behavior.
+
+Clear optimal path to full functional confidence
+
+Phase A: Contract and onboarding correctness (1 day)
+1. Decide and lock a single canonical WS/API port (11369).
+2. Update either implementation or spec so they match everywhere:
+- Runner-Streaming_System.md
+- config.rs
+- wsClient.ts
+- package.json
+3. Add one compatibility fallback if needed during migration.
+
+Exit criteria:
+1. No port mismatch between docs, defaults, and runtime.
+2. Pairing examples work without manual correction.
+
+Phase B: Complete mobile command surface (2-3 days)
+1. Implement real scan_qr behavior (platform-gated).
+2. Add Android plugin dependencies and platform feature gating.
+3. Validate save/load desktop connection + mDNS browse with actual Android device/emulator.
+
+Exit criteria:
+1. End-to-end mobile pairing works from QR and persisted reconnect.
+2. Android build succeeds in CI and local.
+
+Phase C: CI coverage completion (1-2 days)
+1. Add VSCode extension lane:
+- install, compile, run tests in vscode-extension
+2. Add API smoke lane that does not skip BONSAI_SKIP_API.
+3. Add Android build lane (even if smoke-only initially).
+4. Expand nightly soak to at least one additional OS.
+
+Exit criteria:
+1. Required checks include desktop app, extension, and API smoke.
+2. Nightly reports platform-specific flake rates.
+
+Phase D: Reliability hardening (2-4 days)
+1. Replace blocking sleep in async browse path with non-blocking approach.
+2. Add retry diagnostics for all flaky-prone jobs (attempt-level metadata already started).
+3. Add structured artifact triage docs tied to generated logs.
+
+Exit criteria:
+1. Zero known blocking calls in async hot paths.
+2. Actionable failure artifacts for every critical job.
+
+Can this be guaranteed 100%
+Absolute mathematical 100% correctness is not achievable for a distributed multi-platform system. The practical target is release-grade confidence with:
+1. Deterministic required checks all green.
+2. Soak and flaky rates below threshold for multiple days.
+3. Full contract alignment between docs and runtime.
+4. Verified mobile + extension interoperability in CI and device tests.
+
