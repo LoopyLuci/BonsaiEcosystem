@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { scan } from '@tauri-apps/plugin-barcode-scanner';
   import { addAssistantMessage } from '$lib/stores/chat';
   import { DEFAULT_API_PORT } from '$lib/constants/network';
   import { availableModels, activeModel, activeModelId, orchestratorStatus, refreshStatus, refreshModels, modelSwitchStatus } from '$lib/stores/models';
@@ -240,7 +241,49 @@
   let localIp     = '';
   let wsClientCount = 0;
   let pairLoading = false;
+  let pairScanLoading = false;
+  let pairScanResult = '';
   let pairError   = '';
+
+  function extractScannedValue(payload: unknown): string {
+    if (typeof payload === 'string') return payload;
+    if (Array.isArray(payload)) {
+      for (const item of payload) {
+        const value = extractScannedValue(item);
+        if (value) return value;
+      }
+      return '';
+    }
+    if (payload && typeof payload === 'object') {
+      const obj = payload as Record<string, unknown>;
+      if (typeof obj.content === 'string') return obj.content;
+      if (typeof obj.rawValue === 'string') return obj.rawValue;
+      if (typeof obj.displayValue === 'string') return obj.displayValue;
+    }
+    return '';
+  }
+
+  function parseBonsaiConnectUrl(scanned: string): { ip: string; token: string } {
+    let parsed: URL;
+    try {
+      parsed = new URL(scanned);
+    } catch {
+      throw new Error('Scanned QR is not a valid URL.');
+    }
+
+    if (parsed.protocol !== 'bonsai:') {
+      throw new Error(`Unsupported QR scheme: ${parsed.protocol}`);
+    }
+
+    const ipParam = parsed.searchParams.get('ip')?.trim() || '';
+    const token = parsed.searchParams.get('token')?.trim() || '';
+    const port = parsed.searchParams.get('port')?.trim() || '';
+    if (!ipParam) throw new Error('QR code is missing ip parameter.');
+    if (!token) throw new Error('QR code is missing token parameter.');
+
+    const ip = port && !ipParam.includes(':') ? `${ipParam}:${port}` : ipParam;
+    return { ip, token };
+  }
 
   async function loadPairInfo() {
     pairLoading = true;
@@ -261,6 +304,28 @@
 
   async function refreshWsCount() {
     try { wsClientCount = await invoke<number>('ws_client_count'); } catch {}
+  }
+
+  async function scanMobilePairQr() {
+    pairScanLoading = true;
+    pairScanResult = '';
+    pairError = '';
+    try {
+      const raw = await scan({ windowed: true });
+      const scanned = extractScannedValue(raw);
+      if (!scanned) {
+        throw new Error('Scanner returned an empty QR payload.');
+      }
+
+      const connection = parseBonsaiConnectUrl(scanned);
+      await invoke('save_desktop_connection', connection);
+      pairScanResult = `Saved desktop connection: ${connection.ip}`;
+      addAssistantMessage(`📱 Mobile pairing target saved: ${connection.ip}`);
+    } catch (e) {
+      pairError = `Scan failed: ${String(e)}`;
+    } finally {
+      pairScanLoading = false;
+    }
   }
 </script>
 
@@ -504,7 +569,15 @@
               <span class="pair-label">WS clients</span>
               <code class="pair-token">{wsClientCount}</code>
             </div>
-            <button class="action-btn" on:click={refreshWsCount}>↺ Refresh</button>
+            <div class="action-grid pair-actions">
+              <button class="action-btn" on:click={refreshWsCount}>↺ Refresh</button>
+              <button class="action-btn blue" on:click={scanMobilePairQr} disabled={pairScanLoading}>
+                {pairScanLoading ? 'Scanning…' : 'Scan Mobile QR'}
+              </button>
+            </div>
+            {#if pairScanResult}
+              <div class="api-test-result">{pairScanResult}</div>
+            {/if}
           {/if}
           {#if pairError}
             <div class="pair-error">{pairError}</div>
@@ -751,6 +824,7 @@
   .btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .pair-actions { margin-top: 6px; }
   .action-btn {
     padding: 8px 12px;
     border: none;
