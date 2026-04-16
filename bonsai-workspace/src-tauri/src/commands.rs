@@ -1935,27 +1935,30 @@ pub async fn browse_bonsai_services() -> Result<Vec<serde_json::Value>, String> 
         .browse("_bonsai._tcp.local.")
         .map_err(|e| e.to_string())?;
 
-    let deadline = Instant::now() + Duration::from_millis(1500);
-    let mut out = Vec::new();
+    tokio::task::spawn_blocking(move || {
+        let deadline = Instant::now() + Duration::from_millis(1500);
+        let mut out = Vec::new();
 
-    while Instant::now() < deadline {
-        match receiver.try_recv() {
-            Ok(ServiceEvent::ServiceResolved(info)) => {
-                out.push(serde_json::json!({
-                    "name": info.get_fullname(),
-                    "host": info.get_hostname(),
-                    "ip": info.get_addresses().iter().next().map(|x| x.to_string()).unwrap_or_default(),
-                    "port": info.get_port(),
-                }));
-            }
-            Ok(_) => {}
-            Err(_) => {
-                std::thread::sleep(Duration::from_millis(100));
+        while Instant::now() < deadline {
+            match receiver.recv_timeout(Duration::from_millis(100)) {
+                Ok(ServiceEvent::ServiceResolved(info)) => {
+                    out.push(serde_json::json!({
+                        "name": info.get_fullname(),
+                        "host": info.get_hostname(),
+                        "ip": info.get_addresses().iter().next().map(|x| x.to_string()).unwrap_or_default(),
+                        "port": info.get_port(),
+                    }));
+                }
+                Ok(_) => {}
+                Err(flume::RecvTimeoutError::Timeout) => {}
+                Err(flume::RecvTimeoutError::Disconnected) => break,
             }
         }
-    }
 
-    Ok(out)
+        out
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 // ─── Unit tests ──────────────────────────────────────────────────────────────
