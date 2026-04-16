@@ -52,6 +52,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "test:typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "package": "vsce package"
   },
