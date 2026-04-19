@@ -1,224 +1,155 @@
-# Bonsai Workspace
+ # Bonsai Workspace
 
-Local-first AI development workspace built with Tauri 2, Svelte, Rust, and on-device model sidecars.
+ Local-first AI development workspace built with Tauri 2, Svelte, Rust, and on-device model sidecars.
 
-No cloud model keys are required. Core inference, editing, orchestration, and tooling workflows can run fully local.
+ This repository bundles a full desktop IDE, a native Rust backend for local automation and device tooling, and optional on-device model sidecars so you can iterate without cloud credentials.
 
-## What You Get
+ This README summarizes the product features, developer quick-starts, and where to find detailed docs in the repository.
 
-- Multi-pane IDE experience: file tree, Monaco editor, integrated terminal, chat, command palette, status bar.
-- Agent-assisted coding with approval-gated tool execution.
-- Multi-agent swarm mode with leader/worker orchestration and runtime controls.
-- Activity-first terminal with shell tabs plus a dedicated diagnostic event log.
-- Local API server with OpenAI-compatible endpoints for agent automation.
-- Android USB Lab and mobile QR pairing flows for device-level validation and evidence capture.
+ ## Highlights
 
-## Quick Start
+ - Multi-pane IDE with file tree, Monaco editor, integrated terminal, command palette, status bar, and activity-first logging.
+ - Assistant & Bonsai Buddy: an integrated assistant system (chat, assistant profiles, TTS, saved sessions) with a detachable always-on-top Buddy window.
+ - BonsaiBot: a lightweight messaging bot server for Discord/Telegram/Matrix/Email with an admin API used by the workspace.
+ - Multi-agent swarm orchestration for orchestrating many small agents with leader/worker semantics, retries, and resource gating.
+ - Mobile tooling: Android USB Lab, QR mobile pairing, Mobile Viewer (scrcpy integration), remote surface streaming & input.
+ - Rich tooling: editor tool profiles (lint/format/test), per-language commands, Agent Vision, Agent Connect and plugin tooling.
 
-### Windows one-click launch from workspace root
+ ## Quick Start (Windows)
 
-From Z:/Projects/BonsaiWorkspace:
+ From the repository root (recommended):
 
-```powershell
-.\Launch-BonsaiWorkspace.cmd
-```
+ ```powershell
+ cd Z:\Projects\BonsaiWorkspace\bonsai-workspace
+ # Start the local Rust bot (admin API)
+ .\bonsai-bot\target\release\bonsai-bot.exe
 
-Common examples:
+ # In another shell: run the desktop app (dev)
+ npx tauri dev
+ ```
 
-```powershell
-.\Launch-BonsaiWorkspace.cmd -PreflightOnly
-.\Launch-BonsaiWorkspace.cmd -Mode desktop+usb -StrictApp -ApkPath "C:\path\to\app.apk" -Serial "DEVICE_SERIAL"
-.\Launch-BonsaiWorkspace.cmd -Mode desktop+usb -RemoteSurfaceSmoke -Serial "DEVICE_SERIAL"
-```
+ Or use the provided launchers from the workspace root:
 
-### Recommended launcher from src
+ ```powershell
+ .\Launch-BonsaiWorkspace.cmd            # one-click start
+ .\Launch-BonsaiWorkspace.ps1           # PowerShell variant
+ ```
 
-From bonsai-workspace/src:
+ Common modes:
 
-```bash
-npm run launch:preflight
-npm run launch:desktop
-npm run launch:desktop+usb
-npm run launch:desktop+usb:remote-smoke
-npm run launch:desktop+usb:remote-smoke:preflight
-```
+ ```powershell
+ .\Launch-BonsaiWorkspace.cmd -Mode desktop+usb
+ .\Launch-BonsaiWorkspace.cmd -Mode desktop+usb -RemoteSurfaceSmoke
+ ```
 
-### Phase 1 Babashka tasks from workspace root
+ Developer flow (frontend + Tauri):
 
-From Z:/Projects/BonsaiWorkspace:
+ ```bash
+ cd bonsai-workspace/src
+ npm install
+ # from the workspace root Tauri finds src-tauri/tauri.conf.json
+ cd ..
+ npx tauri dev
+ ```
 
-```powershell
-bb tasks
-bb launch-preflight
-bb launch-preflight-report
-bb api-smoke
-```
+ If you prefer building a production bundle:
 
-Notes:
+ ```bash
+ cd bonsai-workspace/src
+ npm run build
+ cd ../src-tauri
+ cargo tauri build
+ ```
 
-- Babashka is optional, but this is the phase-1 script/task path for launcher automation.
-- `bb launch-preflight-report` writes `tool_test/launcher/preflight-bb.json`.
-- If `bb` is missing, install from https://babashka.org and rerun `bb tasks`.
+ ## Key Components & Features
 
-### Standard development flow
+ ### Editor & Explorer
 
-```bash
-cd src
-npm install
-cd ../src-tauri
-cargo tauri dev
-```
+ - File tree with quick create, filter, and context actions.
+ - Monaco editor with language autodetection, autosave, inline completions, and diff hunk apply/reject.
+ - Per-language tooling profiles (format, lint, test, run) with persisted templates and placeholders.
 
-## Prerequisites
+ ### Assistant, Bonsai Buddy & Session Tools
 
-| Tool | Minimum | Notes |
-|---|---:|---|
-| Rust | 1.77+ | Use rustup |
-| Node.js | 20+ | Frontend + scripts |
-| Tauri CLI | 2.x | cargo install tauri-cli --version "^2" |
+ - Full featured assistant with:
+   - persistent profiles and avatars,
+   - saved chat sessions and session history,
+   - approval-gated tool calls and replayable tool traces,
+   - TTS playback and voice synthesis management.
+ - `Bonsai Buddy` — detachable assistant window controlled via Tools → Bonsai Buddy or `toggle_assistant_window` Tauri command.
 
-Platform dependencies:
+ ### BonsaiBot (Messaging Bot)
 
-- Windows: Visual Studio Build Tools (Desktop development with C++) and WebView2 runtime.
-- macOS: xcode-select --install.
-- Ubuntu/Debian: webkit2gtk, gtk3, sqlite3, ssl, audio and build dependencies.
+ - A small server (`bonsai-bot`) that provides an admin API for messaging integrations and automation.
+ - Implements platform adapters (Discord, Telegram, Matrix, Email) and exposes tests and configuration via the app Settings.
+ - Port discovery and token storage use OS keyring and a persisted port probe file (`bonsai-bot-port.json`).
+ - See `bonsai-bot/MAIL_SERVER_PROD_PLAN.md` for the mail server rollout plan and integration notes.
 
-## Core Architecture
+ ### Multi-Agent Swarm, Agent Vision & Agent Connect
 
-Project layout:
+ - Persona and agent config CRUD for multi-agent workflows.
+ - Leader/worker orchestration with runtime controls, token streaming, and debug event emission.
+ - `Agent Vision` for image/video analysis workflows and `Agent Connect` for remote session orchestration.
 
-- src-tauri: Rust backend, command handlers, model orchestration, PTY management, API server, persistence.
-- src: Svelte frontend, stores, Monaco integration, chat/terminal/settings UX.
+ ### Mobile Tooling & Android USB Lab
 
-Key systems:
+ - `Android USB Lab` provides a guided readiness flow: detect device, check authorization, configure reverse port, install APKs, bootstrap connection, and run regression suites.
+ - `Mobile Viewer` uses `scrcpy` (when available) to mirror and control a connected Android device; when scrcpy is missing the UI lists candidate executable paths resolved by the backend to aid troubleshooting.
+ - Remote Surface: a web-accessible frame + input endpoints for device streaming and input routing.
 
-- Command broker: Tauri command layer for editor, file system, git, terminal, remote, agent, and swarm operations.
-- Tool-call loop: assistant emits tool calls, app executes with HITL approval where required, returns tool results into chat context.
-- PTY sessions: per-tab shell sessions for integrated terminal tabs.
-- Activity log: structured diagnostic stream from tool use, swarm events, permission requests, and runtime errors.
-- Swarm orchestrator: leader plans subtasks, workers execute in parallel/sequential mode, leader synthesizes final output.
+ Requirements for Android workflows: `adb` (Android platform tools) and, for screen mirroring, `scrcpy` installed on the host.
 
-## Major Features
+ ### Model Orchestration & Sidecars
 
-### Editor and Explorer
+ - Local model orchestration for `llama-server` style backends and optional whisper/tts sidecars.
+ - Sidecar binaries live under `src-tauri/binaries` when present (platform-suffixed); models are stored in the platform data directory.
+ - The app can operate in degraded mode without any sidecars for editing and orchestration tasks.
 
-- File tree with open folder, filter, refresh, quick create file/folder, and context menu create actions.
-- File-type detection and icon mapping for known extensions and special filenames.
-- Monaco editor with:
-  - language auto-detection from path,
-  - auto-save,
-  - diff hunk accept/reject overlays,
-  - Ask Bonsai context actions,
-  - inline completions.
+ ### Terminal, PTY & Activity Log
 
-### Tooling Profiles in Editor
+ - Multi-tab PTY terminal sessions with an Activity Log tab that streams app events, tool-call traces, and diagnostics.
 
-- Per-language tooling profiles (web, python, rust, powershell, shell, config, docs, data, generic).
-- One-click actions from editor header:
-  - Load Tools
-  - Lint
-  - Format
-  - Test
-- Commands are profile-configurable and persisted locally.
-- Placeholder support in command templates:
-  - {file}
-  - {dir}
-  - {workspace}
+ ### Settings, Secrets & Security
 
-### Chat and Agent Runtime
+ - Settings panel supports API host/port configuration, bot platform secrets, and keyring-backed credential storage.
+ - `assistant_commands` expose Tauri calls for SMTP secrets (`set_smtp_credentials`, `has_smtp_credentials`, `clear_smtp_credentials`).
 
-- Streaming chat with token-speed telemetry.
-- Approval cards for sensitive operations.
-- File-aware diff previews and patch apply controls.
-- System-info hardening for RAM/spec requests:
-  - deterministic tool-call enforcement,
-  - fallback to approval request if model does not emit valid call.
+ ## Running & Testing
 
-### Multi-Agent Swarm
+ Run the backend bot for local integration tests:
 
-- Persona CRUD and agent slot configuration.
-- Leader/worker orchestration with runtime controls:
-  - planning requirement,
-  - worker tool access,
-  - parallel workers,
-  - retries/timeouts,
-  - synthesis style,
-  - token streaming,
-  - debug event emission.
-- RAM safety gate before swarm execution.
+ ```powershell
+ cd bonsai-bot
+ cargo run --release   # or run the built binary in target/release
+ # admin API listens on 127.0.0.1:11424 by default
+ ```
 
-### Terminal and Diagnostics
+ Start the desktop app (recommended from the `bonsai-workspace` root so Tauri finds `src-tauri/tauri.conf.json`):
 
-- Multi-tab shell terminal sessions.
-- First tab is Activity Log with:
-  - live event ingestion,
-  - filter/search,
-  - dedupe and max retention,
-  - compact mode,
-  - copy/save/clear.
+ ```powershell
+ cd Z:\Projects\BonsaiWorkspace\bonsai-workspace
+ npx tauri dev
+ ```
 
-### Settings, Remote, Mobile, USB
+ Mobile/USB smoke tests:
 
-- API host/port settings with save/test/copy endpoint controls.
-- Remote session lifecycle and preview hooks.
-- Mobile QR pairing, saved connection verification, evidence records.
-- Android USB Lab for readiness, install/launch, reverse/bridge, full regression, and ledger append helpers.
+ ```bash
+ # in separate shell
+ cd bonsai-workspace/src
+ npm run test:android-usb-regression
+ ```
 
-## AI Sidecar Setup (Optional in Dev)
+ ## Docs & Where to Look
 
-Bonsai can run without sidecars in development. For local inference/voice features, add sidecar binaries.
+ - User-facing guides: `bonsai-workspace/user_manual.md` and `bonsai-workspace/launcher_manual.md`.
+ - Developer notes: `Runner-Streaming_System.md`, `Cluster-Orchestrator-Design.md`, `Multi-Agent_Swarm.md`.
+ - Mail server plan: `bonsai-bot/MAIL_SERVER_PROD_PLAN.md`.
 
-Expected binaries in src-tauri/binaries are platform-suffixed (for example x86_64-pc-windows-msvc.exe variants).
+ ## Contributing
 
-Download sources:
+ Please open PRs against `main` and follow the repository's CI checks. See `.github/workflows` for CI details.
 
-- llama.cpp releases for llama-server
-- whisper.cpp releases for server (renamed to whisper-server)
+ ---
 
-Model location examples:
-
-- Windows: %APPDATA%/bonsai-workspace/models
-- macOS: ~/Library/Application Support/bonsai-workspace/models
-
-## API and Test Automation
-
-From src:
-
-```bash
-npm run test:agent-api
-npm run test:agent-ui-hitl
-npm run test:agent-ui-live-orchestrated
-npm run test:agent-orchestrated
-npm run test:agent-routing-ci
-npm run test:bonsai-live-testing-feature
-npm run test:bonsai-live-testing-feature:headless
-npm run test:android-usb-regression
-```
-
-Artifacts:
-
-- Launcher report: tool_test/launcher/latest.json
-- USB regression report: tool_test/android-usb-regression/latest.json
-
-## Build for Distribution
-
-```bash
-cd src-tauri
-cargo tauri build
-```
-
-Installers are produced under src-tauri/target/release/bundle.
-
-## Documentation
-
-- End-user guide: user_manual.md
-- Workspace orchestration notes: Multi-Agent_Swarm.md
-- Runner and evidence details: Runner-Streaming_System.md
-
-## Troubleshooting Highlights
-
-- If launch reports exit code 1 but output shows API healthy and running, verify whether the launcher process was interrupted versus app failure.
-- If API settings save fails, verify host is non-empty and port is 1..65535.
-- If tool output seems missing, switch to terminal shell tabs or Activity Log for routed output visibility.
-- If swarm run is denied for memory, reduce enabled workers or select smaller models.
+ If you'd like, I can also add a short quickstart README specifically for contributors (dev-only steps and checks). Would you like that next?
 
