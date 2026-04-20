@@ -74,11 +74,19 @@ async fn main() {
     // Channels
     let (tx, mut rx) = mpsc::channel::<InboundMessage>(cfg.backpressure.inbound_queue_capacity);
     let (shed_tx, mut shed_rx) = mpsc::channel::<ShedNotice>(64);
+    let (broadcast_tx, mut broadcast_rx) = mpsc::channel::<admin_api::BroadcastRequest>(64);
 
     // Admin API
-    let admin = admin_api::start(cfg.admin_port, metrics.clone(), platform_states.clone(), admin_token)
-        .await
-        .expect("admin API startup");
+    let admin = admin_api::start(
+        cfg.admin_port,
+        metrics.clone(),
+        platform_states.clone(),
+        db.clone(),
+        broadcast_tx,
+        admin_token,
+    )
+    .await
+    .expect("admin API startup");
     tracing::info!("[bonsai-bot] Admin API on port {}", admin.port);
 
     // Platform tasks
@@ -181,6 +189,20 @@ async fn main() {
                 ticker.tick().await;
                 session::purge_expired_confirms(&db2).await;
                 session::cleanup_stale(&db2).await;
+            }
+        });
+    }
+
+    // Broadcast task: forward admin /broadcast messages to each target platform
+    {
+        let plats2 = platforms.clone();
+        tokio::spawn(async move {
+            while let Some(req) = broadcast_rx.recv().await {
+                for plat in plats2.iter() {
+                    if req.platforms.is_empty() || req.platforms.contains(&plat.name().to_string()) {
+                        let _ = plat.send_reply("", "", &req.message, None).await;
+                    }
+                }
             }
         });
     }

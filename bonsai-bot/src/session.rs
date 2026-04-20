@@ -110,6 +110,29 @@ pub async fn touch_session(db: &Db, platform: String, user_id: String, chat_id: 
     .await;
 }
 
+pub async fn list_active_sessions(db: &Db) -> Vec<serde_json::Value> {
+    db.call(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT platform, platform_user_id, platform_chat_id, display_name, last_active
+             FROM bot_sessions WHERE is_archived = 0 ORDER BY last_active DESC LIMIT 200"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(serde_json::json!({
+                "platform":      row.get::<_, String>(0)?,
+                "user_id":       row.get::<_, String>(1)?,
+                "chat_id":       row.get::<_, String>(2)?,
+                "display_name":  row.get::<_, Option<String>>(3)?,
+                "last_active":   row.get::<_, i64>(4)?,
+            }))
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+        Ok(rows)
+    })
+    .await
+    .unwrap_or_default()
+}
+
 pub async fn cleanup_stale(db: &Db) {
     let now = now_secs();
     let soft = now - 30 * 86400;
