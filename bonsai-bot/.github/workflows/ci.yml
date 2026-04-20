@@ -62,6 +62,36 @@ jobs:
         working-directory: bonsai-bot
         run: cargo fmt --check
 
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bonsai-bot
+      - name: cargo clippy --features default
+        working-directory: bonsai-bot
+        run: cargo clippy --features default -- -D warnings
+
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bonsai-bot
+      - name: cargo test --features default
+        working-directory: bonsai-bot
+        run: cargo test --features default
+
   audit:
     name: cargo audit
     runs-on: ubuntu-latest

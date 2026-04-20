@@ -8,20 +8,30 @@ use axum::{
 };
 use dashmap::DashMap;
 use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::config::keyring_set;
 use crate::metrics::SharedMetrics;
+use crate::session::Db;
 
 /// Per-platform connection state, written by platform adapters, read by /status.
 pub type PlatformStates = Arc<DashMap<String, String>>;
+
+/// A broadcast request forwarded from the admin API to the main dispatch loop.
+#[derive(Debug, Clone)]
+pub struct BroadcastRequest {
+    pub message:   String,
+    pub platforms: Vec<String>,
+}
 
 #[derive(Clone)]
 pub struct AdminState {
     pub metrics:         SharedMetrics,
     pub platform_states: PlatformStates,
+    pub db:              Db,
+    pub broadcast_tx:    mpsc::Sender<BroadcastRequest>,
     /// In-memory token, wrapped for atomic rotation without restart.
     pub admin_token:     Arc<RwLock<String>>,
 }
@@ -52,6 +62,8 @@ pub async fn start(
     preferred_port:  u16,
     metrics:         SharedMetrics,
     platform_states: PlatformStates,
+    db:              Db,
+    broadcast_tx:    mpsc::Sender<BroadcastRequest>,
     admin_token:     String,
 ) -> Result<AdminHandle, String> {
     let mut bound = None;
@@ -68,6 +80,8 @@ pub async fn start(
     let state = AdminState {
         metrics,
         platform_states,
+        db,
+        broadcast_tx,
         admin_token: Arc::new(RwLock::new(admin_token)),
     };
 
@@ -79,6 +93,8 @@ pub async fn start(
     let app = Router::new()
         .route("/health",                    get(health))
         .route("/status",                    get(status))
+        .route("/sessions",                  get(sessions_handler))
+        .route("/broadcast",                 post(broadcast_handler))
         .route("/metrics",                   get(metrics_handler))
         .route("/config/reload",             post(config_reload))
         .route("/config/rotate-admin-token", post(rotate_token))
@@ -176,5 +192,44 @@ async fn rotate_token(
             Json(json!({ "status": "rotated" })).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e}))).into_response(),
+    }
+}
+
+async fn sessions_handler(
+    State(s): State<AdminState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if !check_auth(&headers, &s) {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+    }
+    let sessions = crate::session::list_active_sessions(&s.db).await;
+    Json(json!({ "sessions": sessions })).into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct BroadcastBody {
+    message:   String,
+    #[serde(default)]
+    platforms: Vec<String>,
+}
+
+async fn broadcast_handler(
+    State(s): State<AdminState>,
+    headers: HeaderMap,
+    Json(body): Json<BroadcastBody>,
+) -> impl IntoResponse {
+    if !check_auth(&headers, &s) {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+    }
+    if body.message.is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": "message is required"}))).into_response();
+    }
+    let req = BroadcastRequest {
+        message:   body.message,
+        platforms: body.platforms,
+    };
+    match s.broadcast_tx.try_send(req) {
+        Ok(()) => Json(json!({ "status": "queued" })).into_response(),
+        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"error": "broadcast queue full"}))).into_response(),
     }
 }

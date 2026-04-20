@@ -57,17 +57,22 @@ impl Router {
         msg: InboundMessage,
         platform: &Arc<dyn MessagingPlatform>,
     ) {
+        let req_id = uuid::Uuid::new_v4();
+
         // Stage 1: Dedup
         if self.dedup.is_duplicate(&msg.platform, &msg.event_id) {
             self.metrics.dedup_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            tracing::debug!(req_id=%req_id, platform=%msg.platform, event_id=%msg.event_id, "dedup hit");
             return;
         }
+
+        tracing::info!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, event=%msg.event_id, "inbound");
 
         // Stage 3: Rate limit (token bucket — 10 msgs/min per platform:user)
         let rate_key = format!("{}:{}", msg.platform, msg.user_id);
         if self.rate_limiter_for(&rate_key).check().is_err() {
             self.metrics.rate_limit_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            tracing::warn!("[router] Rate limited platform={} user={}", msg.platform, msg.user_id);
+            tracing::warn!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, "rate limited");
             let _ = platform.send_reply(
                 &msg.platform_id, &msg.user_id,
                 "⏳ Rate limit exceeded. Please wait before sending more messages.",
@@ -80,7 +85,7 @@ impl Router {
         let clean_text = match sanitize(&msg.text, &self.metrics) {
             Ok(t) => t,
             Err(e) => {
-                tracing::warn!("[router] Sanitize rejected ({e}) platform={} user={}", msg.platform, msg.user_id);
+                tracing::warn!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, reason=%e, "sanitize rejected");
                 let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
                     "⚠️ Your message could not be processed safely.", msg.reply_to.as_deref()).await;
                 return;
@@ -128,9 +133,11 @@ impl Router {
             "_bonsai_session": buddy_session,
         })];
 
+        tracing::debug!(req_id=%req_id, "calling buddy");
         let response = match self.buddy.chat(BuddyClient::build_request(messages, None)).await {
             Ok(v) => v,
             Err(e) => {
+                tracing::warn!(req_id=%req_id, error=%e, "buddy call failed");
                 let reply = if e == "circuit_open" {
                     "⚠️ Bonsai is currently unavailable. Try again shortly."
                 } else {
@@ -146,6 +153,7 @@ impl Router {
         if finish_reason == "tool_calls_pending_approval" {
             if let Some(ext) = response.get("bonsai_ext") {
                 if ext.get("type").and_then(|v| v.as_str()) == Some("confirm_required") {
+                    tracing::info!(req_id=%req_id, "confirm gate triggered");
                     self.handle_confirm(ext, &msg, platform).await;
                     return;
                 }
@@ -157,6 +165,7 @@ impl Router {
             .as_str()
             .unwrap_or("(no response)");
 
+        tracing::info!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, "reply sent");
         let _ = platform.send_reply(&msg.platform_id, &msg.user_id, reply_text, msg.reply_to.as_deref()).await;
 
         session::touch_session(&self.db, msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone()).await;
