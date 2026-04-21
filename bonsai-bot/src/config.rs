@@ -14,6 +14,10 @@ pub struct BotConfig {
     #[serde(default)]
     pub reclaim_allowed_ports: Vec<u16>,
     #[serde(default)]
+    pub allowed_script_paths: Vec<String>,
+    #[serde(default)]
+    pub runtime_limits: RuntimeLimits,
+    #[serde(default)]
     pub db_path: String,
     #[serde(default)]
     pub discord: PlatformSlot<DiscordConfig>,
@@ -27,6 +31,20 @@ pub struct BotConfig {
     pub backpressure: BackpressureConfig,
     #[serde(default)]
     pub circuit_breaker: CircuitBreakerConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RuntimeLimits {
+    #[serde(default)]
+    pub max_runtime_secs: Option<u64>,
+    #[serde(default)]
+    pub max_instances_per_user: Option<u32>,
+}
+
+impl Default for RuntimeLimits {
+    fn default() -> Self {
+        Self { max_runtime_secs: None, max_instances_per_user: None }
+    }
 }
 
 fn default_schema_version() -> u8 { 1 }

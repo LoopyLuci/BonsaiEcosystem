@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
 use tokio::process::Command;
+use tokio::time::Duration;
 use tower_http::cors::{Any, CorsLayer};
 use sha2::Digest;
 use std::path::PathBuf;
@@ -43,8 +44,21 @@ pub struct AdminState {
     pub admin_token:     Arc<RwLock<String>>,
     /// Allowed ports for reclaim operations. Empty means no ports allowed by default.
     pub reclaim_allowed_ports: Vec<u16>,
+    /// Allowed script path prefixes for runtime start requests. Empty -> fallback allowlist.
+    pub allowed_script_paths: Vec<String>,
+    /// Per-runtime limits (timeout, per-user concurrency, etc.)
+    pub runtime_limits: crate::config::RuntimeLimits,
     /// Spawned runtime child processes keyed by generated id.
-    pub runtime_children: Arc<Mutex<HashMap<String, tokio::process::Child>>>,
+    pub runtime_children: Arc<Mutex<HashMap<String, RuntimeInfo>>>,
+}
+
+#[derive(Debug)]
+struct RuntimeInfo {
+    child: tokio::process::Child,
+    user: Option<String>,
+    script: String,
+    started_at: chrono::DateTime<chrono::Utc>,
+    timeout_secs: Option<u64>,
 }
 
 pub struct AdminHandle {
@@ -122,6 +136,8 @@ pub async fn start(
         broadcast_tx,
         admin_token: Arc::new(RwLock::new(admin_token)),
         reclaim_allowed_ports: cfg.reclaim_allowed_ports.clone(),
+        allowed_script_paths: cfg.allowed_script_paths.clone(),
+        runtime_limits: cfg.runtime_limits.clone(),
         runtime_children: Arc::new(Mutex::new(HashMap::new())),
     };
 
@@ -298,6 +314,10 @@ struct StartRuntimeRequest {
     kind: String,
     script: String,
     port: Option<u16>,
+    #[serde(default)]
+    user: Option<String>,
+    #[serde(default)]
+    timeout_secs: Option<u64>,
 }
 
 #[derive(serde::Deserialize)]
@@ -314,14 +334,71 @@ async fn start_runtime(
         return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
     }
 
+    // Resolve script path and enforce allowed-script-paths policy.
+    let script_candidate = PathBuf::from(&body.script);
+    let script_abs = if script_candidate.is_absolute() {
+        script_candidate
+    } else {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join(script_candidate)
+    };
+    let script_canon = script_abs.canonicalize().unwrap_or(script_abs.clone());
+
+    // Build allowed base paths list (from config or fallback locations)
+    let mut allowed_bases: Vec<PathBuf> = Vec::new();
+    if !s.allowed_script_paths.is_empty() {
+        for p in s.allowed_script_paths.iter() {
+            let pb = PathBuf::from(p);
+            let canon = pb.canonicalize().unwrap_or(pb);
+            allowed_bases.push(canon);
+        }
+    } else {
+        if let Ok(cwd) = std::env::current_dir() { allowed_bases.push(cwd.join("runtimes")); }
+        if let Ok(exe) = std::env::current_exe() { if let Some(p) = exe.parent() { allowed_bases.push(p.join("runtimes")); } }
+    }
+
+    let mut allowed = false;
+    for base in allowed_bases.iter() {
+        if script_canon.starts_with(base) {
+            allowed = true;
+            break;
+        }
+    }
+    if !allowed {
+        return (StatusCode::FORBIDDEN, Json(json!({"error": "script path not allowed"}))).into_response();
+    }
+
+    // Enforce per-user concurrency limit (if present)
+    if let Some(user) = &body.user {
+        if let Some(max) = s.runtime_limits.max_instances_per_user {
+            let map = s.runtime_children.lock().await;
+            let count = map.values().filter(|info| info.user.as_deref() == Some(user.as_str())).count();
+            if (count as u32) >= max {
+                return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "user runtime limit reached"}))).into_response();
+            }
+        }
+    }
+
+    // Enforce timeout limit if provided
+    let timeout = match body.timeout_secs {
+        Some(t) => {
+            if let Some(max) = s.runtime_limits.max_runtime_secs {
+                if t > max {
+                    return (StatusCode::BAD_REQUEST, Json(json!({"error": "requested timeout exceeds configured maximum"}))).into_response();
+                }
+            }
+            Some(t)
+        }
+        None => s.runtime_limits.max_runtime_secs,
+    };
+
     let id = uuid::Uuid::new_v4().to_string();
     let rm = bonsai_runtime::RuntimeManager::new();
     let child_res = match body.kind.as_str() {
         "python" => {
             let port = body.port.unwrap_or(0);
-            rm.start_python_worker(&body.script, port).await
+            rm.start_python_worker(&script_canon.to_string_lossy(), port).await
         }
-        "babashka" => rm.start_babashka_worker(&body.script).await,
+        "babashka" => rm.start_babashka_worker(&script_canon.to_string_lossy()).await,
         _ => return (StatusCode::BAD_REQUEST, Json(json!({"error": "unknown runtime kind"}))).into_response(),
     };
 
@@ -331,8 +408,30 @@ async fn start_runtime(
             // store child for lifecycle management
             {
                 let mut map = s.runtime_children.lock().await;
-                map.insert(id.clone(), child);
+                map.insert(id.clone(), RuntimeInfo {
+                    child,
+                    user: body.user.clone(),
+                    script: script_canon.to_string_lossy().into_owned(),
+                    started_at: chrono::Utc::now(),
+                    timeout_secs: timeout,
+                });
             }
+
+            // If timeout was requested, spawn a monitor that will kill the runtime after timeout
+            if let Some(tsec) = timeout {
+                let children_map = s.runtime_children.clone();
+                let id_clone = id.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(tsec)).await;
+                    let mut map = children_map.lock().await;
+                    if let Some(mut info) = map.remove(&id_clone) {
+                        let _ = info.child.kill().await;
+                        let _ = info.child.wait().await;
+                        let _ = write_admin_audit("runtime_timeout", None, &json!({"id": id_clone}));
+                    }
+                });
+            }
+
             Json(json!({ "id": id, "pid": pid })).into_response()
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
@@ -348,13 +447,13 @@ async fn stop_runtime(
         return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
     }
     let mut map = s.runtime_children.lock().await;
-    if let Some(mut child) = map.remove(&body.id) {
+    if let Some(mut info) = map.remove(&body.id) {
         // attempt graceful kill
-        if let Err(e) = child.kill().await {
+        if let Err(e) = info.child.kill().await {
             return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("kill failed: {}", e)}))).into_response();
         }
         // wait for exit
-        match child.wait().await {
+        match info.child.wait().await {
             Ok(status) => Json(json!({"ok": true, "code": status.code()})).into_response(),
             Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
         }
@@ -372,9 +471,9 @@ async fn list_runtimes(
     }
     let map = s.runtime_children.lock().await;
     let mut out = Vec::new();
-    for (id, child) in map.iter() {
-        let pid = child.id().unwrap_or(0);
-        out.push(json!({"id": id, "pid": pid}));
+    for (id, info) in map.iter() {
+        let pid = info.child.id().unwrap_or(0);
+        out.push(json!({"id": id, "pid": pid, "user": info.user, "script": info.script, "started_at": info.started_at.to_rfc3339()}));
     }
     Json(json!({"runtimes": out})).into_response()
 }

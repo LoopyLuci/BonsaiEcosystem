@@ -51,3 +51,6 @@ async-native-tls = { version = "0.5", optional = true }
 [[bin]]
 name = "bonsai-bot"
 path = "src/main.rs"
+
+[dev-dependencies]
+which = "4"
