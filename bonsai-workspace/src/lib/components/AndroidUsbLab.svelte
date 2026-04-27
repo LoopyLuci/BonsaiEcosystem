@@ -277,7 +277,7 @@
 
       <div class="form-group">
         <label>Package Name</label>
-        <input type="text" bind:value={usbPackageName} placeholder="com.bonsai.workspace" />
+        <input type="text" data-bonsai-action="AndroidUsbLab:PackageName" style="-webkit-app-region: no-drag;" bind:value={usbPackageName} placeholder="com.bonsai.workspace" />
       </div>
 
       <div class="action-grid usb-flow-grid">

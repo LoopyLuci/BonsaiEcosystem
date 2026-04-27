@@ -425,7 +425,7 @@
         <div class="top-strip">
           <label>
             Device
-            <select bind:value={selectedSerial} disabled={busy}>
+            <select data-bonsai-action="MobileView:SelectDevice" style="-webkit-app-region: no-drag;" bind:value={selectedSerial} disabled={busy}>
               <option value="">Select device</option>
               {#each devices as d}
                 <option value={d.serial}>{d.serial} ({d.state}{d.model ? ` - ${d.model}` : ''})</option>
