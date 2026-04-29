@@ -741,11 +741,11 @@
           <div class="persona-form">
             {#if personaError}<p class="error-msg">{personaError}</p>{/if}
             <div class="form-row">
-              <input class="emoji-input" type="text" maxlength="2" bind:value={editingPersona.icon_emoji} placeholder="🤖" />
-              <input class="color-swatch" type="color" bind:value={editingPersona.color} />
-              <input class="label-input" type="text" bind:value={editingPersona.name} placeholder="Persona name" />
+              <input class="emoji-input" type="text" maxlength="2" data-bonsai-action="Agents:EditPersonaEmoji" style="-webkit-app-region: no-drag;" bind:value={editingPersona.icon_emoji} placeholder="🤖" />
+              <input class="color-swatch" type="color" data-bonsai-action="Agents:EditPersonaColor" style="-webkit-app-region: no-drag;" bind:value={editingPersona.color} />
+              <input class="label-input" type="text" data-bonsai-action="Agents:EditPersonaName" style="-webkit-app-region: no-drag;" bind:value={editingPersona.name} placeholder="Persona name" />
             </div>
-            <select class="model-select full-width" bind:value={editingPersona.model_id}>
+            <select class="model-select full-width" data-bonsai-action="Agents:EditPersonaModel" style="-webkit-app-region: no-drag;" bind:value={editingPersona.model_id}>
               <option value={null}>Default model</option>
               {#each $availableModels as m}
                 <option value={m.id}>{m.name} ({m.ram_label})</option>
@@ -753,6 +753,8 @@
             </select>
             <textarea
               class="prompt-textarea"
+              data-bonsai-action="Agents:EditPersonaPrompt"
+              style="-webkit-app-region: no-drag;"
               bind:value={editingPersona.system_prompt}
               placeholder="System prompt for this persona…"
               rows="6"
@@ -788,6 +790,8 @@
           <label class="setting-field" title={settingHelp('chain_strategy')}>
             <span>Chain strategy</span>
             <select
+              data-bonsai-action="Agents:ChainStrategy"
+              style="-webkit-app-region: no-drag;"
               value={$swarmRuntimeSettings.chain_strategy}
               on:change={onChainStrategyChange}
               title={settingHelp('chain_strategy')}
@@ -802,6 +806,8 @@
             <span>Stop on first satisfactory worker</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:StopOnFirstSatisfactory"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.stop_on_first_satisfactory}
               on:change={(e) => updateSetting('stop_on_first_satisfactory', checked(e))}
               title={settingHelp('stop_on_first_satisfactory')}
@@ -811,6 +817,8 @@
             <span>Global satisfaction threshold (0-100)</span>
             <input
               type="number"
+              data-bonsai-action="Agents:SatisfactionThreshold"
+              style="-webkit-app-region: no-drag;"
               min="0"
               max="100"
               value={$swarmRuntimeSettings.satisfaction_threshold}
@@ -822,6 +830,8 @@
             <span>Preferred primary worker slot</span>
             <input
               type="number"
+              data-bonsai-action="Agents:PreferredPrimarySlot"
+              style="-webkit-app-region: no-drag;"
               min="1"
               max="24"
               value={$swarmRuntimeSettings.preferred_primary_slot}
@@ -833,6 +843,8 @@
             <span>Force all workers before decision</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:ForceAllWorkersBeforeDecision"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.force_all_workers_before_decision}
               on:change={(e) => updateSetting('force_all_workers_before_decision', checked(e))}
               title={settingHelp('force_all_workers_before_decision')}
@@ -841,6 +853,8 @@
           <label class="setting-field" title={settingHelp('heavy_work_delegate_mode')}>
             <span>Heavy work delegation mode</span>
             <select
+              data-bonsai-action="Agents:HeavyWorkDelegateMode"
+              style="-webkit-app-region: no-drag;"
               value={$swarmRuntimeSettings.heavy_work_delegate_mode}
               on:change={onHeavyDelegateModeChange}
               title={settingHelp('heavy_work_delegate_mode')}
@@ -854,6 +868,8 @@
             <span>Configured heavy worker slot</span>
             <input
               type="number"
+              data-bonsai-action="Agents:ConfiguredHeavyWorkerSlot"
+              style="-webkit-app-region: no-drag;"
               min="1"
               max="24"
               value={$swarmRuntimeSettings.configured_heavy_worker_slot}
@@ -865,6 +881,8 @@
             <span>Auto-fallback if delegate target is invalid</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:HeavyWorkDelegateAutoFallback"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.heavy_work_delegate_auto_fallback}
               on:change={(e) => updateSetting('heavy_work_delegate_auto_fallback', checked(e))}
               title={settingHelp('heavy_work_delegate_auto_fallback')}
@@ -874,6 +892,8 @@
             <span>Auto-repair delegate routing on agent state changes</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:AutoRepairDelegateRouting"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.auto_repair_delegate_routing}
               on:change={(e) => updateSetting('auto_repair_delegate_routing', checked(e))}
               title={settingHelp('auto_repair_delegate_routing')}
@@ -897,6 +917,8 @@
                 <span>Execution tier (lower runs first)</span>
                 <input
                   type="number"
+                  data-bonsai-action="Agents:PolicyExecutionTier"
+                  style="-webkit-app-region: no-drag;"
                   min="0"
                   max="32"
                   value={policy.execution_tier}
@@ -908,6 +930,8 @@
                 <span>Response weight (0-10)</span>
                 <input
                   type="number"
+                  data-bonsai-action="Agents:PolicyResponseWeight"
+                  style="-webkit-app-region: no-drag;"
                   min="0"
                   max="10"
                   value={policy.response_weight}
@@ -919,6 +943,8 @@
                 <span>Early-exit confidence threshold</span>
                 <input
                   type="number"
+                  data-bonsai-action="Agents:PolicyEarlyExitConfidenceThreshold"
+                  style="-webkit-app-region: no-drag;"
                   min="0"
                   max="100"
                   value={policy.early_exit_confidence_threshold}
@@ -930,6 +956,8 @@
                 <span>Always run this agent</span>
                 <input
                   type="checkbox"
+                  data-bonsai-action="Agents:PolicyAlwaysRun"
+                  style="-webkit-app-region: no-drag;"
                   checked={policy.always_run}
                   on:change={(e) => patchAgentChainPolicy(policy.slot_index, { always_run: checked(e) })}
                   title={settingHelp('always_run')}
@@ -939,6 +967,8 @@
                 <span>Can trigger early stop</span>
                 <input
                   type="checkbox"
+                  data-bonsai-action="Agents:PolicyCanBeEarlyExitGate"
+                  style="-webkit-app-region: no-drag;"
                   checked={policy.can_be_early_exit_gate}
                   on:change={(e) => patchAgentChainPolicy(policy.slot_index, { can_be_early_exit_gate: checked(e) })}
                   title={settingHelp('can_be_early_exit_gate')}
@@ -948,6 +978,8 @@
                 <span>Allowed for heavy work</span>
                 <input
                   type="checkbox"
+                  data-bonsai-action="Agents:PolicyAllowHeavyWork"
+                  style="-webkit-app-region: no-drag;"
                   checked={policy.allow_heavy_work}
                   on:change={(e) => patchAgentChainPolicy(policy.slot_index, { allow_heavy_work: checked(e) })}
                   title={settingHelp('allow_heavy_work')}
@@ -962,14 +994,16 @@
                   <p class="slot-warning">{countDisabledSelected(policy.can_review_from_slots)} selected slot(s) are currently disabled.</p>
                 {/if}
                 <div class="slot-presets" role="group" aria-label="Review slot presets">
-                  <button type="button" on:click={() => applySlotPreset(policy.slot_index, 'can_review_from_slots', 'all')}>All</button>
-                  <button type="button" on:click={() => applySlotPreset(policy.slot_index, 'can_review_from_slots', 'core')}>Core</button>
-                  <button type="button" on:click={() => applySlotPreset(policy.slot_index, 'can_review_from_slots', 'none')}>None</button>
+                  <button type="button" data-bonsai-action="Agents:PolicyReviewPresetAll" style="-webkit-app-region: no-drag;" on:click={() => applySlotPreset(policy.slot_index, 'can_review_from_slots', 'all')}>All</button>
+                  <button type="button" data-bonsai-action="Agents:PolicyReviewPresetCore" style="-webkit-app-region: no-drag;" on:click={() => applySlotPreset(policy.slot_index, 'can_review_from_slots', 'core')}>Core</button>
+                  <button type="button" data-bonsai-action="Agents:PolicyReviewPresetNone" style="-webkit-app-region: no-drag;" on:click={() => applySlotPreset(policy.slot_index, 'can_review_from_slots', 'none')}>None</button>
                 </div>
                 <div class="slot-chip-grid">
                   {#each availablePolicySlots as slot (slot)}
                     <button
                       type="button"
+                      data-bonsai-action="Agents:ToggleReviewSlot"
+                      style="-webkit-app-region: no-drag;"
                       class="slot-chip"
                       class:selected={policy.can_review_from_slots.includes(slot)}
                       class:disabled-selected={policy.can_review_from_slots.includes(slot) && isSlotDisabled(slot)}
@@ -989,15 +1023,17 @@
                   <p class="slot-warning">{countDisabledSelected(policy.can_delegate_to_slots)} selected slot(s) are currently disabled.</p>
                 {/if}
                 <div class="slot-presets" role="group" aria-label="Delegation slot presets">
-                  <button type="button" on:click={() => applySlotPreset(policy.slot_index, 'can_delegate_to_slots', 'all')}>All</button>
-                  <button type="button" on:click={() => applySlotPreset(policy.slot_index, 'can_delegate_to_slots', 'core')}>Core</button>
-                  <button type="button" on:click={() => applySlotPreset(policy.slot_index, 'can_delegate_to_slots', 'none')}>None</button>
+                  <button type="button" data-bonsai-action="Agents:PolicyDelegatePresetAll" style="-webkit-app-region: no-drag;" on:click={() => applySlotPreset(policy.slot_index, 'can_delegate_to_slots', 'all')}>All</button>
+                  <button type="button" data-bonsai-action="Agents:PolicyDelegatePresetCore" style="-webkit-app-region: no-drag;" on:click={() => applySlotPreset(policy.slot_index, 'can_delegate_to_slots', 'core')}>Core</button>
+                  <button type="button" data-bonsai-action="Agents:PolicyDelegatePresetNone" style="-webkit-app-region: no-drag;" on:click={() => applySlotPreset(policy.slot_index, 'can_delegate_to_slots', 'none')}>None</button>
                 </div>
                 <div class="slot-chip-grid">
                   {#each availablePolicySlots as slot (slot)}
                     {#if slot !== policy.slot_index}
                     <button
                       type="button"
+                      data-bonsai-action="Agents:ToggleDelegateSlot"
+                      style="-webkit-app-region: no-drag;"
                       class="slot-chip"
                       class:selected={policy.can_delegate_to_slots.includes(slot)}
                       class:disabled-selected={policy.can_delegate_to_slots.includes(slot) && isSlotDisabled(slot)}
@@ -1019,6 +1055,8 @@
             <span>Require leader planning before synthesis</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:LeaderPlanRequired"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.leader_plan_required}
               on:change={(e) => updateSetting('leader_plan_required', checked(e))}
               title={settingHelp('leader_plan_required')}
@@ -1028,6 +1066,8 @@
             <span>Allow workers to call tools</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:AllowWorkerTools"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.allow_worker_tools}
               on:change={(e) => updateSetting('allow_worker_tools', checked(e))}
               title={settingHelp('allow_worker_tools')}
@@ -1037,6 +1077,8 @@
             <span>Enable worker cross-review</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:EnableWorkerCrossReview"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.enable_worker_cross_review}
               on:change={(e) => updateSetting('enable_worker_cross_review', checked(e))}
               title={settingHelp('enable_worker_cross_review')}
@@ -1046,6 +1088,8 @@
             <span>Run workers in parallel</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:ParallelWorkers"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.parallel_workers}
               on:change={(e) => updateSetting('parallel_workers', checked(e))}
               title={settingHelp('parallel_workers')}
@@ -1055,6 +1099,8 @@
             <span>Include worker summaries in final synthesis</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:IncludeWorkerSummaries"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.include_worker_summaries}
               on:change={(e) => updateSetting('include_worker_summaries', checked(e))}
               title={settingHelp('include_worker_summaries')}
@@ -1064,6 +1110,8 @@
             <span>Retry failed workers once</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:RetryFailedWorkers"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.retry_failed_workers}
               on:change={(e) => updateSetting('retry_failed_workers', checked(e))}
               title={settingHelp('retry_failed_workers')}
@@ -1073,6 +1121,8 @@
             <span>Stream worker tokens live in chat</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:StreamWorkerTokens"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.stream_worker_tokens}
               on:change={(e) => updateSetting('stream_worker_tokens', checked(e))}
               title={settingHelp('stream_worker_tokens')}
@@ -1082,6 +1132,8 @@
             <span>Emit detailed swarm debug events</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:EmitDebugEvents"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.emit_debug_events}
               on:change={(e) => updateSetting('emit_debug_events', checked(e))}
               title={settingHelp('emit_debug_events')}
@@ -1091,6 +1143,8 @@
             <span>Include original prompt in worker context</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:IncludeOriginalPrompt"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.include_original_prompt_in_worker_context}
               on:change={(e) => updateSetting('include_original_prompt_in_worker_context', checked(e))}
               title={settingHelp('include_original_prompt_in_worker_context')}
@@ -1100,6 +1154,8 @@
             <span>Allow leader to execute worker-designated tasks</span>
             <input
               type="checkbox"
+              data-bonsai-action="Agents:AllowLeaderAsWorker"
+              style="-webkit-app-region: no-drag;"
               checked={$swarmRuntimeSettings.allow_leader_as_worker}
               on:change={(e) => updateSetting('allow_leader_as_worker', checked(e))}
               title={settingHelp('allow_leader_as_worker')}
@@ -1110,6 +1166,8 @@
             <span>Max worker subtasks per run</span>
             <input
               type="number"
+              data-bonsai-action="Agents:MaxWorkerSubtasks"
+              style="-webkit-app-region: no-drag;"
               min="1"
               max="24"
               value={$swarmRuntimeSettings.max_worker_subtasks}
@@ -1121,6 +1179,8 @@
             <span>Worker timeout (ms)</span>
             <input
               type="number"
+              data-bonsai-action="Agents:WorkerTimeoutMs"
+              style="-webkit-app-region: no-drag;"
               min="5000"
               max="600000"
               step="1000"
@@ -1133,6 +1193,8 @@
             <span>Max worker response chars</span>
             <input
               type="number"
+              data-bonsai-action="Agents:MaxWorkerResponseChars"
+              style="-webkit-app-region: no-drag;"
               min="400"
               max="50000"
               step="100"
@@ -1144,6 +1206,8 @@
           <label class="setting-field" title={settingHelp('synthesis_style')}>
             <span>Synthesis style</span>
             <select
+              data-bonsai-action="Agents:SynthesisStyle"
+              style="-webkit-app-region: no-drag;"
               value={$swarmRuntimeSettings.synthesis_style}
               on:change={(e) => updateSetting('synthesis_style', styleValue(e))}
               title={settingHelp('synthesis_style')}
@@ -1157,7 +1221,7 @@
         </div>
 
         <div class="settings-actions">
-          <button class="add-worker-btn" on:click={() => resetSwarmRuntimeSettings()}>Reset Defaults</button>
+          <button class="add-worker-btn" data-bonsai-action="Agents:ResetDefaults" style="-webkit-app-region: no-drag;" on:click={() => resetSwarmRuntimeSettings()}>Reset Defaults</button>
           <p class="settings-note">These settings are persisted locally and applied to all swarm runs.</p>
         </div>
 

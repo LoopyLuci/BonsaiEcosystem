@@ -288,6 +288,8 @@ Tracks events from:
 - Terminal output patterns
 - Unhandled runtime errors
 
+- UI actions: All interactive UI controls are annotated with `data-bonsai-action` (format "Area:Action") so user interactions are captured with structured labels in the Activity Log. Clickable controls in draggable titlebar regions are set to `-webkit-app-region: no-drag` to ensure they remain interactive.
+
 Controls:
 
 - Search
@@ -376,6 +378,12 @@ Status model:
 Strict mode:
 
 - Fails run if required app launch/install criteria are not met.
+
+### 10.6 Testing Toolkit & Server Auth
+
+- Testing Toolkit UI: the Testing Toolkit now includes a `Server auth token` field in its settings/run dialog. If the mobile automation server is configured to require token authentication, enter the token here to allow the UI to authenticate to the server.
+
+- Mobile automation server: the server supports optional token-based authentication; this allows lightweight access control for CI or shared runners. For security guidance (storage, rotation, and recommended policies) see `SECURITY.md`.
 
 ## 11) Agent Connect Panel
 
