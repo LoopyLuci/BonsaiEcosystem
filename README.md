@@ -97,7 +97,9 @@
  - `Mobile Viewer` uses `scrcpy` (when available) to mirror and control a connected Android device; when scrcpy is missing the UI lists candidate executable paths resolved by the backend to aid troubleshooting.
  - Remote Surface: a web-accessible frame + input endpoints for device streaming and input routing.
 
- Requirements for Android workflows: `adb` (Android platform tools) and, for screen mirroring, `scrcpy` installed on the host.
+- Mobile automation server: supports optional token-based authentication. The Testing Toolkit UI exposes a "Server auth token" field to supply the token when required; see `SECURITY.md` for recommended token storage and rotation practices.
+
+Requirements for Android workflows: `adb` (Android platform tools) and, for screen mirroring, `scrcpy` installed on the host.
 
  ### Model Orchestration & Sidecars
 
@@ -108,6 +110,8 @@
  ### Terminal, PTY & Activity Log
 
  - Multi-tab PTY terminal sessions with an Activity Log tab that streams app events, tool-call traces, and diagnostics.
+
+- Activity Log instrumentation: all interactive UI controls are annotated with `data-bonsai-action` (format "Area:Action") so user interactions are captured with structured labels. Clickable elements in draggable titlebar regions are set to `-webkit-app-region: no-drag` to preserve interactivity.
 
  ### Settings, Secrets & Security
 

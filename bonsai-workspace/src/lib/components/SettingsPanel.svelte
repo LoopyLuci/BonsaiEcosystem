@@ -1039,11 +1039,11 @@
       <h3 class="section-title">API Settings</h3>
       <div class="form-group">
         <label for="api-host">API Host</label>
-        <input id="api-host" type="text" bind:value={$apiHost} />
+        <input id="api-host" type="text" data-bonsai-action="Settings:ApiHost" style="-webkit-app-region: no-drag;" bind:value={$apiHost} />
       </div>
       <div class="form-group">
         <label for="api-port">API Port</label>
-        <input id="api-port" type="number" min="1" max="65535" bind:value={$apiPort} />
+        <input id="api-port" type="number" min="1" max="65535" data-bonsai-action="Settings:ApiPort" style="-webkit-app-region: no-drag;" bind:value={$apiPort} />
       </div>
       <div class="form-note">
         External agents can connect to the OpenAI-compatible endpoint shown here.
@@ -1363,16 +1363,16 @@
         </summary>
         <div class="bot-form">
           <label class="bot-label">Bot Token <span class="secret-hint">(write-only)</span>
-            <input class="bot-input" type="password" placeholder="Paste new token to update" bind:value={discordToken} autocomplete="off"/>
+            <input class="bot-input" type="password" data-bonsai-action="Settings:DiscordToken" style="-webkit-app-region: no-drag;" placeholder="Paste new token to update" bind:value={discordToken} autocomplete="off"/>
           </label>
           <label class="bot-label">Guild IDs (comma-separated, empty = any)
-            <input class="bot-input" type="text" placeholder="123456789012345678, ..." bind:value={discordGuildIds}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:DiscordGuildIds" style="-webkit-app-region: no-drag;" placeholder="123456789012345678, ..." bind:value={discordGuildIds}/>
           </label>
           <label class="bot-label">Channel IDs (comma-separated, empty = any)
-            <input class="bot-input" type="text" placeholder="optional" bind:value={discordChannelIds}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:DiscordChannelIds" style="-webkit-app-region: no-drag;" placeholder="optional" bind:value={discordChannelIds}/>
           </label>
           <label class="bot-label">User IDs (comma-separated, empty = any)
-            <input class="bot-input" type="text" placeholder="optional" bind:value={discordUserIds}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:DiscordUserIds" style="-webkit-app-region: no-drag;" placeholder="optional" bind:value={discordUserIds}/>
           </label>
           <button class="save-btn" on:click={saveDiscordConfig}>Save Discord</button>
         </div>
@@ -1390,10 +1390,10 @@
         </summary>
         <div class="bot-form">
           <label class="bot-label">Bot Token <span class="secret-hint">(write-only)</span>
-            <input class="bot-input" type="password" placeholder="Paste new token to update" bind:value={telegramToken} autocomplete="off"/>
+            <input class="bot-input" type="password" data-bonsai-action="Settings:TelegramToken" style="-webkit-app-region: no-drag;" placeholder="Paste new token to update" bind:value={telegramToken} autocomplete="off"/>
           </label>
           <label class="bot-label">Allowed Chat IDs (comma-separated)
-            <input class="bot-input" type="text" placeholder="-100123456789, ..." bind:value={telegramChatIds}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:TelegramChatIds" style="-webkit-app-region: no-drag;" placeholder="-100123456789, ..." bind:value={telegramChatIds}/>
           </label>
           <button class="save-btn" on:click={saveTelegramConfig}>Save Telegram</button>
         </div>
@@ -1411,34 +1411,34 @@
         </summary>
         <div class="bot-form">
           <label class="bot-label">IMAP Host
-            <input class="bot-input" type="text" placeholder="imap.gmail.com" bind:value={emailImapHost}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:EmailImapHost" style="-webkit-app-region: no-drag;" placeholder="imap.gmail.com" bind:value={emailImapHost}/>
           </label>
           <label class="bot-label">IMAP Port
-            <input class="bot-input" type="number" placeholder="993" bind:value={emailImapPort}/>
+            <input class="bot-input" type="number" data-bonsai-action="Settings:EmailImapPort" style="-webkit-app-region: no-drag;" placeholder="993" bind:value={emailImapPort}/>
           </label>
           <label class="bot-label">IMAP Username
-            <input class="bot-input" type="text" placeholder="you@gmail.com" bind:value={emailImapUsername}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:EmailImapUsername" style="-webkit-app-region: no-drag;" placeholder="you@gmail.com" bind:value={emailImapUsername}/>
           </label>
           <label class="bot-label">IMAP Password <span class="secret-hint">(write-only)</span>
-            <input class="bot-input" type="password" placeholder="Paste new password to update" bind:value={emailImapPassword} autocomplete="off"/>
+            <input class="bot-input" type="password" data-bonsai-action="Settings:EmailImapPassword" style="-webkit-app-region: no-drag;" placeholder="Paste new password to update" bind:value={emailImapPassword} autocomplete="off"/>
           </label>
           <label class="bot-label">SMTP Host
-            <input class="bot-input" type="text" placeholder="smtp.gmail.com" bind:value={emailSmtpHost}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:EmailSmtpHost" style="-webkit-app-region: no-drag;" placeholder="smtp.gmail.com" bind:value={emailSmtpHost}/>
           </label>
           <label class="bot-label">SMTP Username
-            <input class="bot-input" type="text" placeholder="you@gmail.com" bind:value={emailSmtpUsername}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:EmailSmtpUsername" style="-webkit-app-region: no-drag;" placeholder="you@gmail.com" bind:value={emailSmtpUsername}/>
           </label>
           <label class="bot-label">SMTP From
-            <input class="bot-input" type="text" placeholder="Bonsai &lt;you@gmail.com&gt;" bind:value={emailSmtpFrom}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:EmailSmtpFrom" style="-webkit-app-region: no-drag;" placeholder="Bonsai &lt;you@gmail.com&gt;" bind:value={emailSmtpFrom}/>
           </label>
           <label class="bot-label">SMTP Password <span class="secret-hint">(write-only)</span>
-            <input class="bot-input" type="password" placeholder="Paste new password to update" bind:value={emailSmtpPassword} autocomplete="off"/>
+            <input class="bot-input" type="password" data-bonsai-action="Settings:EmailSmtpPassword" style="-webkit-app-region: no-drag;" placeholder="Paste new password to update" bind:value={emailSmtpPassword} autocomplete="off"/>
           </label>
           <label class="bot-label">Subject Prefix
-            <input class="bot-input" type="text" placeholder="[BONSAI]" bind:value={emailSubjectPrefix}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:EmailSubjectPrefix" style="-webkit-app-region: no-drag;" placeholder="[BONSAI]" bind:value={emailSubjectPrefix}/>
           </label>
           <label class="bot-label">Allowed From Addresses (comma-separated)
-            <input class="bot-input" type="text" placeholder="alice@example.com, bob@example.com" bind:value={emailAllowedFrom}/>
+            <input class="bot-input" type="text" data-bonsai-action="Settings:EmailAllowedFrom" style="-webkit-app-region: no-drag;" placeholder="alice@example.com, bob@example.com" bind:value={emailAllowedFrom}/>
           </label>
           <button class="save-btn" on:click={saveEmailConfig}>Save Email</button>
         </div>
