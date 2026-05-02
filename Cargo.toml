@@ -1,0 +1,27 @@
+[workspace]
+members = [
+  "bonsai-bot",
+  "bonsai-runtime",
+  "bonsai-workspace/src-tauri",
+]
+resolver = "2"
+
+# Workspace-level dependency alignment: single libsqlite3-sys version prevents
+# native-link conflicts when all three crates are built together.
+[workspace.dependencies]
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+
+# Profiles must live in the workspace root; per-package profiles are ignored.
+[profile.release]
+opt-level     = 3
+lto           = true
+codegen-units = 1
+panic         = "abort"
+strip         = true
+
+[profile.ci-local]
+inherits      = "test"
+debug         = 0
+incremental   = true
+codegen-units = 16
+opt-level     = 0

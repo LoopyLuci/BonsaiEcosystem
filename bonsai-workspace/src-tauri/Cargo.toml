@@ -71,17 +71,3 @@ enigo        = "0.0.14"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-
-[profile.release]
-opt-level     = 3
-lto           = true
-codegen-units = 1
-panic         = "abort"
-strip         = true
-
-[profile.ci-local]
-inherits      = "test"
-debug         = 0
-incremental   = true
-codegen-units = 16
-opt-level     = 0
