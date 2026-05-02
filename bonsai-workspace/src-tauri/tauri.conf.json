@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "identifier": "com.bonsai.workspace",
   "build": {
-    "beforeDevCommand": "npm --prefix Z:\\Projects\\BonsaiWorkspace\\bonsai-workspace\\src run dev",
+    "beforeDevCommand": "npm --prefix Z:\\Projects\\BonsaiWorkspace\\bonsai-workspace\\src run dev:all",
     "beforeBuildCommand": "npm --prefix Z:\\Projects\\BonsaiWorkspace\\bonsai-workspace\\src run build",
     "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "../dist"

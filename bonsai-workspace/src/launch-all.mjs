@@ -66,6 +66,7 @@ function parseArgs(argv) {
     else if (a === '--wifi-host') cfg.wifiHost = String(argv[++i] || '').trim();
     else if (a === '--wifi-port') cfg.wifiPort = Number(argv[++i] || cfg.wifiPort);
     else if (a === '--allow-port-in-use') cfg.allowPortInUse = true;
+    else if (a === '--no-vite-check') cfg.noViteCheck = true;
     else if (a === '--no-install') cfg.noInstall = true;
     else if (a === '--no-attach-existing') cfg.attachExisting = false;
     else if (a === '--report-path') cfg.reportPath = String(argv[++i] || '').trim() || cfg.reportPath;
@@ -642,7 +643,7 @@ async function run() {
 
     ensureFrontendDeps(cfg);
 
-    if (!cfg.preflightOnly) {
+    if (!cfg.preflightOnly && !cfg.noViteCheck) {
       // Use netstat listener detection here because Vite can bind ::1 while
       // a 127.0.0.1 bind probe still succeeds, causing false "free" results.
       let uiPortBusy = isPortActivelyListening(DEFAULT_DEV_UI_PORT);
