@@ -3,6 +3,10 @@ import { svelte, vitePreprocess }    from '@sveltejs/vite-plugin-svelte';
 import monacoEditorPluginPkg         from 'vite-plugin-monaco-editor';
 import { resolve }                   from 'path';
 
+// Dev API proxy defaults (can be overridden with env vars)
+const API_HOST = process.env.VITE_API_HOST || process.env.BONSAI_API_HOST || '127.0.0.1';
+const API_PORT = process.env.VITE_API_PORT || process.env.BONSAI_API_PORT || '11369';
+
 // vite-plugin-monaco-editor ships as CJS; in an ESM Vite config its real
 // factory lives under .default rather than being the default export itself.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,6 +36,23 @@ export default defineConfig({
     watch: {
       // On Windows, watching inside WSL needs polling
       usePolling: process.platform === 'win32',
+    },
+    // Proxy API and WS requests to the local Bonsai API server to avoid CORS
+    proxy: {
+      '^/v1': {
+        target: `http://${API_HOST}:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
+      },
+      '^/api': {
+        target: `http://${API_HOST}:${API_PORT}`,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/ws': {
+        target: `ws://${API_HOST}:${API_PORT}`,
+        ws: true,
+      },
     },
   },
 

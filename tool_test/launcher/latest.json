@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "ts": "2026-04-19T15:01:26.325Z",
-  "finished_at": "2026-04-19T15:01:26.369Z",
-  "ok": true,
+  "ts": "2026-05-01T00:09:46.397Z",
+  "finished_at": "2026-05-01T00:12:47.319Z",
+  "ok": false,
   "mode": "desktop",
-  "preflight_only": true,
+  "preflight_only": false,
   "strict_app": false,
   "attached_existing_runtime": false,
-  "spawned_tauri": false,
-  "api_healthy": true,
+  "spawned_tauri": true,
+  "api_healthy": false,
   "usb_validation_ran": false,
   "usb_validation_ok": null,
   "remote_surface_smoke_ran": false,
@@ -18,9 +18,9 @@
   "phases": [
     {
       "name": "preflight",
-      "started_at": "2026-04-19T15:01:26.325Z",
-      "completed_at": "2026-04-19T15:01:26.369Z",
-      "duration_ms": 44,
+      "started_at": "2026-05-01T00:09:46.398Z",
+      "completed_at": "2026-05-01T00:09:46.436Z",
+      "duration_ms": 38,
       "ok": true,
       "details": {
         "versions": {
@@ -30,11 +30,31 @@
           "tauri": "tauri-cli 2.10.1"
         },
         "versions_source": "cache",
-        "api_port_free": false,
-        "api_healthy": true
+        "api_port_free": true,
+        "api_healthy": false
       },
       "error": null
+    },
+    {
+      "name": "spawn_tauri",
+      "started_at": "2026-05-01T00:09:46.699Z",
+      "completed_at": "2026-05-01T00:09:46.706Z",
+      "duration_ms": 7,
+      "ok": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "name": "wait_for_api_health",
+      "started_at": "2026-05-01T00:09:46.706Z",
+      "completed_at": "2026-05-01T00:12:47.319Z",
+      "duration_ms": 180613,
+      "ok": false,
+      "details": {
+        "timeout_ms": 180000
+      },
+      "error": "API did not become healthy within 180000ms."
     }
   ],
-  "error": null
+  "error": "API did not become healthy within 180000ms."
 }

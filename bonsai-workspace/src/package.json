@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "node ./scripts/dev-all.cjs",
     "build": "vite build",
     "check:bundle": "node ./scripts/check-bundle-size.mjs",
     "build:ci": "npm run build && npm run check:bundle",
