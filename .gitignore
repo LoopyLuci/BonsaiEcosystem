@@ -28,6 +28,8 @@ bonsai-bot/*.dll
 **/build-output.txt
 tool_test/**/latest.json
 tool_test/**/preflight.json
+tool_test/**/preflight-cache.json
+.bonsai-launcher.pid
 
 # OS / editor
 .DS_Store
