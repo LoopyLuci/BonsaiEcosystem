@@ -26,7 +26,7 @@ use reqwest::Client;
 use serde::Serialize;
 use serde_json::json;
 use sysinfo::System;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, oneshot, Mutex};
 
 use crate::bootstrap;
@@ -467,16 +467,29 @@ fn spawn_model(slot: &mut Slot, info: &ModelInfo, app: &AppHandle) {
 
     let dir      = exe.parent().unwrap_or(&exe).to_path_buf();
     let port_str = slot.port.to_string();
-    let ctx      = info.context_length.clamp(512, 8192).to_string();
+    let ctx      = info.context_length.clamp(512, 4096).to_string();
     let threads  = thread_count().to_string();
 
-    // If the llama-server binary name contains "vulkan" it was compiled with Vulkan
-    // support; offload all layers to GPU. Otherwise fall back to CPU-only.
+    // Offload to GPU when a discrete GPU is present or binary is Vulkan-linked.
+    // Use a conservative partial offload (20 layers) rather than -1 (all layers):
+    // some Vulkan drivers (notably AMD on Windows) reject the single large allocation
+    // that full-model offload requires, even with ample VRAM free. 20 layers allows
+    // llama_params_fit to auto-adjust upward safely.
     let exe_name = exe.file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_lowercase();
-    let n_gpu_layers = if exe_name.contains("vulkan") || has_discrete_gpu() { "-1" } else { "0" };
+    let n_gpu_layers = if exe_name.contains("vulkan") || has_discrete_gpu() { "20" } else { "0" };
+
+    // Pipe stderr to a per-slot log file so crash reasons are diagnosable.
+    let log_dir = app.path().app_log_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let stderr_log = log_dir.join(format!("llama-slot-{}.log", slot.index));
+    let stderr_file = std::fs::OpenOptions::new()
+        .create(true).write(true).truncate(true)
+        .open(&stderr_log)
+        .ok()
+        .map(std::process::Stdio::from)
+        .unwrap_or_else(std::process::Stdio::null);
 
     let mut cmd = std::process::Command::new(&exe);
     cmd.args([
@@ -490,7 +503,7 @@ fn spawn_model(slot: &mut Slot, info: &ModelInfo, app: &AppHandle) {
     ])
     .current_dir(&dir)
     .stdout(std::process::Stdio::null())
-    .stderr(std::process::Stdio::null());
+    .stderr(stderr_file);
 
     #[cfg(windows)] {
         use std::os::windows::process::CommandExt;
@@ -554,9 +567,21 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
             // Check if the process has exited unexpectedly
             if let Some(ref mut child) = slot.process {
                 if let Ok(Some(status)) = child.try_wait() {
+                    // Try to surface the last line of the slot's stderr log as the error.
+                    let log_dir = app.path().app_log_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                    let log_path = log_dir.join(format!("llama-slot-{}.log", slot.index));
+                    let detail = std::fs::read_to_string(&log_path)
+                        .ok()
+                        .and_then(|s| s.lines().filter(|l| !l.trim().is_empty()).last().map(|l| l.to_owned()))
+                        .unwrap_or_default();
+                    let error = if detail.is_empty() {
+                        format!("process exited with {status}")
+                    } else {
+                        format!("process exited with {status}: {detail}")
+                    };
                     slot.state = SlotState::Crashed {
                         model_id: model_id.clone(),
-                        error: format!("process exited with {status}"),
+                        error,
                     };
                     continue;
                 }

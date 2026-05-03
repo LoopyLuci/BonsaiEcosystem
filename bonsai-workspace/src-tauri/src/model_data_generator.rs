@@ -236,7 +236,8 @@ fn knowledge_base() -> HashMap<&'static str, KbEntry> {
             strengths:        &[Reasoning, Instruction, Multilingual, LongContext],
             tier:             ModelTier::Capable,
             tool_calling:     ToolCallingSupport::Basic,
-            prompt_format:    PromptFormat::Gemma,
+            // Gemma 4 uses the standard OpenAI messages format, not the legacy <start_of_turn> template
+            prompt_format:    PromptFormat::OpenAIMessages,
             json_mode:        true,
             extended_thinking: false,
             skill_affinities: &[
