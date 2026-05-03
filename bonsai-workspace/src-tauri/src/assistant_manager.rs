@@ -59,9 +59,22 @@ const TARGET_HINTS: &[&str] = &[
 const LIVE_DATA_HINTS: &[&str] = &[
     "current time", "time now", "date today", "weather", "forecast",
     "system cpu", "cpu usage", "memory usage", "ram usage", "disk usage", "system stats",
+    // system specs / hardware queries
+    "system spec", "system info", "system information", "hardware info", "hardware spec",
+    "my computer", "my machine", "computer spec", "machine spec", "os version",
+    "operating system", "processor info", "my specs", "disk space", "free space",
+    "how much ram", "how much memory", "how much disk", "what os", "what cpu",
+    "what are my", "tell me my", "show my system", "check my",
 ];
 
-const SYSTEM_STATS_HINTS: &[&str] = &["cpu", "memory", "ram", "system stats", "disk usage", "system usage"];
+const SYSTEM_STATS_HINTS: &[&str] = &[
+    "cpu", "memory", "ram", "system stats", "disk usage", "system usage",
+    "system spec", "system info", "system information", "hardware",
+    "my computer", "my machine", "operating system", "os version", "processor",
+    "my specs", "disk space", "free space", "how much ram", "how much memory",
+    "storage", "drives", "what os", "what cpu", "computer info", "machine info",
+    "what are my", "tell me my", "show my system",
+];
 const DATETIME_HINTS: &[&str] = &["time", "date", "clock", "what time", "today", "now"];
 const WEATHER_HINTS: &[&str] = &["weather", "forecast", "temperature", "rain", "wind", "humidity"];
 const FILE_READ_HINTS: &[&str] = &["read file", "open file", "show file", "file contents", "cat file"];
@@ -390,13 +403,49 @@ async fn try_model_independent_live_data_reply(
             Ok(v) => {
                 match tool_name {
                     "get_system_stats" => {
-                        format!(
-                            "Current system stats:\n- CPU: {}%\n- Memory: {} MB / {} MB ({}%)",
-                            v.get("cpu_usage_pct").and_then(|x| x.as_f64()).unwrap_or(0.0),
-                            v.get("memory_used_mb").and_then(|x| x.as_u64()).unwrap_or(0),
-                            v.get("memory_total_mb").and_then(|x| x.as_u64()).unwrap_or(0),
-                            v.get("memory_used_pct").and_then(|x| x.as_f64()).unwrap_or(0.0),
-                        )
+                        let os      = v.get("os_name").and_then(|x| x.as_str()).unwrap_or("Unknown OS");
+                        let os_ver  = v.get("os_version").and_then(|x| x.as_str()).unwrap_or("");
+                        let arch    = v.get("architecture").and_then(|x| x.as_str()).unwrap_or("");
+                        let host    = v.get("hostname").and_then(|x| x.as_str()).unwrap_or("");
+                        let cpu_mod = v.get("cpu_model").and_then(|x| x.as_str()).unwrap_or("Unknown CPU");
+                        let cpu_ph  = v.get("cpu_cores_physical").and_then(|x| x.as_u64()).unwrap_or(0);
+                        let cpu_lg  = v.get("cpu_cores_logical").and_then(|x| x.as_u64()).unwrap_or(0);
+                        let cpu_pct = v.get("cpu_usage_pct").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                        let mem_tot = v.get("memory_total_mb").and_then(|x| x.as_u64()).unwrap_or(0);
+                        let mem_use = v.get("memory_used_mb").and_then(|x| x.as_u64()).unwrap_or(0);
+                        let mem_pct = v.get("memory_used_pct").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                        let sw_tot  = v.get("swap_total_mb").and_then(|x| x.as_u64()).unwrap_or(0);
+                        let sw_use  = v.get("swap_used_mb").and_then(|x| x.as_u64()).unwrap_or(0);
+
+                        let mut s = format!(
+                            "**System specs for {}:**\n\n\
+                             **OS:** {} {} ({})\n\
+                             **CPU:** {} — {} physical / {} logical cores — {}% usage\n\
+                             **RAM:** {} MB / {} MB used ({}%)\n\
+                             **Swap:** {} MB / {} MB used",
+                            host, os, os_ver, arch,
+                            cpu_mod, cpu_ph, cpu_lg, cpu_pct,
+                            mem_use, mem_tot, mem_pct,
+                            sw_use, sw_tot,
+                        );
+
+                        if let Some(disks) = v.get("disks").and_then(|x| x.as_array()) {
+                            if !disks.is_empty() {
+                                s.push_str("\n**Storage:**");
+                                for d in disks {
+                                    let name  = d.get("name").and_then(|x| x.as_str()).unwrap_or("?");
+                                    let mount = d.get("mount").and_then(|x| x.as_str()).unwrap_or("?");
+                                    let tot   = d.get("total_gb").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                                    let avail = d.get("available_gb").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                                    let pct   = d.get("used_pct").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                                    s.push_str(&format!(
+                                        "\n  - {} ({}): {:.1} GB total, {:.1} GB free ({:.0}% used)",
+                                        name, mount, tot, avail, pct
+                                    ));
+                                }
+                            }
+                        }
+                        s
                     }
                     "get_datetime" => {
                         let dt = v.get("datetime").and_then(|x| x.as_str()).unwrap_or("unknown");
@@ -769,8 +818,9 @@ pub async fn run_assistant_turn(
             IntentMode::ClarifyFirst => Vec::new(),
         };
 
-        // Add always-inject tools only when tool calling is intended.
-        if !matches!(intent.mode, IntentMode::AnswerOnly | IntentMode::ClarifyFirst) {
+        // Add always-inject tools for all modes except ClarifyFirst; AnswerOnly still
+        // benefits from get_datetime/get_system_stats if the LLM decides to use them.
+        if !matches!(intent.mode, IntentMode::ClarifyFirst) {
             for name in ALWAYS_INJECT {
                 if !selected.contains(&name.to_string()) { selected.push(name.to_string()); }
             }
