@@ -29,10 +29,13 @@ export default defineConfig({
     },
   },
 
-  // Required for Tauri: no clearScreen spam, correct port
+  // Required for Tauri: no clearScreen spam, correct port.
+  // host must be 127.0.0.1 (IPv4) to match tauri.conf.json devUrl; Windows
+  // resolves bare "localhost" to ::1 (IPv6) which Tauri's probe cannot reach.
   server: {
     port:        1420,
     strictPort:  true,
+    host:        '127.0.0.1',
     watch: {
       // On Windows, watching inside WSL needs polling
       usePolling: process.platform === 'win32',
