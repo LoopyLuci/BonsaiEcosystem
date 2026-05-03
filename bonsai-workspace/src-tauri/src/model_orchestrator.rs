@@ -499,10 +499,15 @@ fn spawn_model(slot: &mut Slot, info: &ModelInfo, app: &AppHandle) {
         "--ctx-size", &ctx,
         "--threads", &threads,
         "--n-gpu-layers", n_gpu_layers,
-        // NOTE: do NOT pass --log-disable. Vulkan memory initialization on AMD
-        // behaves differently (and crashes) when llama-server's internal logging
-        // is suppressed. stderr is already redirected to llama-slot-N.log, so all
-        // output is captured without cluttering the terminal.
+        // Limit parallel slots to 1: the auto value (4) inflates compute-buffer
+        // allocations by 4× and can push AMD Vulkan over its contiguous-heap limit.
+        "--parallel", "1",
+        // Disable flash attention: for Gemma 4 on AMD Vulkan it triggers a 547 MB
+        // single-allocation for FA compute buffers which ErrorOutOfDeviceMemory.
+        // The non-FA path uses smaller scattered allocations that succeed.
+        "--flash-attn", "off",
+        // stderr is redirected to llama-slot-N.log — do NOT add --log-disable here,
+        // as it changes Vulkan init behavior and causes additional crashes on AMD.
     ])
     .current_dir(&dir)
     .stdout(std::process::Stdio::null())
