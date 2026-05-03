@@ -176,6 +176,34 @@ fn ensure_main_window_visible(main: &tauri::WebviewWindow) {
     let _ = main.set_focus();
 }
 
+/// Enforce a screen-relative minimum window size.
+/// If the persisted (or default) size is smaller than 75% of the monitor,
+/// resize to that target and re-center.  Floor: 1000 × 680 physical px.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn enforce_main_window_size(main: &tauri::WebviewWindow) {
+    let monitor = main
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| main.primary_monitor().ok().flatten());
+
+    let (target_w, target_h) = if let Some(mon) = monitor {
+        let ms = mon.size();
+        (
+            ((ms.width  as f64 * 0.75) as u32).max(1000),
+            ((ms.height as f64 * 0.75) as u32).max(680),
+        )
+    } else {
+        (1440, 900)
+    };
+
+    let current = main.outer_size().unwrap_or(PhysicalSize::new(0, 0));
+    if current.width < target_w || current.height < target_h {
+        let _ = main.set_size(Size::Physical(PhysicalSize::new(target_w, target_h)));
+        let _ = main.center();
+    }
+}
+
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn persist_main_window_state(app: &tauri::AppHandle, window: &Window) {
     if let Ok(mut cfg) = crate::config::load_config(app) {
@@ -325,6 +353,10 @@ pub fn run() {
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             restore_main_window_state(&app_handle, &api_config);
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            if let Some(main_win) = app_handle.get_webview_window("main") {
+                enforce_main_window_size(&main_win);
+            }
 
             // Respect explicit `BONSAI_API_PORT` environment override when present.
             // Otherwise, keep the persisted `api_port` (if non-zero). If the persisted
