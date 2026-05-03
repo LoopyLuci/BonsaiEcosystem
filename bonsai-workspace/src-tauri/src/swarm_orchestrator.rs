@@ -1,5 +1,5 @@
 use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,43 @@ pub struct SwarmResult {
     pub leader_plan:    Option<Value>,
     pub agent_results:  Vec<AgentOutput>,
     pub stats:          InferStats,
+}
+
+// ── Aggregated run metrics ────────────────────────────────────────────────────
+
+const METRICS_HISTORY_CAP: usize = 50;
+
+#[derive(Serialize, Clone)]
+pub struct SwarmRunRecord {
+    pub run_id:                  String,
+    pub chain_strategy:          String,
+    pub worker_count:            usize,
+    pub successful_workers:      usize,
+    pub total_prompt_tokens:     u32,
+    pub total_completion_tokens: u32,
+    pub total_time_ms:           u64,
+}
+
+fn metrics_store() -> &'static std::sync::Mutex<VecDeque<SwarmRunRecord>> {
+    static STORE: std::sync::OnceLock<std::sync::Mutex<VecDeque<SwarmRunRecord>>> =
+        std::sync::OnceLock::new();
+    STORE.get_or_init(|| std::sync::Mutex::new(VecDeque::new()))
+}
+
+pub fn recent_swarm_runs() -> Vec<SwarmRunRecord> {
+    metrics_store()
+        .lock()
+        .map(|g| g.iter().cloned().collect())
+        .unwrap_or_default()
+}
+
+fn record_swarm_run(record: SwarmRunRecord) {
+    if let Ok(mut g) = metrics_store().lock() {
+        if g.len() >= METRICS_HISTORY_CAP {
+            g.pop_front();
+        }
+        g.push_back(record);
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -1002,6 +1039,27 @@ async fn continue_swarm_with_plan(
         .iter()
         .partition(|o| !o.result.trim_start().starts_with("Error:") && !o.result.trim().is_empty());
 
+    // Conversation compression: if the total worker output exceeds the synthesis budget,
+    // truncate each worker result proportionally so the context fits one inference window.
+    const SYNTHESIS_CONTEXT_BUDGET: usize = 20_000;
+    let raw_worker_chars: usize = successful_outputs.iter().map(|o| o.result.len()).sum();
+    let n_successful = successful_outputs.len().max(1);
+    let per_worker_cap = if raw_worker_chars > SYNTHESIS_CONTEXT_BUDGET {
+        let cap = SYNTHESIS_CONTEXT_BUDGET / n_successful;
+        if runtime_settings.emit_debug_events {
+            let _ = app_handle.emit("swarm-debug", json!({
+                "run_id": &run_id,
+                "phase": "synthesis.context_compressed",
+                "raw_worker_chars": raw_worker_chars,
+                "budget": SYNTHESIS_CONTEXT_BUDGET,
+                "per_worker_cap": cap,
+            }));
+        }
+        cap
+    } else {
+        usize::MAX
+    };
+
     let synthesis_context = successful_outputs.iter()
         .map(|o| {
             let assessment_line = o.assessment.as_ref().map(|a| {
@@ -1010,10 +1068,16 @@ async fn continue_swarm_with_plan(
                 format!("\n> Self-assessment — confidence: {}%, evidence: [{}], gaps: [{}]", a.confidence as u32, sources, gaps)
             }).unwrap_or_default();
 
-            if runtime_settings.include_worker_summaries {
-                format!("### Worker {} result{}\n{}", o.slot_index, assessment_line, o.result)
+            let capped = if per_worker_cap < usize::MAX && o.result.len() > per_worker_cap {
+                truncate_at_semantic_boundary(&o.result, per_worker_cap)
             } else {
-                let summary = o.result.lines().take(3).collect::<Vec<_>>().join(" ");
+                o.result.clone()
+            };
+
+            if runtime_settings.include_worker_summaries {
+                format!("### Worker {} result{}\n{}", o.slot_index, assessment_line, capped)
+            } else {
+                let summary = capped.lines().take(3).collect::<Vec<_>>().join(" ");
                 format!("### Worker {} summary{}\n{}", o.slot_index, assessment_line, summary)
             }
         })
@@ -1049,19 +1113,21 @@ async fn continue_swarm_with_plan(
     );
 
     let synthesis_sys_prompt = synthesis_system_prompt(workspace_path.as_deref());
+
+    // Pass 1 — core reconciliation.
     let synthesis_ctx = vec![
-        json!({"role": "system", "content": synthesis_sys_prompt}),
-        json!({"role": "user",   "content": synthesis_user_msg}),
+        json!({"role": "system", "content": &synthesis_sys_prompt}),
+        json!({"role": "user",   "content": &synthesis_user_msg}),
     ];
 
-    let (synth_raw, synth_stats) = match run_agent_inference(
+    let (synth_raw, mut synth_stats) = match run_agent_inference(
         &*orchestrator,
         &app_handle,
         synthesis_ctx,
-        leader_agent_id,
+        leader_agent_id.clone(),
         leader_slot,
-        leader_model,
-        Some(leader_cancel),
+        leader_model.clone(),
+        Some(leader_cancel.clone()),
         true,
     ).await {
         Ok(v) => v,
@@ -1071,7 +1137,65 @@ async fn continue_swarm_with_plan(
         }
     };
 
-    let final_text = tools::strip_tool_calls(&strip_think_tags(&synth_raw));
+    let mut final_text = tools::strip_tool_calls(&strip_think_tags(&synth_raw));
+
+    // Pass 2 — gap-fill.  Triggered when workers flagged gaps, any had confidence < 60,
+    // or cross-review is enabled.  Keeps pass 1 result on failure or empty output.
+    let worker_has_gaps = successful_outputs.iter().any(|o| {
+        o.assessment.as_ref()
+            .map(|a| !a.gaps.is_empty() || a.confidence < 60.0)
+            .unwrap_or(false)
+    });
+    if (worker_has_gaps || runtime_settings.enable_worker_cross_review) && !final_text.is_empty() {
+        if runtime_settings.emit_debug_events {
+            let _ = app_handle.emit("swarm-debug", json!({
+                "run_id": &run_id,
+                "phase": "leader.synthesis.pass2.start",
+                "trigger": if worker_has_gaps { "worker_gaps_or_low_confidence" } else { "cross_review" },
+            }));
+        }
+
+        let pass2_ctx = vec![
+            json!({"role": "system",    "content": &synthesis_sys_prompt}),
+            json!({"role": "user",      "content": &synthesis_user_msg}),
+            json!({"role": "assistant", "content": &final_text}),
+            json!({"role": "user",      "content":
+                "Review the draft synthesis above. Identify any unresolved contradictions, \
+                 gaps flagged by workers, or claims that lack cited evidence. \
+                 Fill them in from the worker results where possible; where evidence is \
+                 insufficient, state the uncertainty explicitly. \
+                 Produce the improved final answer."}),
+        ];
+
+        if let Ok((raw2, stats2)) = run_agent_inference(
+            &*orchestrator, &app_handle,
+            pass2_ctx,
+            leader_agent_id,
+            leader_slot,
+            leader_model,
+            Some(leader_cancel),
+            true,
+        ).await {
+            let text2 = tools::strip_tool_calls(&strip_think_tags(&raw2));
+            if !text2.is_empty() {
+                synth_stats = InferStats {
+                    prompt_tokens:          synth_stats.prompt_tokens     + stats2.prompt_tokens,
+                    completion_tokens:      synth_stats.completion_tokens + stats2.completion_tokens,
+                    tokens_per_second:      stats2.tokens_per_second,
+                    time_to_first_token_ms: stats2.time_to_first_token_ms,
+                    total_time_ms:          synth_stats.total_time_ms     + stats2.total_time_ms,
+                };
+                final_text = text2;
+                if runtime_settings.emit_debug_events {
+                    let _ = app_handle.emit("swarm-debug", json!({
+                        "run_id": &run_id,
+                        "phase": "leader.synthesis.pass2.complete",
+                        "chars": final_text.len(),
+                    }));
+                }
+            }
+        }
+    }
 
     if runtime_settings.emit_debug_events {
         let _ = app_handle.emit("swarm-debug", json!({
@@ -1080,6 +1204,20 @@ async fn continue_swarm_with_plan(
             "final_chars": final_text.len(),
         }));
     }
+
+    record_swarm_run(SwarmRunRecord {
+        run_id: run_id.clone(),
+        chain_strategy: chain_strategy.clone(),
+        worker_count: worker_outputs.len(),
+        successful_workers: successful_outputs.len(),
+        total_prompt_tokens: worker_outputs.iter().map(|o| o.stats.prompt_tokens).sum::<u32>()
+            + synth_stats.prompt_tokens,
+        total_completion_tokens: worker_outputs.iter()
+            .map(|o| o.stats.completion_tokens)
+            .sum::<u32>()
+            + synth_stats.completion_tokens,
+        total_time_ms: synth_stats.total_time_ms,
+    });
 
     let _ = app_handle.emit("swarm-complete", json!({
         "run_id": &run_id,
