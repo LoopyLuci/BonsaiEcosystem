@@ -265,7 +265,7 @@
         on:click={() => (showSettings = !showSettings)}>⚙</button>
 
       <!-- Tools dropdown -->
-      <div class="tools-dropdown" on:mouseleave={() => (showTools = false)}>
+      <div class="tools-dropdown" role="group" on:mouseleave={() => (showTools = false)}>
         <button class="btn-icon" title="Tools" on:click={() => (showTools = !showTools)}>Tools ▾</button>
         {#if showTools}
           <div class="tools-menu" role="menu">
