@@ -228,7 +228,8 @@
 </script>
 
 <!-- Simple modal wrapper for Android USB Lab -->
-<div class="usb-overlay" on:click|self={() => dispatch('close')}>
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+<div class="usb-overlay" role="presentation" on:click|self={() => dispatch('close')}>
   <div class="usb-panel" role="dialog" aria-modal="true" aria-label="Android USB Lab">
     <header class="usb-header">
       <h2>Android USB Lab</h2>
@@ -244,8 +245,8 @@
       </div>
 
       <div class="form-group">
-        <label>Device (adb serial)</label>
-        <select bind:value={usbSelectedSerial}>
+        <label for="usb-serial">Device (adb serial)</label>
+        <select id="usb-serial" bind:value={usbSelectedSerial}>
           <option value="">Select device</option>
           {#each usbDevices as d}
             <option value={d.serial}>{d.serial} ({d.state}{d.model ? ` · ${d.model}` : ''})</option>
@@ -268,16 +269,16 @@
       {/if}
 
       <div class="form-group">
-        <label>APK Path</label>
+        <label for="usb-apk">APK Path</label>
         <div class="input-with-btn">
-          <input type="text" bind:value={usbApkPath} placeholder="C:/path/to/app.apk or leave blank to auto-resolve" />
+          <input id="usb-apk" type="text" bind:value={usbApkPath} placeholder="C:/path/to/app.apk or leave blank to auto-resolve" />
           <button class="action-btn" on:click={resolveApk} disabled={usbBusy}>Resolve</button>
         </div>
       </div>
 
       <div class="form-group">
-        <label>Package Name</label>
-        <input type="text" data-bonsai-action="AndroidUsbLab:PackageName" style="-webkit-app-region: no-drag;" bind:value={usbPackageName} placeholder="com.bonsai.workspace" />
+        <label for="usb-pkg">Package Name</label>
+        <input id="usb-pkg" type="text" data-bonsai-action="AndroidUsbLab:PackageName" style="-webkit-app-region: no-drag;" bind:value={usbPackageName} placeholder="com.bonsai.workspace" />
       </div>
 
       <div class="action-grid usb-flow-grid">

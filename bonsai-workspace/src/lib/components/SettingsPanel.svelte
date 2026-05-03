@@ -1951,19 +1951,6 @@
   .usb-steps-table tr.step-skip td:first-child { color: var(--text-dim); }
   .step-detail { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 
-  .usb-advanced {
-    margin: 12px 0 4px;
-    font-size: 12px;
-  }
-  .usb-advanced summary {
-    cursor: pointer;
-    color: var(--text-dim);
-    font-size: 11px;
-    padding: 4px 0;
-    user-select: none;
-  }
-  .usb-advanced summary:hover { color: var(--text); }
-
   /* ── Connection / pairing ── */
   .connection-section .section-desc {
     font-size: 12px;
