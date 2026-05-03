@@ -9,6 +9,118 @@ use crate::tool_core::{
     ToolResult, RetryPolicy, SideEffectProfile,
 };
 
+// ── Path-jail helper ─────────────────────────────────────────────────────────
+//
+// Normalises the path (collapses `.` / `..` without hitting the filesystem)
+// and, when an allowed root is supplied, verifies that the resolved path is
+// a descendant of that root.  This prevents both relative (`../../etc`)
+// and absolute (`C:\Windows\…`) traversal attacks.
+
+fn resolve_and_jail(raw_path: &str, allowed_root: Option<&str>) -> Result<std::path::PathBuf, ToolError> {
+    use std::path::{Component, Path, PathBuf};
+
+    // Step 1 – manual normalization (no filesystem required).
+    let mut normalized = PathBuf::new();
+    for component in Path::new(raw_path).components() {
+        match component {
+            Component::ParentDir => { let _ = normalized.pop(); }
+            Component::CurDir    => {}
+            c                    => normalized.push(c),
+        }
+    }
+
+    let Some(root_raw) = allowed_root else {
+        return Ok(normalized);
+    };
+
+    // Step 2 – canonicalize the workspace root (it must exist).
+    let root = std::fs::canonicalize(root_raw)
+        .unwrap_or_else(|_| PathBuf::from(root_raw));
+
+    // Step 3 – best-effort canonicalize the target.
+    //   • If the path exists, canonicalize it (resolves symlinks too).
+    //   • If not (write targets), canonicalize its nearest existing ancestor.
+    let canonical = if normalized.exists() {
+        std::fs::canonicalize(&normalized).unwrap_or(normalized.clone())
+    } else if let Some(parent) = normalized.parent().filter(|p| p.exists()) {
+        std::fs::canonicalize(parent)
+            .unwrap_or_else(|_| parent.to_path_buf())
+            .join(normalized.file_name().unwrap_or_default())
+    } else {
+        normalized.clone()
+    };
+
+    if !canonical.starts_with(&root) {
+        return Err(ToolError::Permission {
+            message: "access denied: path is outside the allowed workspace root".into(),
+        });
+    }
+
+    Ok(canonical)
+}
+
+// ── SSRF / private-IP policy for fetch_url ────────────────────────────────────
+//
+// Resolves the target hostname and rejects any address in RFC-1918, loopback,
+// or link-local ranges.  Literal IP addresses in the URL are checked directly.
+
+async fn check_ssrf_policy(url_str: &str) -> Result<(), ToolError> {
+    use std::net::IpAddr;
+
+    let url = reqwest::Url::parse(url_str)
+        .map_err(|e| ToolError::ValidationFailed { field: "url".into(), reason: e.to_string() })?;
+
+    let host = url.host_str().ok_or_else(|| ToolError::ValidationFailed {
+        field: "url".into(),
+        reason: "URL has no host".into(),
+    })?;
+
+    // Literal IP in the URL — check immediately, no DNS needed.
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        if is_private_ip(ip) {
+            return Err(ToolError::Permission {
+                message: format!("fetch_url: blocked request to internal address {ip}"),
+            });
+        }
+        return Ok(());
+    }
+
+    // Hostname — resolve and check every returned address.
+    let port = url.port_or_known_default().unwrap_or(80);
+    let addrs = tokio::net::lookup_host(format!("{host}:{port}")).await
+        .map_err(|e| ToolError::Transient { message: format!("DNS lookup: {e}"), retry_after_ms: None })?;
+
+    for addr in addrs {
+        if is_private_ip(addr.ip()) {
+            return Err(ToolError::Permission {
+                message: format!("fetch_url: {host} resolves to internal address {}", addr.ip()),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback() || v4.is_link_local() || {
+                let o = v4.octets();
+                o[0] == 10                                           // 10.0.0.0/8
+                    || (o[0] == 172 && (16..=31).contains(&o[1]))   // 172.16.0.0/12
+                    || (o[0] == 192 && o[1] == 168)                 // 192.168.0.0/16
+            }
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback() || v6.is_unspecified() || {
+                let s = v6.segments();
+                (s[0] & 0xfe00) == 0xfc00    // ULA  (fc00::/7)
+                    || (s[0] & 0xffc0) == 0xfe80 // link-local (fe80::/10)
+            }
+        }
+    }
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 /// Register all built-in assistant tools into a new registry.
@@ -25,6 +137,7 @@ pub fn build_registry() -> ToolRegistry {
     r.register(RenderChart);
     r.register(SendEmail);
     r.register(RunCommand);
+    r.register(SearchKnowledge);
     r
 }
 
@@ -93,7 +206,7 @@ pub struct GetSystemStats;
 #[async_trait::async_trait]
 impl Tool for GetSystemStats {
     fn name(&self)        -> &'static str { "get_system_stats" }
-    fn description(&self) -> &'static str { "Returns CPU usage, RAM usage, and disk info for the local machine." }
+    fn description(&self) -> &'static str { "Returns full system specs: OS name/version, CPU model/cores/usage, RAM, swap, disk space per drive, and hostname." }
     fn tags(&self)        -> &'static [&'static str] { &["system", "cpu", "ram", "memory", "disk", "stats", "hardware"] }
     fn side_effects(&self) -> SideEffectProfile { SideEffectProfile::None }
     fn policy_hint(&self)  -> ToolPolicyHint    { ToolPolicyHint::safe() }
@@ -104,17 +217,67 @@ impl Tool for GetSystemStats {
     }
 
     async fn execute(&self, _args: &Value, _ctx: &ToolContext) -> ToolResult {
-        use sysinfo::System;
+        use sysinfo::{Disks, System};
+
         let mut sys = System::new_all();
         sys.refresh_all();
-        let total = sys.total_memory();
-        let used  = sys.used_memory();
-        let cpu   = sys.global_cpu_info().cpu_usage();
+
+        // CPU
+        let cpu_usage    = sys.global_cpu_info().cpu_usage();
+        let cpu_model    = sys.cpus().first().map(|c| c.brand().to_string()).unwrap_or_default();
+        let cpu_logical  = sys.cpus().len() as u64;
+        let cpu_physical = System::physical_core_count(&sys).unwrap_or(cpu_logical as usize) as u64;
+        let cpu_freq_mhz = sys.cpus().first().map(|c| c.frequency()).unwrap_or(0);
+
+        // Memory
+        let mem_total  = sys.total_memory();
+        let mem_used   = sys.used_memory();
+        let mem_avail  = sys.available_memory();
+        let swap_total = sys.total_swap();
+        let swap_used  = sys.used_swap();
+
+        // OS (static methods)
+        let os_name    = System::name().unwrap_or_default();
+        let os_version = System::os_version().unwrap_or_default();
+        let kernel_ver = System::kernel_version().unwrap_or_default();
+        let hostname   = System::host_name().unwrap_or_default();
+        let arch       = std::env::consts::ARCH.to_string();
+
+        // Disks
+        let disk_list = Disks::new_with_refreshed_list();
+        let disks: Vec<Value> = disk_list.iter().map(|d| {
+            let total = d.total_space();
+            let avail = d.available_space();
+            let used_pct = if total > 0 {
+                ((total.saturating_sub(avail)) as f64 / total as f64 * 1000.0).round() / 10.0
+            } else { 0.0 };
+            json!({
+                "name":         d.name().to_string_lossy().as_ref(),
+                "mount":        d.mount_point().display().to_string(),
+                "total_gb":     (total as f64 / 1_073_741_824.0 * 10.0).round() / 10.0,
+                "available_gb": (avail as f64 / 1_073_741_824.0 * 10.0).round() / 10.0,
+                "used_pct":     used_pct,
+            })
+        }).collect();
+
         Ok(ToolOutput::Complete(json!({
-            "cpu_usage_pct":    (cpu * 10.0).round() / 10.0,
-            "memory_total_mb":  total / 1024 / 1024,
-            "memory_used_mb":   used  / 1024 / 1024,
-            "memory_used_pct":  if total > 0 { (used as f64 / total as f64 * 1000.0).round() / 10.0 } else { 0.0 },
+            "os_name":            os_name,
+            "os_version":         os_version,
+            "kernel_version":     kernel_ver,
+            "architecture":       arch,
+            "hostname":           hostname,
+            "cpu_model":          cpu_model,
+            "cpu_cores_physical": cpu_physical,
+            "cpu_cores_logical":  cpu_logical,
+            "cpu_freq_mhz":       cpu_freq_mhz,
+            "cpu_usage_pct":      (cpu_usage * 10.0).round() / 10.0,
+            "memory_total_mb":    mem_total  / 1024 / 1024,
+            "memory_used_mb":     mem_used   / 1024 / 1024,
+            "memory_avail_mb":    mem_avail  / 1024 / 1024,
+            "memory_used_pct":    if mem_total > 0 { (mem_used as f64 / mem_total as f64 * 1000.0).round() / 10.0 } else { 0.0 },
+            "swap_total_mb":      swap_total / 1024 / 1024,
+            "swap_used_mb":       swap_used  / 1024 / 1024,
+            "disks":              disks,
         })))
     }
 }
@@ -265,9 +428,12 @@ impl Tool for FetchUrl {
             });
         }
 
+        check_ssrf_policy(url).await?;
+
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("BonsaiAssistant/1.0")
+            .redirect(reqwest::redirect::Policy::limited(5))
             .build()
             .map_err(|e| ToolError::Internal { message: e.to_string() })?;
 
@@ -324,19 +490,17 @@ impl Tool for FindFiles {
         })
     }
 
-    async fn execute(&self, args: &Value, _ctx: &ToolContext) -> ToolResult {
+    async fn execute(&self, args: &Value, ctx: &ToolContext) -> ToolResult {
         let root    = args.get("path").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::ValidationFailed { field: "path".into(), reason: "required".into() })?;
         let pattern = args.get("pattern").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::ValidationFailed { field: "pattern".into(), reason: "required".into() })?;
         let max     = args.get("max_results").and_then(|v| v.as_u64()).unwrap_or(50).min(500) as usize;
 
-        if root.contains("..") {
-            return Err(ToolError::Permission { message: "path traversal not allowed".into() });
-        }
+        let jailed_root = resolve_and_jail(root, ctx.workspace_path.as_deref())?;
 
         let mut results = Vec::new();
-        find_recursive(std::path::Path::new(root), pattern, &mut results, max);
+        find_recursive(&jailed_root, pattern, &mut results, max);
         let count = results.len();
         Ok(ToolOutput::Complete(json!({ "files": results, "count": count })))
     }
@@ -400,23 +564,21 @@ impl Tool for ReadFileAssistant {
         })
     }
 
-    async fn execute(&self, args: &Value, _ctx: &ToolContext) -> ToolResult {
+    async fn execute(&self, args: &Value, ctx: &ToolContext) -> ToolResult {
         let path = args.get("path").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::ValidationFailed { field: "path".into(), reason: "required".into() })?;
         let max  = args.get("max_bytes").and_then(|v| v.as_u64()).unwrap_or(65536).min(524288) as usize;
 
-        if path.contains("..") {
-            return Err(ToolError::Permission { message: "path traversal not allowed".into() });
-        }
-        let content = std::fs::read_to_string(path)
+        let jailed = resolve_and_jail(path, ctx.workspace_path.as_deref())?;
+        let content = std::fs::read_to_string(&jailed)
             .map_err(|e| match e.kind() {
-                std::io::ErrorKind::NotFound       => ToolError::NotFound { resource: path.into() },
+                std::io::ErrorKind::NotFound         => ToolError::NotFound { resource: path.into() },
                 std::io::ErrorKind::PermissionDenied => ToolError::Permission { message: format!("cannot read {path}") },
                 _ => ToolError::Internal { message: e.to_string() },
             })?;
         let truncated = content.len() > max;
         let content   = if truncated { &content[..max] } else { &content };
-        Ok(ToolOutput::Complete(json!({ "path": path, "content": content, "truncated": truncated })))
+        Ok(ToolOutput::Complete(json!({ "path": jailed.display().to_string(), "content": content, "truncated": truncated })))
     }
 }
 
@@ -445,22 +607,20 @@ impl Tool for WriteFileAssistant {
         })
     }
 
-    async fn execute(&self, args: &Value, _ctx: &ToolContext) -> ToolResult {
+    async fn execute(&self, args: &Value, ctx: &ToolContext) -> ToolResult {
         let path    = args.get("path").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::ValidationFailed { field: "path".into(), reason: "required".into() })?;
         let content = args.get("content").and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::ValidationFailed { field: "content".into(), reason: "required".into() })?;
-        if path.contains("..") {
-            return Err(ToolError::Permission { message: "path traversal not allowed".into() });
-        }
-        // Create parent dirs if needed
-        if let Some(parent) = std::path::Path::new(path).parent() {
+
+        let jailed = resolve_and_jail(path, ctx.workspace_path.as_deref())?;
+        if let Some(parent) = jailed.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| ToolError::Permission { message: e.to_string() })?;
         }
-        std::fs::write(path, content)
-            .map_err(|e| ToolError::Permission { message: format!("write {path}: {e}") })?;
-        Ok(ToolOutput::Complete(json!({ "path": path, "bytes_written": content.len() })))
+        std::fs::write(&jailed, content)
+            .map_err(|e| ToolError::Permission { message: format!("write {}: {e}", jailed.display()) })?;
+        Ok(ToolOutput::Complete(json!({ "path": jailed.display().to_string(), "bytes_written": content.len() })))
     }
 }
 
@@ -740,6 +900,78 @@ impl Tool for RunCommand {
             "stdout":    &stdout[..stdout.len().min(8192)],
             "stderr":    &stderr[..stderr.len().min(2048)],
             "timed_out": false,
+        })))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// search_knowledge
+// ─────────────────────────────────────────────────────────────────────────────
+
+pub struct SearchKnowledge;
+
+#[async_trait::async_trait]
+impl Tool for SearchKnowledge {
+    fn name(&self)        -> &'static str { "search_knowledge" }
+    fn description(&self) -> &'static str {
+        "Searches indexed workspace files and documents for relevant text passages. \
+         Use this to find information from local files, code, notes, or docs."
+    }
+    fn tags(&self) -> &'static [&'static str] {
+        &["search", "knowledge", "rag", "documents", "files", "find", "lookup", "information"]
+    }
+    fn side_effects(&self) -> SideEffectProfile { SideEffectProfile::Read }
+    fn policy_hint(&self)  -> ToolPolicyHint    { ToolPolicyHint::filesystem_read() }
+    fn cache_ttl_secs(&self) -> Option<u64>     { Some(120) }
+
+    fn schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "required": ["query"],
+            "properties": {
+                "query":   { "type": "string", "description": "Natural language search query." },
+                "top_k":   { "type": "integer", "description": "Max results to return (default 5, max 10)." },
+                "path":    { "type": "string",  "description": "Optional: restrict search to files under this path." }
+            }
+        })
+    }
+
+    async fn execute(&self, args: &Value, ctx: &ToolContext) -> ToolResult {
+        let query = args.get("query").and_then(|v| v.as_str())
+            .ok_or_else(|| ToolError::ValidationFailed { field: "query".into(), reason: "required".into() })?;
+        let top_k = args.get("top_k").and_then(|v| v.as_u64()).unwrap_or(5).min(10) as usize;
+        let path_filter = args.get("path").and_then(|v| v.as_str());
+
+        let store = crate::rag_store::global_rag();
+        if !store {
+            // Auto-index workspace path if available
+            if let Some(ws) = ctx.workspace_path.as_deref() {
+                crate::rag_store::index_directory(ws, 500);
+            }
+        }
+
+        let results = crate::rag_store::search(query, top_k, path_filter);
+        if results.is_empty() {
+            return Ok(ToolOutput::Complete(json!({
+                "query": query,
+                "results": [],
+                "count": 0,
+                "note": "No indexed documents found. Workspace may not be indexed yet."
+            })));
+        }
+
+        let formatted: Vec<Value> = results.iter().map(|(score, chunk)| {
+            json!({
+                "path":    chunk.path,
+                "score":   (score * 1000.0).round() / 1000.0,
+                "excerpt": chunk.text.chars().take(512).collect::<String>(),
+            })
+        }).collect();
+
+        Ok(ToolOutput::Complete(json!({
+            "query":   query,
+            "results": formatted,
+            "count":   results.len(),
         })))
     }
 }

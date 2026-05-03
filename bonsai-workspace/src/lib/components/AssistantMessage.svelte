@@ -11,11 +11,16 @@
 
   // ── Markdown renderer with code-block copy buttons ────────────────────────
 
+  function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   const renderer = new Renderer();
   renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
-    const encoded = encodeURIComponent(text);
-    const langClass = lang ? ` class="language-${lang}"` : '';
-    return `<div class="code-block"><button class="copy-btn" data-code="${encoded}" title="Copy code">Copy</button><pre><code${langClass}>${text}</code></pre></div>`;
+    const encoded   = encodeURIComponent(text);
+    const safeLang  = lang ? escapeHtml(lang) : '';
+    const langClass = safeLang ? ` class="language-${safeLang}"` : '';
+    return `<div class="code-block"><button class="copy-btn" data-code="${encoded}" title="Copy code">Copy</button><pre><code${langClass}>${escapeHtml(text)}</code></pre></div>`;
   };
 
   marked.use({ renderer });

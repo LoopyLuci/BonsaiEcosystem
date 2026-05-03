@@ -34,6 +34,7 @@ mod commands;
 mod config;
 mod model_orchestrator;
 mod model_registry;
+pub mod rag_store;
 mod remote;
 mod remote_input;
 mod sidecar_manager;
@@ -48,7 +49,11 @@ use std::sync::{
     atomic::AtomicBool,
     Arc,
     Mutex as StdMutex,
+    OnceLock,
 };
+
+// Keeps the non-blocking tracing writer flushed for the lifetime of the process.
+static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
 use tauri::Emitter;
 use tauri::Manager;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -218,6 +223,26 @@ pub fn run() {
             use tauri::Manager;
             let app_handle = app.handle().clone();
 
+            // ── Structured logging (tracing) ──────────────────────────────────
+            {
+                use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+                let log_dir = app_handle.path().app_local_data_dir()
+                    .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                    .join("logs");
+                let _ = std::fs::create_dir_all(&log_dir);
+                let file_appender = tracing_appender::rolling::daily(&log_dir, "bonsai.log");
+                let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+                let _ = LOG_GUARD.set(guard);
+                let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+                let _ = tracing_subscriber::registry()
+                    .with(tracing_subscriber::fmt::layer().with_writer(non_blocking).with_ansi(false))
+                    .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
+                    .with(filter)
+                    .try_init();
+                tracing::info!("Bonsai Workspace starting — logs: {}", log_dir.display());
+            }
+
             // WAL — must be ready before any command runs
             let wal = Arc::new(
                 tauri::async_runtime::block_on(wal::WAL::new(&app_handle))
@@ -342,7 +367,7 @@ pub fn run() {
                 )) {
                     Ok(handle) => Some(handle),
                     Err(e) => {
-                        eprintln!("[api] {e}");
+                        tracing::error!("[api] failed to start API server: {e}");
                         None
                     }
                 }
@@ -374,7 +399,7 @@ pub fn run() {
                         (Some(h), p)
                     }
                     Err(e) => {
-                        eprintln!("[buddy-api] {e}");
+                        tracing::error!("[buddy-api] failed to start: {e}");
                         let _ = app_handle.emit("buddy-api-unavailable", e);
                         (None, 0u16)
                     }
@@ -413,12 +438,34 @@ pub fn run() {
             });
             app.manage(remote_manager.clone());
 
+            // ── Startup health gate ────────────────────────────────────────────
+            // Check whether each major subsystem initialised. Emit a single event
+            // shortly after the window opens so the frontend can surface problems
+            // instead of presenting a silent blank state.
+            {
+                let bh   = app_handle.clone();
+                let orch = orchestrator.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+                    let model_ready = orch.active_slot_url().await.is_some();
+                    if model_ready {
+                        tracing::info!("startup: AI model slot is ready");
+                    } else {
+                        tracing::warn!("startup: no AI model slot is ready — prompting user");
+                        let _ = bh.emit("startup-health", serde_json::json!({
+                            "model_ready": false,
+                            "message": "No AI model is loaded. Go to Settings → Models to download or configure one."
+                        }));
+                    }
+                });
+            }
+
             // ── User skills startup load ────────────────────────────────────
             {
                 let user_skills = app.state::<AppState>().user_skill_store.clone();
                 tauri::async_runtime::spawn(async move {
                     if let Err(e) = crate::assistant_manager::reload_user_skills(&user_skills).await {
-                        eprintln!("[skills] failed to load user skills at startup: {e}");
+                        tracing::error!("[skills] failed to load user skills at startup: {e}");
                     }
                 });
             }
@@ -435,10 +482,10 @@ pub fn run() {
                             let mut reg = registry.write().await;
                             let connected = mgr.connect_all_into_registry(&mut *reg).await;
                             if !connected.is_empty() {
-                                eprintln!("[mcp] connected servers: {}", connected.join(", "));
+                                tracing::info!("[mcp] connected: {}", connected.join(", "));
                             }
                         }
-                        Err(e) => eprintln!("[mcp] failed to load configs: {e}"),
+                        Err(e) => tracing::error!("[mcp] failed to load configs: {e}"),
                     }
                 });
             }
@@ -529,10 +576,10 @@ pub fn run() {
                                 None,
                             ) {
                                 Ok(svc) => { let _ = mdns.register(svc); }
-                                Err(e) => eprintln!("[mdns] service info error: {e}"),
+                                Err(e) => tracing::warn!("[mdns] service info error: {e}"),
                             }
                         }
-                        Err(e) => eprintln!("[mdns] daemon error: {e}"),
+                        Err(e) => tracing::warn!("[mdns] daemon error: {e}"),
                     }
                 });
             }
@@ -552,10 +599,20 @@ pub fn run() {
                             orch.refresh_registry();
                         }
                         Err(e) => {
-                            eprintln!("[bootstrap] Failed: {e}");
+                            tracing::error!("[bootstrap] failed: {e}");
                             let _ = bh.emit("bootstrap-error", e.to_string());
                         }
                     }
+                });
+            }
+
+            // Background RAG index: walk workspace root for searchable documents.
+            {
+                let ws_root = app_handle.path().app_local_data_dir()
+                    .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                    .display().to_string();
+                tauri::async_runtime::spawn_blocking(move || {
+                    crate::rag_store::index_directory(&ws_root, 2000);
                 });
             }
 
