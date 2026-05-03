@@ -32,6 +32,9 @@ mod chat_sessions;
 mod cluster_orchestrator;
 mod commands;
 mod config;
+mod model_data;
+mod model_data_store;
+mod model_data_generator;
 mod model_orchestrator;
 mod model_registry;
 pub mod rag_store;
@@ -122,6 +125,8 @@ pub struct AppState {
     pub buddy_api_server:  Arc<Mutex<Option<buddy_api_server::BuddyApiHandle>>>,
     /// Resolved port for the Buddy API (0 if unavailable).
     pub buddy_api_port:    u16,
+    /// Rich, persistent metadata for every model (local and cloud).
+    pub model_data_store:  Arc<model_data_store::ModelDataStore>,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -349,6 +354,12 @@ pub fn run() {
             // MCP bridge — load persisted configs and connect on startup
             let mcp_manager = Arc::new(mcp_bridge::McpManager::new());
 
+            let model_data_store = Arc::new(
+                tauri::async_runtime::block_on(
+                    model_data_store::ModelDataStore::new(wal.pool())
+                ).expect("model data store init failed"),
+            );
+
             let mut api_config = config::load_config(&app_handle).unwrap_or_default();
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -467,6 +478,7 @@ pub fn run() {
                 mcp_manager: mcp_manager.clone(),
                 buddy_api_server: Arc::new(Mutex::new(buddy_handle)),
                 buddy_api_port:   buddy_port,
+                model_data_store: model_data_store.clone(),
             });
             app.manage(remote_manager.clone());
 
@@ -488,6 +500,20 @@ pub fn run() {
                             "model_ready": false,
                             "message": "No AI model is loaded. Go to Settings → Models to download or configure one."
                         }));
+                    }
+                });
+            }
+
+            // ── Model data: sync registry → store on startup ──────────────
+            {
+                let mds  = model_data_store.clone();
+                let orch = orchestrator.clone();
+                tauri::async_runtime::spawn(async move {
+                    let models = orch.list_models().await;
+                    match mds.sync_from_registry(&models).await {
+                        Ok(n) if n > 0 => tracing::info!("[model-data] created {n} skeleton entries from registry"),
+                        Ok(_)          => {},
+                        Err(e)         => tracing::warn!("[model-data] registry sync failed: {e}"),
                     }
                 });
             }
@@ -894,6 +920,15 @@ pub fn run() {
             commands::save_email_bot_config,
             commands::test_bot_platform,
             commands::get_matrix_key_backup_passphrase,
+            // ── Model Data ────────────────────────────────────────────────────
+            commands::list_model_data,
+            commands::get_model_data,
+            commands::save_model_data,
+            commands::delete_model_data,
+            commands::search_model_data,
+            commands::rank_models_for_skill,
+            commands::generate_model_data,
+            commands::sync_registry_to_model_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

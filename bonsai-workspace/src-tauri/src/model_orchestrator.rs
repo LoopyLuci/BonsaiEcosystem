@@ -134,6 +134,22 @@ pub struct InferStats {
     pub total_time_ms:          u64,
 }
 
+// ── Per-request inference overrides ──────────────────────────────────────────
+
+/// Sampling parameters that override the orchestrator's built-in defaults.
+/// Populated from `ModelData::inference` when available; all fields optional.
+#[derive(Debug, Clone, Default)]
+pub struct InferenceOverrides {
+    pub temperature:       Option<f32>,
+    pub top_p:             Option<f32>,
+    pub top_k:             Option<u32>,
+    pub min_p:             Option<f32>,
+    pub repeat_penalty:    Option<f32>,
+    pub presence_penalty:  Option<f32>,
+    pub frequency_penalty: Option<f32>,
+    pub stop_sequences:    Vec<String>,
+}
+
 // ── Infer request ─────────────────────────────────────────────────────────────
 
 pub struct InferRequest {
@@ -142,6 +158,8 @@ pub struct InferRequest {
     /// Full OpenAI-format message history (system + user + assistant turns).
     pub messages:   Vec<serde_json::Value>,
     pub max_tokens: u32,
+    /// Per-model sampling overrides from `ModelData`. None = use defaults.
+    pub overrides:  Option<InferenceOverrides>,
     /// If Some, tokens are streamed here instead of via the app event bus.
     pub stream_tx:  Option<mpsc::UnboundedSender<String>>,
     /// Optional cancellation flag set by the UI to stop active generation.
@@ -225,6 +243,31 @@ impl ModelOrchestrator {
         status.slots.iter()
             .find(|s| s.state.is_ready())
             .map(|s| format!("http://127.0.0.1:{}", s.port))
+    }
+
+    /// Convenience wrapper: submit a single user-turn prompt and await the full
+    /// response text. Used by the model-data generator and similar internal tools.
+    pub async fn infer_simple(
+        &self,
+        prompt:     &str,
+        max_tokens: u32,
+        source:     &'static str,
+    ) -> Result<(String, InferStats), String> {
+        use serde_json::json;
+        let messages = vec![json!({ "role": "user", "content": prompt })];
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let req = InferRequest {
+            model_id:   None,
+            messages,
+            max_tokens,
+            overrides:  None,
+            stream_tx:  None,
+            cancel_flag: None,
+            resp_tx,
+            source,
+        };
+        self.infer(req)?;
+        resp_rx.await.map_err(|_| "orchestrator dropped the response channel".to_string())?
     }
 }
 
@@ -592,6 +635,7 @@ fn dispatch(
         let result = infer(
             req.messages,
             req.max_tokens,
+            req.overrides,
             &url,
             &client2,
             req.stream_tx,
@@ -606,22 +650,36 @@ fn dispatch(
 // ── Inference HTTP call ───────────────────────────────────────────────────────
 
 async fn infer(
-    messages:   Vec<serde_json::Value>,
-    max_tokens: u32,
-    base_url:   &str,
-    client:     &Client,
-    stream_tx:  Option<mpsc::UnboundedSender<String>>,
+    messages:    Vec<serde_json::Value>,
+    max_tokens:  u32,
+    overrides:   Option<InferenceOverrides>,
+    base_url:    &str,
+    client:      &Client,
+    stream_tx:   Option<mpsc::UnboundedSender<String>>,
     cancel_flag: Option<Arc<AtomicBool>>,
-    app:        &AppHandle,
+    app:         &AppHandle,
 ) -> Result<(String, InferStats), String> {
-    let body = json!({
+    let ov = overrides.unwrap_or_default();
+    let temperature = ov.temperature.unwrap_or(0.7);
+
+    let mut body = json!({
         "model":          "local",
         "messages":       messages,
         "stream":         true,
-        "temperature":    0.7,
+        "temperature":    temperature,
         "max_tokens":     max_tokens,
         "stream_options": { "include_usage": true },
     });
+
+    // Apply optional sampling overrides.
+    let obj = body.as_object_mut().unwrap();
+    if let Some(v) = ov.top_p             { obj.insert("top_p".into(),             json!(v)); }
+    if let Some(v) = ov.top_k             { obj.insert("top_k".into(),             json!(v)); }
+    if let Some(v) = ov.min_p             { obj.insert("min_p".into(),             json!(v)); }
+    if let Some(v) = ov.repeat_penalty    { obj.insert("repeat_penalty".into(),    json!(v)); }
+    if let Some(v) = ov.presence_penalty  { obj.insert("presence_penalty".into(),  json!(v)); }
+    if let Some(v) = ov.frequency_penalty { obj.insert("frequency_penalty".into(), json!(v)); }
+    if !ov.stop_sequences.is_empty()      { obj.insert("stop".into(), json!(ov.stop_sequences)); }
 
     let resp = client
         .post(format!("{}/v1/chat/completions", base_url))

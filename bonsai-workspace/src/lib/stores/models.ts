@@ -4,6 +4,11 @@ import { listen } from '@tauri-apps/api/event';
 import { apiBaseUrl, apiHost, apiPort } from '$lib/stores/settings';
 import { DEFAULT_API_HOST, DEFAULT_API_PORT } from '$lib/constants/network';
 import { swarmEnabled } from '$lib/stores/agents';
+import type {
+  ModelData,
+  ModelDataSummary,
+  GenerateModelDataInput,
+} from '$lib/types/model_data';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -62,6 +67,13 @@ const CUSTOM_SWARM_MODEL: ModelInfo = {
   ram_label: 'Dynamic',
   valid: true,
 };
+
+// ── Model Data stores ─────────────────────────────────────────────────────────
+
+export const modelDataList      = writable<ModelDataSummary[]>([]);
+export const modelDataDetail    = writable<Record<string, ModelData>>({});
+export const modelDataGenerating = writable(false);
+export const modelDataError     = writable<string | null>(null);
 
 export const isBootstrapping   = writable(false);
 export const bootstrapProgress = writable<Record<string, BootstrapProgress>>({});
@@ -230,6 +242,86 @@ export async function loadModel(modelId: string) {
   }
 }
 
+// ── Model Data actions ────────────────────────────────────────────────────────
+
+export async function refreshModelData(): Promise<void> {
+  try {
+    const list = await invoke<ModelDataSummary[]>('list_model_data');
+    modelDataList.set(list);
+  } catch (e) {
+    console.error('[model-data] list failed:', e);
+  }
+}
+
+export async function fetchModelData(id: string): Promise<ModelData | null> {
+  try {
+    const data = await invoke<ModelData | null>('get_model_data', { id });
+    if (data) modelDataDetail.update(prev => ({ ...prev, [id]: data }));
+    return data;
+  } catch (e) {
+    console.error('[model-data] get failed:', e);
+    return null;
+  }
+}
+
+export async function saveModelData(data: ModelData): Promise<string | null> {
+  try {
+    const id = await invoke<string>('save_model_data', { data });
+    await refreshModelData();
+    return id;
+  } catch (e) {
+    modelDataError.set(String(e));
+    return null;
+  }
+}
+
+export async function deleteModelData(id: string): Promise<boolean> {
+  try {
+    await invoke('delete_model_data', { id });
+    modelDataDetail.update(prev => { const n = { ...prev }; delete n[id]; return n; });
+    await refreshModelData();
+    return true;
+  } catch (e) {
+    modelDataError.set(String(e));
+    return false;
+  }
+}
+
+export async function generateModelData(
+  input: GenerateModelDataInput,
+): Promise<ModelData | null> {
+  modelDataGenerating.set(true);
+  modelDataError.set(null);
+  try {
+    return await invoke<ModelData>('generate_model_data', { input });
+  } catch (e) {
+    modelDataError.set(String(e));
+    return null;
+  } finally {
+    modelDataGenerating.set(false);
+  }
+}
+
+export async function syncRegistryToModelData(): Promise<number> {
+  try {
+    const count = await invoke<number>('sync_registry_to_model_data');
+    if (count > 0) await refreshModelData();
+    return count;
+  } catch (e) {
+    console.error('[model-data] sync failed:', e);
+    return 0;
+  }
+}
+
+export async function rankModelsForSkill(skillId: string): Promise<ModelDataSummary[]> {
+  try {
+    return await invoke<ModelDataSummary[]>('rank_models_for_skill', { skillId });
+  } catch (e) {
+    console.error('[model-data] rank failed:', e);
+    return [];
+  }
+}
+
 // ── Event listeners ───────────────────────────────────────────────────────────
 
 let _initialized = false;
@@ -262,7 +354,7 @@ export function initModelStores() {
   });
 
   // Model/orchestrator events
-  listen('registry-updated', () => refreshModels());
+  listen('registry-updated', () => { refreshModels(); syncRegistryToModelData(); });
   listen('orchestrator-status', ({ payload }) => {
     orchestratorStatus.set(payload as OrchestratorStatus);
   });
@@ -274,4 +366,5 @@ export function initModelStores() {
   // Initial load
   refreshModels();
   refreshStatus();
+  refreshModelData();
 }

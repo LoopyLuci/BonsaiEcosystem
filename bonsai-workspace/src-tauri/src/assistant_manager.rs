@@ -1474,6 +1474,7 @@ async fn run_plain_turn(
         model_id:    profile.model_id.clone(),
         messages:    history,
         max_tokens:  MAX_TOKENS,
+        overrides:   None,
         stream_tx:   Some(tok_tx),
         cancel_flag: Some(cancel),
         resp_tx,

@@ -822,6 +822,7 @@ dependencies = [
  "axum",
  "base64 0.21.7",
  "bytes",
+ "chrono",
  "cpal",
  "diffy",
  "dirs 5.0.1",
@@ -864,6 +865,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uuid",
  "walkdir",
  "zip",
 ]

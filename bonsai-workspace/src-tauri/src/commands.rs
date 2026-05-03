@@ -554,6 +554,7 @@ async fn run_inference(
         model_id:   None,
         messages,
         max_tokens: 4096,
+        overrides:  None,
         stream_tx:  Some(stream_tx),
         cancel_flag,
         resp_tx,
@@ -1595,14 +1596,15 @@ pub async fn ai_scaffold_project(
 
     let (resp_tx, resp_rx) = oneshot::channel();
     let req = InferRequest {
-        model_id: None,
-        messages: vec![json!({"role": "system", "content": "Scaffold a Bonsai project."}),
-                   json!({"role": "user", "content": full_prompt})],
+        model_id:   None,
+        messages:   vec![json!({"role": "system", "content": "Scaffold a Bonsai project."}),
+                     json!({"role": "user", "content": full_prompt})],
         max_tokens: 4096,
-        stream_tx: None,
+        overrides:  None,
+        stream_tx:  None,
         cancel_flag: None,
         resp_tx,
-        source: "workspace",
+        source:     "workspace",
     };
 
     state.orchestrator.infer(req)?;
@@ -5491,6 +5493,120 @@ async fn bot_reload(_state: &State<'_, AppState>) -> Result<(), ()> {
     let token = bot_admin_token();
     let _ = fetch_from_bot_path("config/reload", &token).await;
     Ok(())
+}
+
+// ─── Model Data ──────────────────────────────────────────────────────────────
+
+use crate::model_data::{GenerateModelDataInput, ModelData, ModelDataSummary};
+use crate::model_data_generator::ModelDataGenerator;
+
+/// List all model data entries (summaries — lighter than full records).
+#[tauri::command]
+pub async fn list_model_data(state: State<'_, AppState>) -> Result<Vec<ModelDataSummary>, String> {
+    state.model_data_store
+        .list_summaries()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Get the full ModelData record for a single model.
+#[tauri::command]
+pub async fn get_model_data(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<Option<ModelData>, String> {
+    state.model_data_store
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Create or update a ModelData record. Returns the saved ID.
+#[tauri::command]
+pub async fn save_model_data(
+    state: State<'_, AppState>,
+    mut data: ModelData,
+) -> Result<String, String> {
+    data.touch();
+    state.model_data_store
+        .save(&data)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(data.id)
+}
+
+/// Delete a ModelData record.
+#[tauri::command]
+pub async fn delete_model_data(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    state.model_data_store
+        .delete(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Search model data by keyword.
+#[tauri::command]
+pub async fn search_model_data(
+    state: State<'_, AppState>,
+    query: String,
+) -> Result<Vec<ModelDataSummary>, String> {
+    let results = state.model_data_store
+        .search(&query)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(results.iter().map(ModelDataSummary::from).collect())
+}
+
+/// Return models ranked best-first for a given skill/tool ID.
+#[tauri::command]
+pub async fn rank_models_for_skill(
+    state: State<'_, AppState>,
+    skill_id: String,
+) -> Result<Vec<ModelDataSummary>, String> {
+    let results = state.model_data_store
+        .rank_for_skill(&skill_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(results.iter().map(ModelDataSummary::from).collect())
+}
+
+/// Auto-generate a ModelData draft using the built-in knowledge base + LLM.
+/// The result is NOT automatically saved — the frontend shows it for review first.
+#[tauri::command]
+pub async fn generate_model_data(
+    state: State<'_, AppState>,
+    input: GenerateModelDataInput,
+) -> Result<ModelData, String> {
+    let generator = ModelDataGenerator::new(state.orchestrator.clone());
+    match input {
+        GenerateModelDataInput::FromRegistry { registry_id } => {
+            let models = state.orchestrator.list_models().await;
+            let info   = models.iter()
+                .find(|m| m.id == registry_id)
+                .ok_or_else(|| format!("registry model '{registry_id}' not found"))?;
+            generator.from_registry_info(info).await.map_err(|e| e.to_string())
+        }
+        GenerateModelDataInput::FromProvider { provider, model_id, base_url } => {
+            generator
+                .from_provider(&provider, &model_id, base_url.as_deref())
+                .await
+                .map_err(|e| e.to_string())
+        }
+    }
+}
+
+/// Ensure every local GGUF in the registry has a ModelData entry.
+/// Skips models that already have an entry. Returns the count of new entries created.
+#[tauri::command]
+pub async fn sync_registry_to_model_data(state: State<'_, AppState>) -> Result<usize, String> {
+    let models = state.orchestrator.list_models().await;
+    state.model_data_store
+        .sync_from_registry(&models)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // ─── Unit tests ──────────────────────────────────────────────────────────────
