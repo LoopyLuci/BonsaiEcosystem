@@ -15,6 +15,27 @@ fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
 }
 
+// ── Shell helpers (platform-safe) ─────────────────────────────────────────────
+
+#[cfg(windows)]
+fn shell_cmd() -> &'static str { "cmd" }
+#[cfg(not(windows))]
+fn shell_cmd() -> &'static str { "sh" }
+
+#[cfg(windows)]
+fn shell_flag() -> &'static str { "/c" }
+#[cfg(not(windows))]
+fn shell_flag() -> &'static str { "-c" }
+
+/// Strip characters that could break shell comment boundaries or inject commands
+/// when passed as a skill arg. This is defence-in-depth; the arg is always
+/// delivered via an environment variable rather than interpolated into the body.
+fn sanitize_skill_args(s: &str) -> String {
+    s.chars()
+        .filter(|&c| c != '\n' && c != '\r' && c != '\0')
+        .collect()
+}
+
 fn new_id() -> String {
     use rand::distributions::Alphanumeric;
     use rand::Rng;
@@ -108,20 +129,24 @@ impl crate::tool_core::Tool for UserSkillTool {
         match self.row.kind.as_str() {
             "shell" => {
                 let body = self.row.body.clone();
-                let extra_args = args.get("args").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let script = if extra_args.is_empty() {
-                    body
-                } else {
-                    format!("{body}\n# args: {extra_args}")
-                };
+                let extra_args = args.get("args").and_then(|v| v.as_str()).unwrap_or("");
+                // Never interpolate args into the script body — pass via env var instead.
+                // Sanitize to strip control characters as an additional layer of defence.
+                let sanitized_args = sanitize_skill_args(extra_args);
 
-                let child_fut = tokio::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(&script)
-                    .kill_on_drop(true)
-                    .output();
+                let mut cmd = tokio::process::Command::new(shell_cmd());
+                cmd.arg(shell_flag())
+                    .arg(&body)
+                    .env("BONSAI_SKILL_ARGS", &sanitized_args)
+                    .kill_on_drop(true);
 
-                match tokio::time::timeout(Duration::from_secs(30), child_fut).await {
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+                }
+
+                match tokio::time::timeout(Duration::from_secs(30), cmd.output()).await {
                     Ok(Ok(output)) => {
                         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
                         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
