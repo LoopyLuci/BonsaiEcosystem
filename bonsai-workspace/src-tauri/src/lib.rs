@@ -634,6 +634,63 @@ pub fn run() {
                 });
             }
 
+            // ── BonsaiBot status polling loop ──────────────────────────────────
+            // Polls the bot admin API every 10 s and emits `bot-status-changed`
+            // to the main window so ResourcesPanel can update without manual refresh.
+            {
+                let bh2 = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    use tauri::Emitter;
+                    let http = reqwest::Client::builder()
+                        .timeout(std::time::Duration::from_secs(3))
+                        .build()
+                        .unwrap_or_default();
+                    let mut last_online: Option<bool> = None;
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+                        let port = crate::commands::read_persisted_bot_port()
+                            .ok()
+                            .flatten();
+                        let port = match port { Some(p) => p, None => continue };
+
+                        // Read token from keyring (best-effort; empty string if unavailable)
+                        let token = keyring::Entry::new("bonsai-bot", "bot_admin_token")
+                            .ok()
+                            .and_then(|e| e.get_password().ok())
+                            .unwrap_or_default();
+
+                        let url = format!("http://127.0.0.1:{port}/status");
+                        match http.get(&url)
+                            .header("authorization", format!("Bearer {token}"))
+                            .send().await
+                        {
+                            Ok(resp) if resp.status().is_success() => {
+                                if let Ok(body) = resp.json::<serde_json::Value>().await {
+                                    if last_online != Some(true) {
+                                        tracing::info!("[bot-watchdog] bot came online");
+                                        last_online = Some(true);
+                                    }
+                                    let _ = bh2.emit("bot-status-changed", serde_json::json!({
+                                        "online":  true,
+                                        "status":  body,
+                                    }));
+                                }
+                            }
+                            _ => {
+                                if last_online != Some(false) {
+                                    tracing::info!("[bot-watchdog] bot went offline");
+                                    last_online = Some(false);
+                                }
+                                let _ = bh2.emit("bot-status-changed", serde_json::json!({
+                                    "online": false,
+                                }));
+                            }
+                        }
+                    }
+                });
+            }
+
             // Register mDNS service so Android can discover this desktop on the LAN.
             {
                 let port = api_config.api_port;
