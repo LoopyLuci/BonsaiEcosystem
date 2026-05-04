@@ -86,8 +86,27 @@ impl RuntimeManager {
 
     /// Start a Babashka (Clojure) worker by spawning `bb` with the given script.
     pub async fn start_babashka_worker(&self, script_path: &str) -> Result<Box<dyn RuntimeController + Send + Sync>> {
+        let script = std::path::PathBuf::from(script_path);
+        let script_root = script
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+        let workspace_root = std::env::current_dir().unwrap_or_else(|_| script_root.clone());
+        let allowed_paths = build_allowed_paths_env(&workspace_root, &[script_root.clone()]);
+
         let mut cmd = tokio::process::Command::new("bb");
-        cmd.arg(script_path);
+        cmd.current_dir(&script_root)
+            .env("BONSAI_ALLOWED_PATHS", &allowed_paths)
+            .arg(script_path);
+
+        if script
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.eq_ignore_ascii_case("bb_runner.clj"))
+        {
+            cmd.arg("--allowed-paths").arg(&allowed_paths);
+        }
+
         let child = cmd.spawn()?;
         Ok(Box::new(ProcessController { child }))
     }
@@ -204,6 +223,18 @@ fn resolve_python_binary() -> String {
     } else {
         "python".to_string()
     }
+}
+
+fn build_allowed_paths_env(workspace_root: &Path, additional_paths: &[std::path::PathBuf]) -> String {
+    let mut unique = std::collections::BTreeSet::new();
+
+    unique.insert(workspace_root.to_string_lossy().to_string());
+    for p in additional_paths {
+        unique.insert(p.to_string_lossy().to_string());
+    }
+
+    let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+    unique.into_iter().collect::<Vec<_>>().join(sep)
 }
 
 #[cfg(test)]

@@ -6,6 +6,7 @@
 /// - `ShellGuard`: command allow/deny list and resource quotas for shell skills.
 /// - `preflight_validate()`: schema + compatibility check before execution.
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -35,6 +36,21 @@ impl Default for ResourceLimits {
 pub struct SkillConfig {
     #[serde(default)]
     pub resource_limits: ResourceLimits,
+}
+
+/// Compose a BONSAI_ALLOWED_PATHS value from workspace root and explicit skill paths.
+pub fn build_allowed_paths_env(workspace_root: &Path, skill_paths: &[String]) -> String {
+    let mut roots = std::collections::BTreeSet::new();
+    roots.insert(workspace_root.to_string_lossy().to_string());
+    for p in skill_paths {
+        let trimmed = p.trim();
+        if !trimmed.is_empty() {
+            roots.insert(trimmed.to_string());
+        }
+    }
+
+    let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+    roots.into_iter().collect::<Vec<_>>().join(sep)
 }
 
 // ── Skill Manifest ────────────────────────────────────────────────────────────
