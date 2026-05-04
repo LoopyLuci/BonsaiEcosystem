@@ -50,6 +50,29 @@ export interface OrchestratorStatus {
   free_ram_mb:  number;
 }
 
+export interface SourceQueueStats {
+  pending: number;
+  active: number;
+  served_last_60s: number;
+  avg_latency_ms_last_60s: number;
+  starved: boolean;
+}
+
+export interface TaskQueueStatus {
+  pending_total: number;
+  active_total: number;
+  max_parallel_inference: number;
+  free_ram_mb: number;
+  cpu_pct: number;
+  sources: Record<string, SourceQueueStats>;
+  active_tasks: Array<{
+    id: string;
+    task_type: string;
+    source: string;
+    running_for_ms: number;
+  }>;
+}
+
 export interface BootstrapProgress {
   step: string;
   pct:  number;
@@ -60,6 +83,7 @@ export interface BootstrapProgress {
 
 export const availableModels   = writable<ModelInfo[]>([]);
 export const orchestratorStatus = writable<OrchestratorStatus | null>(null);
+export const taskQueueStatus = writable<TaskQueueStatus | null>(null);
 export const activeModelId     = writable<string | null>(null);
 export const modelSwitchStatus = writable<string>('');
 
@@ -156,6 +180,16 @@ export async function refreshStatus() {
     }
   } catch (e) {
     console.error('[models] HTTP status fetch failed:', e);
+  }
+}
+
+export async function refreshTaskQueueStatus() {
+  try {
+    const s = await invoke<TaskQueueStatus>('get_task_queue_status');
+    taskQueueStatus.set(s);
+    return;
+  } catch (e) {
+    console.warn('[models] get_task_queue_status invoke failed:', e);
   }
 }
 
@@ -367,6 +401,7 @@ export function initModelStores() {
   listen('registry-updated', () => { refreshModels(); syncRegistryToModelData(); });
   listen('orchestrator-status', ({ payload }) => {
     orchestratorStatus.set(payload as OrchestratorStatus);
+    refreshTaskQueueStatus();
   });
   listen<ModelLoadProgress>('model-load-progress', ({ payload }) => {
     modelLoadProgress.set(payload);
@@ -380,5 +415,10 @@ export function initModelStores() {
   // Initial load
   refreshModels();
   refreshStatus();
+  refreshTaskQueueStatus();
   refreshModelData();
+
+  window.setInterval(() => {
+    refreshTaskQueueStatus();
+  }, 2000);
 }
