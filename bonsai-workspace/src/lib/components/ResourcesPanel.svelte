@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { listen } from '@tauri-apps/api/event';
   import { agentConfigs } from '$lib/stores/agents';
   import { availableModels, orchestratorStatus, refreshStatus } from '$lib/stores/models';
 
@@ -37,6 +38,7 @@
   let botMetrics: BotMetrics | null = null;
   let botOnline = false;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  let botStatusUnlisten: (() => void) | null = null;
 
   async function loadSnapshot() {
     try {
@@ -118,10 +120,23 @@
     refreshTimer = setInterval(() => {
       void loadSnapshot();
     }, 2000);
+
+    // Live bot status updates via Tauri event — faster than polling
+    botStatusUnlisten = await listen<{ online: boolean; status?: BotStatus }>(
+      'bot-status-changed',
+      ({ payload }) => {
+        botOnline  = payload.online;
+        botStatus  = payload.status ?? null;
+        if (!payload.online) {
+          botMetrics = null;
+        }
+      },
+    );
   });
 
   onDestroy(() => {
     if (refreshTimer) clearInterval(refreshTimer);
+    if (botStatusUnlisten) botStatusUnlisten();
   });
 </script>
 
