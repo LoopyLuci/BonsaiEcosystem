@@ -94,6 +94,14 @@ impl MessagingPlatform for MatrixPlatform {
         tracing::info!("[matrix] Logged in as {}", self.config.username);
         self.platform_states.insert("matrix".to_string(), "connected".to_string());
 
+        // Advertise presence as Online
+        use matrix_sdk::ruma::api::client::presence::set_presence;
+        use matrix_sdk::ruma::presence::PresenceState;
+        if let Ok(user_id) = matrix_sdk::ruma::UserId::parse(&self.config.username) {
+            let req = set_presence::v3::Request::new(user_id, PresenceState::Online);
+            let _ = client.send(req, None).await;
+        }
+
         let platform = self.clone();
 
         client.add_event_handler(
