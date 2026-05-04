@@ -37,7 +37,10 @@ const MODEL_LOAD_POLL_INTERVAL_MS: u64 = 500;
 const MODEL_LOAD_TIMEOUT_SECS: u64 = 420;
 #[cfg(not(target_os = "android"))]
 const MODEL_LOAD_TIMEOUT_SECS: u64 = 240;
+const MODEL_LOAD_TIMEOUT_GRACE_SECS: u64 = 120;
 const MODEL_LOAD_MAX_POLLS: u64 = (MODEL_LOAD_TIMEOUT_SECS * 1000) / MODEL_LOAD_POLL_INTERVAL_MS;
+const MODEL_LOAD_GRACE_POLLS: u64 = (MODEL_LOAD_TIMEOUT_GRACE_SECS * 1000) / MODEL_LOAD_POLL_INTERVAL_MS;
+const MAX_MODEL_LOAD_ATTEMPTS: u8 = 2; // 1 GPU attempt + 1 CPU fallback
 
 // ── Slot state ────────────────────────────────────────────────────────────────
 
@@ -77,6 +80,11 @@ struct Slot {
     last_used:      Instant,
     total_requests: u64,
     load_started:   Option<Instant>,
+    current_model:  Option<ModelInfo>,
+    load_attempt:   u8,
+    gpu_layers:     u32,
+    cpu_mode:       bool,
+    fallback_note:  Option<String>,
 }
 
 impl Slot {
@@ -91,6 +99,11 @@ impl Slot {
             last_used: Instant::now(),
             total_requests: 0,
             load_started: None,
+            current_model: None,
+            load_attempt: 0,
+            gpu_layers: 0,
+            cpu_mode: false,
+            fallback_note: None,
         }
     }
 
@@ -99,6 +112,11 @@ impl Slot {
             let _ = child.kill();
         }
         self.state = SlotState::Empty;
+        self.current_model = None;
+        self.load_attempt = 0;
+        self.gpu_layers = 0;
+        self.cpu_mode = false;
+        self.fallback_note = None;
     }
 }
 
@@ -116,6 +134,10 @@ pub struct SlotStatus {
     pub requests:     u64,
     pub idle_secs:    u64,
     pub load_elapsed_secs: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_note: Option<String>,
+    #[serde(skip_serializing_if = "is_false")]
+    pub cpu_mode: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -466,7 +488,20 @@ async fn wait_for_model_health(url: String) -> Result<(), String> {
             return Ok(());
         }
     }
-    Err(format!("model load timeout after {}s", MODEL_LOAD_TIMEOUT_SECS))
+
+    // Grace period: some models complete loading just after the primary timeout.
+    for _ in 0..MODEL_LOAD_GRACE_POLLS {
+        tokio::time::sleep(Duration::from_millis(MODEL_LOAD_POLL_INTERVAL_MS)).await;
+        if probe_model_ready(&probe, &url).await {
+            return Ok(());
+        }
+    }
+
+    Err(format!(
+        "model load timeout after {}s (+{}s grace)",
+        MODEL_LOAD_TIMEOUT_SECS,
+        MODEL_LOAD_TIMEOUT_GRACE_SECS
+    ))
 }
 
 async fn resolve_active_slot_url(status: &OrchestratorStatus, probe: &Client) -> Option<String> {
@@ -520,7 +555,29 @@ async fn probe_model_ready(client: &Client, base_url: &str) -> bool {
 // ── Slot management ───────────────────────────────────────────────────────────
 
 fn spawn_model(slot: &mut Slot, info: &ModelInfo, app: &AppHandle) {
+    let exe = bootstrap::llama_exe(app);
+    let exe_name = exe.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let initial_gpu_layers = if exe_name.contains("vulkan") || has_discrete_gpu() { 20 } else { 0 };
+    spawn_model_with_layers(slot, info, app, initial_gpu_layers, 1, None);
+}
+
+fn spawn_model_with_layers(
+    slot: &mut Slot,
+    info: &ModelInfo,
+    app: &AppHandle,
+    gpu_layers: u32,
+    attempt: u8,
+    fallback_note: Option<String>,
+) {
     slot.kill();
+    slot.current_model = Some(info.clone());
+    slot.load_attempt = attempt;
+    slot.gpu_layers = gpu_layers;
+    slot.cpu_mode = gpu_layers == 0;
+    slot.fallback_note = fallback_note;
     slot.state = SlotState::Loading { model_id: info.id.clone(), load_pct: None };
     slot.load_started = Some(Instant::now());
 
@@ -533,21 +590,11 @@ fn spawn_model(slot: &mut Slot, info: &ModelInfo, app: &AppHandle) {
         return;
     }
 
-    let dir      = exe.parent().unwrap_or(&exe).to_path_buf();
+    let dir = exe.parent().unwrap_or(&exe).to_path_buf();
     let port_str = slot.port.to_string();
-    let ctx      = info.context_length.clamp(512, 4096).to_string();
-    let threads  = thread_count().to_string();
-
-    // Offload to GPU when a discrete GPU is present or binary is Vulkan-linked.
-    // Use a conservative partial offload (20 layers) rather than -1 (all layers):
-    // some Vulkan drivers (notably AMD on Windows) reject the single large allocation
-    // that full-model offload requires, even with ample VRAM free. 20 layers allows
-    // llama_params_fit to auto-adjust upward safely.
-    let exe_name = exe.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    let n_gpu_layers = if exe_name.contains("vulkan") || has_discrete_gpu() { "20" } else { "0" };
+    let ctx = info.context_length.clamp(512, 4096).to_string();
+    let threads = thread_count().to_string();
+    let gpu_layers_str = gpu_layers.to_string();
 
     // Pipe stderr to a per-slot log file so crash reasons are diagnosable.
     let log_dir = app.path().app_log_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
@@ -561,37 +608,37 @@ fn spawn_model(slot: &mut Slot, info: &ModelInfo, app: &AppHandle) {
 
     let mut cmd = std::process::Command::new(&exe);
     cmd.args([
-        "--port",    &port_str,
-        "--host",    "127.0.0.1",
-        "--model",   &info.path.to_string_lossy(),
+        "--port", &port_str,
+        "--host", "127.0.0.1",
+        "--model", &info.path.to_string_lossy(),
         "--ctx-size", &ctx,
         "--threads", &threads,
-        "--n-gpu-layers", n_gpu_layers,
+        "--n-gpu-layers", &gpu_layers_str,
         // Limit parallel slots to 1: the auto value (4) inflates compute-buffer
         // allocations by 4× and can push AMD Vulkan over its contiguous-heap limit.
         "--parallel", "1",
         // Disable flash attention: for Gemma 4 on AMD Vulkan it triggers a 547 MB
         // single-allocation for FA compute buffers which ErrorOutOfDeviceMemory.
-        // The non-FA path uses smaller scattered allocations that succeed.
         "--flash-attn", "off",
         // Empty-run warmup is crashing this Windows/Vulkan build after model init.
         // Skip it and let the server become ready without the extra probe pass.
         "--no-warmup",
-        // stderr is redirected to llama-slot-N.log — do NOT add --log-disable here,
-        // as it changes Vulkan init behavior and causes additional crashes on AMD.
     ])
     .current_dir(&dir)
     .stdout(std::process::Stdio::null())
     .stderr(stderr_file);
 
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
 
     match cmd.spawn() {
-        Ok(child) => { slot.process = Some(child); }
-        Err(e)    => {
+        Ok(child) => {
+            slot.process = Some(child);
+        }
+        Err(e) => {
             slot.state = SlotState::Crashed {
                 model_id: info.id.clone(),
                 error: e.to_string(),
@@ -652,11 +699,32 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
                         .ok()
                         .and_then(|s| s.lines().filter(|l| !l.trim().is_empty()).last().map(|l| l.to_owned()))
                         .unwrap_or_default();
-                    let error = if detail.is_empty() {
-                        format!("process exited with {status}")
-                    } else {
-                        format!("process exited with {status}: {detail}")
-                    };
+                    let code = status.code();
+
+                    if should_retry_cpu_fallback(slot, code, &detail) {
+                        let exit_code = code.unwrap_or_default();
+                        let note = format!(
+                            "GPU unstable (exit code {exit_code:#010X}) — switching to CPU mode"
+                        );
+                        eprintln!(
+                            "[orchestrator] GPU crash detected on slot {} (exit code {exit_code:#010X}), retrying with CPU-only",
+                            slot.index
+                        );
+                        let _ = app.emit("model-load-fallback", json!({
+                            "slot": slot.index,
+                            "model_id": model_id,
+                            "message": note,
+                            "exit_code": format!("{exit_code:#010X}"),
+                        }));
+
+                        if let Some(info) = slot.current_model.clone() {
+                            let next_attempt = (slot.load_attempt + 1).min(MAX_MODEL_LOAD_ATTEMPTS);
+                            spawn_model_with_layers(slot, &info, app, 0, next_attempt, Some(note));
+                            continue;
+                        }
+                    }
+
+                    let error = classify_model_load_error(code, &detail, status.to_string());
                     slot.state = SlotState::Crashed {
                         model_id: model_id.clone(),
                         error,
@@ -688,6 +756,8 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
                         "model_id": model_id,
                         "pct":      p,
                         "elapsed_secs": slot.load_started.map(|t| t.elapsed().as_secs()).unwrap_or(0),
+                        "cpu_mode": slot.cpu_mode,
+                        "fallback_note": slot.fallback_note,
                     }));
                 }
             }
@@ -706,10 +776,71 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
                     "slot":     slot.index,
                     "model_id": model_id,
                     "port":     slot.port,
+                    "cpu_mode": slot.cpu_mode,
                 }));
             }
         }
     }
+}
+
+fn should_retry_cpu_fallback(slot: &Slot, code: Option<i32>, detail: &str) -> bool {
+    if slot.cpu_mode || slot.load_attempt >= MAX_MODEL_LOAD_ATTEMPTS {
+        return false;
+    }
+
+    code.is_some_and(is_gpu_memory_crash) || is_gpu_memory_log(detail)
+}
+
+fn is_gpu_memory_log(detail: &str) -> bool {
+    let d = detail.to_lowercase();
+    d.contains("status_access_violation")
+        || d.contains("status_stack_buffer_overrun")
+        || d.contains("erroroutofdevicememory")
+        || d.contains("unable to allocate vulkan")
+        || d.contains("vk::device::allocatememory")
+}
+
+fn classify_model_load_error(code: Option<i32>, detail: &str, status_text: String) -> String {
+    if is_model_file_error(detail) {
+        return format!("Model file error: {}", detail.trim());
+    }
+
+    match code {
+        Some(c) if is_gpu_memory_crash(c) => {
+            if detail.is_empty() {
+                format!("GPU memory fault ({c:#010X})")
+            } else {
+                format!("GPU memory fault ({c:#010X}): {detail}")
+            }
+        }
+        Some(c) => {
+            if detail.is_empty() {
+                format!("process exited with {c:#010X} ({status_text})")
+            } else {
+                format!("process exited with {c:#010X} ({status_text}): {detail}")
+            }
+        }
+        None => {
+            if detail.is_empty() {
+                format!("process exited with {status_text}")
+            } else {
+                format!("process exited with {status_text}: {detail}")
+            }
+        }
+    }
+}
+
+fn is_model_file_error(detail: &str) -> bool {
+    let d = detail.to_lowercase();
+    d.contains("failed to load model")
+        || d.contains("no such file")
+        || d.contains("cannot find the file")
+        || d.contains("invalid gguf")
+        || d.contains("corrupt")
+}
+
+fn is_gpu_memory_crash(code: i32) -> bool {
+    (0xC0000000..=0xC0000FFF).contains(&(code as u32))
 }
 
 // ── Queue drain ───────────────────────────────────────────────────────────────
@@ -933,12 +1064,16 @@ fn build_status(slots: &[Slot], queue: &VecDeque<InferRequest>) -> OrchestratorS
             requests:  s.total_requests,
             idle_secs: s.last_used.elapsed().as_secs(),
             load_elapsed_secs: s.load_started.map(|t| t.elapsed().as_secs()),
+            fallback_note: s.fallback_note.clone(),
+            cpu_mode: s.cpu_mode,
         }).collect(),
         queue_depth:  queue.len(),
         total_ram_mb: sys.total_memory() / (1024 * 1024),
         free_ram_mb:  sys.available_memory() / (1024 * 1024),
     }
 }
+
+fn is_false(v: &bool) -> bool { !*v }
 
 fn emit_status(slots: &[Slot], queue: &VecDeque<InferRequest>, app: &AppHandle) {
     let _ = app.emit("orchestrator-status", build_status(slots, queue));
@@ -1049,6 +1184,8 @@ mod tests {
                 requests: 0,
                 idle_secs: 0,
                 load_elapsed_secs: Some(1),
+                fallback_note: None,
+                cpu_mode: false,
             }],
             queue_depth: 0,
             total_ram_mb: 0,
@@ -1060,5 +1197,13 @@ mod tests {
         assert_eq!(resolved, Some(format!("http://127.0.0.1:{port}")));
 
         handle.abort();
+    }
+
+    #[test]
+    fn gpu_crash_triggers_cpu_fallback() {
+        assert!(is_gpu_memory_crash(0xC0000005u32 as i32));
+        assert!(is_gpu_memory_crash(0xC0000409u32 as i32));
+        assert!(!is_gpu_memory_crash(0));
+        assert!(!is_gpu_memory_crash(1));
     }
 }
