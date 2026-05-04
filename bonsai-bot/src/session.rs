@@ -60,7 +60,16 @@ pub async fn migrate(db: &Db) -> Result<(), tokio_rusqlite::Error> {
                 enabled     INTEGER NOT NULL DEFAULT 1,
                 created_at  INTEGER NOT NULL,
                 updated_at  INTEGER NOT NULL
-            );"#,
+            );
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts          INTEGER NOT NULL,
+                event       TEXT NOT NULL,
+                platform    TEXT,
+                user_id     TEXT,
+                detail      TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);"#,
         )
         .map_err(tokio_rusqlite::Error::from)
     })
@@ -601,4 +610,52 @@ pub async fn purge_expired_confirms(db: &Db) {
         Ok(())
     })
     .await;
+}
+
+// ── Audit log ─────────────────────────────────────────────────────────────────
+
+pub async fn audit(db: &Db, event: &str, platform: Option<&str>, user_id: Option<&str>, detail: Option<&str>) {
+    let ts       = now_secs();
+    let event    = event.to_string();
+    let platform = platform.map(str::to_string);
+    let user_id  = user_id.map(str::to_string);
+    let detail   = detail.map(str::to_string);
+    let _ = db.call(move |conn| {
+        conn.execute(
+            "INSERT INTO audit_log (ts, event, platform, user_id, detail) VALUES (?1,?2,?3,?4,?5)",
+            rusqlite::params![ts, event, platform, user_id, detail],
+        ).map(|_| ())?;
+        Ok(())
+    }).await;
+}
+
+pub struct AuditEntry {
+    pub id:       i64,
+    pub ts:       i64,
+    pub event:    String,
+    pub platform: Option<String>,
+    pub user_id:  Option<String>,
+    pub detail:   Option<String>,
+}
+
+pub async fn list_audit(db: &Db, limit: usize) -> Vec<AuditEntry> {
+    let limit = limit as i64;
+    db.call(move |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT id, ts, event, platform, user_id, detail FROM audit_log ORDER BY ts DESC LIMIT ?1"
+        )?;
+        let rows = stmt.query_map(rusqlite::params![limit], |row| {
+            Ok(AuditEntry {
+                id:       row.get(0)?,
+                ts:       row.get(1)?,
+                event:    row.get(2)?,
+                platform: row.get(3)?,
+                user_id:  row.get(4)?,
+                detail:   row.get(5)?,
+            })
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    })
+    .await
+    .unwrap_or_default()
 }

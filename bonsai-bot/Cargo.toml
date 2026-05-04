@@ -3,6 +3,10 @@ name    = "bonsai-bot"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "bonsai_bot"
+path = "src/lib.rs"
+
 [features]
 default  = ["discord", "telegram", "email"]
 discord  = ["dep:serenity"]
