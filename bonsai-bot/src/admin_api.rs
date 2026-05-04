@@ -371,6 +371,10 @@ async fn reclaim_listener(
 
     let mut cmd = Command::new("powershell");
     cmd.arg("-NoProfile").arg("-ExecutionPolicy").arg("Bypass").arg("-Command").arg(ps_cmd);
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
 
     match cmd.output().await {
         Ok(output) => {
