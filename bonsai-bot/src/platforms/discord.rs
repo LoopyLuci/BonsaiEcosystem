@@ -86,6 +86,103 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = &interaction {
+            use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
+            use serenity::model::application::CommandDataOptionValue;
+
+            let cmd_name = command.data.name.as_str();
+
+            // ACK within 3s — deferred so we have time for Buddy calls
+            let ack = tokio::time::timeout(
+                tokio::time::Duration::from_secs(2),
+                command.create_response(&ctx.http,
+                    CreateInteractionResponse::Defer(
+                        CreateInteractionResponseMessage::new().ephemeral(false),
+                    ),
+                ),
+            ).await;
+            if ack.is_err() || ack.unwrap().is_err() {
+                tracing::warn!("[discord] slash command ACK timed out");
+                return;
+            }
+
+            let reply_text = match cmd_name {
+                "help" => {
+                    "**Bonsai commands**\n\
+                     `/ask <question>` — Ask Bonsai anything\n\
+                     `/status` — Show health status\n\
+                     `/help` — This message\n\n\
+                     You can also DM or mention me directly in any allowed channel."
+                        .to_string()
+                }
+                "status" => {
+                    // Call the bot's own health endpoint via BuddyClient workspace URL
+                    let url = format!("{}/health/full", self.platform.router.buddy.workspace_api_url());
+                    match reqwest::Client::new().get(&url).timeout(std::time::Duration::from_secs(5)).send().await {
+                        Ok(resp) if resp.status().is_success() => {
+                            match resp.json::<serde_json::Value>().await {
+                                Ok(v) => {
+                                    let status = v["status"].as_str().unwrap_or("unknown");
+                                    let emoji = if status == "healthy" { "🟢" } else if status == "degraded" { "🟡" } else { "🔴" };
+                                    format!("{emoji} **Bonsai status**: {status}")
+                                }
+                                Err(_) => "⚠️ Could not parse health response.".to_string(),
+                            }
+                        }
+                        _ => "⚠️ Health endpoint unreachable.".to_string(),
+                    }
+                }
+                "ask" => {
+                    let question = command.data.options.iter()
+                        .find(|o| o.name == "question")
+                        .and_then(|o| if let CommandDataOptionValue::String(s) = &o.value { Some(s.clone()) } else { None })
+                        .unwrap_or_default();
+
+                    if question.is_empty() {
+                        "Please provide a question.".to_string()
+                    } else {
+                        let user_id  = command.user.id.to_string();
+                        let platform_id = command.channel_id.to_string();
+                        let event_id = format!("slash-{}", command.id);
+
+                        let inbound = crate::platforms::InboundMessage {
+                            platform:     "discord".to_string(),
+                            platform_id:  platform_id.clone(),
+                            user_id:      user_id.clone(),
+                            display_name: command.user.name.clone(),
+                            event_id,
+                            text:         question,
+                            reply_to:     None,
+                        };
+
+                        self.platform.metrics.messages_inbound.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+                        // Use a one-shot channel to capture the reply
+                        let (reply_tx, mut reply_rx) = tokio::sync::mpsc::channel::<String>(1);
+                        let router  = self.platform.router.clone();
+                        let plat    = self.platform.clone() as Arc<dyn crate::platforms::MessagingPlatform>;
+                        let plat_capture: Arc<dyn crate::platforms::MessagingPlatform> = Arc::new(
+                            SlashReplyCapture { inner: plat, tx: reply_tx }
+                        );
+
+                        tokio::time::timeout(
+                            tokio::time::Duration::from_secs(28),
+                            async move { router.handle(inbound, &plat_capture).await },
+                        ).await.ok();
+
+                        reply_rx.try_recv().unwrap_or_else(|_| "(no response)".to_string())
+                    }
+                }
+                _ => return,
+            };
+
+            let follow_up = serenity::builder::EditInteractionResponse::new().content(&reply_text);
+            if let Err(e) = command.edit_response(&ctx.http, follow_up).await {
+                tracing::warn!("[discord] slash follow-up failed: {e}");
+            }
+            return;
+        }
+
         if let Interaction::Component(component) = interaction {
             let custom_id = &component.data.custom_id;
 
@@ -155,9 +252,32 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn ready(&self, _ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         tracing::info!("[discord] Connected as {}", ready.user.name);
         self.platform.platform_states.insert("discord".to_string(), "connected".to_string());
+
+        // Register global slash commands
+        use serenity::builder::{CreateCommand, CreateCommandOption};
+        use serenity::model::application::CommandOptionType;
+
+        let commands = vec![
+            CreateCommand::new("ask")
+                .description("Ask Bonsai a question")
+                .add_option(
+                    CreateCommandOption::new(CommandOptionType::String, "question", "Your question")
+                        .required(true),
+                ),
+            CreateCommand::new("status")
+                .description("Show Bonsai health status"),
+            CreateCommand::new("help")
+                .description("List available commands and capabilities"),
+        ];
+
+        if let Err(e) = serenity::model::application::Command::set_global_commands(&ctx.http, commands).await {
+            tracing::error!("[discord] Failed to register slash commands: {e}");
+        } else {
+            tracing::info!("[discord] Slash commands registered (/ask, /status, /help)");
+        }
     }
 }
 
@@ -245,6 +365,28 @@ impl MessagingPlatform for DiscordPlatform {
             .map_err(|e| format!("discord confirm: {e}"))?;
 
         Ok(sent.id.to_string())
+    }
+}
+
+/// Intercepts send_reply to capture the slash-command response text.
+struct SlashReplyCapture {
+    inner: Arc<dyn MessagingPlatform>,
+    tx:    tokio::sync::mpsc::Sender<String>,
+}
+
+#[async_trait]
+impl MessagingPlatform for SlashReplyCapture {
+    fn name(&self) -> &'static str { "discord" }
+
+    async fn run(self: Arc<Self>, _tx: tokio::sync::mpsc::Sender<InboundMessage>, _shed: tokio::sync::mpsc::Sender<ShedNotice>) {}
+
+    async fn send_reply(&self, _chat_id: &str, _user_id: &str, text: &str, _reply_to: Option<&str>) -> Result<(), String> {
+        let _ = self.tx.try_send(text.to_string());
+        Ok(())
+    }
+
+    async fn send_confirm_prompt(&self, chat_id: &str, user_id: &str, token: &str, prompt: &str, nonce: i64) -> Result<String, String> {
+        self.inner.send_confirm_prompt(chat_id, user_id, token, prompt, nonce).await
     }
 }
 

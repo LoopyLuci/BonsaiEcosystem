@@ -255,6 +255,8 @@ pub async fn start(
         .route("/skills/:id/toggle",         post(toggle_skill_handler))
         .route("/skills/:id",               axum::routing::delete(delete_skill_handler))
         .route("/health/full",               get(health_full))
+        .route("/audit-log",                 get(audit_log_handler))
+        .route("/metrics/prometheus",        get(prometheus_handler))
         .layer(cors)
         .with_state(state);
 
@@ -1074,4 +1076,83 @@ async fn health_full(
             "scheduler":    scheduler_check,
         }
     })).into_response()
+}
+
+// ── Audit log ─────────────────────────────────────────────────────────────────
+
+use axum::response::Response;
+
+async fn audit_log_handler(
+    State(s): State<AdminState>,
+    headers: HeaderMap,
+) -> Response {
+    if !check_auth(&headers, &s) {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+    }
+    let entries = crate::session::list_audit(&s.db, 200).await;
+    let rows: Vec<_> = entries.iter().map(|e| json!({
+        "id":       e.id,
+        "ts":       e.ts,
+        "event":    e.event,
+        "platform": e.platform,
+        "user_id":  e.user_id,
+        "detail":   e.detail,
+    })).collect();
+    Json(json!({ "entries": rows })).into_response()
+}
+
+// ── Prometheus metrics ────────────────────────────────────────────────────────
+
+async fn prometheus_handler(
+    State(s): State<AdminState>,
+    headers: HeaderMap,
+) -> Response {
+    if !check_auth(&headers, &s) {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+    }
+    let m = &s.metrics;
+    use std::sync::atomic::Ordering::Relaxed;
+    let body = format!(
+        "# HELP bonsai_messages_inbound Total inbound messages\n\
+         # TYPE bonsai_messages_inbound counter\n\
+         bonsai_messages_inbound {}\n\
+         # HELP bonsai_messages_processed Total processed messages\n\
+         # TYPE bonsai_messages_processed counter\n\
+         bonsai_messages_processed {}\n\
+         # HELP bonsai_buddy_requests Total buddy API requests\n\
+         # TYPE bonsai_buddy_requests counter\n\
+         bonsai_buddy_requests {}\n\
+         # HELP bonsai_buddy_errors Total buddy API errors\n\
+         # TYPE bonsai_buddy_errors counter\n\
+         bonsai_buddy_errors {}\n\
+         # HELP bonsai_rate_limit_hits Total rate limit hits\n\
+         # TYPE bonsai_rate_limit_hits counter\n\
+         bonsai_rate_limit_hits {}\n\
+         # HELP bonsai_dedup_hits Total dedup cache hits\n\
+         # TYPE bonsai_dedup_hits counter\n\
+         bonsai_dedup_hits {}\n\
+         # HELP bonsai_allowlist_denials Total allowlist denials\n\
+         # TYPE bonsai_allowlist_denials counter\n\
+         bonsai_allowlist_denials {}\n\
+         # HELP bonsai_confirms_resolved Total confirmations resolved\n\
+         # TYPE bonsai_confirms_resolved counter\n\
+         bonsai_confirms_resolved {}\n\
+         # HELP bonsai_messages_queued_full Total messages dropped due to full queue\n\
+         # TYPE bonsai_messages_queued_full counter\n\
+         bonsai_messages_queued_full {}\n",
+        m.messages_inbound.load(Relaxed),
+        m.messages_processed.load(Relaxed),
+        m.buddy_requests.load(Relaxed),
+        m.buddy_errors.load(Relaxed),
+        m.rate_limit_hits.load(Relaxed),
+        m.dedup_hits.load(Relaxed),
+        m.allowlist_denials.load(Relaxed),
+        m.confirms_resolved.load(Relaxed),
+        m.messages_queued_full.load(Relaxed),
+    );
+    (
+        StatusCode::OK,
+        [("content-type", "text/plain; version=0.0.4")],
+        body,
+    ).into_response()
 }
