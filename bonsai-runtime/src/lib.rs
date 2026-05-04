@@ -67,11 +67,19 @@ impl RuntimeController for InProcessController {
 impl RuntimeManager {
     pub fn new() -> Self { Self {} }
 
+    const DEFAULT_SKILL_MAX_CPU_SECONDS: u64 = 30;
+    const DEFAULT_SKILL_MAX_MEMORY_MB: u64 = 512;
+
     /// Start a Python worker by spawning the given script path with the provided port.
     /// Returns a boxed `RuntimeController` that can be used to manage the runtime.
     pub async fn start_python_worker(&self, script_path: &str, port: u16) -> Result<Box<dyn RuntimeController + Send + Sync>> {
         let mut cmd = tokio::process::Command::new("python");
-        cmd.arg(script_path).arg(port.to_string());
+        cmd.arg(script_path)
+            .arg(port.to_string())
+            .arg("--max-cpu-seconds")
+            .arg(Self::DEFAULT_SKILL_MAX_CPU_SECONDS.to_string())
+            .arg("--max-memory-mb")
+            .arg(Self::DEFAULT_SKILL_MAX_MEMORY_MB.to_string());
         let child = cmd.spawn()?;
         Ok(Box::new(ProcessController { child }))
     }

@@ -14,6 +14,29 @@ use serde_json::{json, Value};
 
 use crate::tool_core::{ToolContext, ToolError, ToolOutput, ToolResult, RetryPolicy};
 
+/// Runtime resource ceilings applied per skill execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceLimits {
+    pub max_cpu_seconds: u64,
+    pub max_memory_mb: u64,
+}
+
+impl Default for ResourceLimits {
+    fn default() -> Self {
+        Self {
+            max_cpu_seconds: 30,
+            max_memory_mb: 512,
+        }
+    }
+}
+
+/// Common execution settings used by language-specific skill runtimes.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SkillConfig {
+    #[serde(default)]
+    pub resource_limits: ResourceLimits,
+}
+
 // ── Skill Manifest ────────────────────────────────────────────────────────────
 
 /// Formal contract for a skill: describes its input schema, output schema,
