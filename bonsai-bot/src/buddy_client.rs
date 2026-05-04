@@ -10,19 +10,27 @@ use crate::health::CircuitBreaker;
 use crate::metrics::SharedMetrics;
 
 pub struct BuddyClient {
-    http:    Client,
-    base:    String,
-    breaker: Arc<CircuitBreaker>,
-    metrics: SharedMetrics,
+    http:              Client,
+    base:              String,
+    workspace_api_url: String,
+    preferred_tags:    Vec<String>,
+    breaker:           Arc<CircuitBreaker>,
+    metrics:           SharedMetrics,
 }
 
 impl BuddyClient {
-    pub fn new(base_url: String, breaker: Arc<CircuitBreaker>, metrics: SharedMetrics) -> Self {
+    pub fn new(
+        base_url:          String,
+        workspace_api_url: String,
+        preferred_tags:    Vec<String>,
+        breaker:           Arc<CircuitBreaker>,
+        metrics:           SharedMetrics,
+    ) -> Self {
         let http = Client::builder()
             .timeout(Duration::from_secs(120))
             .build()
             .expect("reqwest client");
-        Self { http, base: base_url, breaker, metrics }
+        Self { http, base: base_url, workspace_api_url, preferred_tags, breaker, metrics }
     }
 
     /// Send a chat/completions request to Buddy. Returns the raw JSON response.
@@ -161,5 +169,87 @@ impl BuddyClient {
         self.http.get(&url).send().await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
+    }
+
+    /// Query the workspace orchestrator for a ready llama-server slot URL.
+    /// Returns the base_url of the first ready slot, or an error.
+    pub async fn local_slot_url(&self) -> Result<String, String> {
+        let status_url = format!("{}/v1/orchestrator/status", self.workspace_api_url);
+        let resp = tokio::time::timeout(
+            Duration::from_secs(3),
+            self.http.get(&status_url).send(),
+        ).await
+        .map_err(|_| "workspace API timeout".to_string())?
+        .map_err(|e| e.to_string())?;
+
+        let body: Value = resp.json().await.map_err(|e| e.to_string())?;
+        let slots = body["slots"].as_array().ok_or("no slots in status")?;
+
+        for slot in slots {
+            if slot["state"]["state"].as_str() == Some("ready") {
+                let port = slot["port"].as_u64().ok_or("no port")?;
+                return Ok(format!("http://127.0.0.1:{port}"));
+            }
+        }
+        Err("no ready slot found in workspace orchestrator".to_string())
+    }
+
+    /// Direct llama-server call — bypasses Buddy API and circuit breaker.
+    /// Used as fallback when the circuit breaker is open.
+    pub async fn chat_local(&self, body: Value) -> Result<Value, String> {
+        let slot_url = self.local_slot_url().await?;
+        let url = format!("{slot_url}/v1/chat/completions");
+
+        let resp = tokio::time::timeout(
+            Duration::from_secs(120),
+            self.http.post(&url).json(&body).send(),
+        ).await
+        .map_err(|_| "local slot timeout".to_string())?
+        .map_err(|e| e.to_string())?;
+
+        if resp.status().is_success() {
+            resp.json::<Value>().await.map_err(|e| e.to_string())
+        } else {
+            Err(format!("local slot HTTP {}", resp.status()))
+        }
+    }
+
+    /// Query the workspace for loaded models and pick the best one matching preferred tags.
+    /// Falls back to `None` (caller uses default) if the workspace is unreachable.
+    pub async fn resolve_model(&self) -> Option<String> {
+        if self.preferred_tags.is_empty() {
+            return None;
+        }
+        let url = format!("{}/v1/orchestrator/status", self.workspace_api_url);
+        let resp = tokio::time::timeout(
+            Duration::from_secs(2),
+            self.http.get(&url).send(),
+        ).await.ok()?.ok()?;
+
+        let body: Value = resp.json().await.ok()?;
+        let slots = body["slots"].as_array()?;
+
+        // Find the first ready slot's model_id
+        for slot in slots {
+            if slot["state"]["state"].as_str() == Some("ready") {
+                if let Some(model_id) = slot["state"]["model_id"].as_str() {
+                    let mid_lower = model_id.to_lowercase();
+                    let matches = self.preferred_tags.iter()
+                        .any(|tag| mid_lower.contains(&tag.to_lowercase()));
+                    if matches {
+                        return Some(model_id.to_string());
+                    }
+                    // No tag match but it's the only ready slot — use it anyway
+                    return Some(model_id.to_string());
+                }
+            }
+        }
+        None
+    }
+
+    /// Build an OpenAI-compatible chat request, resolving the model from the workspace if needed.
+    pub async fn build_request_auto(&self, messages: Vec<Value>) -> Value {
+        let model = self.resolve_model().await;
+        Self::build_request(messages, model.as_deref())
     }
 }

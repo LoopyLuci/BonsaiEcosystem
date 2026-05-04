@@ -9,8 +9,14 @@ pub struct BotConfig {
     pub schema_version: u8,
     #[serde(default = "default_buddy_api_url")]
     pub buddy_api_url: String,
+    /// Bonsai Workspace API base URL — used for direct llama-server slot fallback.
+    #[serde(default = "default_workspace_api_url")]
+    pub workspace_api_url: String,
     #[serde(default = "default_admin_port")]
     pub admin_port: u16,
+    /// Model tags to prefer when selecting a model from the workspace registry.
+    #[serde(default = "default_preferred_model_tags")]
+    pub preferred_model_tags: Vec<String>,
     #[serde(default)]
     pub reclaim_allowed_ports: Vec<u16>,
     #[serde(default)]
@@ -51,7 +57,11 @@ impl Default for RuntimeLimits {
 
 fn default_schema_version() -> u8 { 1 }
 fn default_buddy_api_url() -> String { "http://127.0.0.1:11420".to_string() }
+fn default_workspace_api_url() -> String { "http://127.0.0.1:11369".to_string() }
 fn default_admin_port() -> u16 { 11666 }
+fn default_preferred_model_tags() -> Vec<String> {
+    vec!["chatbot".into(), "instruction".into(), "capable".into()]
+}
 
 impl Default for BotConfig {
     fn default() -> Self {
@@ -60,8 +70,10 @@ impl Default for BotConfig {
             .unwrap_or_else(|| "bonsai-bot.db".to_string());
         Self {
             schema_version: 1,
-            buddy_api_url:  "http://127.0.0.1:11420".to_string(),
-            admin_port:     11666,
+            buddy_api_url:       "http://127.0.0.1:11420".to_string(),
+            workspace_api_url:   "http://127.0.0.1:11369".to_string(),
+            admin_port:          11666,
+            preferred_model_tags: default_preferred_model_tags(),
             reclaim_allowed_ports: Vec::new(),
             allowed_script_paths: Vec::new(),
             runtime_limits: RuntimeLimits::default(),
