@@ -227,12 +227,12 @@ impl McpManager {
 
             match McpConnection::connect(cfg).await {
                 Err(e) => {
-                    eprintln!("[mcp] server '{name}' connect failed: {e}");
+                    tracing::error!(server=%name, error=%e, "[mcp] server connect failed");
                 }
                 Ok(mut conn) => {
                     match conn.list_tools().await {
                         Err(e) => {
-                            eprintln!("[mcp] server '{name}' list_tools failed: {e}");
+                            tracing::error!(server=%name, error=%e, "[mcp] server list_tools failed");
                         }
                         Ok(tool_defs) => {
                             let shared = Arc::new(Mutex::new(conn));
@@ -263,6 +263,6 @@ impl McpManager {
         // Connections are owned by their Arc<Mutex<McpConnection>>; drop is
         // handled when all McpToolAdapter arcs go out of scope (registry clear).
         // This method is a placeholder for future per-server teardown.
-        eprintln!("[mcp] disconnect_server called for {server_id} (adapters will drop with registry)");
+        tracing::info!(server_id=%server_id, "[mcp] disconnect_server called (adapters will drop with registry)");
     }
 }
