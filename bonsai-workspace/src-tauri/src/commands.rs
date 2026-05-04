@@ -26,9 +26,10 @@ use crate::cluster_orchestrator::{
     ClusterWorkload,
     NodeRuntimeMetrics,
 };
-use crate::model_orchestrator::{InferRequest, InferStats};
+use crate::model_orchestrator::InferStats;
 use crate::remote::RemoteManager;
 use crate::remote_input::RemoteInputEvent;
+use crate::task_queue::{InferenceTask, TaskQueueStatus, TaskSource, TaskType};
 use crate::tools;
 use crate::AppState;
 
@@ -543,30 +544,30 @@ pub struct ChatResponse {
 
 /// Single inference call — streams tokens via "token-stream" event.
 async fn run_inference(
-    orchestrator: &crate::model_orchestrator::ModelOrchestrator,
+    task_queue:   &crate::task_queue::TaskQueue,
     app_handle:   &AppHandle,
     messages:     Vec<Value>,
     cancel_flag:  Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> Result<(String, InferStats), String> {
-    let (resp_tx, resp_rx) = oneshot::channel();
     let (stream_tx, mut stream_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    orchestrator.infer(InferRequest {
-        model_id:   None,
-        messages,
-        max_tokens: 4096,
-        overrides:  None,
-        stream_tx:  Some(stream_tx),
-        cancel_flag,
-        resp_tx,
-        source:     "workspace",
-    })?;
     let handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(tok) = stream_rx.recv().await {
             let _ = handle.emit("token-stream", &tok);
         }
     });
-    resp_rx.await.map_err(|_| "Request cancelled".to_string())?
+    task_queue.submit(InferenceTask {
+        task_type: TaskType::UserChat,
+        source: TaskSource::Workspace,
+        model_id: None,
+        messages,
+        max_tokens: 4096,
+        overrides: None,
+        stream_tx: Some(stream_tx),
+        cancel_flag,
+        estimated_tokens: 4096,
+        estimated_ram_mb: 2048,
+    }).await
 }
 
 #[tauri::command]
@@ -669,7 +670,7 @@ pub async fn submit_chat(
     for _turn in 0..MAX_TURNS {
         trim_context_to_budget(&mut ctx, CHAT_PROMPT_TOKEN_BUDGET);
         let (raw, stats) = match run_inference(
-            &state.orchestrator,
+            &state.task_queue,
             &app_handle,
             ctx.clone(),
             Some(state.chat_cancel.clone()),
@@ -983,7 +984,7 @@ Do not include markdown fences, explanations, or repeated context. Keep completi
         json!({"role": "user", "content": user_prompt}),
     ];
 
-    let (raw, _stats) = run_inference(&state.orchestrator, &app_handle, messages, None).await?;
+    let (raw, _stats) = run_inference(&state.task_queue, &app_handle, messages, None).await?;
     let mut completion = strip_think_tags(&raw);
     completion = tools::strip_tool_calls(&completion);
 
@@ -1594,24 +1595,25 @@ pub async fn ai_scaffold_project(
          No markdown, no explanation — pure JSON."
     );
 
-    let (resp_tx, resp_rx) = oneshot::channel();
-    let req = InferRequest {
-        model_id:   None,
-        messages:   vec![json!({"role": "system", "content": "Scaffold a Bonsai project."}),
-                     json!({"role": "user", "content": full_prompt})],
-        max_tokens: 4096,
-        overrides:  None,
-        stream_tx:  None,
-        cancel_flag: None,
-        resp_tx,
-        source:     "workspace",
-    };
-
-    state.orchestrator.infer(req)?;
-
-    let (raw, _stats) = resp_rx
+    let (raw, _stats) = state
+        .task_queue
+        .submit(InferenceTask {
+            task_type: TaskType::BackgroundTask,
+            source: TaskSource::Workspace,
+            model_id: None,
+            messages: vec![
+                json!({"role": "system", "content": "Scaffold a Bonsai project."}),
+                json!({"role": "user", "content": full_prompt}),
+            ],
+            max_tokens: 4096,
+            overrides: None,
+            stream_tx: None,
+            cancel_flag: None,
+            estimated_tokens: 4096,
+            estimated_ram_mb: 2048,
+        })
         .await
-        .map_err(|_| "Scaffold cancelled".to_string())??;
+        .map_err(|e| format!("Scaffold cancelled: {e}"))?;
     handle_agent_response(&app_handle, raw).await?;
     Ok("Scaffolding complete".to_string())
 }
@@ -1633,7 +1635,7 @@ pub async fn ai_code_review(
         json!({"role": "user", "content": user}),
     ];
 
-    let (raw, _stats) = run_inference(&state.orchestrator, &app_handle, messages, None).await?;
+    let (raw, _stats) = run_inference(&state.task_queue, &app_handle, messages, None).await?;
     let mut review = strip_think_tags(&raw);
     review = tools::strip_tool_calls(&review);
     let trimmed = review.trim();
@@ -2005,6 +2007,11 @@ pub async fn get_orchestrator_status(
 ) -> Result<serde_json::Value, String> {
     let s = state.orchestrator.status().await;
     Ok(serde_json::to_value(s).map_err(|e| e.to_string())?)
+}
+
+#[tauri::command]
+pub async fn get_task_queue_status(state: State<'_, AppState>) -> Result<TaskQueueStatus, String> {
+    Ok(state.task_queue.status().await)
 }
 
 // ─── Cluster Orchestrator ───────────────────────────────────────────────────
