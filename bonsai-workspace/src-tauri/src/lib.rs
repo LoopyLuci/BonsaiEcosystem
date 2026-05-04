@@ -42,6 +42,7 @@ mod remote;
 mod remote_input;
 mod sidecar_manager;
 mod swarm_orchestrator;
+mod task_queue;
 mod tools;
 mod user_skills;
 mod wal;
@@ -127,6 +128,8 @@ pub struct AppState {
     pub buddy_api_port:    u16,
     /// Rich, persistent metadata for every model (local and cloud).
     pub model_data_store:  Arc<model_data_store::ModelDataStore>,
+    /// Shared inference task queue with fairness/resource gating.
+    pub task_queue:       Arc<task_queue::TaskQueue>,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -380,6 +383,11 @@ pub fn run() {
                 ).expect("model data store init failed"),
             );
 
+            let task_queue = Arc::new(task_queue::TaskQueue::new(
+                orchestrator.clone(),
+                task_queue::QueueConfig::default(),
+            ));
+
             let mut api_config = config::load_config(&app_handle).unwrap_or_default();
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -499,6 +507,7 @@ pub fn run() {
                 buddy_api_server: Arc::new(Mutex::new(buddy_handle)),
                 buddy_api_port:   buddy_port,
                 model_data_store: model_data_store.clone(),
+                task_queue,
             });
             app.manage(remote_manager.clone());
 
@@ -1007,6 +1016,7 @@ pub fn run() {
             commands::rank_models_for_skill,
             commands::generate_model_data,
             commands::sync_registry_to_model_data,
+            commands::get_task_queue_status,
             // ── Model directories ─────────────────────────────────────────────
             commands::list_model_directories,
             commands::add_model_directory,

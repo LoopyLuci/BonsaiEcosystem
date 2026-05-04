@@ -19,6 +19,7 @@
     activeModel,
     activeModelId,
     orchestratorStatus,
+    taskQueueStatus,
     modelSwitchStatus,
     modelDataList,
     CUSTOM_SWARM_MODEL_ID,
@@ -285,6 +286,11 @@
         <button type="button" class="trigger-chip" on:click|stopPropagation={openAgentsPanel}
           title="Open Agents panel" aria-label="Open Agents panel">Swarm Active</button>
       {/if}
+      {#if $taskQueueStatus}
+        <span class="queue-chip" title="Inference queue status">
+          Queue: {$taskQueueStatus.pending_total} pending, {$taskQueueStatus.active_total} active
+        </span>
+      {/if}
       <span class="trigger-chevron" class:open>{open ? '▲' : '▼'}</span>
     </button>
 
@@ -533,6 +539,23 @@
     font-size: 10px; line-height: 1;
     padding: 3px 7px;
     white-space: nowrap; flex-shrink: 0; cursor: pointer;
+  }
+
+  .queue-chip {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(250, 204, 21, 0.45);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 10px;
+    color: #fde68a;
+    background: rgba(120, 53, 15, 0.35);
+    white-space: nowrap;
+  }
+  .model-selector-bar.inline .queue-chip {
+    border-color: var(--border);
+    color: var(--text-dim);
+    background: var(--bg2);
   }
   .trigger-chip:hover { filter: brightness(1.08); }
 
