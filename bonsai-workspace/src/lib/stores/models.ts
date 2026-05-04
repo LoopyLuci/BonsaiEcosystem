@@ -87,6 +87,16 @@ export const taskQueueStatus = writable<TaskQueueStatus | null>(null);
 export const activeModelId     = writable<string | null>(null);
 export const modelSwitchStatus = writable<string>('');
 
+/** Set model switch status; if autoDismissMs is provided, clear after that delay. */
+let _switchStatusTimer: ReturnType<typeof setTimeout> | null = null;
+export function setModelSwitchStatus(msg: string, autoDismissMs?: number): void {
+  if (_switchStatusTimer) { clearTimeout(_switchStatusTimer); _switchStatusTimer = null; }
+  modelSwitchStatus.set(msg);
+  if (autoDismissMs && autoDismissMs > 0) {
+    _switchStatusTimer = setTimeout(() => { modelSwitchStatus.set(''); _switchStatusTimer = null; }, autoDismissMs);
+  }
+}
+
 export const CUSTOM_SWARM_MODEL_ID = '__custom_swarm__';
 
 const CUSTOM_SWARM_MODEL: ModelInfo = {

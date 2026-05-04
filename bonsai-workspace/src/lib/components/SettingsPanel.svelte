@@ -6,7 +6,7 @@
   import { addAssistantMessage } from '$lib/stores/chat';
   import ClusterControlPanel from '$lib/components/ClusterControlPanel.svelte';
   import { DEFAULT_API_PORT } from '$lib/constants/network';
-  import { availableModels, activeModel, activeModelId, orchestratorStatus, refreshStatus, refreshModels, modelSwitchStatus } from '$lib/stores/models';
+  import { availableModels, activeModel, activeModelId, orchestratorStatus, refreshStatus, refreshModels, modelSwitchStatus, setModelSwitchStatus } from '$lib/stores/models';
   import { apiHost, apiPort, apiBaseUrl, loadApiSettings, saveApiSettings } from '$lib/stores/settings';
   import {
     applyAutoDetectedMobileDisplaySettings,
@@ -102,7 +102,7 @@
       await refreshModels();
       await refreshStatus();
       switchDetails = `${msg} Orchestrator refreshed.`;
-      modelSwitchStatus.set(switchDetails);
+      setModelSwitchStatus(switchDetails, 5000);
       addAssistantMessage(msg);
     } catch (e) {
       errorMsg = String(e);
@@ -119,7 +119,7 @@
           if (isReady) {
             await refreshModels();
             switchDetails = `${name} became ready after timeout grace window.`;
-            modelSwitchStatus.set(switchDetails);
+            setModelSwitchStatus(switchDetails, 5000);
             errorMsg = '';
             return;
           }
