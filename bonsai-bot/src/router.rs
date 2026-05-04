@@ -127,7 +127,7 @@ impl Router {
             // No pending confirm found — fall through to normal Buddy call
         }
 
-        // Stage 6: Buddy call
+        // Stage 6: Buddy call (with direct llama-server fallback on circuit-open)
         let messages = vec![json!({
             "role": "user",
             "content": clean_text,
@@ -135,16 +135,26 @@ impl Router {
         })];
 
         tracing::debug!(req_id=%req_id, "calling buddy");
-        let response = match self.buddy.chat(BuddyClient::build_request(messages, None)).await {
+        let buddy_body = self.buddy.build_request_auto(messages.clone()).await;
+        let response = match self.buddy.chat(buddy_body.clone()).await {
             Ok(v) => v,
+            Err(e) if e == "circuit_open" => {
+                tracing::warn!(req_id=%req_id, "buddy circuit open — trying local llama-server");
+                match self.buddy.chat_local(buddy_body).await {
+                    Ok(v) => v,
+                    Err(le) => {
+                        tracing::warn!(req_id=%req_id, error=%le, "local fallback also failed");
+                        let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
+                            "⚠️ Bonsai is currently unavailable. Try again shortly.",
+                            msg.reply_to.as_deref()).await;
+                        return;
+                    }
+                }
+            }
             Err(e) => {
                 tracing::warn!(req_id=%req_id, error=%e, "buddy call failed");
-                let reply = if e == "circuit_open" {
-                    "⚠️ Bonsai is currently unavailable. Try again shortly."
-                } else {
-                    "⚠️ Bonsai error. Please retry."
-                };
-                let _ = platform.send_reply(&msg.platform_id, &msg.user_id, reply, msg.reply_to.as_deref()).await;
+                let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
+                    "⚠️ Bonsai error. Please retry.", msg.reply_to.as_deref()).await;
                 return;
             }
         };
