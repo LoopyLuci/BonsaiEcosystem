@@ -36,6 +36,8 @@ impl Default for ResourceLimits {
 pub struct SkillConfig {
     #[serde(default)]
     pub resource_limits: ResourceLimits,
+    #[serde(default)]
+    pub required_bb_version: Option<String>,
 }
 
 /// Compose a BONSAI_ALLOWED_PATHS value from workspace root and explicit skill paths.
@@ -51,6 +53,14 @@ pub fn build_allowed_paths_env(workspace_root: &Path, skill_paths: &[String]) ->
 
     let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
     roots.into_iter().collect::<Vec<_>>().join(sep)
+}
+
+/// Returns true when the installed babashka version does not match a required pin.
+pub fn bb_version_mismatch(required_bb_version: Option<&str>, installed_version: &str) -> bool {
+    match required_bb_version.map(str::trim).filter(|v| !v.is_empty()) {
+        Some(required) => !installed_version.contains(required),
+        None => false,
+    }
 }
 
 // ── Skill Manifest ────────────────────────────────────────────────────────────

@@ -1,6 +1,9 @@
 use anyhow::Result;
 use std::path::Path;
+use std::sync::Once;
 use async_trait::async_trait;
+
+static BB_VERSION_CHECK: Once = Once::new();
 
 pub struct RuntimeManager {}
 
@@ -86,6 +89,11 @@ impl RuntimeManager {
 
     /// Start a Babashka (Clojure) worker by spawning `bb` with the given script.
     pub async fn start_babashka_worker(&self, script_path: &str) -> Result<Box<dyn RuntimeController + Send + Sync>> {
+        BB_VERSION_CHECK.call_once(|| {
+            let required = std::env::var("BONSAI_REQUIRED_BB_VERSION").ok();
+            warn_if_bb_version_mismatch(required.as_deref());
+        });
+
         let script = std::path::PathBuf::from(script_path);
         let script_root = script
             .parent()
@@ -235,6 +243,27 @@ fn build_allowed_paths_env(workspace_root: &Path, additional_paths: &[std::path:
 
     let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
     unique.into_iter().collect::<Vec<_>>().join(sep)
+}
+
+fn warn_if_bb_version_mismatch(required: Option<&str>) {
+    let required = required.map(str::trim).filter(|v| !v.is_empty());
+    let Some(required) = required else { return; };
+
+    let output = std::process::Command::new("bb").arg("--version").output();
+    match output {
+        Ok(out) => {
+            let installed = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !installed.contains(required) {
+                eprintln!(
+                    "[runtime] WARN: babashka version mismatch. required={required}, installed='{}'",
+                    if installed.is_empty() { "unknown" } else { &installed }
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("[runtime] WARN: unable to run 'bb --version' for version check: {e}");
+        }
+    }
 }
 
 #[cfg(test)]
