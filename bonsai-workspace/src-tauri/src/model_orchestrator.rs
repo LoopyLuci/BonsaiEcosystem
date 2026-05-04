@@ -250,9 +250,23 @@ impl ModelOrchestrator {
         let (tx, rx) = oneshot::channel();
         let _ = self.cmd_tx.send(Cmd::Status { resp_tx: tx });
         let status = rx.await.ok()?;
-        status.slots.iter()
+        if let Some(url) = status.slots.iter()
             .find(|s| s.state.is_ready())
             .map(|s| format!("http://127.0.0.1:{}", s.port))
+        {
+            return Some(url);
+        }
+
+        // Startup race guard: a slot can be process-healthy for a brief window
+        // before the orchestrator poll loop transitions Loading -> Ready.
+        let probe = Client::new();
+        for slot in status.slots.iter().filter(|s| matches!(s.state, SlotState::Loading { .. })) {
+            let url = format!("http://127.0.0.1:{}", slot.port);
+            if probe_model_ready(&probe, &url).await {
+                return Some(url);
+            }
+        }
+        None
     }
 
     /// Convenience wrapper: submit a single user-turn prompt and await the full

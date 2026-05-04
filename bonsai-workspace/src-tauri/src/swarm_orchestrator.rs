@@ -1661,19 +1661,7 @@ async fn run_agent_inference(
     cancel_flag:  Option<Arc<AtomicBool>>,
     emit_tokens:  bool,
 ) -> Result<(String, InferStats), String> {
-    let (resp_tx, resp_rx) = oneshot::channel();
     let (stream_tx, mut stream_rx) = mpsc::unbounded_channel::<String>();
-
-    orchestrator.infer(InferRequest {
-        model_id,
-        messages,
-        max_tokens: 4096,
-        overrides:  None,
-        stream_tx:  Some(stream_tx),
-        cancel_flag,
-        resp_tx,
-        source: "workspace",
-    })?;
 
     let ah = app_handle.clone();
     let aid = agent_id.clone();
@@ -1692,6 +1680,36 @@ async fn run_agent_inference(
             }
         }
     });
+
+    if let Some(state) = app_handle.try_state::<crate::AppState>() {
+        return state
+            .task_queue
+            .submit(crate::task_queue::InferenceTask {
+                task_type: crate::task_queue::TaskType::SwarmWorker,
+                source: crate::task_queue::TaskSource::Workspace,
+                model_id: model_id.clone(),
+                messages: messages.clone(),
+                max_tokens: 4096,
+                overrides: None,
+                stream_tx: Some(stream_tx),
+                cancel_flag,
+                estimated_tokens: 4096,
+                estimated_ram_mb: 2048,
+            })
+            .await;
+    }
+
+    let (resp_tx, resp_rx) = oneshot::channel();
+    orchestrator.infer(InferRequest {
+        model_id,
+        messages,
+        max_tokens: 4096,
+        overrides:  None,
+        stream_tx:  Some(stream_tx),
+        cancel_flag,
+        resp_tx,
+        source: "workspace",
+    })?;
 
     resp_rx.await.map_err(|_| "Request cancelled".to_string())?
 }
