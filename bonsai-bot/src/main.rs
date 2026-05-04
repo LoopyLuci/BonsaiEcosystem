@@ -58,7 +58,11 @@ async fn main() {
     let metrics = Arc::new(Metrics::default());
     let breaker = CircuitBreaker::new(cfg.circuit_breaker.clone());
     let buddy   = Arc::new(BuddyClient::new(
-        cfg.buddy_api_url.clone(), breaker.clone(), metrics.clone()
+        cfg.buddy_api_url.clone(),
+        cfg.workspace_api_url.clone(),
+        cfg.preferred_model_tags.clone(),
+        breaker.clone(),
+        metrics.clone(),
     ));
     let dedup   = Arc::new(DedupCache::new(10_000, 600));
 
