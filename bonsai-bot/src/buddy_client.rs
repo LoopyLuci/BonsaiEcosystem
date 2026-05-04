@@ -33,6 +33,8 @@ impl BuddyClient {
         Self { http, base: base_url, workspace_api_url, preferred_tags, breaker, metrics }
     }
 
+    pub fn workspace_api_url(&self) -> &str { &self.workspace_api_url }
+
     /// Send a chat/completions request to Buddy. Returns the raw JSON response.
     pub async fn chat(&self, body: Value) -> Result<Value, String> {
         if self.breaker.is_open() {

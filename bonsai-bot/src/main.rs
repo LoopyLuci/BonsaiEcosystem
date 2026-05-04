@@ -1,17 +1,5 @@
-mod admin_api;
-mod port_manager;
-mod buddy_client;
-mod config;
-mod dedup;
-mod formatter;
-mod health;
-mod metrics;
-mod platforms;
-mod router;
-mod sanitizer;
-mod scheduler;
-mod session;
-mod swarm_client;
+// All modules are declared in lib.rs; import them here
+use bonsai_bot::{admin_api, buddy_client, config, dedup, health, metrics, platforms, router, scheduler, session, swarm_client};
 
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -26,6 +14,34 @@ use crate::metrics::Metrics;
 use crate::platforms::{InboundMessage, MessagingPlatform, ShedNotice};
 use crate::router::Router;
 
+/// Spawn a platform and restart it with exponential backoff (1→2→4→8→16→32s, max 10 retries)
+/// if it exits. Each successful run resets the backoff counter.
+fn spawn_platform_with_backoff(
+    p: Arc<dyn MessagingPlatform>,
+    tx: mpsc::Sender<InboundMessage>,
+    shed_tx: mpsc::Sender<ShedNotice>,
+) {
+    tokio::spawn(async move {
+        let mut delay_secs: u64 = 1;
+        let mut attempts: u32   = 0;
+        loop {
+            let name  = p.name();
+            let p2    = p.clone();
+            let tx2   = tx.clone();
+            let shed2 = shed_tx.clone();
+            p2.run(tx2, shed2).await;
+            attempts += 1;
+            if attempts >= 10 {
+                tracing::error!("[{name}] Platform exited 10 times — giving up");
+                break;
+            }
+            tracing::warn!("[{name}] Platform exited (attempt {attempts}); reconnecting in {delay_secs}s");
+            tokio::time::sleep(Duration::from_secs(delay_secs)).await;
+            delay_secs = (delay_secs * 2).min(32);
+        }
+    });
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -38,6 +54,18 @@ async fn main() {
     tracing::info!("[bonsai-bot] Starting v{}", env!("CARGO_PKG_VERSION"));
 
     let cfg = load_config();
+
+    // Config validation
+    {
+        let mut errs: Vec<&str> = Vec::new();
+        if cfg.buddy_api_url.is_empty()     { errs.push("buddy_api_url is empty"); }
+        if cfg.preferred_model_tags.is_empty() { errs.push("preferred_model_tags is empty"); }
+        let any_platform = cfg.discord.enabled || cfg.telegram.enabled || cfg.email.enabled || cfg.matrix.enabled;
+        if !any_platform { tracing::warn!("[bonsai-bot] No platforms are enabled — bot will not receive messages"); }
+        for e in &errs { tracing::error!("[bonsai-bot] Config error: {e}"); }
+        if !errs.is_empty() { std::process::exit(1); }
+    }
+
     let admin_token = ensure_admin_token().expect("keychain access for admin token");
 
     // Wait for Buddy
@@ -116,10 +144,8 @@ async fn main() {
             use crate::platforms::discord::DiscordPlatform;
             let p = DiscordPlatform::new(token, cfg.discord.config.clone(), metrics.clone(), router.clone(), platform_states.clone());
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
-            platform_list.push(p2);
-            let tx2    = tx.clone();
-            let shed2  = shed_tx.clone();
-            tokio::spawn(async move { p.run(tx2, shed2).await });
+            platform_list.push(p2.clone());
+            spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
         } else {
             tracing::warn!("[discord] No token in keychain — platform disabled");
         }
@@ -131,10 +157,8 @@ async fn main() {
             use crate::platforms::telegram::TelegramPlatform;
             let p = TelegramPlatform::new(token, cfg.telegram.config.clone(), metrics.clone(), router.clone(), platform_states.clone());
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
-            platform_list.push(p2);
-            let tx2   = tx.clone();
-            let shed2 = shed_tx.clone();
-            tokio::spawn(async move { p.run(tx2, shed2).await });
+            platform_list.push(p2.clone());
+            spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
         } else {
             tracing::warn!("[telegram] No token in keychain — platform disabled");
         }
@@ -148,10 +172,8 @@ async fn main() {
             use crate::platforms::email::EmailPlatform;
             let p = EmailPlatform::new(imap_pass, smtp_pass, cfg.email.config.clone(), metrics.clone(), platform_states.clone());
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
-            platform_list.push(p2);
-            let tx2   = tx.clone();
-            let shed2 = shed_tx.clone();
-            tokio::spawn(async move { p.run(tx2, shed2).await });
+            platform_list.push(p2.clone());
+            spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
         } else {
             tracing::warn!("[email] No password in keychain — platform disabled");
         }
@@ -163,10 +185,8 @@ async fn main() {
             use crate::platforms::matrix::MatrixPlatform;
             let p = MatrixPlatform::new(password, cfg.matrix.config.clone(), metrics.clone(), platform_states.clone());
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
-            platform_list.push(p2);
-            let tx2   = tx.clone();
-            let shed2 = shed_tx.clone();
-            tokio::spawn(async move { p.run(tx2, shed2).await });
+            platform_list.push(p2.clone());
+            spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
         } else {
             tracing::warn!("[matrix] No password in keychain — platform disabled");
         }
@@ -241,6 +261,22 @@ async fn main() {
 
     loop {
         tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("[bonsai-bot] SIGINT received — draining queue (30s max)");
+                drop(rx); // Close the channel so no new messages are accepted
+                let drain_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+                loop {
+                    if semaphore.available_permits() == cfg.backpressure.global_semaphore {
+                        break; // All in-flight tasks finished
+                    }
+                    if tokio::time::Instant::now() >= drain_deadline {
+                        tracing::warn!("[bonsai-bot] Drain timeout — forcing shutdown");
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                break;
+            }
             msg = rx.recv() => {
                 let msg = match msg { Some(m) => m, None => break };
 

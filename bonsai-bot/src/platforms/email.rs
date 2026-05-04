@@ -46,15 +46,24 @@ impl MessagingPlatform for EmailPlatform {
         tx: tokio::sync::mpsc::Sender<InboundMessage>,
         shed_tx: tokio::sync::mpsc::Sender<ShedNotice>,
     ) {
-        self.platform_states.insert("email".to_string(), "polling".to_string());
+        self.platform_states.insert("email".to_string(), "connecting".to_string());
+
+        // Try IMAP IDLE for push notifications; fall back to 60s polling on error
         loop {
-            if let Err(e) = self.poll_once(&tx, &shed_tx).await {
-                tracing::warn!("[email] Poll error: {e}; retrying in {}s", self.config.poll_interval_secs);
-                self.platform_states.insert("email".to_string(), "error".to_string());
-            } else {
-                self.platform_states.insert("email".to_string(), "polling".to_string());
+            match self.run_idle_session(&tx, &shed_tx).await {
+                Ok(()) => {
+                    // IDLE ended normally (server changed, 28-min keepalive) — reconnect
+                    tracing::debug!("[email] IDLE session ended, reconnecting");
+                    self.platform_states.insert("email".to_string(), "connecting".to_string());
+                }
+                Err(e) => {
+                    tracing::warn!("[email] IDLE error: {e}; falling back to 60s poll");
+                    self.platform_states.insert("email".to_string(), "polling".to_string());
+                    // poll once then wait before retrying IDLE
+                    let _ = self.poll_once(&tx, &shed_tx).await;
+                    sleep(Duration::from_secs(60)).await;
+                }
             }
-            sleep(Duration::from_secs(self.config.poll_interval_secs)).await;
         }
     }
 
@@ -122,6 +131,124 @@ impl MessagingPlatform for EmailPlatform {
 }
 
 impl EmailPlatform {
+    /// Connect, enter IMAP IDLE, process messages when notified, then return.
+    /// Reconnected by the caller (run loop).
+    async fn run_idle_session(
+        &self,
+        tx: &tokio::sync::mpsc::Sender<InboundMessage>,
+        shed_tx: &tokio::sync::mpsc::Sender<ShedNotice>,
+    ) -> Result<(), String> {
+        use async_native_tls::TlsConnector;
+        use async_imap::Client;
+        use futures::TryStreamExt;
+        use tokio_util::compat::TokioAsyncReadCompatExt;
+
+        let addr = format!("{}:{}", self.config.imap_host, self.config.imap_port);
+        let tcp  = tokio::net::TcpStream::connect(&addr)
+            .await
+            .map_err(|e| format!("TCP connect: {e}"))?;
+        let tls  = TlsConnector::new()
+            .connect(&self.config.imap_host, tcp.compat())
+            .await
+            .map_err(|e| format!("TLS: {e}"))?;
+
+        let client = Client::new(tls);
+        let mut session = client
+            .login(&self.config.imap_username, &self.imap_password)
+            .await
+            .map_err(|(e, _)| format!("IMAP login: {e}"))?;
+
+        session.select("INBOX").await.map_err(|e| format!("SELECT: {e}"))?;
+
+        // Process any messages that arrived while we were offline
+        let uid_set = {
+            let query = format!("UNSEEN SUBJECT \"{}\"", self.config.subject_prefix);
+            session.uid_search(&query).await.map_err(|e| format!("SEARCH: {e}"))?
+        };
+        self.drain_uids(&mut session, uid_set, tx, shed_tx).await?;
+
+        self.platform_states.insert("email".to_string(), "idle".to_string());
+
+        // IDLE — wait up to 25 minutes (server max is 29)
+        let mut idle = session.idle();
+        let (idle_wait, _stop) = idle.wait_with_timeout(std::time::Duration::from_secs(25 * 60));
+        let _fired = idle_wait.await.map_err(|e| format!("IDLE wait: {e}"))?;
+        let mut session = idle.done().await.map_err(|e| format!("IDLE done: {e}"))?;
+
+        // Process what arrived during IDLE
+        let uid_set = {
+            let query = format!("UNSEEN SUBJECT \"{}\"", self.config.subject_prefix);
+            session.uid_search(&query).await.map_err(|e| format!("SEARCH: {e}"))?
+        };
+        self.drain_uids(&mut session, uid_set, tx, shed_tx).await?;
+
+        let _ = session.logout().await;
+        Ok(())
+    }
+
+    async fn drain_uids<S>(
+        &self,
+        session: &mut async_imap::Session<S>,
+        uid_set: std::collections::HashSet<u32>,
+        tx: &tokio::sync::mpsc::Sender<InboundMessage>,
+        shed_tx: &tokio::sync::mpsc::Sender<ShedNotice>,
+    ) -> Result<(), String>
+    where
+        S: futures::AsyncRead + futures::AsyncWrite + Unpin + Send + std::fmt::Debug,
+    {
+        use futures::TryStreamExt;
+
+        for uid in uid_set {
+            let uid_str     = uid.to_string();
+            let fetch_query = "(BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)] BODY.PEEK[TEXT]<0.2000>)";
+            let messages: Vec<_> = session
+                .uid_fetch(&uid_str, fetch_query)
+                .await
+                .map_err(|e| format!("FETCH {uid}: {e}"))?
+                .try_collect()
+                .await
+                .map_err(|e| format!("collect {uid}: {e}"))?;
+
+            for msg in messages.iter() {
+                let header_bytes = msg.header().unwrap_or_default();
+                let body_bytes   = msg.text().unwrap_or_default();
+                let headers      = parse_headers(header_bytes);
+                let from         = headers.get("from").cloned().unwrap_or_default();
+                let subject      = headers.get("subject").cloned().unwrap_or_default();
+                let date         = headers.get("date").cloned().unwrap_or_default();
+                let message_id   = headers.get("message-id").cloned();
+                let body         = String::from_utf8_lossy(body_bytes).to_string();
+
+                let from_lower = from.to_lowercase();
+                if !self.config.allowed_from_addrs.iter().any(|a| from_lower.contains(&a.to_lowercase())) {
+                    let _ = session.uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)").await;
+                    self.metrics.allowlist_denials.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    continue;
+                }
+
+                let event_id = self.dedup_key(message_id.as_deref(), &from, &date, &subject, &body);
+                let inbound  = InboundMessage {
+                    platform: "email".to_string(), platform_id: from.clone(),
+                    user_id: from.clone(), display_name: from.clone(),
+                    event_id, text: body, reply_to: message_id,
+                };
+                self.metrics.messages_inbound.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if tx.try_send(inbound).is_err() {
+                    self.metrics.messages_queued_full.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let _ = shed_tx.try_send(ShedNotice { platform: "email".to_string(), chat_id: from.clone(), user_id: from, reply_to: None });
+                }
+                let _ = session.uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)").await;
+                if self.config.delete_processed {
+                    let _ = session.uid_store(&uid_str, "+FLAGS.SILENT (\\Deleted)").await;
+                }
+            }
+        }
+        if self.config.delete_processed {
+            let _ = session.expunge().await;
+        }
+        Ok(())
+    }
+
     async fn poll_once(
         &self,
         tx: &tokio::sync::mpsc::Sender<InboundMessage>,
