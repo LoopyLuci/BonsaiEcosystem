@@ -56,6 +56,8 @@
   let voiceStopRequested = false;
   let isSpeechActive = false;
   let speechStatusTimer: ReturnType<typeof setInterval> | null = null;
+  let modelFallbackNotice = '';
+  let modelReadyCpuNotice = '';
   let showToolSkills = false;
   let showNewMenu = false;
 
@@ -844,6 +846,20 @@
       tokenSpeed.set(e.payload);
     });
 
+    const unlistenModelFallback = await listen<{ message?: string }>('model-load-fallback', ({ payload }) => {
+      modelFallbackNotice = payload?.message || 'GPU unstable — switched to CPU mode';
+      modelReadyCpuNotice = '';
+    });
+
+    const unlistenModelReady = await listen<{ cpu_mode?: boolean }>('model-ready', ({ payload }) => {
+      if (payload?.cpu_mode) {
+        modelReadyCpuNotice = 'Ready (CPU mode)';
+      } else {
+        modelReadyCpuNotice = '';
+      }
+      modelFallbackNotice = '';
+    });
+
     const unsubAskBonsai = askBonsaiRequest.subscribe(async (request) => {
       if (!request) return;
 
@@ -882,6 +898,8 @@
       unlistenPermission,
       unlistenToolUsed,
       unlistenToken,
+      unlistenModelFallback,
+      unlistenModelReady,
       unsubAskBonsai,
       unlistenAgentStream,
       unlistenSwarmComplete,
@@ -1327,6 +1345,16 @@
     <div class="error-bar" role="alert">
       {errorMsg}
       <button on:click={() => (errorMsg = '')}>✕</button>
+    </div>
+  {/if}
+
+  {#if modelFallbackNotice}
+    <div class="model-fallback-bar" role="status">
+      ⚠ {modelFallbackNotice}
+    </div>
+  {:else if modelReadyCpuNotice}
+    <div class="model-fallback-ready" role="status">
+      ✅ {modelReadyCpuNotice}
     </div>
   {/if}
 
@@ -2166,6 +2194,28 @@
     color: var(--accent-hl);
     font-size: 12px;
     animation: pulse 1.4s infinite;
+  }
+
+  .model-fallback-bar {
+    margin: 8px 12px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(245, 158, 11, 0.6);
+    background: rgba(245, 158, 11, 0.14);
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .model-fallback-ready {
+    margin: 8px 12px 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    background: rgba(16, 185, 129, 0.12);
+    color: #a7f3d0;
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .model-load-bar {
