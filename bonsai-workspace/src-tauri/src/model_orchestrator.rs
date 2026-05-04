@@ -778,9 +778,10 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
                         let note = format!(
                             "GPU unstable (exit code {exit_code:#010X}) — switching to CPU mode"
                         );
-                        eprintln!(
-                            "[orchestrator] GPU crash detected on slot {} (exit code {exit_code:#010X}), retrying with CPU-only",
-                            slot.index
+                        tracing::warn!(
+                            slot=%slot.index,
+                            exit_code=%format!("{exit_code:#010X}"),
+                            "[orchestrator] GPU crash detected, retrying with CPU-only"
                         );
                         let _ = app.emit("model-load-fallback", json!({
                             "slot": slot.index,
