@@ -92,6 +92,12 @@ pub struct AdminState {
     pub runtime_limits: Arc<RwLock<crate::config::RuntimeLimits>>,
     /// Spawned runtime child processes keyed by generated id.
     pub runtime_children: Arc<Mutex<HashMap<String, RuntimeInfo>>>,
+    /// Buddy API base URL — used by /health/full
+    pub buddy_api_url: String,
+    /// Workspace API base URL — used by /health/full
+    pub workspace_api_url: String,
+    /// Swarm peer list — used by /health/full
+    pub swarm_peers: Vec<crate::config::SwarmPeer>,
 }
 
 #[allow(dead_code)]
@@ -185,6 +191,9 @@ pub async fn start(
         allowed_script_paths: Arc::new(RwLock::new(cfg.allowed_script_paths.clone())),
         runtime_limits: Arc::new(RwLock::new(cfg.runtime_limits.clone())),
         runtime_children: Arc::new(Mutex::new(HashMap::new())),
+        buddy_api_url:    cfg.buddy_api_url.clone(),
+        workspace_api_url: cfg.workspace_api_url.clone(),
+        swarm_peers:      cfg.swarm_peers.clone(),
     };
 
     // Reconcile persisted runtime records on startup; populate in-memory map with metadata
@@ -245,6 +254,7 @@ pub async fn start(
         .route("/skills",                    get(list_skills_handler))
         .route("/skills/:id/toggle",         post(toggle_skill_handler))
         .route("/skills/:id",               axum::routing::delete(delete_skill_handler))
+        .route("/health/full",               get(health_full))
         .layer(cors)
         .with_state(state);
 
@@ -807,6 +817,9 @@ mod tests {
             allowed_script_paths: Arc::new(RwLock::new(vec![])),
             runtime_limits: Arc::new(RwLock::new(crate::config::RuntimeLimits::default())),
             runtime_children: Arc::new(Mutex::new(HashMap::new())),
+            buddy_api_url:    "http://127.0.0.1:11420".into(),
+            workspace_api_url: "http://127.0.0.1:11369".into(),
+            swarm_peers:      vec![],
         };
 
         let mut headers = HeaderMap::new();
@@ -962,4 +975,103 @@ async fn delete_skill_handler(
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
     }
+}
+
+// ── Full health dashboard ─────────────────────────────────────────────────────
+
+async fn health_full(
+    State(s): State<AdminState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if !check_auth(&headers, &s) {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+    }
+
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(4))
+        .build()
+        .unwrap_or_default();
+
+    // Buddy API check
+    let buddy_check = {
+        let url = format!("{}/health", s.buddy_api_url);
+        let t0  = std::time::Instant::now();
+        let ok  = tokio::time::timeout(Duration::from_secs(3), http.get(&url).send())
+            .await.ok().and_then(|r| r.ok()).map(|r| r.status().is_success()).unwrap_or(false);
+        json!({ "healthy": ok, "url": s.buddy_api_url, "latency_ms": t0.elapsed().as_millis() })
+    };
+
+    // Workspace / llama-server check
+    let llama_check = {
+        let status_url = format!("{}/v1/orchestrator/status", s.workspace_api_url);
+        let t0 = std::time::Instant::now();
+        match tokio::time::timeout(Duration::from_secs(3), http.get(&status_url).send()).await {
+            Ok(Ok(resp)) if resp.status().is_success() => {
+                if let Ok(body) = resp.json::<Value>().await {
+                    let slots = body["slots"].as_array().cloned().unwrap_or_default();
+                    let ready = slots.iter().find(|s| s["state"]["state"] == "ready");
+                    let (slot_idx, model_id, loaded) = ready
+                        .map(|s| (
+                            s["index"].as_u64().unwrap_or(0),
+                            s["state"]["model_id"].as_str().unwrap_or("").to_string(),
+                            true,
+                        ))
+                        .unwrap_or((0, String::new(), false));
+                    json!({ "healthy": loaded, "slot": slot_idx, "model": model_id, "loaded": loaded, "latency_ms": t0.elapsed().as_millis() })
+                } else {
+                    json!({ "healthy": false, "error": "parse error" })
+                }
+            }
+            _ => json!({ "healthy": false, "error": "workspace unreachable" }),
+        }
+    };
+
+    // Platform checks
+    let mut platform_checks = serde_json::Map::new();
+    for name in &["discord", "telegram", "email", "matrix"] {
+        let state_str = s.platform_states.get(*name).map(|v| v.clone()).unwrap_or_else(|| "not configured".to_string());
+        let healthy = matches!(state_str.as_str(), "connected" | "polling" | "syncing");
+        platform_checks.insert(name.to_string(), json!({ "healthy": healthy, "state": state_str }));
+    }
+
+    // Swarm peer checks
+    let mut peer_results = Vec::new();
+    for peer in &s.swarm_peers {
+        let url = format!("{}/health", peer.admin_url);
+        let ok = tokio::time::timeout(Duration::from_secs(2),
+            http.get(&url).header("authorization", format!("Bearer {}", peer.token)).send())
+            .await.ok().and_then(|r| r.ok()).map(|r| r.status().is_success()).unwrap_or(false);
+        peer_results.push(json!({ "name": peer.name, "healthy": ok, "url": peer.admin_url }));
+    }
+
+    // Scheduler check
+    let scheduler_check = {
+        let path = crate::config::config_dir()
+            .map(|d| d.join("bonsai").join("scheduled_tasks.json"))
+            .unwrap_or_else(|| std::path::PathBuf::from("scheduled_tasks.json"));
+        let (count, exists) = if path.exists() {
+            let n = std::fs::read_to_string(&path).ok()
+                .and_then(|s| serde_json::from_str::<Vec<Value>>(&s).ok())
+                .map(|v| v.iter().filter(|t| t["enabled"].as_bool().unwrap_or(false)).count())
+                .unwrap_or(0);
+            (n, true)
+        } else { (0, false) };
+        json!({ "healthy": exists, "enabled_tasks": count })
+    };
+
+    // Aggregate
+    let buddy_ok = buddy_check["healthy"].as_bool().unwrap_or(false);
+    let llama_ok = llama_check["healthy"].as_bool().unwrap_or(false);
+    let overall  = if buddy_ok && llama_ok { "healthy" } else if buddy_ok || llama_ok { "degraded" } else { "unhealthy" };
+
+    Json(json!({
+        "status": overall,
+        "checks": {
+            "buddy_api":    buddy_check,
+            "llama_server": llama_check,
+            "platforms":    Value::Object(platform_checks),
+            "swarm_peers":  peer_results,
+            "scheduler":    scheduler_check,
+        }
+    })).into_response()
 }
