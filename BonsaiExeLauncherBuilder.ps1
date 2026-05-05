@@ -169,6 +169,13 @@ try {
     Write-Info "Tauri CLI not detected; will use cargo build --release fallback for local exe."
   }
 
+  if (Get-Command sccache -ErrorAction SilentlyContinue) {
+    $env:RUSTC_WRAPPER = "sccache"
+    Write-Success "sccache enabled"
+  } else {
+    Write-Host "[builder] Tip: install sccache for faster rebuilds (cargo install sccache)" -ForegroundColor DarkYellow
+  }
+
   $tauriBuildOk = $false
   if ($tauriBuildMethod -eq "cargo-tauri" -or $tauriBuildMethod -eq "npx-tauri") {
     Push-Location $FrontendDir
