@@ -4,6 +4,7 @@
 #![allow(unused_mut)]
 
 mod action_parser;
+mod error;
 mod memory_store;
 mod context_builder;
 mod skill_executor;
