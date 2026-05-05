@@ -33,6 +33,9 @@
  .\BonsaiExeLauncherBuilder.ps1
  ```
 
+> **Note:** `npm audit fix --force` will upgrade Svelte 4 to 5 and Vite 5 to 6,
+> which breaks the frontend build. Only use `npm audit fix` (without `--force`).
+
  The builder script runs frontend and Tauri build steps, then resolves and stages the built executable. See launcher options in the script help and `bonsai-workspace/launcher_manual.md`.
 
  ## Highlights
