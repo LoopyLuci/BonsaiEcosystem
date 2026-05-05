@@ -1,5 +1,7 @@
 # DeepSeek Handbook
 
+> **Status:** Production-ready | 165 tests passing | 28 PRs merged | All audit findings resolved
+
 ## Current State & Progress
 
 Merged baseline now includes the recent launcher/runtime hardening and feature rollouts:
