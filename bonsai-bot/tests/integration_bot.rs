@@ -56,14 +56,14 @@ async fn start_mock_buddy(response_text: &'static str) -> (String, Arc<AtomicU32
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port     = listener.local_addr().unwrap().port();
-    tokio::spawn(axum::serve(listener, app));
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
 
     (format!("http://127.0.0.1:{port}"), call_count)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn make_router(buddy_url: String) -> Arc<bonsai_bot::router::Router> {
+async fn make_router(buddy_url: String) -> Arc<bonsai_bot::router::Router> {
     use bonsai_bot::{buddy_client::BuddyClient, dedup::DedupCache, health::CircuitBreaker, metrics::Metrics};
     use bonsai_bot::config::{BotConfig, CircuitBreakerConfig};
     use std::sync::Arc;
@@ -81,9 +81,8 @@ fn make_router(buddy_url: String) -> Arc<bonsai_bot::router::Router> {
     let dedup = Arc::new(DedupCache::new(1_000, 60));
 
     // In-memory SQLite for tests
-    let rt  = tokio::runtime::Handle::current();
-    let db  = Arc::new(rt.block_on(Connection::open_in_memory()).unwrap());
-    rt.block_on(bonsai_bot::session::migrate(&db)).unwrap();
+    let db = Arc::new(Connection::open_in_memory().await.unwrap());
+    bonsai_bot::session::migrate(&db).await.unwrap();
 
     Arc::new(bonsai_bot::router::Router::new(buddy, dedup, db, metrics, BotConfig::default()))
 }
@@ -105,7 +104,7 @@ fn make_inbound(text: &str) -> InboundMessage {
 #[tokio::test]
 async fn roundtrip_basic_message() {
     let (url, call_count) = start_mock_buddy("Hello from Bonsai!").await;
-    let router   = make_router(url);
+    let router   = make_router(url).await;
     let platform = MockPlatform::new();
 
     router.handle(make_inbound("hi"), &(platform.clone() as Arc<dyn MessagingPlatform>)).await;
@@ -119,7 +118,7 @@ async fn roundtrip_basic_message() {
 #[tokio::test]
 async fn dedup_drops_duplicate_event() {
     let (url, call_count) = start_mock_buddy("pong").await;
-    let router   = make_router(url);
+    let router   = make_router(url).await;
     let platform = MockPlatform::new();
 
     let mut msg = make_inbound("ping");
@@ -141,7 +140,7 @@ async fn circuit_breaker_opens_after_failures() {
     use tokio_rusqlite::Connection;
 
     let metrics = Arc::new(Metrics::default());
-    let cb_cfg  = CircuitBreakerConfig { failure_threshold: 2, recovery_secs: 60 };
+    let cb_cfg  = CircuitBreakerConfig { open_after_failures: 2, half_open_probe_secs: 60, close_on_successes: 1 };
     let breaker = CircuitBreaker::new(cb_cfg);
     let buddy   = Arc::new(BuddyClient::new(
         "http://127.0.0.1:19999".to_string(), // nothing listening here
