@@ -32,7 +32,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::time::timeout;
 use tokio_stream::wrappers::IntervalStream;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
@@ -45,6 +45,15 @@ use crate::remote_input::RemoteInputEvent;
 use crate::ws_router::WsRouter;
 
 const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/json");
+
+fn allow_extension_origin(origin: &HeaderValue) -> bool {
+    let origin_str = origin.to_str().unwrap_or("");
+    origin_str == "tauri://localhost"
+        || origin_str == "http://localhost:1420"
+        || origin_str == "https://localhost:1420"
+        || origin_str.starts_with("chrome-extension://")
+        || origin_str.starts_with("moz-extension://")
+}
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
@@ -110,11 +119,9 @@ pub async fn start(
     };
 
     let cors = CorsLayer::new()
-        .allow_origin([
-            "tauri://localhost".parse::<HeaderValue>().expect("valid origin"),
-            "http://localhost:1420".parse::<HeaderValue>().expect("valid origin"),
-            "https://localhost:1420".parse::<HeaderValue>().expect("valid origin"),
-        ])
+        .allow_origin(AllowOrigin::predicate(|origin, _request| {
+            allow_extension_origin(origin)
+        }))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any);
 
