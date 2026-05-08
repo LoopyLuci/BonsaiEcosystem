@@ -26,7 +26,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 use crate::{
     assistant_audit_log::AuditLog,
@@ -57,6 +57,15 @@ ALWAYS call get_system_stats. Never answer from training data.\n\
 3. When asked about weather — call get_weather.\n\
 4. When asked to find or read local files — use find_files and read_file_assistant.\n\
 Be concise, direct, and warm.";
+
+fn allow_extension_origin(origin: &HeaderValue) -> bool {
+    let origin_str = origin.to_str().unwrap_or("");
+    origin_str == "tauri://localhost"
+        || origin_str == "http://localhost:1420"
+        || origin_str == "https://localhost:1420"
+        || origin_str.starts_with("chrome-extension://")
+        || origin_str.starts_with("moz-extension://")
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -122,11 +131,9 @@ pub async fn start(
     };
 
     let cors = CorsLayer::new()
-        .allow_origin([
-            "tauri://localhost".parse::<HeaderValue>().expect("valid origin"),
-            "http://localhost:1420".parse::<HeaderValue>().expect("valid origin"),
-            "https://localhost:1420".parse::<HeaderValue>().expect("valid origin"),
-        ])
+        .allow_origin(AllowOrigin::predicate(|origin, _request| {
+            allow_extension_origin(origin)
+        }))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any);
 
