@@ -29,6 +29,15 @@ Sprint 1 scaffold for Bonsai Buddy mobile companion.
 3. Add a local server host and desktop token via setup UI in Sprint 2 (current values can be seeded in SecureConfigStore during development).
 4. Build and run on emulator or device.
 
+### Build Requirements
+
+- Java 17+ (JDK)
+- Android Studio Hedgehog or later
+- **Windows:** The Gradle daemon requires sufficient virtual memory.
+	If you see `paging file is too small`, increase the Windows paging file:
+	`System Properties -> Advanced -> Performance -> Advanced -> Virtual Memory -> Change`
+	Set Custom Size: Initial 4096 MB, Maximum 8192 MB.
+
 ## Next sprint targets
 
 - Full setup/discovery screen with QR token onboarding
