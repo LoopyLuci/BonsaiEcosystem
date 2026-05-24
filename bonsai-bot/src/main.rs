@@ -8,7 +8,7 @@ use tokio::time::{interval, Duration};
 use crate::admin_api::PlatformStates;
 use crate::buddy_client::BuddyClient;
 use crate::mgmt_client::MgmtClient;
-use crate::config::{ensure_admin_token, keyring_get, load_config, read_workspace_pair_token};
+use crate::config::{ensure_admin_token, keyring_get, load_config, read_workspace_api_url, read_workspace_pair_token};
 use crate::dedup::DedupCache;
 use crate::health::{wait_for_buddy, CircuitBreaker};
 use crate::metrics::Metrics;
@@ -104,9 +104,13 @@ async fn main() {
     ));
     let dedup = Arc::new(DedupCache::new(10_000, 600));
 
-    // Resolve the pair token: prefer the live value written by Bonsai Workspace
-    // to its own config file on each startup, falling back to the manually-set
-    // value in bonsai-bot-config.json.
+    // Resolve workspace URL: prefer live value from bonsai-config.json, fall back to config file.
+    let workspace_url = read_workspace_api_url()
+        .or_else(|| (!cfg.workspace_api_url.is_empty()).then(|| cfg.workspace_api_url.clone()))
+        .unwrap_or_else(|| "http://127.0.0.1:11369".to_string());
+    tracing::info!("[bonsai-bot] Workspace API URL: {workspace_url}");
+
+    // Resolve pair token: prefer live value from bonsai-config.json, fall back to config file.
     let pair_token = read_workspace_pair_token()
         .or_else(|| (!cfg.workspace_pair_token.is_empty()).then(|| cfg.workspace_pair_token.clone()))
         .unwrap_or_default();
@@ -115,7 +119,7 @@ async fn main() {
     } else {
         tracing::info!("[bonsai-bot] Workspace pair token loaded ({} chars)", pair_token.len());
     }
-    let mgmt = MgmtClient::new(&cfg.workspace_api_url, pair_token);
+    let mgmt = MgmtClient::new(&workspace_url, pair_token);
 
     // Router created first — Discord/Telegram platforms need it for button callback handling
     let router = Arc::new(Router::new(
