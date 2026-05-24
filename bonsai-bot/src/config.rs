@@ -243,18 +243,32 @@ pub fn ensure_admin_token() -> Result<String, String> {
 
 // ── Workspace pair token ──────────────────────────────────────────────────────
 
-/// Read the current pair token directly from the Bonsai Workspace config file.
-/// Returns `None` if the file doesn't exist or has no token yet.
-/// The workspace writes this on every startup, so the bot always gets the
-/// current token without any manual copy-paste.
-pub fn read_workspace_pair_token() -> Option<String> {
+/// Read fields from the Bonsai Workspace config file, returning the parsed JSON.
+/// Returns `None` if the file is missing or unparseable.
+fn read_workspace_config() -> Option<serde_json::Value> {
     let path = dirs::data_dir()?
         .join("com.bonsai.workspace")
         .join("bonsai-config.json");
     let content = std::fs::read_to_string(&path).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let tok = v["pair_token"].as_str()?.to_string();
+    serde_json::from_str(&content).ok()
+}
+
+/// Read the current pair token from the Bonsai Workspace config file.
+/// The workspace writes a fresh token on every startup, so the bot never
+/// needs a manual copy-paste.
+pub fn read_workspace_pair_token() -> Option<String> {
+    let tok = read_workspace_config()?["pair_token"].as_str()?.to_string();
     if tok.is_empty() { None } else { Some(tok) }
+}
+
+/// Read the workspace API port from bonsai-config.json (`api_port` field).
+/// Falls back to `default_workspace_api_url`'s port (11369) when unavailable.
+pub fn read_workspace_api_url() -> Option<String> {
+    let cfg = read_workspace_config()?;
+    let host = cfg["api_host"].as_str().unwrap_or("127.0.0.1");
+    let port = cfg["api_port"].as_u64()?;
+    if port == 0 { return None; }
+    Some(format!("http://{host}:{port}"))
 }
 
 // ── Load / save ───────────────────────────────────────────────────────────────
