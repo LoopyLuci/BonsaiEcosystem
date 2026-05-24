@@ -73,11 +73,13 @@ impl FeatureFlags {
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn get_feature_flags() -> FeatureFlags {
     FeatureFlags::global()
 }
 
 #[tauri::command]
+#[specta::specta]
 pub fn set_feature_flags(flags: FeatureFlags) {
     FeatureFlags::set_global(flags);
 }
