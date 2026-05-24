@@ -6085,6 +6085,7 @@ pub async fn list_agents(
 
 #[tauri::command]
 pub async fn send_agent_message(
+    app:      tauri::AppHandle,
     state:    State<'_, crate::AppState>,
     agent_id: String,
     message:  crate::agent::AgentMessage,
@@ -6092,5 +6093,10 @@ pub async fn send_agent_message(
     let ctx = crate::agent::AgentContext {
         model_url: state.orchestrator.active_slot_url().await,
     };
-    state.agent_host.handle(&agent_id, ctx, message).await.map_err(|e| e.to_string())
+    let output = state.agent_host.handle(&agent_id, ctx, message).await.map_err(|e| e.to_string())?;
+    let payload = output.clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = app.emit("agent-output", &payload);
+    });
+    Ok(output)
 }

@@ -926,6 +926,22 @@
       agentStreams.set(new Map());
     });
 
+    const unlistenAgentOutput = await listen<{
+      content: string;
+      actions: Array<{ kind: string; payload: Record<string, unknown> }>;
+    }>('agent-output', (e) => {
+      let text = e.payload.content;
+      const writtenFiles = (e.payload.actions ?? [])
+        .filter(a => a.kind === 'write_file')
+        .map(a => String(a.payload?.path ?? ''))
+        .filter(Boolean);
+      if (writtenFiles.length) {
+        text += `\n\nWrote: ${writtenFiles.join(', ')}`;
+      }
+      addAssistantMessage(text);
+      fileTreeRefresh.set(Date.now());
+    });
+
     loadSwarmRuntimeSettings();
     await loadAgentConfigs();
 
@@ -939,6 +955,7 @@
       unsubAskBonsai,
       unlistenAgentStream,
       unlistenSwarmComplete,
+      unlistenAgentOutput,
     ];
   });
 
