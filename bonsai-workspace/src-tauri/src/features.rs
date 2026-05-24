@@ -34,14 +34,30 @@ impl Default for FeatureFlags {
     }
 }
 
+fn features_path() -> std::path::PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("com.bonsai.workspace")
+        .join("features.yaml")
+}
+
 impl FeatureFlags {
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
-        let path = std::path::Path::new("features.yaml");
+        let path = features_path();
         if path.exists() {
-            Ok(serde_yaml::from_str(&std::fs::read_to_string(path)?)?)
-        } else {
-            Ok(Self::default())
+            return Ok(serde_yaml::from_str(&std::fs::read_to_string(&path)?)?);
         }
+        // One-time migration: copy legacy repo-root features.yaml into app data dir.
+        let legacy = std::path::Path::new("features.yaml");
+        if legacy.exists() {
+            if let Ok(yaml) = std::fs::read_to_string(legacy) {
+                if let Ok(flags) = serde_yaml::from_str::<Self>(&yaml) {
+                    let _ = crate::atomic_write(&path, yaml.as_bytes());
+                    return Ok(flags);
+                }
+            }
+        }
+        Ok(Self::default())
     }
 
     pub fn global() -> FeatureFlags {
@@ -51,7 +67,7 @@ impl FeatureFlags {
     pub fn set_global(flags: FeatureFlags) {
         *FEATURES.write().unwrap() = flags;
         if let Ok(yaml) = serde_yaml::to_string(&*FEATURES.read().unwrap()) {
-            let _ = crate::atomic_write(std::path::Path::new("features.yaml"), yaml.as_bytes());
+            let _ = crate::atomic_write(&features_path(), yaml.as_bytes());
         }
     }
 
