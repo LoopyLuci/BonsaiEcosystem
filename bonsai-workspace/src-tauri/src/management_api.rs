@@ -151,6 +151,10 @@ async fn mgmt_queue_status(
 
 #[derive(Deserialize)]
 struct SwarmSubmitBody {
+    /// Convenience: a single-turn user prompt. If provided, wraps into messages.
+    #[serde(default)]
+    prompt:         Option<String>,
+    #[serde(default)]
     messages:       Vec<MgmtChatMessage>,
     workspace_path: Option<String>,
     enabled_tools:  Option<Vec<String>>,
@@ -173,6 +177,15 @@ async fn mgmt_swarm_submit(
         return err400("Swarm feature is disabled").into_response();
     }
 
+    // Resolve messages: accept either `prompt` shorthand or explicit `messages` array
+    let messages = if !body.messages.is_empty() {
+        body.messages.clone()
+    } else if let Some(p) = &body.prompt {
+        vec![MgmtChatMessage { role: "user".into(), content: p.clone() }]
+    } else {
+        return err400("Provide either `prompt` or `messages`").into_response();
+    };
+
     let resolved = match s.agent_store.resolve_agents(&s.orchestrator).await {
         Ok(r) => r,
         Err(e) => return err500(e).into_response(),
@@ -184,7 +197,7 @@ async fn mgmt_swarm_submit(
     };
 
     // Build the prompt from messages
-    let user_prompt = body.messages.iter().rev()
+    let user_prompt = messages.iter().rev()
         .find(|m| m.role == "user")
         .map(|m| m.content.clone())
         .unwrap_or_default();
@@ -483,8 +496,10 @@ async fn mgmt_set_features(
 
 #[derive(Deserialize)]
 struct ToolRunBody {
-    tool:      String,
-    args:      Value,
+    tool: String,
+    /// Accept both `args` and `params` as field names
+    #[serde(alias = "params")]
+    args: Option<Value>,
     workspace: Option<String>,
 }
 
@@ -495,7 +510,8 @@ async fn mgmt_run_tool(
 ) -> impl IntoResponse {
     auth!(s, headers);
     let workspace = body.workspace.clone();
-    match crate::tools::execute_built_in(&body.tool, &body.args, workspace.as_deref()).await {
+    let args = body.args.clone().unwrap_or(Value::Object(Default::default()));
+    match crate::tools::execute_built_in(&body.tool, &args, workspace.as_deref()).await {
         Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
         Err(e)     => err400(e).into_response(),
     }
