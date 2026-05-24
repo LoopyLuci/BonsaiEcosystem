@@ -241,6 +241,22 @@ pub fn ensure_admin_token() -> Result<String, String> {
     Ok(tok)
 }
 
+// ── Workspace pair token ──────────────────────────────────────────────────────
+
+/// Read the current pair token directly from the Bonsai Workspace config file.
+/// Returns `None` if the file doesn't exist or has no token yet.
+/// The workspace writes this on every startup, so the bot always gets the
+/// current token without any manual copy-paste.
+pub fn read_workspace_pair_token() -> Option<String> {
+    let path = dirs::data_dir()?
+        .join("com.bonsai.workspace")
+        .join("bonsai-config.json");
+    let content = std::fs::read_to_string(&path).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let tok = v["pair_token"].as_str()?.to_string();
+    if tok.is_empty() { None } else { Some(tok) }
+}
+
 // ── Load / save ───────────────────────────────────────────────────────────────
 
 pub fn config_dir() -> Option<PathBuf> {

@@ -8,7 +8,7 @@ use tokio::time::{interval, Duration};
 use crate::admin_api::PlatformStates;
 use crate::buddy_client::BuddyClient;
 use crate::mgmt_client::MgmtClient;
-use crate::config::{ensure_admin_token, keyring_get, load_config};
+use crate::config::{ensure_admin_token, keyring_get, load_config, read_workspace_pair_token};
 use crate::dedup::DedupCache;
 use crate::health::{wait_for_buddy, CircuitBreaker};
 use crate::metrics::Metrics;
@@ -103,10 +103,19 @@ async fn main() {
         metrics.clone(),
     ));
     let dedup = Arc::new(DedupCache::new(10_000, 600));
-    let mgmt  = MgmtClient::new(&cfg.workspace_api_url, cfg.workspace_pair_token.clone());
-    if cfg.workspace_pair_token.is_empty() {
-        tracing::warn!("[bonsai-bot] workspace_pair_token is empty — slash commands will be unavailable until it is set in bonsai-bot-config.json");
+
+    // Resolve the pair token: prefer the live value written by Bonsai Workspace
+    // to its own config file on each startup, falling back to the manually-set
+    // value in bonsai-bot-config.json.
+    let pair_token = read_workspace_pair_token()
+        .or_else(|| (!cfg.workspace_pair_token.is_empty()).then(|| cfg.workspace_pair_token.clone()))
+        .unwrap_or_default();
+    if pair_token.is_empty() {
+        tracing::warn!("[bonsai-bot] No workspace pair token found — slash commands disabled. Start Bonsai Workspace first, or set workspace_pair_token in bonsai-bot-config.json");
+    } else {
+        tracing::info!("[bonsai-bot] Workspace pair token loaded ({} chars)", pair_token.len());
     }
+    let mgmt = MgmtClient::new(&cfg.workspace_api_url, pair_token);
 
     // Router created first — Discord/Telegram platforms need it for button callback handling
     let router = Arc::new(Router::new(

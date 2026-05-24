@@ -48,6 +48,10 @@ pub struct AppConfig {
     /// Default mode applied to newly discovered local models.
     #[serde(default = "default_inference_mode")]
     pub default_inference_mode: InferenceMode,
+    /// Pairing token for the REST management API and QR-code Android pairing.
+    /// Regenerated each launch and persisted here so bonsai-bot can read it.
+    #[serde(default)]
+    pub pair_token: String,
 }
 
 impl Default for AppConfig {
@@ -69,6 +73,7 @@ impl Default for AppConfig {
             last_model_id: None,
             mcp_allowed_commands: Vec::new(),
             default_inference_mode: InferenceMode::default(),
+            pair_token: String::new(),
         }
     }
 }
