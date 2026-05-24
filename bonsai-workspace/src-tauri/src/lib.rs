@@ -416,6 +416,10 @@ pub fn run() {
             ));
 
             let mut api_config = config::load_config(&app_handle).unwrap_or_default();
+            // Persist the pair token so bonsai-bot and local clients can read it
+            // from bonsai-config.json without needing the UI.
+            api_config.pair_token = pair_token.clone();
+            let _ = config::save_config(&app_handle, &api_config);
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             restore_main_window_state(&app_handle, &api_config);
