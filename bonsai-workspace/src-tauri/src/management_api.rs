@@ -403,6 +403,7 @@ async fn mgmt_list_agents(
 
 #[derive(Deserialize)]
 struct AgentMessageBody {
+    #[serde(alias = "agentId")]
     agent_id: String,
     message:  AgentMessage,
 }
