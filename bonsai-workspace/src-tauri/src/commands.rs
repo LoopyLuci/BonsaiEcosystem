@@ -6286,3 +6286,26 @@ pub async fn load_model_gpu(
         "model": model_path,
     }))
 }
+
+// ── Training loop Tauri commands ──────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn start_training_loop(
+    state: State<'_, AppState>,
+    config: crate::training_loop::LoopConfig,
+) -> Result<(), String> {
+    state.training_loop.start(config).await
+}
+
+#[tauri::command]
+pub async fn stop_training_loop(state: State<'_, AppState>) -> Result<(), String> {
+    state.training_loop.stop().await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_training_loop_status(
+    state: State<'_, AppState>,
+) -> Result<crate::training_loop::LoopStatus, String> {
+    Ok(state.training_loop.status().await)
+}

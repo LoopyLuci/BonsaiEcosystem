@@ -23,6 +23,10 @@
 //!   GET  /api/v1/features          read feature flags
 //!   POST /api/v1/features          write feature flags
 //!   POST /api/v1/tools/run         invoke a single tool by name + args
+//!   POST /api/v1/render/block      render rich markdown block to SVG
+//!   POST /api/v1/sandbox/run       run Python code in sandboxed venv
+//!   POST /api/v1/images/generate   generate image via local SD model
+//!   POST /api/v1/tts/speak         synthesize speech via Piper TTS
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -123,6 +127,11 @@ pub fn router(state: MgmtState) -> Router {
         .route("/api/v1/training/loop/start",      post(mgmt_loop_start))
         .route("/api/v1/training/loop/stop",       post(mgmt_loop_stop))
         .route("/api/v1/training/loop/status",     get(mgmt_loop_status))
+        // multi-modal — rich markdown, sandbox, image gen, TTS
+        .route("/api/v1/render/block",    post(mgmt_render_block))
+        .route("/api/v1/sandbox/run",     post(mgmt_sandbox_run))
+        .route("/api/v1/images/generate", post(mgmt_image_generate))
+        .route("/api/v1/tts/speak",       post(mgmt_tts_speak))
         .with_state(state)
 }
 
@@ -765,4 +774,73 @@ async fn mgmt_loop_status(
 ) -> impl IntoResponse {
     auth!(s, headers);
     Json(s.training_loop.status().await).into_response()
+}
+
+// ── Rich markdown ─────────────────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct RenderBlockBody {
+    block_type: String,
+    content: String,
+    data: Option<Vec<crate::rich_markdown::ChartDataPoint>>,
+}
+
+async fn mgmt_render_block(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+    Json(body): Json<RenderBlockBody>,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match crate::rich_markdown::render_rich_block(body.block_type, body.content, body.data) {
+        Ok(svg) => Json(json!({ "svg": svg })).into_response(),
+        Err(e)  => err400(e).into_response(),
+    }
+}
+
+// ── Sandbox execution ─────────────────────────────────────────────────────────
+
+async fn mgmt_sandbox_run(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+    Json(req): Json<crate::sandbox_executor::SandboxRequest>,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match crate::sandbox_executor::run_sandboxed_code(req).await {
+        Ok(result) => Json(result).into_response(),
+        Err(e)     => err500(e).into_response(),
+    }
+}
+
+// ── Image generation ──────────────────────────────────────────────────────────
+
+async fn mgmt_image_generate(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+    Json(req): Json<crate::image_generation::ImageGenRequest>,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match crate::image_generation::generate_image(req).await {
+        Ok(result) => Json(result).into_response(),
+        Err(e)     => err500(e).into_response(),
+    }
+}
+
+// ── TTS ───────────────────────────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct TtsSpeakBody {
+    text: String,
+    voice: Option<String>,
+}
+
+async fn mgmt_tts_speak(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+    Json(body): Json<TtsSpeakBody>,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match crate::tts_engine::synthesize_speech(&body.text, body.voice.as_deref()).await {
+        Ok(result) => Json(result).into_response(),
+        Err(e)     => err500(e).into_response(),
+    }
 }
