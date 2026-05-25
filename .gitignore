@@ -45,6 +45,12 @@ sysinfo.py
 .bonsai/
 **/.bonsai/
 
+# Generated training data splits (auto-produced by data_curator / trainer)
+bonsai-workspace/data/bonsai_core/*_train.jsonl
+bonsai-workspace/data/bonsai_core/*_val.jsonl
+bonsai-workspace/data/bonsai_core/*_test.jsonl
+bonsai-workspace/data/bonsai_core/smoke_*.jsonl
+
 # OS / editor
 .DS_Store
 Thumbs.db
