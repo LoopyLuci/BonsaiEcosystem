@@ -41,6 +41,8 @@ def main():
     parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--grad_accum", type=int, default=8)
     parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--extra-data", type=str, default=None,
+        help="Additional JSONL with curated examples from real usage (merged before training)")
     args = parser.parse_args()
 
     dev, dtype = get_device()
@@ -67,7 +69,23 @@ def main():
 
     with open(args.data, encoding="utf-8") as f:
         examples = [json.loads(line) for line in f if line.strip()]
-    texts = [json.dumps(ex["messages"]) for ex in examples]
+
+    # Merge curated live examples if provided
+    if args.extra_data and Path(args.extra_data).exists():
+        orig_count = len(examples)
+        with open(args.extra_data, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    examples.append(json.loads(line))
+                except Exception:
+                    pass
+        print(f"[finetune] Merged {len(examples) - orig_count} curated examples (total: {len(examples)})")
+
+    # Curated examples store the full prompt in "text"; synthetic ones use "messages"
+    texts = [ex["text"] if "text" in ex else json.dumps(ex["messages"]) for ex in examples]
 
     def tokenize(batch):
         enc = tokenizer(
