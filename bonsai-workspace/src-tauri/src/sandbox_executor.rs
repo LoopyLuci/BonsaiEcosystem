@@ -50,13 +50,20 @@ async fn execute_in_venv(language: &str, code: &str, timeout: Duration) -> Resul
     let venv_dir = get_or_create_venv().await?;
     let python = venv_python(&venv_dir);
 
+    // Fall back to system Python if venv binary doesn't exist yet
+    let python_exe = if python.exists() {
+        python
+    } else {
+        std::path::PathBuf::from(find_python()?)
+    };
+
     // Write code to a temp file so we don't hit command-line length limits
     let tmp = std::env::temp_dir().join(format!("bonsai_sandbox_{}.py", uuid_short()));
     tokio::fs::write(&tmp, code)
         .await
         .map_err(|e| format!("Cannot write sandbox script: {e}"))?;
 
-    let mut cmd = tokio::process::Command::new(&python);
+    let mut cmd = tokio::process::Command::new(&python_exe);
     cmd.arg(&tmp)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -92,11 +99,12 @@ async fn get_or_create_venv() -> Result<PathBuf, String> {
 
     if !dir.join("pyvenv.cfg").exists() {
         info!(?dir, "Creating sandbox venv");
-        let out = tokio::process::Command::new("python")
+        let python_cmd = find_python()?;
+        let out = tokio::process::Command::new(&python_cmd)
             .args(["-m", "venv", dir.to_string_lossy().as_ref()])
             .output()
             .await
-            .map_err(|e| format!("python -m venv failed: {e}"))?;
+            .map_err(|e| format!("{python_cmd} -m venv failed: {e}"))?;
         if !out.status.success() {
             return Err(format!(
                 "venv creation failed: {}",
@@ -105,6 +113,25 @@ async fn get_or_create_venv() -> Result<PathBuf, String> {
         }
     }
     Ok(dir)
+}
+
+fn find_python() -> Result<String, String> {
+    for candidate in &["python", "python3", "py"] {
+        if which_python(candidate) {
+            return Ok(candidate.to_string());
+        }
+    }
+    Err("Python not found. Install Python 3 and ensure it is on PATH.".into())
+}
+
+fn which_python(name: &str) -> bool {
+    std::process::Command::new(name)
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 fn venv_python(venv_dir: &Path) -> PathBuf {
