@@ -52,6 +52,7 @@ pub struct MgmtState {
     pub app_handle:      tauri::AppHandle,
     pub pair_token:      String,
     pub bonsai_core:     Arc<crate::bonsai_core::BonsaiCore>,
+    pub telemetry:       Arc<crate::telemetry::TelemetryStore>,
 }
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
@@ -107,7 +108,11 @@ pub fn router(state: MgmtState) -> Router {
         .route("/api/v1/core/stats",     get(mgmt_core_stats))
         .route("/api/v1/bonsai/process", post(mgmt_bonsai_process))
         .route("/api/v1/core/shadow",    post(mgmt_set_shadow))
-        .route("/api/v1/curator/flush",  post(mgmt_curator_flush))
+        .route("/api/v1/curator/flush",         post(mgmt_curator_flush))
+        .route("/api/v1/telemetry/training",    get(mgmt_telemetry_training))
+        .route("/api/v1/telemetry/training/:id",get(mgmt_telemetry_training_run))
+        .route("/api/v1/telemetry/inference",   get(mgmt_telemetry_inference))
+        .route("/api/v1/telemetry/curated",     get(mgmt_telemetry_curated))
         .with_state(state)
 }
 
@@ -593,4 +598,58 @@ async fn mgmt_set_shadow(
     auth!(s, headers);
     s.bonsai_core.set_shadow_mode(body.enabled).await;
     Json(json!({ "shadow_mode": body.enabled })).into_response()
+}
+
+// ── Telemetry endpoints ───────────────────────────────────────────────────────
+
+async fn mgmt_telemetry_training(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match s.telemetry.get_training_runs(50).await {
+        Ok(runs) => Json(json!({ "runs": runs })).into_response(),
+        Err(e)   => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn mgmt_telemetry_training_run(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match s.telemetry.get_training_run(&id).await {
+        Ok(Some(run)) => Json(run).into_response(),
+        Ok(None)      => (StatusCode::NOT_FOUND, "run not found").into_response(),
+        Err(e)        => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn mgmt_telemetry_inference(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match s.telemetry.get_inference_stats(24).await {
+        Ok(stats) => Json(stats).into_response(),
+        Err(e)    => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn mgmt_telemetry_curated(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    let path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".bonsai/curated_examples.jsonl");
+    match std::fs::read_to_string(&path) {
+        Ok(content) => (
+            [(axum::http::header::CONTENT_TYPE, "application/x-ndjson")],
+            content,
+        ).into_response(),
+        Err(_) => Json(json!({ "examples": [] })).into_response(),
+    }
 }
