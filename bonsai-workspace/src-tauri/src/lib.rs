@@ -56,6 +56,7 @@ mod hybrid_engine;
 mod gpu_layer;
 mod gpu_telemetry;
 mod gpu_model_loader;
+mod dual_inference;
 mod sidecar_supervisor;
 mod swarm_orchestrator;
 mod task_queue;
@@ -172,6 +173,8 @@ pub struct AppState {
     pub hybrid_engine:    Arc<hybrid_engine::HybridEngineState>,
     /// GPU layer health tracker + VRAM estimator.
     pub gpu:              Arc<gpu_layer::GpuLayer>,
+    /// Long-lived dual model session manager for continuous training loop.
+    pub dual_session:     Arc<dual_inference::SessionManager>,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -565,6 +568,7 @@ pub fn run() {
                     pair_token:    token.clone(),
                     bonsai_core:   shared_bonsai_core.clone(),
                     telemetry:     telemetry_store.clone(),
+                    dual_session:  Arc::new(dual_inference::SessionManager::new()),
                 };
                 match tauri::async_runtime::block_on(api_server::start_with_fallback(
                     orch,
@@ -629,6 +633,7 @@ pub fn run() {
                 telemetry:   telemetry_store,
                 hybrid_engine: Arc::new(hybrid_engine::HybridEngineState::new()),
                 gpu: Arc::new(gpu_layer::GpuLayer::new(&gpu_layer::GpuLayer::detect())),
+                dual_session: Arc::new(dual_inference::SessionManager::new()),
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
@@ -1176,6 +1181,7 @@ pub fn run() {
             commands::apply_lora_native,
             commands::get_memory_status,
             commands::load_model_gpu,
+            commands::compare_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

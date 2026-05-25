@@ -389,3 +389,84 @@ fn rd_val(f: &mut impl Read, vt: u32) -> anyhow::Result<serde_json::Value> {
         t  => anyhow::bail!("unknown GGUF value type {t}"),
     })
 }
+
+// ── Adapter scanning ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AdapterInfo {
+    pub id: String,
+    pub name: String,
+    pub path: PathBuf,
+    pub file_size_bytes: u64,
+    /// Base model architecture the adapter was trained on (from metrics.json if present).
+    pub base_model: Option<String>,
+    pub version: Option<String>,
+}
+
+/// Scan a directory for LoRA adapter subdirectories.
+///
+/// A directory is considered an adapter if it contains any of:
+/// `adapter_model.safetensors`, `adapter_model.bin`, or `lora.gguf`.
+pub fn scan_adapters(adapter_dir: &Path) -> Vec<AdapterInfo> {
+    let mut out = Vec::new();
+    let entries = match std::fs::read_dir(adapter_dir) {
+        Ok(e) => e,
+        Err(_) => return out,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let has_adapter = path.join("adapter_model.safetensors").exists()
+            || path.join("adapter_model.bin").exists()
+            || path.join("lora.gguf").exists();
+
+        if !has_adapter {
+            continue;
+        }
+
+        let dir_size = walkdir::WalkDir::new(&path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .filter_map(|e| e.metadata().ok())
+            .map(|m| m.len())
+            .sum::<u64>();
+
+        let meta: Option<serde_json::Value> = path
+            .join("metrics.json")
+            .exists()
+            .then(|| std::fs::read_to_string(path.join("metrics.json")).ok())
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok());
+
+        let dir_name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        out.push(AdapterInfo {
+            id: format!("adapter-{dir_name}"),
+            name: meta
+                .as_ref()
+                .and_then(|m| m["name"].as_str())
+                .unwrap_or(&dir_name)
+                .to_string(),
+            path: path.clone(),
+            file_size_bytes: dir_size,
+            base_model: meta
+                .as_ref()
+                .and_then(|m| m["base_model"].as_str())
+                .map(|s| s.to_string()),
+            version: meta
+                .as_ref()
+                .and_then(|m| m["version"].as_str())
+                .map(|s| s.to_string()),
+        });
+    }
+    out
+}
