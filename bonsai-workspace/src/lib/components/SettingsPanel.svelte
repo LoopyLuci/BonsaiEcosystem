@@ -4,6 +4,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { scan } from '@tauri-apps/plugin-barcode-scanner';
   import { addAssistantMessage } from '$lib/stores/chat';
+  import { addToast } from '$lib/stores/toast';
   import DOMPurify from 'dompurify';
   import ClusterControlPanel from '$lib/components/ClusterControlPanel.svelte';
   import { DEFAULT_API_PORT } from '$lib/constants/network';
@@ -326,8 +327,38 @@
 
   let showAdvanced = false;
 
+  function getFlagValue(key: string): boolean {
+    return !!($featureFlags as unknown as Record<string, boolean>)[key];
+  }
+
+  function onFlagChange(key: string, e: Event): void {
+    toggleFlag(key, (e.currentTarget as HTMLInputElement).checked);
+  }
+
+  let trainingAdapter = false;
+  let trainingLog = '';
+
+  async function startTrainingCycle() {
+    trainingAdapter = true;
+    trainingLog = '';
+    try {
+      const adapterPath = await invoke<string>('start_training_cycle', {
+        dataPath: 'data/bonsai_core/bonsai_core_train.jsonl',
+        outputPath: null,  // uses default ~/.bonsai/adapters/bonsai-core-v2
+      });
+      trainingLog = `Done: ${adapterPath}`;
+      addToast(`Adapter saved: ${adapterPath}`, 'success');
+    } catch (e) {
+      trainingLog = `Error: ${e}`;
+      addToast(`Training failed: ${e}`, 'error');
+    } finally {
+      trainingAdapter = false;
+    }
+  }
+
   async function toggleFlag(key: string, value: boolean) {
-    $featureFlags[key as keyof typeof $featureFlags] = value;
+    const flags = $featureFlags as unknown as Record<string, boolean>;
+    flags[key] = value;
     featureFlags.set($featureFlags);
     await invoke('set_feature_flags', { flags: $featureFlags });
   }
@@ -1542,12 +1573,27 @@
               <span class="flag-key">{key.replace(/_/g, ' ')}</span>
               <input
                 type="checkbox"
-                checked={$featureFlags[key as keyof typeof $featureFlags]}
-                on:change={(e) => toggleFlag(key, (e.currentTarget as HTMLInputElement).checked)}
+                checked={getFlagValue(key)}
+                on:change={(e) => onFlagChange(key, e)}
               />
             </label>
           {/each}
         </div>
+
+        <h4 class="flags-heading" style="margin-top:1rem">BonsAI-Core Adapter</h4>
+        <div class="flags-grid" style="align-items:center">
+          <span class="flag-key">Train new adapter (Qwen2.5-1.5B · AMD/CPU)</span>
+          <button
+            class="btn-sm"
+            disabled={trainingAdapter}
+            on:click={startTrainingCycle}
+          >
+            {trainingAdapter ? 'Training…' : 'Train New Adapter'}
+          </button>
+        </div>
+        {#if trainingLog}
+          <pre class="training-log">{trainingLog}</pre>
+        {/if}
       {/if}
     </section>
 

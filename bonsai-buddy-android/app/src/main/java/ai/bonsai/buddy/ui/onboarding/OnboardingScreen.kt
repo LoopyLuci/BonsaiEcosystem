@@ -46,9 +46,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -95,6 +99,7 @@ fun OnboardingScreen(
 ) {
     var manualEndpoint by remember { mutableStateOf("") }
     var showScanner by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     val context = LocalContext.current
     val requestCameraPermission = rememberLauncherForActivityResult(
@@ -134,6 +139,8 @@ fun OnboardingScreen(
                     onValueChange = { manualEndpoint = it },
                     label = { Text("Manual host:port") },
                     placeholder = { Text("192.168.1.20:11420") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -152,6 +159,8 @@ fun OnboardingScreen(
                     value = state.token,
                     onValueChange = onTokenChange,
                     label = { Text("Desktop token") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Button(onClick = {
