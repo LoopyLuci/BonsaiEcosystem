@@ -1197,6 +1197,9 @@ pub fn run() {
             commands::get_memory_status,
             commands::load_model_gpu,
             commands::compare_models,
+            commands::start_training_loop,
+            commands::stop_training_loop,
+            commands::get_training_loop_status,
             // ── Rich Markdown / Multi-modal ───────────────────────────────────
             rich_markdown::render_rich_block,
             sandbox_executor::run_sandboxed_code,
