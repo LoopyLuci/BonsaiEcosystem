@@ -42,6 +42,7 @@
     activeModel,
     activeModelId,
     CUSTOM_SWARM_MODEL_ID,
+    BONSAI_AI_MODEL_ID,
     orchestratorStatus,
     getModelInferenceMode,
     setModelInferenceMode,
@@ -352,7 +353,7 @@
       return;
     }
 
-    if (!$swarmEnabled) {
+    if (!$swarmEnabled && get(activeModelId) !== BONSAI_AI_MODEL_ID) {
       await refreshStatus();
       const status = get(orchestratorStatus);
       const requestedModelId = get(activeModelId);
