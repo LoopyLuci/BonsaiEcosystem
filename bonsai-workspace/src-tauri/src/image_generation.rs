@@ -161,12 +161,24 @@ fn find_sd_python() -> String {
 }
 
 fn find_default_sd_model() -> Option<String> {
-    let base = dirs::home_dir()?.join(".bonsai").join("models").join("sd");
-    for ext in &["safetensors", "ckpt", "gguf"] {
-        if let Ok(mut rd) = std::fs::read_dir(&base) {
-            while let Some(Ok(entry)) = rd.next() {
-                if entry.path().extension().map(|e| e == *ext).unwrap_or(false) {
-                    return Some(entry.path().to_string_lossy().into_owned());
+    let search_dirs: Vec<std::path::PathBuf> = vec![
+        dirs::home_dir()?.join(".bonsai").join("models").join("sd"),
+        std::path::PathBuf::from(r"D:\Models"),
+        std::path::PathBuf::from(r"D:\models\sd"),
+    ];
+    for base in &search_dirs {
+        for ext in &["safetensors", "ckpt", "gguf"] {
+            if let Ok(mut rd) = std::fs::read_dir(base) {
+                while let Some(Ok(entry)) = rd.next() {
+                    let p = entry.path();
+                    // Skip non-SD files: GGUF language models tend to be large (>4 GB) and have llm names
+                    if p.extension().map(|e| e == *ext).unwrap_or(false) {
+                        let name = p.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+                        // Basic heuristic: skip obvious LLM files
+                        if name.contains("bonsai") || name.contains("qwen") || name.contains("gemma")
+                            || name.contains("svara") || name.contains("vibevoice") { continue; }
+                        return Some(p.to_string_lossy().into_owned());
+                    }
                 }
             }
         }
