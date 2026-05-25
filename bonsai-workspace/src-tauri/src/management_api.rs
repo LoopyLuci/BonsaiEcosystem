@@ -54,6 +54,7 @@ pub struct MgmtState {
     pub bonsai_core:     Arc<crate::bonsai_core::BonsaiCore>,
     pub telemetry:       Arc<crate::telemetry::TelemetryStore>,
     pub dual_session:    Arc<crate::dual_inference::SessionManager>,
+    pub training_loop:   Arc<crate::training_loop::TrainingLoopState>,
 }
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
@@ -118,7 +119,10 @@ pub fn router(state: MgmtState) -> Router {
         .route("/api/v1/training/status",  get(mgmt_training_status))
         .route("/api/v1/training/history", get(mgmt_training_history))
         // dual model comparison — continuous training loop
-        .route("/api/v1/compare",          post(mgmt_compare_models))
+        .route("/api/v1/compare",                  post(mgmt_compare_models))
+        .route("/api/v1/training/loop/start",      post(mgmt_loop_start))
+        .route("/api/v1/training/loop/stop",       post(mgmt_loop_stop))
+        .route("/api/v1/training/loop/status",     get(mgmt_loop_status))
         .with_state(state)
 }
 
@@ -730,4 +734,35 @@ async fn mgmt_compare_models(
         Ok(result) => Json(result).into_response(),
         Err(e) => err500(e).into_response(),
     }
+}
+
+// ── Continuous training loop ──────────────────────────────────────────────────
+
+async fn mgmt_loop_start(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+    Json(config): Json<crate::training_loop::LoopConfig>,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    match s.training_loop.start(config).await {
+        Ok(()) => Json(json!({ "ok": true, "status": "started" })).into_response(),
+        Err(e) => err500(e).into_response(),
+    }
+}
+
+async fn mgmt_loop_stop(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    s.training_loop.stop().await;
+    Json(json!({ "ok": true, "status": "stopped" })).into_response()
+}
+
+async fn mgmt_loop_status(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    Json(s.training_loop.status().await).into_response()
 }

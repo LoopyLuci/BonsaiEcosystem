@@ -2249,6 +2249,7 @@ pub async fn set_api_config(
         bonsai_core:   state.bonsai_core.clone(),
         telemetry:     state.telemetry.clone(),
         dual_session:  state.dual_session.clone(),
+        training_loop: state.training_loop.clone(),
     };
 
     let started = api_server::start(

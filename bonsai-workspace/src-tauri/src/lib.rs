@@ -57,6 +57,7 @@ mod gpu_layer;
 mod gpu_telemetry;
 mod gpu_model_loader;
 mod dual_inference;
+mod training_loop;
 mod sidecar_supervisor;
 mod swarm_orchestrator;
 mod task_queue;
@@ -175,6 +176,8 @@ pub struct AppState {
     pub gpu:              Arc<gpu_layer::GpuLayer>,
     /// Long-lived dual model session manager for continuous training loop.
     pub dual_session:     Arc<dual_inference::SessionManager>,
+    /// Controlled continuous training loop orchestrator.
+    pub training_loop:    Arc<training_loop::TrainingLoopState>,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -569,6 +572,10 @@ pub fn run() {
                     bonsai_core:   shared_bonsai_core.clone(),
                     telemetry:     telemetry_store.clone(),
                     dual_session:  Arc::new(dual_inference::SessionManager::new()),
+                    training_loop: Arc::new(training_loop::TrainingLoopState::new(
+                        Arc::new(dual_inference::SessionManager::new()),
+                        telemetry_store.clone(),
+                    )),
                 };
                 match tauri::async_runtime::block_on(api_server::start_with_fallback(
                     orch,
@@ -630,10 +637,14 @@ pub fn run() {
                 task_queue,
                 agent_host,
                 bonsai_core: shared_bonsai_core,
-                telemetry:   telemetry_store,
+                telemetry:   telemetry_store.clone(),
                 hybrid_engine: Arc::new(hybrid_engine::HybridEngineState::new()),
                 gpu: Arc::new(gpu_layer::GpuLayer::new(&gpu_layer::GpuLayer::detect())),
                 dual_session: Arc::new(dual_inference::SessionManager::new()),
+                training_loop: Arc::new(training_loop::TrainingLoopState::new(
+                    Arc::new(dual_inference::SessionManager::new()),
+                    telemetry_store,
+                )),
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
