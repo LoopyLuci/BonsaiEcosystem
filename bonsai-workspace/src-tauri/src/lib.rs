@@ -63,6 +63,7 @@ mod sandbox_executor;
 mod image_generation;
 mod tts_engine;
 mod sidecar_supervisor;
+mod plugin_loader;
 mod swarm_orchestrator;
 mod task_queue;
 mod tools;
@@ -1218,6 +1219,8 @@ pub fn run() {
             sandbox_executor::run_sandboxed_code,
             image_generation::generate_image_command,
             tts_engine::tts_synthesize,
+            plugin_loader::list_plugins_cmd,
+            plugin_loader::load_plugin_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
