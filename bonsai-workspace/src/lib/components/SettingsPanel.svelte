@@ -327,23 +327,128 @@
 
   let showAdvanced = false;
   let showTrainingDashboard = false;
-  let trainingBusy = false;
-  let trainingLog = '';
 
-  async function startTrainingCycle(): Promise<void> {
-    trainingBusy = true;
+  // ── Training Monitor state ────────────────────────────────────────────────
+  type TrainingStatus = 'idle' | 'running' | 'completed' | 'failed';
+  interface TrainProgress {
+    status: TrainingStatus;
+    epoch: string;
+    step: number;
+    totalSteps: number;
+    loss: string;
+    pct: number;
+    elapsed: string;
+    eta: string;
+    device: string;
+    dtype: string;
+    examples: number;
+    curatedMerged: number;
+  }
+
+  let trainingStatus: TrainingStatus = 'idle';
+  let trainingLog = '';
+  let trainProgress: TrainProgress = {
+    status: 'idle', epoch: '0', step: 0, totalSteps: 0,
+    loss: '—', pct: 0, elapsed: '0s', eta: '—',
+    device: '—', dtype: '—', examples: 0, curatedMerged: 0,
+  };
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let coreStats: Record<string, unknown> = {};
+
+  type HistoryRun = {
+    id: string; started_at: number; finished_at: number | null;
+    base_model: string; status: string; metrics: string | null;
+    total_examples: number | null; curated_examples: number | null;
+  };
+  let runHistory: HistoryRun[] = [];
+  let showHistory = false;
+
+  function parseTrainLine(line: string): void {
+    // Parse structured [tag] key=val lines emitted by finetune.py
+    const m = line.match(/^\[(\w+)\]\s+(.+)$/);
+    if (!m) return;
+    const [, tag, rest] = m;
+    const kv: Record<string, string> = {};
+    for (const part of rest.matchAll(/(\w+)=(\S+)/g)) kv[part[1]] = part[2];
+
+    if (tag === 'device') {
+      trainProgress = { ...trainProgress, device: kv.using ?? '—', dtype: kv.dtype ?? '—' };
+    } else if (tag === 'train' && kv.status === 'starting') {
+      trainProgress = { ...trainProgress, examples: Number(kv.examples ?? 0),
+        curatedMerged: 0, step: 0, pct: 0, loss: '—' };
+    } else if (tag === 'progress') {
+      trainProgress = {
+        ...trainProgress,
+        step: Number(kv.step ?? 0),
+        totalSteps: Number(kv.total ?? trainProgress.totalSteps),
+        epoch: kv.epoch ?? trainProgress.epoch,
+        loss: kv.loss ?? trainProgress.loss,
+        pct: parseFloat(kv.pct ?? '0'),
+        elapsed: kv.elapsed ?? trainProgress.elapsed,
+        eta: kv.eta ?? trainProgress.eta,
+      };
+    } else if (tag === 'save') {
+      trainProgress = { ...trainProgress, pct: 100, eta: '0s', status: 'completed' };
+      trainingStatus = 'completed';
+    } else if (tag === 'data') {
+      if (kv.curated) trainProgress = { ...trainProgress, curatedMerged: Number(kv.curated) };
+    }
+  }
+
+  async function startTrainingMonitor(): Promise<void> {
+    trainingStatus = 'running';
     trainingLog = '';
+    trainProgress = { ...trainProgress, status: 'running', step: 0, pct: 0, loss: '—', eta: '—' };
+    startStatsPoll();
     try {
       const adapterPath = await invoke<string>('start_training_cycle', {
-        dataPath: 'data/bonsai_core/bonsai_core_train.jsonl',
+        dataPath: 'data/bonsai_core/bonsai_core_train_v2.jsonl',
         outputPath: null,
       });
-      trainingLog = `Done: ${adapterPath}`;
+      trainingLog += `\n[save] path=${adapterPath}`;
+      parseTrainLine(`[save] path=${adapterPath}`);
+      trainingStatus = 'completed';
     } catch (e: unknown) {
-      trainingLog = `Error: ${e}`;
+      trainingLog += `\n[error] ${String(e)}`;
+      trainingStatus = 'failed';
+      trainProgress = { ...trainProgress, status: 'failed' };
     } finally {
-      trainingBusy = false;
+      stopStatsPoll();
     }
+  }
+
+  function startStatsPoll(): void {
+    if (pollInterval) return;
+    pollInterval = setInterval(async () => {
+      try {
+        const cfg = await invoke<{ api_port: number; pair_token: string }>('get_api_config');
+        const res = await fetch(`http://127.0.0.1:${cfg.api_port}/api/v1/core/stats`, {
+          headers: { Authorization: `Bearer ${cfg.pair_token}` },
+        });
+        if (res.ok) coreStats = await res.json();
+      } catch { /* stats are best-effort */ }
+    }, 2000);
+  }
+
+  function stopStatsPoll(): void {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  }
+
+  async function loadRunHistory(): Promise<void> {
+    try {
+      const cfg = await invoke<{ api_port: number; pair_token: string }>('get_api_config');
+      const res = await fetch(`http://127.0.0.1:${cfg.api_port}/api/v1/telemetry/training`, {
+        headers: { Authorization: `Bearer ${cfg.pair_token}` },
+      });
+      if (res.ok) runHistory = await res.json();
+    } catch { /* offline */ }
+  }
+
+  function fmtTs(ms: number): string {
+    return ms ? new Date(ms).toLocaleString() : '—';
+  }
+  function statusColor(s: string): string {
+    return s === 'completed' ? '#4caf50' : s === 'failed' ? '#e57373' : s === 'running' ? '#64b5f6' : '#888';
   }
 
   function getFlagValue(key: string): boolean {
@@ -364,6 +469,7 @@
   onDestroy(() => {
     disconnectRemotePreview();
     if (botStatusInterval) clearInterval(botStatusInterval);
+    stopStatsPoll();
   });
 
   async function downloadWhisper() {
@@ -1579,17 +1685,101 @@
         </div>
 
         <div class="training-section">
-          <h4 class="flags-heading">BonsAI-Core Training</h4>
-          <div class="training-actions">
-            <button class="btn-training" on:click={startTrainingCycle} disabled={trainingBusy}>
-              {trainingBusy ? 'Training…' : 'Train New Adapter'}
+          <h4 class="flags-heading">BonsAI-Core Training Monitor</h4>
+
+          <!-- Status bar -->
+          <div class="tm-status-bar">
+            <span class="tm-status-dot" style="background:{statusColor(trainingStatus)}"></span>
+            <span class="tm-status-label">{trainingStatus.toUpperCase()}</span>
+            {#if trainingStatus === 'running'}
+              <span class="tm-device-badge">{trainProgress.device}</span>
+              <span class="tm-device-badge">{trainProgress.dtype}</span>
+            {/if}
+          </div>
+
+          <!-- Progress bar -->
+          {#if trainingStatus === 'running' || trainingStatus === 'completed'}
+            <div class="tm-progress-track">
+              <div class="tm-progress-fill" style="width:{trainProgress.pct}%"></div>
+            </div>
+            <div class="tm-metrics-row">
+              <span>Epoch {trainProgress.epoch}</span>
+              <span>Step {trainProgress.step}{trainProgress.totalSteps ? `/${trainProgress.totalSteps}` : ''}</span>
+              <span class="tm-loss">Loss {trainProgress.loss}</span>
+              <span>{trainProgress.pct.toFixed(1)}%</span>
+              <span>⏱ {trainProgress.elapsed}</span>
+              {#if trainProgress.eta !== '0s' && trainProgress.eta !== '—'}
+                <span>ETA {trainProgress.eta}</span>
+              {/if}
+            </div>
+            {#if trainProgress.examples > 0}
+              <div class="tm-data-row">
+                <span>{trainProgress.examples} examples</span>
+                {#if trainProgress.curatedMerged > 0}
+                  <span class="tm-curated-badge">+{trainProgress.curatedMerged} curated</span>
+                {/if}
+              </div>
+            {/if}
+          {/if}
+
+          <!-- Live stats from /core/stats poll -->
+          {#if trainingStatus === 'running' && Object.keys(coreStats).length > 0}
+            <div class="tm-stats-grid">
+              {#if coreStats.queue_depth !== undefined}
+                <div class="tm-stat"><span class="tm-stat-label">Queue</span><span>{coreStats.queue_depth}</span></div>
+              {/if}
+              {#if coreStats.curator_buffered !== undefined}
+                <div class="tm-stat"><span class="tm-stat-label">Curated buf</span><span>{coreStats.curator_buffered}</span></div>
+              {/if}
+              {#if coreStats.adapter_loaded !== undefined}
+                <div class="tm-stat"><span class="tm-stat-label">Adapter</span><span>{coreStats.adapter_loaded ? '✓' : '–'}</span></div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Log tail -->
+          {#if trainingLog}
+            <pre class="training-log tm-log">{trainingLog.split('\n').slice(-20).join('\n')}</pre>
+          {/if}
+
+          <!-- Action buttons -->
+          <div class="training-actions" style="margin-top:10px">
+            <button class="btn-training btn-primary-training"
+              on:click={startTrainingMonitor}
+              disabled={trainingStatus === 'running'}>
+              {trainingStatus === 'running' ? '⏳ Training…' : '▶ Train New Adapter'}
             </button>
-            <button class="btn-training" on:click={() => (showTrainingDashboard = true)}>
-              Training Dashboard
+            <button class="btn-training" on:click={() => { showTrainingDashboard = true; }}>
+              Dashboard
+            </button>
+            <button class="btn-training" on:click={() => { showHistory = !showHistory; loadRunHistory(); }}>
+              History {showHistory ? '▲' : '▼'}
             </button>
           </div>
-          {#if trainingLog}
-            <pre class="training-log">{trainingLog}</pre>
+
+          <!-- Run history table -->
+          {#if showHistory}
+            <div class="tm-history">
+              {#if runHistory.length === 0}
+                <div class="tm-history-empty">No training runs recorded yet.</div>
+              {:else}
+                <table class="tm-history-table">
+                  <thead>
+                    <tr><th>Run</th><th>Started</th><th>Status</th><th>Examples</th></tr>
+                  </thead>
+                  <tbody>
+                    {#each runHistory as run}
+                      <tr>
+                        <td class="tm-run-id">{run.id}</td>
+                        <td>{fmtTs(run.started_at)}</td>
+                        <td style="color:{statusColor(run.status)}">{run.status}</td>
+                        <td>{run.total_examples ?? '—'}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {/if}
+            </div>
           {/if}
         </div>
       {/if}
@@ -2187,6 +2377,121 @@
     padding: 8px;
     white-space: pre-wrap;
     word-break: break-all;
+  }
+
+  /* ── Training Monitor ───────────────────────────────────────────────────── */
+  .tm-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0 6px;
+  }
+  .tm-status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .tm-status-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-dim, #888);
+  }
+  .tm-device-badge {
+    background: var(--bg4, #30304a);
+    border-radius: 4px;
+    font-size: 0.68rem;
+    padding: 1px 6px;
+    color: var(--text-dim, #aaa);
+  }
+  .tm-progress-track {
+    background: var(--bg3, #25253a);
+    border-radius: 4px;
+    height: 6px;
+    margin: 6px 0 4px;
+    overflow: hidden;
+  }
+  .tm-progress-fill {
+    background: linear-gradient(90deg, #6c63ff, #a78bfa);
+    border-radius: 4px;
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+  .tm-metrics-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.73rem;
+    color: var(--text-dim, #aaa);
+    margin-bottom: 4px;
+  }
+  .tm-loss { color: #a78bfa; font-weight: 600; }
+  .tm-data-row {
+    display: flex;
+    gap: 8px;
+    font-size: 0.71rem;
+    color: var(--text-dim, #888);
+    margin-bottom: 4px;
+  }
+  .tm-curated-badge {
+    background: #2a3a2a;
+    border: 1px solid #4caf5066;
+    border-radius: 4px;
+    color: #81c784;
+    padding: 0 5px;
+  }
+  .tm-stats-grid {
+    display: flex;
+    gap: 12px;
+    margin: 6px 0;
+  }
+  .tm-stat {
+    background: var(--bg3, #25253a);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 10px;
+    gap: 2px;
+    font-size: 0.72rem;
+  }
+  .tm-stat-label { color: var(--text-dim, #888); font-size: 0.66rem; }
+  .tm-log { max-height: 120px; overflow-y: auto; margin-top: 6px; }
+  .btn-primary-training {
+    background: var(--accent, #6c63ff) !important;
+    border-color: var(--accent, #6c63ff) !important;
+    color: #fff !important;
+  }
+  .btn-primary-training:hover:not(:disabled) {
+    background: #7c74ff !important;
+  }
+  .tm-history { margin-top: 10px; }
+  .tm-history-empty {
+    color: var(--text-dim, #888);
+    font-size: 0.75rem;
+    padding: 6px 0;
+  }
+  .tm-history-table {
+    border-collapse: collapse;
+    font-size: 0.72rem;
+    width: 100%;
+  }
+  .tm-history-table th {
+    color: var(--text-dim, #888);
+    font-weight: 600;
+    padding: 4px 6px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .tm-history-table td {
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--border, #2a2a3a);
+    color: var(--text);
+  }
+  .tm-run-id {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.68rem;
+    color: var(--text-dim, #888);
   }
 
   .dashboard-overlay {
