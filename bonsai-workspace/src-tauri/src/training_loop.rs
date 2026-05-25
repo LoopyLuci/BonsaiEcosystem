@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tracing::{info, warn};
 
 use crate::dual_inference::{DualModelSession, DualSessionConfig, SessionManager};
@@ -116,15 +116,18 @@ pub struct TrainingLoop {
     telemetry: Arc<TelemetryStore>,
     status: Arc<RwLock<LoopStatus>>,
     stop_flag: Arc<Mutex<bool>>,
+    pub progress_tx: broadcast::Sender<serde_json::Value>,
 }
 
 impl TrainingLoop {
     pub fn new(session_manager: Arc<SessionManager>, telemetry: Arc<TelemetryStore>) -> Self {
+        let (progress_tx, _) = broadcast::channel(16);
         Self {
             session_manager,
             telemetry,
             status: Arc::new(RwLock::new(LoopStatus::default())),
             stop_flag: Arc::new(Mutex::new(false)),
+            progress_tx,
         }
     }
 
@@ -230,6 +233,13 @@ impl TrainingLoop {
                 s.last_tool_overlap_pct = comparison.tool_overlap_pct;
                 s.elapsed_secs = started_at.elapsed().as_secs();
             }
+            self.progress_tx.send(serde_json::json!({
+                "round": prompt_idx,
+                "gaps_found": comparison.gaps.len(),
+                "examples": examples_this_run,
+                "tool_overlap_pct": comparison.tool_overlap_pct,
+                "elapsed_secs": started_at.elapsed().as_secs()
+            })).ok();
 
             // Only write training data when there are gaps to learn from
             if !comparison.gaps.is_empty() || !comparison.intent_match {
@@ -326,5 +336,9 @@ impl TrainingLoopState {
 
     pub async fn status(&self) -> LoopStatus {
         self.inner.status().await
+    }
+
+    pub fn subscribe_progress(&self) -> broadcast::Receiver<serde_json::Value> {
+        self.inner.progress_tx.subscribe()
     }
 }

@@ -653,6 +653,19 @@ pub fn run() {
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
 
+            // ── Forward training-loop progress events to the frontend ─────────
+            {
+                use tauri::Manager;
+                let app_state = app.state::<AppState>();
+                let mut rx = app_state.training_loop.subscribe_progress();
+                let bh = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    while let Ok(payload) = rx.recv().await {
+                        let _ = bh.emit("training-loop-progress", payload);
+                    }
+                });
+            }
+
             // ── Startup health gate ────────────────────────────────────────────
             // Check whether each major subsystem initialised. Emit a single event
             // shortly after the window opens so the frontend can surface problems
