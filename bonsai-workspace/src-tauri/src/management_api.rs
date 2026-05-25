@@ -53,6 +53,7 @@ pub struct MgmtState {
     pub pair_token:      String,
     pub bonsai_core:     Arc<crate::bonsai_core::BonsaiCore>,
     pub telemetry:       Arc<crate::telemetry::TelemetryStore>,
+    pub dual_session:    Arc<crate::dual_inference::SessionManager>,
 }
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
@@ -116,6 +117,8 @@ pub fn router(state: MgmtState) -> Router {
         // training control — mirrors Tauri commands for web clients
         .route("/api/v1/training/status",  get(mgmt_training_status))
         .route("/api/v1/training/history", get(mgmt_training_history))
+        // dual model comparison — continuous training loop
+        .route("/api/v1/compare",          post(mgmt_compare_models))
         .with_state(state)
 }
 
@@ -684,5 +687,47 @@ async fn mgmt_training_history(
     match s.telemetry.get_training_runs(limit).await {
         Ok(runs) => Json(runs).into_response(),
         Err(e)   => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+// ── Dual model comparison ─────────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct CompareRequest {
+    base_model: String,
+    bonsai_adapter: String,
+    prompt: String,
+    gpu_layers: Option<u32>,
+}
+
+async fn mgmt_compare_models(
+    State(s): State<MgmtState>,
+    headers: HeaderMap,
+    Json(body): Json<CompareRequest>,
+) -> impl IntoResponse {
+    auth!(s, headers);
+    use crate::dual_inference::{DualModelSession, DualSessionConfig};
+
+    let layers = body.gpu_layers.unwrap_or(35);
+
+    let server = match s
+        .dual_session
+        .ensure_session(DualSessionConfig {
+            base_model_path: body.base_model,
+            bonsai_lora_path: Some(body.bonsai_adapter),
+            reference_lora_path: None,
+            gpu_layers: layers,
+            context_size: 2048,
+        })
+        .await
+    {
+        Ok(srv) => srv,
+        Err(e) => return err500(e).into_response(),
+    };
+
+    let session = DualModelSession::new(server, None);
+    match session.compare(&body.prompt).await {
+        Ok(result) => Json(result).into_response(),
+        Err(e) => err500(e).into_response(),
     }
 }

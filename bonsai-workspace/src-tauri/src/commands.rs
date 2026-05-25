@@ -2248,6 +2248,7 @@ pub async fn set_api_config(
         pair_token:    state.pair_token.clone(),
         bonsai_core:   state.bonsai_core.clone(),
         telemetry:     state.telemetry.clone(),
+        dual_session:  state.dual_session.clone(),
     };
 
     let started = api_server::start(
@@ -6223,6 +6224,33 @@ pub async fn get_memory_status(
     state: State<'_, AppState>,
 ) -> Result<crate::hybrid_engine::NativeEngineStatus, String> {
     Ok(state.hybrid_engine.status().await)
+}
+
+#[tauri::command]
+pub async fn compare_models(
+    state: State<'_, AppState>,
+    base_model_path: String,
+    bonsai_adapter: String,
+    prompt: String,
+    gpu_layers: Option<u32>,
+) -> Result<crate::dual_inference::ComparisonResult, String> {
+    use crate::dual_inference::{DualModelSession, DualSessionConfig};
+
+    let layers = gpu_layers.unwrap_or(35); // default: 35 for MoE models on 7900 XTX
+
+    let server = state
+        .dual_session
+        .ensure_session(DualSessionConfig {
+            base_model_path,
+            bonsai_lora_path: Some(bonsai_adapter),
+            reference_lora_path: None,
+            gpu_layers: layers,
+            context_size: 2048,
+        })
+        .await?;
+
+    let session = DualModelSession::new(server, None);
+    session.compare(&prompt).await
 }
 
 #[tauri::command]
