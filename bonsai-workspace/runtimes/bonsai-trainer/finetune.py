@@ -61,9 +61,25 @@ def main():
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
+    MAX_LEN = 512
+
     with open(args.data, encoding="utf-8") as f:
         examples = [json.loads(line) for line in f if line.strip()]
-    dataset = Dataset.from_list([{"text": json.dumps(ex["messages"])} for ex in examples])
+    texts = [json.dumps(ex["messages"]) for ex in examples]
+
+    def tokenize(batch):
+        enc = tokenizer(
+            batch["text"],
+            truncation=True,
+            max_length=MAX_LEN,
+            padding="max_length",
+        )
+        enc["labels"] = enc["input_ids"].copy()
+        return enc
+
+    raw = Dataset.from_list([{"text": t} for t in texts])
+    dataset = raw.map(tokenize, batched=True, remove_columns=["text"])
+    dataset.set_format("torch")
 
     use_fp16 = (dtype == torch.float16) and str(dev) != "cpu"
     training_args = TrainingArguments(
