@@ -289,7 +289,7 @@ def main():
     print(f"[gen] Seeded {len(rows)} refusal examples. Generating {args.count - len(rows)} more ...")
 
     scenario_pool = [s[0] for s in SCENARIOS]
-    target = args.count - len(rows)
+    target = max(0, args.count - len(rows))
 
     for i in range(target):
         # Cycle through seed requests then paraphrase-vary
@@ -334,7 +334,7 @@ def main():
         for row in rows:
             f.write(json.dumps(row) + "\n")
 
-    print(f"\n[gen] {len(rows)} examples → {out}")
+    print(f"\n[gen] {len(rows)} examples -> {out}")
     if use_llm:
         print(f"[gen] llm={llm_ok}  fail={llm_fail}  template={tmpl}")
 
@@ -348,7 +348,7 @@ def main():
             with open(p, "w", encoding="utf-8") as f:
                 for row in data:
                     f.write(json.dumps(row) + "\n")
-            print(f"[gen] [{name}] {len(data)} → {p}")
+            print(f"[gen] [{name}] {len(data)} -> {p}")
 
 
 if __name__ == "__main__":
