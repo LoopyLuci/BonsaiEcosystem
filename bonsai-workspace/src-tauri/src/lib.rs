@@ -581,7 +581,7 @@ pub fn run() {
                     telemetry:     telemetry_store.clone(),
                     dual_session:  shared_dual_session.clone(),
                     training_loop: Arc::new(training_loop::TrainingLoopState::new(
-                        shared_dual_session.clone(),
+                        orchestrator.clone(),
                         telemetry_store.clone(),
                     )),
                 };
@@ -650,7 +650,7 @@ pub fn run() {
                 gpu: Arc::new(gpu_layer::GpuLayer::new(&gpu_layer::GpuLayer::detect())),
                 dual_session: shared_dual_session.clone(),
                 training_loop: Arc::new(training_loop::TrainingLoopState::new(
-                    shared_dual_session.clone(),
+                    orchestrator.clone(),
                     telemetry_store,
                 )),
             });
