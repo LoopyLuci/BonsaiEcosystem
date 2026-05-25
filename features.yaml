@@ -7,3 +7,4 @@ mobile_automation_enabled: false
 mcp_bridge_enabled: false
 cluster_orchestrator_enabled: false
 tts_enabled: false
+hybrid_engine_enabled: false
