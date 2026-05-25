@@ -4,7 +4,7 @@
 //! synthesises optimal training examples from the reference's correct answers,
 //! and queues a fine-tune run when enough examples accumulate.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex, RwLock};
 use tracing::{info, warn};
 
-use crate::dual_inference::{DualModelSession, DualSessionConfig, SessionManager};
+use crate::dual_inference::{DualModelSession, SharedServer};
+use crate::model_orchestrator::ModelOrchestrator;
 use crate::telemetry::TelemetryStore;
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -112,7 +113,7 @@ fn seed_prompts() -> Vec<String> {
 // ── Loop state ────────────────────────────────────────────────────────────────
 
 pub struct TrainingLoop {
-    session_manager: Arc<SessionManager>,
+    orchestrator: Arc<ModelOrchestrator>,
     telemetry: Arc<TelemetryStore>,
     status: Arc<RwLock<LoopStatus>>,
     stop_flag: Arc<Mutex<bool>>,
@@ -120,10 +121,10 @@ pub struct TrainingLoop {
 }
 
 impl TrainingLoop {
-    pub fn new(session_manager: Arc<SessionManager>, telemetry: Arc<TelemetryStore>) -> Self {
+    pub fn new(orchestrator: Arc<ModelOrchestrator>, telemetry: Arc<TelemetryStore>) -> Self {
         let (progress_tx, _) = broadcast::channel(16);
         Self {
-            session_manager,
+            orchestrator,
             telemetry,
             status: Arc::new(RwLock::new(LoopStatus::default())),
             stop_flag: Arc::new(Mutex::new(false)),
@@ -190,17 +191,20 @@ impl TrainingLoop {
         let mut prompt_idx = 0usize;
         let mut examples_this_run = 0usize;
 
-        // Ensure the shared server is up
-        let server = self
-            .session_manager
-            .ensure_session(DualSessionConfig {
-                base_model_path: config.base_model_path.clone(),
-                bonsai_lora_path: Some(config.bonsai_adapter_path.clone()),
-                reference_lora_path: None,
-                gpu_layers: config.gpu_layers,
-                context_size: 2048,
-            })
-            .await?;
+        // Reuse the orchestrator's already-running llama-server slot.
+        // Parse the port from its base URL (e.g. "http://127.0.0.1:8080").
+        let slot_url = self
+            .orchestrator
+            .active_slot_url()
+            .await
+            .ok_or_else(|| "No active model slot — load a model first".to_string())?;
+        let port: u16 = slot_url
+            .trim_end_matches('/')
+            .rsplit(':')
+            .next()
+            .and_then(|p| p.parse().ok())
+            .ok_or_else(|| format!("Cannot parse port from slot URL: {slot_url}"))?;
+        let server = Arc::new(SharedServer::from_existing_port(port));
 
         loop {
             // Check stop flag
@@ -320,9 +324,9 @@ pub struct TrainingLoopState {
 }
 
 impl TrainingLoopState {
-    pub fn new(session_manager: Arc<SessionManager>, telemetry: Arc<TelemetryStore>) -> Self {
+    pub fn new(orchestrator: Arc<ModelOrchestrator>, telemetry: Arc<TelemetryStore>) -> Self {
         Self {
-            inner: Arc::new(TrainingLoop::new(session_manager, telemetry)),
+            inner: Arc::new(TrainingLoop::new(orchestrator, telemetry)),
         }
     }
 

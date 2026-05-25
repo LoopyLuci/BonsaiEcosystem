@@ -200,6 +200,15 @@ impl SharedServer {
         self.port
     }
 
+    /// Wrap an already-running server (no child process to manage).
+    /// Used by the training loop to reuse the orchestrator's active slot.
+    pub fn from_existing_port(port: u16) -> Self {
+        Self {
+            port,
+            child: Mutex::new(None),
+        }
+    }
+
     pub async fn shutdown(&self) {
         if let Some(mut child) = self.child.lock().await.take() {
             info!(port = self.port, "[dual_inference] shutting down shared server");
