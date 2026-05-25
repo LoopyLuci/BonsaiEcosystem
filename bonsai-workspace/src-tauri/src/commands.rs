@@ -2247,6 +2247,7 @@ pub async fn set_api_config(
         app_handle:    app_handle.clone(),
         pair_token:    state.pair_token.clone(),
         bonsai_core:   state.bonsai_core.clone(),
+        telemetry:     state.telemetry.clone(),
     };
 
     let started = api_server::start(

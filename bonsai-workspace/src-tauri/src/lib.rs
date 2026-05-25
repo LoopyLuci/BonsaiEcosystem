@@ -50,6 +50,7 @@ mod sidecar_manager;
 mod management_api;
 pub mod bonsai_core;
 pub mod data_curator;
+pub mod telemetry;
 mod trainer;
 mod sidecar_supervisor;
 mod swarm_orchestrator;
@@ -161,6 +162,8 @@ pub struct AppState {
     pub agent_host:       Arc<agent_host::AgentHost>,
     /// BonsAI-Core orchestrator — plan, execute, curate.
     pub bonsai_core:      Arc<bonsai_core::BonsaiCore>,
+    /// Telemetry store — training runs + inference metrics.
+    pub telemetry:        Arc<telemetry::TelemetryStore>,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -494,6 +497,18 @@ pub fn run() {
             let bonsai_home = dirs::home_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join(".bonsai");
+
+            // ── Telemetry store ────────────────────────────────────────────────
+            let telemetry_store = Arc::new(
+                tauri::async_runtime::block_on(
+                    telemetry::TelemetryStore::new(
+                        bonsai_home.join("telemetry.db").to_str().unwrap_or("telemetry.db")
+                    )
+                ).unwrap_or_else(|e| {
+                    tracing::error!("[telemetry] failed to open DB: {e}");
+                    panic!("telemetry DB required");
+                })
+            );
             let memory_path = bonsai_home.join("core_memory.jsonl");
             let curator_path = bonsai_home.join("curated_examples.jsonl");
             let workspace_root = app_handle
@@ -541,6 +556,7 @@ pub fn run() {
                     app_handle:    app_handle.clone(),
                     pair_token:    token.clone(),
                     bonsai_core:   shared_bonsai_core.clone(),
+                    telemetry:     telemetry_store.clone(),
                 };
                 match tauri::async_runtime::block_on(api_server::start_with_fallback(
                     orch,
@@ -602,6 +618,7 @@ pub fn run() {
                 task_queue,
                 agent_host,
                 bonsai_core: shared_bonsai_core,
+                telemetry:   telemetry_store,
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
