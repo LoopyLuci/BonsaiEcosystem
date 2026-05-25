@@ -58,6 +58,10 @@ mod gpu_telemetry;
 mod gpu_model_loader;
 mod dual_inference;
 mod training_loop;
+mod rich_markdown;
+mod sandbox_executor;
+mod image_generation;
+mod tts_engine;
 mod sidecar_supervisor;
 mod swarm_orchestrator;
 mod task_queue;
@@ -1193,6 +1197,11 @@ pub fn run() {
             commands::get_memory_status,
             commands::load_model_gpu,
             commands::compare_models,
+            // ── Rich Markdown / Multi-modal ───────────────────────────────────
+            rich_markdown::render_rich_block,
+            sandbox_executor::run_sandboxed_code,
+            image_generation::generate_image_command,
+            tts_engine::tts_synthesize,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
