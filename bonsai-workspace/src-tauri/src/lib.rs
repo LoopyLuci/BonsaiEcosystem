@@ -47,9 +47,12 @@ pub mod rag_store;
 mod remote;
 mod remote_input;
 mod sidecar_manager;
+mod management_api;
 mod sidecar_supervisor;
 mod swarm_orchestrator;
 mod task_queue;
+pub mod bonsai_core;
+pub mod trainer;
 mod tools;
 mod user_skills;
 mod wal;
@@ -155,6 +158,10 @@ pub struct AppState {
     pub task_queue:       Arc<task_queue::TaskQueue>,
     /// Pluggable agent registry with built-in CodeWriter and CodeReviewer.
     pub agent_host:       Arc<agent_host::AgentHost>,
+    /// BonsAI-Core orchestrator (few-shot + optional LoRA adapter).
+    pub bonsai_core:      Arc<bonsai_core::BonsaiCore>,
+    /// Stateless training lifecycle helper.
+    pub trainer:          trainer::Trainer,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -377,6 +384,7 @@ pub fn run() {
                 .map(char::from)
                 .collect();
 
+            tracing::info!("[api] pair_token={pair_token}");
             let ws_router = Arc::new(ws_router::WsRouter::new());
 
             let policy_engine = Arc::new(assistant_policy::PolicyEngine::new());
@@ -414,6 +422,10 @@ pub fn run() {
             ));
 
             let mut api_config = config::load_config(&app_handle).unwrap_or_default();
+            // Persist the pair token so bonsai-bot and local clients can read it
+            // from bonsai-config.json without needing the UI.
+            api_config.pair_token = pair_token.clone();
+            let _ = config::save_config(&app_handle, &api_config);
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             restore_main_window_state(&app_handle, &api_config);
@@ -438,42 +450,6 @@ pub fn run() {
             if api_config.assistant_window_open {
                 if let Some(assistant_window) = app.get_webview_window("assistant") {
                     let _ = assistant_window.show();
-                }
-            }
-
-            let api_runtime = {
-                let orch   = orchestrator.clone();
-                let remote = remote_manager.clone();
-                let ws     = ws_router.clone();
-                let token  = pair_token.clone();
-                let host   = api_config.api_host.clone();
-                let port   = api_config.api_port;
-                // Try the preferred port and a small range of fallback ports if binding fails.
-                // This avoids hard failures when the preferred port is briefly unavailable
-                // (e.g., stale listeners or other local tools). We attempt +1..+4 as fallbacks.
-                match tauri::async_runtime::block_on(api_server::start_with_fallback(
-                    orch,
-                    remote,
-                    ws,
-                    token,
-                    host,
-                    port,
-                    4u16,
-                    app_handle.clone(),
-                )) {
-                    Ok(handle) => Some(handle),
-                    Err(e) => {
-                        tracing::error!("[api] failed to start API server: {e}");
-                        None
-                    }
-                }
-            };
-
-            if let Some(ref handle) = api_runtime {
-                if handle.host != api_config.api_host || handle.port != api_config.api_port {
-                    api_config.api_host = handle.host.clone();
-                    api_config.api_port = handle.port;
-                    let _ = config::save_config(&app_handle, &api_config);
                 }
             }
 
@@ -513,6 +489,86 @@ pub fn run() {
                 });
             }
 
+            let swarm_cancels = Arc::new(StdMutex::new(HashMap::new()));
+
+            // BonsaiCore: constructed before api_runtime so both MgmtState and AppState
+            // can hold an Arc to the same instance.
+            let shared_bonsai_core = {
+                let adapter_dir = dirs::home_dir()
+                    .map(|h| h.join(".bonsai").join("adapters").join("bonsai-core-v1"));
+                let prompt_template = adapter_dir.as_ref()
+                    .and_then(|d| std::fs::read_to_string(d.join("prompt_template.txt")).ok())
+                    .unwrap_or_else(|| {
+                        concat!(
+                            "You are BonsAI-Core, an orchestration AI. ",
+                            "Output ONLY a JSON object with keys: intent, reasoning, plan (array of {tool,args}), ",
+                            "final_response (string or null), confidence (0-1).\n",
+                            "Available tools: read_file, write_file, list_files, grep_files, run_command, search_knowledge.\n",
+                            "Example: {\"intent\":\"tool_use\",\"reasoning\":\"user wants files\",",
+                            "\"plan\":[{\"tool\":\"list_files\",\"args\":{\"path\":\"src\"}}],",
+                            "\"final_response\":null,\"confidence\":0.95}\n",
+                            "Memory: {memory}\n",
+                            "User request: {request}\n",
+                            "JSON:"
+                        ).into()
+                    });
+                let memory_path = adapter_dir.as_ref().map(|d| d.join("memory_index.jsonl"));
+                let core_memory = bonsai_core::CoreMemory::new(memory_path);
+                let inference_url = format!("http://127.0.0.1:{}/v1/chat/completions", api_config.api_port);
+                Arc::new(bonsai_core::BonsaiCore::new(
+                    adapter_dir.filter(|d| d.exists()),
+                    inference_url,
+                    core_memory,
+                    prompt_template,
+                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
+                    false,
+                ))
+            };
+
+            let api_runtime = {
+                let orch   = orchestrator.clone();
+                let remote = remote_manager.clone();
+                let ws     = ws_router.clone();
+                let token  = pair_token.clone();
+                let host   = api_config.api_host.clone();
+                let port   = api_config.api_port;
+                let mgmt = management_api::MgmtState {
+                    orchestrator:  orchestrator.clone(),
+                    agent_host:    agent_host.clone(),
+                    agent_store:   agent_store.clone(),
+                    task_queue:    task_queue.clone(),
+                    swarm_cancels: swarm_cancels.clone(),
+                    app_handle:    app_handle.clone(),
+                    pair_token:    token.clone(),
+                    bonsai_core:   shared_bonsai_core.clone(),
+                };
+                match tauri::async_runtime::block_on(api_server::start_with_fallback(
+                    orch,
+                    remote,
+                    ws,
+                    token,
+                    host,
+                    port,
+                    4u16,
+                    app_handle.clone(),
+                    mgmt,
+                )) {
+                    Ok(handle) => Some(handle),
+                    Err(e) => {
+                        tracing::error!("[api] failed to start API server: {e}");
+                        None
+                    }
+                }
+            };
+
+            if let Some(ref handle) = api_runtime {
+                if handle.host != api_config.api_host || handle.port != api_config.api_port {
+                    api_config.api_host = handle.host.clone();
+                    api_config.api_port = handle.port;
+                    let _ = config::save_config(&app_handle, &api_config);
+                }
+            }
+
             app.manage(AppState {
                 orchestrator:     orchestrator.clone(),
                 whisper:          whisper.clone(),
@@ -527,7 +583,7 @@ pub fn run() {
                 pair_token:         pair_token.clone(),
                 agent_store,
                 swarm_orchestrator: swarm_orch,
-                swarm_cancels:      Arc::new(StdMutex::new(HashMap::new())),
+                swarm_cancels,
                 api_server:         Arc::new(Mutex::new(api_runtime)),
                 cluster_orchestrator,
                 policy_engine,
@@ -545,6 +601,8 @@ pub fn run() {
                 model_data_store: model_data_store.clone(),
                 task_queue,
                 agent_host,
+                bonsai_core: shared_bonsai_core,
+                trainer: trainer::Trainer,
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
@@ -1083,6 +1141,8 @@ pub fn run() {
             // ── Agent Host ────────────────────────────────────────────────────
             commands::list_agents,
             commands::send_agent_message,
+            // ── BonsAI-Core training lifecycle ────────────────────────────────
+            commands::start_training_cycle,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

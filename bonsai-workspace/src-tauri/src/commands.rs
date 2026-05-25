@@ -89,11 +89,8 @@ pub async fn write_file(path: String, content: String) -> Result<(), String> {
     if has_parent_dir_component(&path) {
         return Err("Path not allowed: traversal sequences are forbidden".to_string());
     }
-    let p = std::path::Path::new(&path);
-    if let Some(parent) = p.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    fs::write(&path, content).map_err(|e| e.to_string())
+    crate::atomic_write(std::path::Path::new(&path), content.as_bytes())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1907,7 +1904,8 @@ pub async fn accept_diff_hunk(
     let new_content =
         diffy::apply(&original, &patch).map_err(|e| format!("Patch apply error: {e}"))?;
 
-    fs::write(&file_path, new_content).map_err(|e| e.to_string())
+    crate::atomic_write(std::path::Path::new(&file_path), new_content.as_bytes())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2240,6 +2238,16 @@ pub async fn set_api_config(
         running.stop().await;
     }
 
+    let mgmt = crate::management_api::MgmtState {
+        orchestrator:  state.orchestrator.clone(),
+        agent_host:    state.agent_host.clone(),
+        agent_store:   state.agent_store.clone(),
+        task_queue:    state.task_queue.clone(),
+        swarm_cancels: state.swarm_cancels.clone(),
+        app_handle:    app_handle.clone(),
+        pair_token:    state.pair_token.clone(),
+    };
+
     let started = api_server::start(
         state.orchestrator.clone(),
         remote_manager,
@@ -2248,6 +2256,7 @@ pub async fn set_api_config(
         api_host.clone(),
         api_port,
         app_handle.clone(),
+        mgmt.clone(),
     )
     .await;
 
@@ -2264,6 +2273,7 @@ pub async fn set_api_config(
                 old_config.api_host.clone(),
                 old_config.api_port,
                 app_handle.clone(),
+                mgmt,
             )
             .await
             {
@@ -6099,4 +6109,28 @@ pub async fn send_agent_message(
         let _ = app.emit("agent-output", &payload);
     });
     Ok(output)
+}
+
+// ── BonsAI-Core training lifecycle ───────────────────────────────────────────
+
+#[tauri::command]
+pub async fn start_training_cycle(
+    state: State<'_, AppState>,
+    data_path: Option<String>,
+    output_path: Option<String>,
+) -> Result<String, String> {
+    let data = data_path.unwrap_or_else(|| {
+        "data/bonsai_core/bonsai_core_train.jsonl".into()
+    });
+    let output = output_path.unwrap_or_else(|| {
+        dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".bonsai/adapters/bonsai-core-v2")
+            .to_string_lossy()
+            .to_string()
+    });
+
+    let adapter = crate::trainer::Trainer::run(&data, &output)?;
+    state.bonsai_core.load_adapter(&adapter);
+    Ok(adapter.to_string_lossy().to_string())
 }

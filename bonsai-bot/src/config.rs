@@ -12,6 +12,10 @@ pub struct BotConfig {
     /// Bonsai Workspace API base URL — used for direct llama-server slot fallback.
     #[serde(default = "default_workspace_api_url")]
     pub workspace_api_url: String,
+    /// Pair token shown in Settings → Desktop Connection. Required for /api/v1/* endpoints.
+    /// Leave empty to disable slash commands (bot will warn on first use).
+    #[serde(default)]
+    pub workspace_pair_token: String,
     #[serde(default = "default_admin_port")]
     pub admin_port: u16,
     /// Model tags to prefer when selecting a model from the workspace registry.
@@ -74,8 +78,9 @@ impl Default for BotConfig {
         Self {
             schema_version: 1,
             buddy_api_url:       "http://127.0.0.1:11420".to_string(),
-            workspace_api_url:   "http://127.0.0.1:11369".to_string(),
-            admin_port:          11666,
+            workspace_api_url:    "http://127.0.0.1:11369".to_string(),
+            workspace_pair_token: String::new(),
+            admin_port:           11666,
             preferred_model_tags: default_preferred_model_tags(),
             reclaim_allowed_ports: Vec::new(),
             allowed_script_paths: Vec::new(),
@@ -234,6 +239,36 @@ pub fn ensure_admin_token() -> Result<String, String> {
     keyring_set("bot_admin_token", &tok)?;
     tracing::info!("[config] Generated new bot_admin_token and stored in keychain");
     Ok(tok)
+}
+
+// ── Workspace pair token ──────────────────────────────────────────────────────
+
+/// Read fields from the Bonsai Workspace config file, returning the parsed JSON.
+/// Returns `None` if the file is missing or unparseable.
+fn read_workspace_config() -> Option<serde_json::Value> {
+    let path = dirs::data_dir()?
+        .join("com.bonsai.workspace")
+        .join("bonsai-config.json");
+    let content = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+/// Read the current pair token from the Bonsai Workspace config file.
+/// The workspace writes a fresh token on every startup, so the bot never
+/// needs a manual copy-paste.
+pub fn read_workspace_pair_token() -> Option<String> {
+    let tok = read_workspace_config()?["pair_token"].as_str()?.to_string();
+    if tok.is_empty() { None } else { Some(tok) }
+}
+
+/// Read the workspace API port from bonsai-config.json (`api_port` field).
+/// Falls back to `default_workspace_api_url`'s port (11369) when unavailable.
+pub fn read_workspace_api_url() -> Option<String> {
+    let cfg = read_workspace_config()?;
+    let host = cfg["api_host"].as_str().unwrap_or("127.0.0.1");
+    let port = cfg["api_port"].as_u64()?;
+    if port == 0 { return None; }
+    Some(format!("http://{host}:{port}"))
 }
 
 // ── Load / save ───────────────────────────────────────────────────────────────
