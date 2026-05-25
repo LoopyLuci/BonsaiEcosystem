@@ -64,6 +64,11 @@ mod image_generation;
 mod tts_engine;
 mod sidecar_supervisor;
 mod plugin_loader;
+mod plugin_manifest;
+mod plugin_host;
+mod tool_registry;
+mod self_play;
+mod cross_training;
 mod swarm_orchestrator;
 mod task_queue;
 mod tools;
@@ -183,6 +188,14 @@ pub struct AppState {
     pub dual_session:     Arc<dual_inference::SessionManager>,
     /// Controlled continuous training loop orchestrator.
     pub training_loop:    Arc<training_loop::TrainingLoopState>,
+    /// Self-play training loop (generate → critique → correct → curate).
+    pub self_play:        Arc<self_play::SelfPlayState>,
+    /// Secure WASM/Python plugin host with capability enforcement.
+    pub plugin_host:      Arc<plugin_host::PluginHost>,
+    /// Pluggable tool registry (execute_code, system_info, …).
+    pub tool_registry:    Arc<tool_registry::ToolRegistryState>,
+    /// Cross-training event sender — feed chat/plugin/tool events for passive data collection.
+    pub cross_training:   cross_training::CrossTrainingSender,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -612,6 +625,25 @@ pub fn run() {
                 }
             }
 
+            // ── New subsystems (self-play, plugins, tools, cross-training) ────────
+            let self_play_state = Arc::new(self_play::SelfPlayState::new(
+                orchestrator.clone(),
+                self_play::SelfPlayConfig::default(),
+            ));
+            let plugin_host = Arc::new(plugin_host::PluginHost::new());
+            {
+                let ph = plugin_host.clone();
+                tauri::async_runtime::spawn(async move { ph.load_all().await; });
+            }
+            let tool_registry = tauri::async_runtime::block_on(
+                tool_registry::ToolRegistryState::new_with_defaults()
+            );
+            let (cross_pipeline, cross_tx) = cross_training::CrossTrainingPipeline::new(
+                cross_training::CrossTrainingConfig::default(),
+            );
+            tauri::async_runtime::spawn(cross_pipeline.start());
+            let cross_training_sender = cross_training::CrossTrainingSender(cross_tx);
+
             app.manage(AppState {
                 orchestrator:     orchestrator.clone(),
                 whisper:          whisper.clone(),
@@ -653,6 +685,10 @@ pub fn run() {
                     orchestrator.clone(),
                     telemetry_store,
                 )),
+                self_play:     self_play_state,
+                plugin_host,
+                tool_registry,
+                cross_training: cross_training_sender,
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
@@ -1224,6 +1260,17 @@ pub fn run() {
             tts_engine::tts_synthesize,
             plugin_loader::list_plugins_cmd,
             plugin_loader::load_plugin_cmd,
+            // Self-play training
+            self_play::start_self_play,
+            self_play::stop_self_play,
+            self_play::get_self_play_status,
+            // Plugin host
+            plugin_host::list_loaded_plugins,
+            plugin_host::load_plugin_from_dir,
+            plugin_host::execute_plugin,
+            // Tool registry
+            tool_registry::list_tools,
+            tool_registry::run_tool,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
