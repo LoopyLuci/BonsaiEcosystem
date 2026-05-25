@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "bonsai-bot",
+  "bonsai-native",
   "bonsai-runtime",
   "bonsai-workspace/src-tauri",
 ]
