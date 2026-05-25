@@ -6,6 +6,12 @@
 
  This README summarizes the product features, developer quick-starts, and where to find detailed docs in the repository.
 
+ ## Demo
+
+ **MLP walkthrough video:** [`docs/bonsai-mlp-demo.mp4`](docs/bonsai-mlp-demo.mp4) _(record with OBS following [`docs/VIDEO_TUTORIAL_SCRIPT.md`](docs/VIDEO_TUTORIAL_SCRIPT.md))_
+
+ **Docs site:** built with VitePress — run `npm run docs:dev` in `docs/site/` to browse locally.
+
  ## What's New
 
  - Model Data system with rich metadata and AI-assisted model profile generation for local and catalog models.
