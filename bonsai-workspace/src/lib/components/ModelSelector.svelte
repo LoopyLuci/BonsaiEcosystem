@@ -23,6 +23,7 @@
     setModelSwitchStatus,
     modelDataList,
     CUSTOM_SWARM_MODEL_ID,
+    BONSAI_AI_MODEL_ID,
   } from '$lib/stores/models';
   import type { ModelInfo } from '$lib/stores/models';
   import type { ModelDataSummary, ModelTier, ModelStrength, ToolCallingSupport } from '$lib/types/model_data';
@@ -240,6 +241,12 @@
     activeModelId.set(CUSTOM_SWARM_MODEL_ID);
   }
 
+  function pickBonsaiAI() {
+    open = false; clearDropdownStyle();
+    autoMode.set(false);
+    activeModelId.set(BONSAI_AI_MODEL_ID);
+  }
+
   async function download(e: MouseEvent, entry: typeof BONSAI_CATALOG[number]) {
     e.stopPropagation();
     await downloadCatalogModel(entry);
@@ -248,12 +255,15 @@
   // ── Derived state ─────────────────────────────────────────────────────────
 
   $: isCustomSwarmActive = $swarmEnabled || $activeModelId === CUSTOM_SWARM_MODEL_ID;
+  $: isBonsaiAIActive    = $activeModelId === BONSAI_AI_MODEL_ID;
 
   $: label = isCustomSwarmActive
     ? 'Custom Swarm'
-    : $autoMode
-      ? `Auto · ${$activeModel?.name ?? 'selecting…'}`
-      : ($activeModel ? displayName($activeModel, bestDataForModel($activeModel)) : 'Select Model');
+    : isBonsaiAIActive
+      ? 'BonsAI'
+      : $autoMode
+        ? `Auto · ${$activeModel?.name ?? 'selecting…'}`
+        : ($activeModel ? displayName($activeModel, bestDataForModel($activeModel)) : 'Select Model');
 
   $: freeGb = $orchestratorStatus
     ? Math.round($orchestratorStatus.free_ram_mb / 1024 * 10) / 10
@@ -330,6 +340,37 @@
             <span class="opt-desc">Orchestrator picks the best loaded model for your task</span>
           </div>
           {#if $autoMode}<span class="opt-badge active">Active</span>{/if}
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-label">Integrated AI</div>
+
+        <!-- BonsAI — first-class integrated option -->
+        <div class="option option-special bonsai-ai-option"
+          class:selected={isBonsaiAIActive} role="option" aria-selected={isBonsaiAIActive}
+          tabindex="0" on:click={pickBonsaiAI}
+          on:keydown={(e) => e.key === 'Enter' && pickBonsaiAI()}>
+          <span class="opt-icon bonsai-ai-icon">🌿</span>
+          <div class="opt-body">
+            <div class="opt-name-row">
+              <span class="opt-name">BonsAI</span>
+              <span class="tier-badge" style="color: #34d399">Integrated</span>
+            </div>
+            <span class="opt-desc">Bonsai Workspace's own AI · fast, private, always available</span>
+            <div class="capability-row">
+              <span class="cap-tag">Instruction</span>
+              <span class="cap-tag">Coding</span>
+              <span class="cap-tag tool-tag">🔧 Tools</span>
+              <span class="cap-tag ctx-tag">128K ctx</span>
+            </div>
+          </div>
+          <div class="opt-actions">
+            {#if isBonsaiAIActive}
+              <span class="opt-badge active">Active</span>
+            {:else}
+              <span class="opt-badge local">Use</span>
+            {/if}
+          </div>
         </div>
 
         <div class="divider"></div>
@@ -682,4 +723,13 @@
 
   /* Rich installed model rows get a bit more padding */
   .model-rich { padding: 10px 12px; }
+
+  /* BonsAI integrated AI option */
+  .bonsai-ai-option {
+    background: linear-gradient(135deg, rgba(52,211,153,0.06) 0%, rgba(16,185,129,0.03) 100%);
+    border-left: 2px solid rgba(52,211,153,0.4);
+  }
+  .bonsai-ai-option:hover { background: rgba(52,211,153,0.1) !important; }
+  .bonsai-ai-option.selected { background: rgba(52,211,153,0.12) !important; }
+  .bonsai-ai-icon { filter: drop-shadow(0 0 4px rgba(52,211,153,0.5)); }
 </style>

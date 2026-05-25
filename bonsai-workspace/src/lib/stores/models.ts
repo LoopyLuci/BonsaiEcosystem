@@ -100,6 +100,20 @@ export function setModelSwitchStatus(msg: string, autoDismissMs?: number): void 
 }
 
 export const CUSTOM_SWARM_MODEL_ID = '__custom_swarm__';
+export const BONSAI_AI_MODEL_ID    = '__bonsai_ai__';
+
+const BONSAI_AI_MODEL: ModelInfo = {
+  id: BONSAI_AI_MODEL_ID,
+  name: 'BonsAI',
+  path: '',
+  architecture: 'integrated',
+  parameter_count: 0,
+  context_length: 128_000,
+  quant: 'integrated',
+  ram_required_mb: 0,
+  ram_label: 'Cloud',
+  valid: true,
+};
 
 const CUSTOM_SWARM_MODEL: ModelInfo = {
   id: CUSTOM_SWARM_MODEL_ID,
@@ -132,6 +146,9 @@ export const activeModel = derived(
   ([$models, $status, $activeModelId, $swarmEnabled]) => {
     if ($swarmEnabled || $activeModelId === CUSTOM_SWARM_MODEL_ID) {
       return CUSTOM_SWARM_MODEL;
+    }
+    if ($activeModelId === BONSAI_AI_MODEL_ID) {
+      return BONSAI_AI_MODEL;
     }
     if ($activeModelId) {
       return $models.find(m => m.id === $activeModelId) ?? null;
