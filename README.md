@@ -195,3 +195,25 @@ Requirements for Android workflows: `adb` (Android platform tools) and, for scre
 
  If you'd like, I can also add a short quickstart README specifically for contributors (dev-only steps and checks). Would you like that next?
 
+## Multimodal Tools & Models
+
+This workspace includes multiple local multimodal tools. Models must be downloaded
+manually and placed into `~/.bonsai/models/`.
+
+Common tools (tool names shown for `tools/call` / Tauri `run_tool`):
+- `numarkdown_image_to_markdown` — NuMarkdown-8B OCR → Markdown (model: `NuMarkdown-8B-Thinking-Q4_K_M.gguf`)
+- `numarkdown_extract_structure` — Document structure extraction
+- `demo_streaming` — Demo progress-streaming tool (for testing `$\/progress`)
+- `system_info` — System info (built-in)
+
+Install models (example):
+
+1. Download model(s) from your provider (e.g. Hugging Face) and place under:
+
+```
+%USERPROFILE%/.bonsai/models/  # Windows
+~/.bonsai/models/              # Linux/macOS
+```
+
+2. Start the BonsAI app; missing-model errors will be shown in the UI when tools are invoked.
+

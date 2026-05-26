@@ -11,6 +11,7 @@ pub const BUDDY_API_PORT:   u16 = 11420;   // Bonsai Buddy
 
 fn default_buddy_api_port() -> u16 { BUDDY_API_PORT }
 fn default_inference_mode() -> InferenceMode { InferenceMode::default() }
+fn default_critic_threshold() -> f32 { 0.55 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -57,6 +58,22 @@ pub struct AppConfig {
     /// enables GPU layers from Settings.
     #[serde(default)]
     pub gpu_crash_fallback: bool,
+    /// Path to a small (0.5–1.5B) draft model for speculative decoding.
+    /// When set and the file exists, llama-server is started with `--model-draft`.
+    #[serde(default)]
+    pub draft_model_path: Option<String>,
+    /// Directory where LoRA adapters are stored. Defaults to ~/.bonsai/adapters.
+    #[serde(default)]
+    pub adapters_dir: Option<String>,
+    /// Path to LLaVA CLIP mmproj file for vision support.
+    #[serde(default)]
+    pub vision_mmproj_path: Option<String>,
+    /// Whether the critic quality-gate is enabled (auto-retry responses below threshold).
+    #[serde(default)]
+    pub critic_enabled: bool,
+    /// Minimum critic score to accept a response without retry (0.0–1.0).
+    #[serde(default = "default_critic_threshold")]
+    pub critic_threshold: f32,
 }
 
 impl Default for AppConfig {
@@ -80,6 +97,11 @@ impl Default for AppConfig {
             default_inference_mode: InferenceMode::default(),
             pair_token: String::new(),
             gpu_crash_fallback: false,
+            draft_model_path: None,
+            adapters_dir: None,
+            vision_mmproj_path: None,
+            critic_enabled: true,
+            critic_threshold: 0.55,
         }
     }
 }

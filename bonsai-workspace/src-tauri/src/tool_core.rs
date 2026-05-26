@@ -23,6 +23,26 @@ pub(crate) fn intern_str(s: String) -> &'static str {
     leaked
 }
 
+// ── Sandbox requirement ───────────────────────────────────────────────────────
+
+/// Execution isolation tier required by a tool.
+/// The executor enforces this — a tool that declares Wasm cannot fall back to Native.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SandboxRequirement {
+    /// Direct subprocess with full process permissions. Default for read-only tools.
+    Native,
+    /// Python venv with restricted sys.path. Required for user-supplied Python code.
+    Venv,
+    /// WASM sandbox via wasmtime — strongest isolation. Required for untrusted plugins.
+    Wasm,
+}
+
+impl SandboxRequirement {
+    pub fn is_isolated(&self) -> bool {
+        matches!(self, Self::Venv | Self::Wasm)
+    }
+}
+
 // ── Side-effect profile ───────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq)]
@@ -259,9 +279,33 @@ pub trait Tool: Send + Sync + 'static {
     }
     /// Retry policy for transient failures.
     fn retry_policy(&self) -> RetryPolicy { RetryPolicy::none() }
+    /// Minimum sandbox tier required to execute this tool safely.
+    /// Executor enforces: actual tier must be >= declared tier.
+    fn sandbox_requirement(&self) -> SandboxRequirement { SandboxRequirement::Native }
 
     /// Execute the tool. Called only after PolicyEngine has approved the call.
     async fn execute(&self, args: &Value, ctx: &ToolContext) -> ToolResult;
+}
+
+// ── ReAct bridge descriptors ─────────────────────────────────────────────────
+
+/// Minimal tool description used to auto-generate the ReAct system prompt from
+/// any `ToolRegistry` without depending on `tools::ToolDef`.
+#[derive(Debug, Clone)]
+pub struct ReactArgDef {
+    pub name:        String,
+    pub arg_type:    String,
+    pub description: String,
+    pub required:    bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReactBridgeDef {
+    pub name:              String,
+    pub description:       String,
+    pub args:              Vec<ReactArgDef>,
+    pub requires_approval: bool,
+    pub sandbox:           SandboxRequirement,
 }
 
 // ── Tool registry ─────────────────────────────────────────────────────────────
@@ -294,6 +338,40 @@ impl ToolRegistry {
 
     pub fn len(&self) -> usize { self.tools.len() }
     pub fn is_empty(&self) -> bool { self.tools.is_empty() }
+
+    /// Iterate all registered tools (used by the ReAct bridge and MCP server).
+    pub fn iter_tools(&self) -> impl Iterator<Item = Arc<dyn Tool>> + '_ {
+        self.tools.values().cloned()
+    }
+
+    /// Lightweight bridge descriptors for the ReAct system prompt — no JSON Schema,
+    /// just name + description + required-arg list suitable for tag-based calling.
+    pub fn react_bridge_defs(&self) -> Vec<ReactBridgeDef> {
+        self.tools.values().map(|t| {
+            let schema = t.schema();
+            let props = schema.get("properties").and_then(|p| p.as_object());
+            let required_set: std::collections::HashSet<&str> = schema
+                .get("required")
+                .and_then(|r| r.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+                .unwrap_or_default();
+            let args: Vec<ReactArgDef> = props.map(|m| {
+                m.iter().map(|(name, prop)| ReactArgDef {
+                    name:        name.clone(),
+                    arg_type:    prop.get("type").and_then(|t| t.as_str()).unwrap_or("string").to_string(),
+                    description: prop.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string(),
+                    required:    required_set.contains(name.as_str()),
+                }).collect()
+            }).unwrap_or_default();
+            ReactBridgeDef {
+                name:              t.name().to_string(),
+                description:       t.description().to_string(),
+                args,
+                requires_approval: t.policy_hint().max_risk >= RiskLevel::Destructive,
+                sandbox:           t.sandbox_requirement(),
+            }
+        }).collect()
+    }
 
     /// Full tool definitions (JSON schema array for the LLM).
     /// Optionally filtered to `names` subset; filtered by profile permissions.

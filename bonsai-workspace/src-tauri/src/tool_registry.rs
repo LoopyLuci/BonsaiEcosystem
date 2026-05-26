@@ -17,6 +17,16 @@ pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
     async fn run(&self, args: &Value) -> Result<ToolResult, String>;
+
+    /// Optional streaming run with progress updates sent on `progress_tx`.
+    /// By default, this calls `run()` and sends no progress updates.
+    async fn run_with_progress(
+        &self,
+        args: &Value,
+        _progress_tx: tokio::sync::mpsc::UnboundedSender<serde_json::Value>,
+    ) -> Result<ToolResult, String> {
+        self.run(args).await
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +75,24 @@ impl ToolRegistry {
     pub async fn execute(&self, name: &str, args: &Value) -> Option<ToolResult> {
         let tools = self.tools.read().await;
         match tools.get(name)?.run(args).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                warn!(tool=name, error=%e, "[tool_registry] execution failed");
+                None
+            }
+        }
+    }
+
+    /// Execute a tool and forward progress via `progress_tx`.
+    pub async fn execute_with_progress(
+        &self,
+        name: &str,
+        args: &Value,
+        progress_tx: tokio::sync::mpsc::UnboundedSender<serde_json::Value>,
+    ) -> Option<ToolResult> {
+        let tools = self.tools.read().await;
+        let tool = tools.get(name)?;
+        match tool.run_with_progress(args, progress_tx).await {
             Ok(r) => Some(r),
             Err(e) => {
                 warn!(tool=name, error=%e, "[tool_registry] execution failed");
@@ -148,7 +176,39 @@ impl ToolRegistryState {
         let registry = Arc::new(ToolRegistry::new());
         registry.register(Box::new(ExecuteCodeTool)).await;
         registry.register(Box::new(SystemInfoTool)).await;
-        Arc::new(Self { registry })
+        // Demo streaming tool for testing progress updates
+        registry.register(Box::new(crate::tools::demo_streaming::DemoStreamingTool::new())).await;
+        let state = Arc::new(Self { registry });
+        // Register Phase-1 multi-modal tools (Kokoro TTS, Depth, YOLO).
+        crate::multimodal::register_all(&state).await;
+        state
+    }
+
+    /// Return a simple list of tools for external listing consumers.
+    pub fn list_tools(&self) -> Vec<ToolInfo> {
+        // Note: This clones the current snapshot; callers should be quick.
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(async { self.registry.list().await })
+    }
+
+    /// Invoke a tool by name and return a JSON-ish Value result or an error.
+    pub async fn invoke_by_name(&self, name: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
+        match self.registry.execute(name, &args).await {
+            Some(res) => {
+                if res.content_type.starts_with("text/") {
+                    if let Ok(s) = std::str::from_utf8(&res.data) {
+                        Ok(serde_json::json!({ "content": s }))
+                    } else {
+                        Err("invalid utf8 in text result".into())
+                    }
+                } else if res.content_type == "application/json" {
+                    serde_json::from_slice(&res.data).map_err(|e| e.to_string())
+                } else {
+                    Err(format!("unsupported content_type: {}", res.content_type))
+                }
+            }
+            None => Err(format!("tool '{}' not found or failed", name)),
+        }
     }
 }
 
@@ -159,6 +219,25 @@ pub async fn list_tools(
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<Vec<ToolInfo>, String> {
     Ok(state.tool_registry.registry.list().await)
+}
+
+#[tauri::command]
+pub async fn discover_peers_cmd(
+    _state: tauri::State<'_, crate::AppState>,
+) -> Result<Vec<(String,u16,Vec<String>)>, String> {
+    match crate::p2p::sharing::discover_peers().await {
+        Ok(p) => Ok(p),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn request_model_cmd(
+    _state: tauri::State<'_, crate::AppState>,
+    url: String,
+    local_path: String,
+) -> Result<(), String> {
+    crate::p2p::sharing::request_model(&url, &local_path).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

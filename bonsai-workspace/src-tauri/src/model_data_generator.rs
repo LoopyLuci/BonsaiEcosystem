@@ -189,7 +189,12 @@ fn knowledge_base() -> HashMap<&'static str, KbEntry> {
         kb!("bonsai" => KbEntry {
             family:           "Bonsai",
             organization:     "Prism ML",
-            description:      "Bonsai is an ultra-efficient 1.7B model purpose-built for the Bonsai Workspace. Uses BitNet-inspired quantization for minimal RAM usage and near-instant responses — ideal for quick questions, simple code generation, and rapid iteration.",
+            description:      "Bonsai Models are created by Prism ML and are the heart of the Bonsai Ecosystem. \
+                               Bonsai-1.7B is an ultra-efficient model purpose-built for Bonsai Workspace — using \
+                               BitNet-inspired quantization for minimal RAM and near-instant responses. \
+                               Bonsai Workspace and the wider Bonsai Ecosystem are built to give every user a \
+                               peaceful, simple, and powerful AI experience, whether running Bonsai Models or any \
+                               other compatible model. Source: huggingface.co/prism-ml",
             license:          "Bonsai Community License",
             homepage_url:     "https://huggingface.co/prism-ml",
             training_cutoff:  Some("2024-06"),

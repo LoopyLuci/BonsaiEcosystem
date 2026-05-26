@@ -278,8 +278,9 @@ impl SelfPlayTrainer {
             .append(true)
             .open(&self.config.output_jsonl)?;
 
+        let dpo_path = self.config.output_jsonl.with_file_name("dpo_pairs.jsonl");
+
         for gap in gaps {
-            // Alpaca-style format expected by finetune.py
             let example = serde_json::json!({
                 "text": format!(
                     "### Instruction:\n{}\n\n### Response:\n{}",
@@ -289,6 +290,15 @@ impl SelfPlayTrainer {
                 "confidence": 1.0 - gap.overlap,
             });
             writeln!(file, "{}", serde_json::to_string(&example).unwrap_or_default())?;
+
+            // DPO triple: corrected = chosen, original = rejected
+            let triple = crate::adapter_manager::DpoTriple {
+                prompt:   gap.seed_prompt.clone(),
+                chosen:   gap.corrected_response.clone(),
+                rejected: gap.model_response.clone(),
+                source:   "self_play",
+            };
+            let _ = crate::adapter_manager::write_dpo_triples(&dpo_path, &[triple]);
         }
         Ok(())
     }

@@ -103,7 +103,6 @@ pub async fn start(
     host: String,
     port: u16,
     app_handle: AppHandle,
-    mgmt_state: crate::management_api::MgmtState,
 ) -> Result<ApiServerHandle, String> {
     let state = ApiState {
         orchestrator,
@@ -126,7 +125,7 @@ pub async fn start(
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any);
 
-    let legacy_router = Router::new()
+    let app = Router::new()
         // OpenAI-compatible
         .route("/v1/models",            get(list_models))
         .route("/v1/chat/completions",  post(chat_completions))
@@ -152,11 +151,8 @@ pub async fn start(
         .route("/api/version",          get(ollama_version))
         // WebSocket — bidirectional relay for Android app + VSCode extension
         .route("/ws",                   get(ws_handler))
+        .layer(cors)
         .with_state(state);
-
-    let app = crate::management_api::router(mgmt_state)
-        .merge(legacy_router)
-        .layer(cors);
 
     let addr = format!("{host}:{port}");
 
@@ -222,24 +218,19 @@ pub async fn start_with_fallback(
     preferred_port: u16,
     max_extra_attempts: u16,
     app_handle: AppHandle,
-    mgmt_state: crate::management_api::MgmtState,
 ) -> Result<ApiServerHandle, String> {
-    // Try the preferred port with up to 8 seconds of TIME_WAIT patience before
-    // falling back to higher ports. This prevents port drift across restarts.
-    match try_start_with_wait(
-        &orchestrator, &remote_manager, &ws_router, &pair_token, &host,
-        preferred_port, &app_handle, &mgmt_state, 8,
-    ).await {
-        Ok(h) => return Ok(h),
-        Err(_) => {}
+    let mut ports = Vec::with_capacity(max_extra_attempts as usize + 1);
+    ports.push(preferred_port);
+    for i in 1..=max_extra_attempts {
+        if let Some(p) = preferred_port.checked_add(i) {
+            ports.push(p);
+        } else {
+            break;
+        }
     }
 
-    let mut last_err = format!("Failed to bind preferred port {preferred_port}");
-    for i in 1..=max_extra_attempts {
-        let p = match preferred_port.checked_add(i) {
-            Some(p) => p,
-            None => break,
-        };
+    let mut last_err = String::new();
+    for p in ports {
         match start(
             orchestrator.clone(),
             remote_manager.clone(),
@@ -248,7 +239,6 @@ pub async fn start_with_fallback(
             host.clone(),
             p,
             app_handle.clone(),
-            mgmt_state.clone(),
         )
         .await
         {
@@ -257,45 +247,14 @@ pub async fn start_with_fallback(
         }
     }
 
-    Err(last_err)
-}
-
-/// Try to bind `port`, waiting up to `wait_secs` for TIME_WAIT to clear before giving up.
-async fn try_start_with_wait(
-    orchestrator: &Arc<ModelOrchestrator>,
-    remote_manager: &Arc<RemoteManager>,
-    ws_router: &Arc<WsRouter>,
-    pair_token: &str,
-    host: &str,
-    port: u16,
-    app_handle: &AppHandle,
-    mgmt_state: &crate::management_api::MgmtState,
-    wait_secs: u64,
-) -> Result<ApiServerHandle, String> {
-    let deadline = std::time::Instant::now() + Duration::from_secs(wait_secs);
-    loop {
-        match start(
-            orchestrator.clone(),
-            remote_manager.clone(),
-            ws_router.clone(),
-            pair_token.to_string(),
-            host.to_string(),
-            port,
-            app_handle.clone(),
-            mgmt_state.clone(),
+    Err(if last_err.is_empty() {
+        format!(
+            "Failed to start API server on {}:{} and fallback ports",
+            host, preferred_port
         )
-        .await
-        {
-            Ok(h) => return Ok(h),
-            Err(e) => {
-                if std::time::Instant::now() >= deadline {
-                    return Err(e);
-                }
-                // Port likely in TIME_WAIT; wait 500ms and retry.
-                tokio::time::sleep(Duration::from_millis(500)).await;
-            }
-        }
-    }
+    } else {
+        last_err
+    })
 }
 
 async fn is_api_healthy(host: &str, port: u16) -> bool {

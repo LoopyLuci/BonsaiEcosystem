@@ -73,6 +73,7 @@
     await refreshStatus();
     modelSwitchStatus.set('');
     try { hwInfo = await invoke<Record<string,unknown>>('get_hardware_info'); } catch {}
+    void checkVisionTools();
     try { await loadApiSettings(); } catch (e) { console.warn('Failed to load API settings', e); }
     try {
       await refreshDefaultInferenceMode();
@@ -340,6 +341,19 @@
 
   let showAdvanced = false;
   let showTrainingDashboard = false;
+
+  // ── Vision tool availability ──────────────────────────────────────────────
+  let opencvAvail  = false;
+  let depthAvail   = false;
+  let yoloAvail    = false;
+  let kokoroAvail  = false;
+
+  async function checkVisionTools() {
+    try { opencvAvail  = await invoke<boolean>('opencv_available');  } catch { opencvAvail  = false; }
+    try { depthAvail   = await invoke<boolean>('depth_model_available'); } catch { depthAvail   = false; }
+    try { yoloAvail    = await invoke<boolean>('yolo_available');    } catch { yoloAvail    = false; }
+    try { kokoroAvail  = await invoke<boolean>('kokoro_available');  } catch { kokoroAvail  = false; }
+  }
 
   // ── Training: local model selection ──────────────────────────────────────
   let selectedGgufPath = '';
@@ -1899,6 +1913,10 @@
               bind:value={selectedGgufPath}
               title="Local GGUF path — no downloads" />
           </div>
+          <div class="tm-model-credit">
+            Bonsai Models are created by <a href="https://huggingface.co/prism-ml" target="_blank" rel="noopener noreferrer">Prism ML</a>.
+            Bonsai Workspace supports Bonsai Models and all compatible GGUF models.
+          </div>
           {#if selectedGgufPath}
             <div class="tm-model-hint">
               🔒 Offline — local model only, no network calls
@@ -1958,6 +1976,101 @@
       {/if}
     </section>
 
+    <!-- ── Vision Tools (OpenCV + Multi-modal) ─────────────────────────── -->
+    <section class="section">
+      <h3 class="section-title">Vision Tools</h3>
+      <p class="setting-description">
+        OpenCV 4.12 + multi-modal model integrations. All tools run 100% offline.
+        Models must be placed in the locations below — nothing is downloaded automatically.
+      </p>
+
+      <div class="vision-tool-grid">
+        <!-- OpenCV -->
+        <div class="vision-card">
+          <div class="vision-card-header">
+            <span class="vision-icon">👁️</span>
+            <div>
+              <strong>OpenCV 4.12</strong>
+              <span class="vision-status-badge" class:available={opencvAvail} class:missing={!opencvAvail}>
+                {opencvAvail ? 'ready' : 'not installed'}
+              </span>
+            </div>
+          </div>
+          <p class="vision-card-desc">
+            12 vision operations: edges, contours, faces, thresholding, morphology,
+            histograms, perspective warp, colour conversion, pipeline chaining.
+          </p>
+          <code class="vision-install">pip install opencv-python</code>
+          <code class="vision-path">~/.bonsai/sidecars/opencv_worker.py</code>
+        </div>
+
+        <!-- Depth Anything V2 -->
+        <div class="vision-card">
+          <div class="vision-card-header">
+            <span class="vision-icon">📐</span>
+            <div>
+              <strong>Depth-Anything-V2</strong>
+              <span class="vision-status-badge" class:available={depthAvail} class:missing={!depthAvail}>
+                {depthAvail ? 'model found' : 'model missing'}
+              </span>
+            </div>
+          </div>
+          <p class="vision-card-desc">
+            Monocular depth estimation from any image. Tool: <code>estimate_depth</code>.
+          </p>
+          <code class="vision-path">~/.bonsai/models/depth/Depth-Anything-V2-Small-F16.gguf</code>
+          <a class="vision-hf-link" href="https://huggingface.co/Acly/Depth-Anything-V2-GGUF" target="_blank" rel="noreferrer">
+            huggingface.co/Acly/Depth-Anything-V2-GGUF
+          </a>
+        </div>
+
+        <!-- YOLOv8 -->
+        <div class="vision-card">
+          <div class="vision-card-header">
+            <span class="vision-icon">🔍</span>
+            <div>
+              <strong>YOLOv8</strong>
+              <span class="vision-status-badge" class:available={yoloAvail} class:missing={!yoloAvail}>
+                {yoloAvail ? 'ready' : 'not installed'}
+              </span>
+            </div>
+          </div>
+          <p class="vision-card-desc">
+            Object detection, pose estimation, instance segmentation.
+            Stock market pattern detection (separate model).
+            Tools: <code>detect_objects</code>, <code>estimate_pose</code>, <code>segment_objects</code>.
+          </p>
+          <code class="vision-install">pip install ultralytics</code>
+          <code class="vision-path">~/.bonsai/models/yolo/yolov8n.pt</code>
+        </div>
+
+        <!-- Kokoro TTS -->
+        <div class="vision-card">
+          <div class="vision-card-header">
+            <span class="vision-icon">🔊</span>
+            <div>
+              <strong>Kokoro-82M TTS</strong>
+              <span class="vision-status-badge" class:available={kokoroAvail} class:missing={!kokoroAvail}>
+                {kokoroAvail ? 'ready' : 'not installed'}
+              </span>
+            </div>
+          </div>
+          <p class="vision-card-desc">
+            High-quality TTS with 54 voices in 8 languages. Replaces Piper when available.
+            Tool: <code>speak_text_kokoro</code>.
+          </p>
+          <code class="vision-path">~/.bonsai/models/kokoro/kokoro-v1.9.onnx</code>
+          <a class="vision-hf-link" href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noreferrer">
+            huggingface.co/hexgrad/Kokoro-82M
+          </a>
+        </div>
+      </div>
+
+      <button class="sm-btn" on:click={checkVisionTools} style="margin-top:10px">
+        Refresh Status
+      </button>
+    </section>
+
   </div>
 </div>
 
@@ -1968,6 +2081,71 @@
 {/if}
 
 <style>
+  /* Vision tools section */
+  .vision-tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .vision-card {
+    border: 1px solid var(--border, #333);
+    border-radius: 8px;
+    background: var(--bg, #141420);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .vision-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .vision-icon { font-size: 18px; }
+  .vision-card-desc {
+    font-size: 12px;
+    color: var(--text-dim, #999);
+    margin: 0;
+    line-height: 1.5;
+  }
+  .vision-card-desc code {
+    background: var(--bg2, #1e1e2e);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+  .vision-status-badge {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+    font-weight: 600;
+  }
+  .vision-status-badge.available { background: #1a3a1a; color: #4caf50; }
+  .vision-status-badge.missing   { background: #3a1a1a; color: #f87171; }
+  .vision-install {
+    font-size: 11px;
+    background: var(--bg2, #1e1e2e);
+    border-radius: 4px;
+    padding: 3px 7px;
+    color: #7dd3fc;
+  }
+  .vision-path {
+    font-size: 10px;
+    background: var(--bg2, #1e1e2e);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--text-dim, #888);
+    word-break: break-all;
+  }
+  .vision-hf-link {
+    font-size: 11px;
+    color: #818cf8;
+    text-decoration: none;
+  }
+  .vision-hf-link:hover { text-decoration: underline; }
+
   .settings-overlay {
     position: fixed;
     inset: 0;
@@ -2711,6 +2889,17 @@
     margin-top: 3px;
   }
   .tm-model-warn { color: #ffa726; }
+  .tm-model-credit {
+    font-size: 0.67rem;
+    color: var(--text-dim, #71717a);
+    margin-top: 5px;
+    line-height: 1.45;
+  }
+  .tm-model-credit a {
+    color: var(--accent-hl, #60a5fa);
+    text-decoration: none;
+  }
+  .tm-model-credit a:hover { text-decoration: underline; }
   .tm-chart-wrap {
     margin: 8px 0 4px;
     border-radius: 6px;
