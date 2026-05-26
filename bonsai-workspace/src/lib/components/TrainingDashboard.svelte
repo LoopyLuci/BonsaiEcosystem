@@ -1,4 +1,38 @@
 <script lang="ts">
+  import { invoke } from '@tauri-apps/api/core';
+  import { onMount } from 'svelte';
+  let status: any = {};
+  let loading = false;
+
+  onMount(refresh);
+  async function refresh() {
+    status = await invoke('get_training_status');
+  }
+  async function trigger() {
+    loading = true;
+    status = await invoke('trigger_training');
+    loading = false;
+  }
+</script>
+
+<div class="p-4 bg-gray-900 rounded-lg border border-gray-700">
+  <h2 class="text-lg font-semibold text-white mb-3">Continuous Training</h2>
+  <div class="text-sm text-gray-400">Examples: {status.examples_collected}/{status.threshold}</div>
+  <div class="w-full bg-gray-800 rounded h-2 mt-1 mb-3">
+    <div class="bg-blue-500 h-2 rounded" style="width:{(status.examples_collected / (status.threshold||1) * 100).toFixed(0)}%"></div>
+  </div>
+  {#if status.last_adapter}
+    <div class="text-xs text-gray-500">Last: {status.last_adapter} (F1: {status.last_f1})</div>
+  {/if}
+  <button
+    class="mt-3 px-4 py-2 text-sm rounded {status.running ? 'bg-gray-600' : 'bg-green-600'} text-white"
+    on:click={trigger}
+    disabled={loading || status.running}
+  >
+    {status.running ? 'Training...' : 'Train Now'}
+  </button>
+</div>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
 
