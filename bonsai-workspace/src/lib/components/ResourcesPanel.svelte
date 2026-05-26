@@ -31,12 +31,27 @@
     messages_queued_full?:  number;
   };
 
+  type GpuHealthReport = {
+    backend: string;
+    healthy: boolean;
+    vram_total_mb: number;
+    vram_free_mb: number;
+    loaded_models: string[];
+    total_vram_reserved_mb: number;
+    allocation_ok: boolean;
+    fallback_active: boolean;
+    recovery_pending: boolean;
+    uptime_secs: number;
+  };
+
   let hardware: HardwareInfo | null = null;
   let loading = true;
   let error = '';
   let botStatus: BotStatus | null = null;
   let botMetrics: BotMetrics | null = null;
   let botOnline = false;
+  let gpuHealth: GpuHealthReport | null = null;
+  let gpuResetting = false;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let botStatusUnlisten: (() => void) | null = null;
 
@@ -52,6 +67,13 @@
       error = String(e);
     } finally {
       loading = false;
+    }
+
+    // GPU health — non-fatal
+    try {
+      gpuHealth = await invoke<GpuHealthReport>('get_gpu_controller_health');
+    } catch {
+      gpuHealth = null;
     }
 
     // Bot status — non-fatal if bot is not running
@@ -265,6 +287,60 @@
             <p class="note" style="margin-top:8px">Bot is not running or not reachable.</p>
           {/if}
         </section>
+
+        <!-- GPU Health Panel -->
+        {#if gpuHealth}
+          <section class="agents-section">
+            <div class="section-title">
+              GPU Controller
+              <span class={`state-pill ${gpuHealth.healthy ? 'ready' : 'crashed'}`} style="margin-left:8px;font-size:11px">
+                {gpuHealth.healthy ? 'healthy' : gpuHealth.fallback_active ? 'CPU fallback' : 'degraded'}
+              </span>
+              {#if gpuHealth.recovery_pending}
+                <span class="state-pill loading" style="margin-left:6px;font-size:11px">recovery…</span>
+              {/if}
+            </div>
+            <div class="summary-grid" style="margin-top:8px">
+              <article class="card" style="padding:10px 14px">
+                <div class="card-label">Backend</div>
+                <div class="card-value" style="font-size:14px">{gpuHealth.backend}</div>
+                <div class="card-sub">Uptime {Math.floor(gpuHealth.uptime_secs / 60)}m {gpuHealth.uptime_secs % 60}s</div>
+              </article>
+              <article class="card" style="padding:10px 14px">
+                <div class="card-label">VRAM Free</div>
+                <div class="card-value" style="font-size:14px">{gpuHealth.vram_free_mb} MB</div>
+                <div class="meter">
+                  {@const pct = gpuHealth.vram_total_mb > 0
+                    ? Math.min(100, Math.round((gpuHealth.total_vram_reserved_mb / gpuHealth.vram_total_mb) * 100))
+                    : 0}
+                  <div class="fill {pct > 80 ? 'red' : pct > 60 ? 'amber' : ''}" style:width={`${pct}%`}></div>
+                </div>
+                <div class="card-sub">Reserved {gpuHealth.total_vram_reserved_mb} MB</div>
+              </article>
+              <article class="card" style="padding:10px 14px">
+                <div class="card-label">Loaded Models</div>
+                <div class="card-value" style="font-size:14px">{gpuHealth.loaded_models.length}</div>
+                <div class="card-sub">{gpuHealth.loaded_models.slice(0,2).map(m => m.split('/').pop()?.split('\\').pop()).join(', ') || 'none'}</div>
+              </article>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+              <button
+                class="gpu-reset-btn"
+                disabled={gpuResetting}
+                on:click={async () => {
+                  gpuResetting = true;
+                  try { await invoke('reset_gpu_controller'); await loadSnapshot(); } catch {}
+                  gpuResetting = false;
+                }}
+              >
+                {gpuResetting ? 'Resetting…' : 'Reset GPU Controller'}
+              </button>
+              {#if !gpuHealth.healthy}
+                <span class="note" style="color:#f5a623;margin:0">GPU unhealthy — all inference routed to CPU</span>
+              {/if}
+            </div>
+          </section>
+        {/if}
       {/if}
     </div>
   </div>
@@ -438,6 +514,22 @@
     font-size: 11px;
     color: var(--text-dim, #888);
   }
+
+  .gpu-reset-btn {
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border, #444);
+    background: var(--bg, #141420);
+    color: var(--text, #ccc);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .gpu-reset-btn:hover:not(:disabled) { background: var(--bg2, #1e1e2e); }
+  .gpu-reset-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .fill.red   { background: #f87171; }
+  .fill.amber { background: #f5a623; }
 
   .state {
     font-size: 13px;

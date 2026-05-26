@@ -603,7 +603,7 @@ pub async fn submit_chat(
         tools.retain(|t| allow.contains(&t.name));
     }
 
-    let mut sys_prompt = tools::system_prompt(&tools, workspace_path.as_deref());
+    let mut sys_prompt = tools::system_prompt_for(&tools, workspace_path.as_deref(), Some(&last_user_text));
     if is_file_inventory_request(&last_user_text) {
             sys_prompt.push_str(
                 "\n\n## Immediate instruction for this request\n\
@@ -2213,6 +2213,11 @@ pub async fn get_buddy_api_port(state: State<'_, AppState>) -> Result<u16, Strin
 }
 
 #[tauri::command]
+pub async fn get_mcp_port(state: State<'_, AppState>) -> Result<u16, String> {
+    Ok(state.mcp_port)
+}
+
+#[tauri::command]
 pub async fn get_api_config(app_handle: AppHandle) -> Result<serde_json::Value, String> {
     let config = crate::config::load_config(&app_handle)?;
     Ok(serde_json::json!({
@@ -2263,7 +2268,6 @@ pub async fn set_api_config(
         api_host.clone(),
         api_port,
         app_handle.clone(),
-        mgmt.clone(),
     )
     .await;
 
@@ -2272,16 +2276,15 @@ pub async fn set_api_config(
         Err(e) => {
             // Try to restore previous config runtime so the app keeps working.
             let rollback_remote = app_handle.state::<Arc<RemoteManager>>().inner().clone();
-            if let Ok(restored) = api_server::start(
-                state.orchestrator.clone(),
-                rollback_remote,
-                state.ws_router.clone(),
-                state.pair_token.clone(),
-                old_config.api_host.clone(),
-                old_config.api_port,
-                app_handle.clone(),
-                mgmt,
-            )
+                if let Ok(restored) = api_server::start(
+                    state.orchestrator.clone(),
+                    rollback_remote,
+                    state.ws_router.clone(),
+                    state.pair_token.clone(),
+                    old_config.api_host.clone(),
+                    old_config.api_port,
+                    app_handle.clone(),
+                )
             .await
             {
                 *api_guard = Some(restored);
@@ -6326,4 +6329,15 @@ pub async fn clear_gpu_crash_flag(app_handle: AppHandle) -> Result<(), String> {
     cfg.gpu_crash_fallback = false;
     crate::config::save_config(&app_handle, &cfg)?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn generate_music_command(prompt: String, duration: Option<f32>) -> Result<String, String> {
+    let dur = duration.unwrap_or(10.0).clamp(1.0, 60.0);
+    let wav = crate::music_engine::generate_wav(&prompt, dur).await;
+    if wav.is_empty() {
+        return Err("Music generation produced no audio".into());
+    }
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    Ok(format!("data:audio/wav;base64,{}", STANDARD.encode(&wav)))
 }

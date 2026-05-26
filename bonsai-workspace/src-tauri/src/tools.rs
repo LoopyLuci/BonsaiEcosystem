@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 use regex::RegexBuilder;
+pub mod demo_streaming;
 
 // ── Tool schema types ─────────────────────────────────────────────────────────
 
@@ -180,6 +181,30 @@ pub fn built_in_tools() -> Vec<ToolDef> {
             requires_approval: true,
             is_custom: false, script_path: None,
         },
+        ToolDef {
+            name: "generate_music".into(),
+            description: concat!(
+                "Generate an original music track from a text description and return it as a playable audio file. ",
+                "Describe the desired mood, genre, tempo, key, instruments, and length. ",
+                "Examples: 'lo-fi hip hop beat at 85 bpm', 'epic orchestral minor key 30 seconds', ",
+                "'upbeat jazz piano with bass 20 seconds', 'dark ambient drone 45 seconds'. ",
+                "Works fully offline — no internet required. Returns a data URI the UI plays directly."
+            ).into(),
+            args: vec![
+                ToolArg {
+                    name: "prompt".into(), arg_type: "string".into(),
+                    description: "Natural-language description of the music to generate.".into(),
+                    required: true,
+                },
+                ToolArg {
+                    name: "duration".into(), arg_type: "number".into(),
+                    description: "Duration in seconds (1–60). Default 10.".into(),
+                    required: false,
+                },
+            ],
+            requires_approval: false,
+            is_custom: false, script_path: None,
+        },
     ]
 }
 
@@ -225,12 +250,56 @@ pub fn load_custom_tools(workspace_path: &Path) -> Vec<ToolDef> {
     tools
 }
 
+/// Convert a `ReactBridgeDef` from `tool_core` into a `ToolDef` for the ReAct system.
+/// This is the unified bridge: any tool registered in any `tool_core::ToolRegistry`
+/// becomes automatically available to every model via tag-based tool calling.
+fn bridge_def_to_tool_def(b: crate::tool_core::ReactBridgeDef) -> ToolDef {
+    ToolDef {
+        name:              b.name,
+        description:       b.description,
+        args:              b.args.into_iter().map(|a| ToolArg {
+            name:        a.name,
+            arg_type:    a.arg_type,
+            description: a.description,
+            required:    a.required,
+        }).collect(),
+        requires_approval: b.requires_approval,
+        is_custom:         false,
+        script_path:       None,
+    }
+}
+
 /// Merge built-in tools with workspace custom tools.
 pub fn all_tools(workspace_path: Option<&str>) -> Vec<ToolDef> {
+    all_tools_with_registry(workspace_path, None)
+}
+
+/// Full merge: built-ins + custom workspace tools + any `tool_core::ToolRegistry` tools.
+/// This is the single function all call-sites should use — it ensures every registry
+/// tool is visible to every model regardless of whether it supports native function calling.
+pub fn all_tools_with_registry(
+    workspace_path: Option<&str>,
+    registry: Option<&crate::tool_core::ToolRegistry>,
+) -> Vec<ToolDef> {
     let mut tools = built_in_tools();
+
+    // Workspace custom tools (JSON manifests in bonsai-tools/)
     if let Some(ws) = workspace_path {
         tools.extend(load_custom_tools(Path::new(ws)));
     }
+
+    // Auto-bridge: every Arc<dyn Tool> in the core registry becomes a ToolDef
+    if let Some(reg) = registry {
+        let existing_names: std::collections::HashSet<String> =
+            tools.iter().map(|t| t.name.clone()).collect();
+        let bridge: Vec<ToolDef> = reg.react_bridge_defs()
+            .into_iter()
+            .filter(|d| !existing_names.contains(&d.name))
+            .map(bridge_def_to_tool_def)
+            .collect();
+        tools.extend(bridge);
+    }
+
     tools
 }
 
@@ -271,11 +340,31 @@ fn snapshot_dir(path: &std::path::Path, depth: usize, max_depth: usize, out: &mu
 
 /// Build the ReAct-style system prompt injected before every tool-enabled conversation.
 pub fn system_prompt(tools: &[ToolDef], workspace_path: Option<&str>) -> String {
+    system_prompt_for(tools, workspace_path, None)
+}
+
+pub fn system_prompt_for(tools: &[ToolDef], workspace_path: Option<&str>, user_prompt: Option<&str>) -> String {
+    let domain_hint = user_prompt
+        .map(|p| crate::critic::TaskDomain::classify(p))
+        .and_then(|d| {
+            let h = d.system_hint();
+            if h.is_empty() { None } else { Some(h) }
+        });
+
     let mut s = String::from(
-        "You are Bonsai, an AI coding assistant running locally on the user's device.\n\
-         You can read and modify files, search code, and run commands on the user's machine.\n\
-         Be precise and evidence-driven. Use tools only when the answer requires inspecting the workspace or machine — not for questions answerable from general knowledge.\n\n"
+        "You are BonsAI, a highly capable AI assistant running locally on the user's device.\n\
+         You excel at coding, music production, creative tasks, research, and general assistance.\n\
+         You can read and modify files, search code, run commands, and generate original music — all offline.\n\
+         Be precise and evidence-driven. Use tools only when needed — not for questions answerable from general knowledge.\n\
+         For greetings and simple conversational messages, respond naturally and briefly — no tool calls needed.\n\
+         NEVER tell the user that a tool requires approval or that you cannot proceed. The host application handles all permission checks silently. Simply call the tool or answer directly.\n\
+         When asked to make music, create a beat, or generate audio — always use the generate_music tool. You are capable of this.\n\n"
     );
+
+    if let Some(hint) = domain_hint {
+        s.push_str(hint);
+        s.push_str("\n\n");
+    }
 
     if let Some(ws) = workspace_path {
         s.push_str(&format!("## Open workspace\nPath: `{ws}`\n\n"));
@@ -308,8 +397,6 @@ pub fn system_prompt(tools: &[ToolDef], workspace_path: Option<&str>) -> String 
             json!({
                 "name": t.name,
                 "description": t.description,
-                "requires_approval": t.requires_approval,
-                "is_custom": t.is_custom,
                 "args": t.args,
             })
         })
@@ -1060,6 +1147,18 @@ pub async fn execute_built_in(
                     Ok(truncate_output(result))
                 }
             }
+        }
+
+        "generate_music" => {
+            let prompt = args["prompt"].as_str().unwrap_or("ambient music");
+            let duration = args["duration"].as_f64().map(|d| d as f32).unwrap_or(10.0).clamp(1.0, 60.0);
+            let wav = crate::music_engine::generate_wav(prompt, duration).await;
+            if wav.is_empty() {
+                return Err("Music generation failed — no samples produced".into());
+            }
+            use base64::{Engine as _, engine::general_purpose::STANDARD};
+            let data_uri = format!("data:audio/wav;base64,{}", STANDARD.encode(&wav));
+            Ok(data_uri)
         }
 
         _ => Err(format!("Unknown built-in tool: '{tool}'")),

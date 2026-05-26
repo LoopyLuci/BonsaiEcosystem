@@ -67,12 +67,31 @@ mod sidecar_supervisor;
 mod plugin_loader;
 mod plugin_manifest;
 mod plugin_host;
+mod a2a_server;
+mod p2p {
+    pub mod sharing;
+}
+mod collab {
+    pub mod crdt;
+}
 mod tool_registry;
 mod self_play;
+mod critic;
+mod adapter_manager;
+mod tool_watcher;
+mod mcp_server;
+mod tool_compose;
 mod cross_training;
 mod swarm_orchestrator;
+mod shared_arena;
+mod micro_bonsai;
+mod swarm_config;
+mod gpu_controller;
+mod multimodal;
+mod vision_training;
 mod task_queue;
 mod tools;
+mod music_engine;
 mod user_skills;
 mod wal;
 mod ws_router;
@@ -197,7 +216,20 @@ pub struct AppState {
     pub tool_registry:    Arc<tool_registry::ToolRegistryState>,
     /// Cross-training event sender — feed chat/plugin/tool events for passive data collection.
     pub cross_training:   cross_training::CrossTrainingSender,
+    /// MCP server port (0 if startup failed). Exposes all tools to Claude Desktop, Cursor, etc.
+    pub mcp_port:         u16,
+    /// Filesystem watcher — invalidates tool cache on workspace file changes.
+    pub tool_watcher:     Arc<Mutex<Option<tool_watcher::ToolWatcher>>>,
+    /// Zero-copy mmap-backed cross-model memory arena.
+    pub shared_arena:     Arc<shared_arena::SharedMemoryArena>,
+    /// Micro BonsAI intelligent model monitor and selector.
+    pub micro_bonsai:     Arc<micro_bonsai::MicroBonsai>,
+    /// Custom swarm configuration store (SQLite-backed).
+    pub swarm_config_store: Arc<swarm_config::SwarmConfigStore>,
+    /// Unified GPU controller — layer allocation, health, invisible crash recovery.
+    pub gpu_controller:    Arc<gpu_controller::GpuController>,
 }
+
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn restore_main_window_state(app: &tauri::AppHandle, cfg: &config::AppConfig) {
@@ -656,7 +688,6 @@ pub fn run() {
                     port,
                     4u16,
                     app_handle.clone(),
-                    mgmt,
                 )) {
                     Ok(handle) => Some(handle),
                     Err(e) => {
@@ -715,6 +746,108 @@ pub fn run() {
                 });
             }
 
+            // ── MCP server (port 11421) ────────────────────────────────────────
+            // Exposes all assistant tools to any MCP-compatible client (Claude Desktop,
+            // Cursor, VS Code Continue) — Bonsai becomes the universal local tool backend.
+            let mcp_port = {
+                use tokio::sync::RwLock as TokioRwLock;
+                let registry = Arc::new(TokioRwLock::new(crate::tool_core::ToolRegistry::new()));
+                let memory_path = Some(
+                    dirs::home_dir().unwrap_or_default().join(".bonsai/core_memory.jsonl")
+                );
+                match tauri::async_runtime::block_on(mcp_server::start(
+                    registry,
+                    None, // workspace root injected per-call from tool context
+                    memory_path,
+                    pair_token.clone(),
+                    11421,
+                )) {
+                    Ok(h) => {
+                        tracing::info!(port=h.port, "[mcp] MCP server ready");
+                        h.port
+                    }
+                    Err(e) => {
+                        tracing::warn!("[mcp] Failed to start: {e}");
+                        0u16
+                    }
+                }
+            };
+
+            // ── Tool cache filesystem watcher ──────────────────────────────────
+            // Invalidates cached tool results (read_file, grep_files, etc.) when
+            // workspace files change — makes the tool cache safe AND fast.
+            let tool_watcher_state: Arc<Mutex<Option<tool_watcher::ToolWatcher>>> =
+                Arc::new(Mutex::new(None));
+
+            // ── Zero-copy cross-model memory arena ────────────────────────────
+            let arena_path = dirs::home_dir()
+                .unwrap_or_default()
+                .join(".bonsai/shared_arena.bin");
+            let shared_arena = shared_arena::SharedMemoryArena::open(&arena_path, None)
+                .unwrap_or_else(|e| {
+                    tracing::warn!("[arena] Failed to open shared arena: {e}");
+                    shared_arena::SharedMemoryArena::open(
+                        std::env::temp_dir().join("bonsai_arena.bin"), None,
+                    ).expect("Fallback arena creation failed")
+                });
+
+            // ── Micro BonsAI model monitor/selector ───────────────────────────
+            let micro_bonsai = micro_bonsai::MicroBonsai::new();
+
+            // ── Custom swarm configuration store ──────────────────────────────
+            let swarm_config_store = tauri::async_runtime::block_on(
+                swarm_config::SwarmConfigStore::new(wal.pool()),
+            ).unwrap_or_else(|e| {
+                panic!("[swarm_config] Failed to init store: {e}");
+            });
+
+            // ── Unified GPU controller ─────────────────────────────────────────
+            let gpu_ctrl_inst = Arc::new(gpu_layer::GpuLayer::new(&gpu_layer::GpuLayer::detect()));
+            let gpu_controller = gpu_controller::GpuController::new(
+                gpu_ctrl_inst.clone(),
+                Arc::clone(&shared_arena),
+                Arc::clone(&micro_bonsai),
+            );
+            // Run non-blocking startup health check.
+            {
+                let ctrl = Arc::clone(&gpu_controller);
+                tauri::async_runtime::spawn(async move {
+                    let report = gpu_controller::run_startup_health_check(&ctrl.gpu).await;
+                    tracing::info!(
+                        backend  = %report.backend,
+                        healthy  = report.healthy,
+                        vram_mb  = report.vram_free_mb,
+                        "[gpu_ctrl] Startup health check"
+                    );
+                });
+            }
+
+            // Start VRAM TTL monitor (evict idle models) and profiling endpoint.
+            {
+                let gc = Arc::clone(&gpu_controller);
+                tauri::async_runtime::spawn(async move {
+                    // TTL: 5 minutes idle, check every 60 seconds
+                    gc.run_ttl_monitor(300, 60).await;
+                });
+            }
+
+            // Start A2A server for agent interoperability (best-effort)
+            {
+                let ah = agent_host.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = tokio::spawn(async move { crate::a2a_server::start_a2a_server(11370, ah).await }).await {
+                        tracing::error!("Failed to start A2A server: {:?}", e);
+                    }
+                });
+            }
+
+            // Start P2P announce (best-effort)
+            {
+                let _ = tauri::async_runtime::spawn(async move {
+                    let _ = crate::p2p::sharing::announce_peer(11420, Vec::new()).await;
+                });
+            }
+
             app.manage(AppState {
                 orchestrator:     orchestrator.clone(),
                 whisper:          whisper.clone(),
@@ -760,6 +893,12 @@ pub fn run() {
                 plugin_host,
                 tool_registry,
                 cross_training: cross_training_sender,
+                mcp_port,
+                tool_watcher: tool_watcher_state,
+                shared_arena,
+                micro_bonsai,
+                swarm_config_store,
+                gpu_controller,
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
@@ -1138,6 +1277,7 @@ pub fn run() {
             commands::get_hardware_info,
             commands::get_api_port,
             commands::get_buddy_api_port,
+            commands::get_mcp_port,
             commands::get_api_config,
             commands::set_api_config,
             commands::get_current_session_state,
@@ -1328,6 +1468,7 @@ pub fn run() {
             rich_markdown::render_rich_block,
             sandbox_executor::run_sandboxed_code,
             image_generation::generate_image_command,
+            commands::generate_music_command,
             tts_engine::tts_synthesize,
             plugin_loader::list_plugins_cmd,
             plugin_loader::load_plugin_cmd,
@@ -1345,6 +1486,62 @@ pub fn run() {
             // GPU crash flag
             commands::get_gpu_crash_flag,
             commands::clear_gpu_crash_flag,
+            // Tool composition DSL
+            tool_compose::validate_composed_skill,
+            // Micro BonsAI model selector
+            micro_bonsai::micro_select_model,
+            micro_bonsai::micro_hardware_snapshot,
+            micro_bonsai::micro_perf_history,
+            // Custom swarm configurations
+            swarm_config::create_swarm_config,
+            swarm_config::list_swarm_configs,
+            swarm_config::get_swarm_config,
+            swarm_config::update_swarm_config,
+            swarm_config::delete_swarm_config,
+            swarm_config::activate_swarm,
+            swarm_config::arena_stats,
+            // GPU controller
+            gpu_controller::get_gpu_controller_health,
+            gpu_controller::reset_gpu_controller,
+            // Multi-modal Phase 1 — Kokoro TTS
+            multimodal::kokoro::kokoro_synthesize,
+            multimodal::kokoro::list_kokoro_voices,
+            multimodal::kokoro::kokoro_available,
+            // Multi-modal Phase 1 — Depth estimation
+            multimodal::depth::estimate_depth,
+            multimodal::depth::depth_model_available,
+            // Multi-modal Phase 1 — YOLO detection
+            multimodal::yolo::detect_objects_cmd,
+            multimodal::yolo::detect_chart_patterns,
+            multimodal::yolo::yolo_available,
+            // Multi-modal Phase 2 — OpenCV 4.12 vision toolkit
+            multimodal::opencv_tools::opencv_run_op,
+            multimodal::opencv_tools::opencv_available,
+            multimodal::opencv_tools::opencv_detect_faces,
+            multimodal::opencv_tools::opencv_detect_edges,
+            multimodal::opencv_tools::opencv_pipeline_cmd,
+            // Multi-modal Phase 2 — PixAI image tagger
+            multimodal::pixai_tagger::pixai_tag,
+            multimodal::pixai_tagger::pixai_available,
+            // Multi-modal Phase 2 — NuMarkdown document OCR
+            multimodal::nu_markdown::image_to_markdown,
+            multimodal::nu_markdown::numarkdown_model_path,
+            multimodal::nu_markdown::numarkdown_mmproj_path,
+            // Multi-modal Phase 2 — Qwen image editing
+            multimodal::image_edit::edit_image_cmd,
+            multimodal::image_edit::generate_image_rapid_cmd,
+            multimodal::image_edit::generate_multiview_cmd,
+            multimodal::image_edit::image_edit_available,
+            // Multi-modal Phase 2 — Sulphur-2 video generation
+            multimodal::video_gen::generate_video_cmd,
+            multimodal::video_gen::video_gen_available,
+            // Multi-modal Phase 2 — TRELLIS.2-4B 3D generation
+            multimodal::threed_gen::generate_3d_model_cmd,
+            multimodal::threed_gen::generate_3d_from_text_cmd,
+            multimodal::threed_gen::threed_gen_available,
+            // Vision oracle self-play training loop
+            vision_training::start_vision_training,
+            vision_training::vision_training_oracles_available,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

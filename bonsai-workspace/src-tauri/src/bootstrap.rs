@@ -5,9 +5,13 @@
 //!   2. Downloads the whisper-server binary from the latest whisper.cpp GitHub release.
 //!   3. Downloads the Whisper base.en model (~148 MB).
 //!   4. Downloads the Bonsai-1.7B GGUF model from HuggingFace (~1.1 GB).
+//!      Bonsai Models are created by Prism ML — https://huggingface.co/prism-ml
 //!
 //! Everything is stored in `{app_data}/sidecars/` and `{app_data}/models/`.
 //! On subsequent launches the check is instant (just `Path::exists()`).
+//!
+//! Bonsai Workspace is built to give users a peaceful, easy experience with
+//! Bonsai Models and all other compatible AI models.
 //!
 //! # Cancellation
 //! Pass an `Arc<AtomicBool>` as `cancel`; set it to `true` from any thread/task

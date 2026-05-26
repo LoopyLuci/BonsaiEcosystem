@@ -97,16 +97,28 @@ struct TrainingExample {
 
 fn seed_prompts() -> Vec<String> {
     vec![
+        // Coding
         "Create a Python script that reads a CSV file and outputs the top 5 rows.".into(),
         "List all files in the current directory that are larger than 1 MB.".into(),
-        "What time is it right now?".into(),
-        "Search the knowledge base for information about machine learning.".into(),
-        "Run a system stats check and report CPU and memory usage.".into(),
-        "Fetch the content from https://example.com and summarise it.".into(),
-        "Write a bash script to recursively find all .log files.".into(),
-        "What is the weather like today?".into(),
-        "Create a new file called notes.txt with today's date as content.".into(),
+        "Write a Rust function that computes the nth Fibonacci number iteratively.".into(),
         "Find all occurrences of 'TODO' in the current project source files.".into(),
+        "Write a bash script to recursively find all .log files.".into(),
+        "Create a new file called notes.txt with today's date as content.".into(),
+        // System & tools
+        "Run a system stats check and report CPU and memory usage.".into(),
+        "Search the knowledge base for information about machine learning.".into(),
+        // Music production
+        "Generate a lo-fi hip hop beat at 85 bpm, 30 seconds.".into(),
+        "Make an ambient dark drone in D minor, 45 seconds.".into(),
+        "Create an upbeat major pentatonic melody at 120 bpm, 20 seconds.".into(),
+        "Generate epic orchestral music with a slow tempo, 40 seconds.".into(),
+        "Make a blues guitar-style track in A at 95 bpm, 25 seconds.".into(),
+        "Compose a chill jazz chord progression at 70 bpm, 30 seconds.".into(),
+        // General conversation & reasoning
+        "Explain the difference between TCP and UDP in simple terms.".into(),
+        "What are the SOLID principles in software engineering?".into(),
+        "How does a transformer neural network work at a high level?".into(),
+        "Describe the key differences between Rust and C++ memory management.".into(),
     ]
 }
 

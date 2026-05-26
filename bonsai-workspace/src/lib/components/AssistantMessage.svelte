@@ -79,6 +79,11 @@
           <button class="play-btn" on:click={() => { const a = new Audio(URL.createObjectURL(new Blob([new Uint8Array(message.tool_result.data ?? [])], {type:'audio/wav'}))); a.play(); }}>🔊 Play audio</button>
         {:else if message.tool_result?.content_type === 'application/json'}
           <pre class="result json">{JSON.stringify(JSON.parse(new TextDecoder().decode(new Uint8Array(message.tool_result.data ?? []))), null, 2)}</pre>
+        {:else if typeof message.tool_result === 'string' && message.tool_result.startsWith('data:audio/')}
+          <div class="audio-result">
+            <span class="audio-label">🎵 Generated audio</span>
+            <audio controls src={message.tool_result} class="audio-player" preload="auto"/>
+          </div>
         {:else}
           <pre class="result">{typeof message.tool_result === 'string' ? message.tool_result : JSON.stringify(message.tool_result)}</pre>
         {/if}
@@ -136,6 +141,9 @@
   .bubble.markdown :global(code)       { font-family: monospace; font-size: 0.85em; background: var(--bg, #1e1e1e); padding: 1px 4px; border-radius: 3px; }
   .bubble.markdown :global(pre)        { margin: 0.5em 0; overflow-x: auto; }
   .play-btn { background: var(--accent, #5ca4ea); color: #fff; border: none; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 0.82rem; margin-top: 4px; }
+  .audio-result { margin-top: 8px; }
+  .audio-label { display: block; font-size: 0.78rem; color: var(--fg2, #aaa); margin-bottom: 4px; }
+  .audio-player { width: 100%; border-radius: 6px; accent-color: var(--accent, #5ca4ea); }
   .result.json { font-size: 0.78rem; max-height: 200px; overflow-y: auto; }
   .bubble.markdown :global(pre code)   { background: none; padding: 0; }
   .bubble.markdown :global(blockquote) { border-left: 3px solid var(--accent, #5ca4ea); margin: 0.5em 0; padding-left: 0.75em; opacity: 0.8; }

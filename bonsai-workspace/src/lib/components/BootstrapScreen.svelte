@@ -9,7 +9,7 @@
     { key: 'llama',          label: 'AI Engine (llama-server)' },
     { key: 'whisper',        label: 'Voice Engine (whisper-server)' },
     { key: 'whisper_model',  label: 'Whisper Model (base.en, 148 MB)' },
-    { key: 'bonsai_model',   label: 'Bonsai-1.7B Language Model' },
+    { key: 'bonsai_model',   label: 'Bonsai-1.7B Language Model by Prism ML' },
   ];
 
   $: steps = STEPS.map(s => ({
@@ -93,6 +93,12 @@
           <button class="btn-retry" on:click={retry}>Retry</button>
         </div>
       {/if}
+    </div>
+
+    <div class="attribution">
+      Bonsai Models are created by
+      <a href="https://huggingface.co/prism-ml" target="_blank" rel="noopener noreferrer">Prism ML</a>.
+      Bonsai Workspace is built to give everyone a peaceful, easy AI experience.
     </div>
   </div>
 </div>
@@ -275,5 +281,22 @@
 
   .btn-retry:hover {
     opacity: 0.85;
+  }
+
+  .attribution {
+    font-size: 11px;
+    color: var(--text-dim, #71717a);
+    text-align: center;
+    line-height: 1.5;
+    padding-top: 4px;
+  }
+
+  .attribution a {
+    color: var(--accent-hl, #60a5fa);
+    text-decoration: none;
+  }
+
+  .attribution a:hover {
+    text-decoration: underline;
   }
 </style>
