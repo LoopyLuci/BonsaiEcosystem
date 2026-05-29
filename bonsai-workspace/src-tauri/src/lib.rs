@@ -1557,6 +1557,29 @@ pub fn run() {
                 });
             }
 
+            // ── Launch-mode window visibility ─────────────────────────────────
+            // Reads BONSAI_LAUNCH_MODE set by main.rs before any threads spawn.
+            // "workspace"  → show main, hide assistant (default Tauri conf state)
+            // "buddy"      → hide main, show assistant
+            // "ecosystem"  → show both
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                let mode = std::env::var("BONSAI_LAUNCH_MODE").unwrap_or_default();
+                match mode.as_str() {
+                    "buddy" => {
+                        if let Some(w) = app.get_webview_window("main") { let _ = w.hide(); }
+                        if let Some(w) = app.get_webview_window("assistant") { let _ = w.show(); }
+                    }
+                    "ecosystem" => {
+                        if let Some(w) = app.get_webview_window("main") { let _ = w.show(); }
+                        if let Some(w) = app.get_webview_window("assistant") { let _ = w.show(); }
+                    }
+                    _ => {
+                        // "workspace" or anything else — default state is correct
+                    }
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| {
