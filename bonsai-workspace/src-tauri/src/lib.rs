@@ -172,6 +172,17 @@ mod resource_guard;
 mod ipc_resilience;
 mod crash_recovery;
 mod survival;
+mod hot_reload;
+mod training_job;
+mod brain_metadata;
+mod bonsai_md;
+mod memory_nodes;
+mod middleware;
+mod plan_gate;
+mod web_router;
+mod kdb_state;
+mod kdb_commands;
+mod package_commands;
 
 // Workstream types
 use crate::auth_commands::AuthState;
@@ -333,6 +344,22 @@ pub struct AppState {
     pub device_manager: Arc<crate::device_manager::DeviceManager>,
     /// OmniBoot — self-verifying boot chain with CAS manifest and Axiom proofs.
     pub omni_boot: Arc<crate::omni_boot::OmniBoot>,
+    /// Activity-level memory node store — raw event log fed to EternalWorkshop.
+    pub memory_nodes: Arc<crate::memory_nodes::MemoryNodeStore>,
+    /// Tool call middleware pipeline — safety gate, undercover, plan gate.
+    pub middleware_registry: Arc<crate::middleware::MiddlewareRegistry>,
+    /// Plan gate state — pending high-risk operations awaiting human approval.
+    pub plan_gate: Arc<crate::plan_gate::PlanGateState>,
+    /// Undercover mode flag — shared with UndercoverMiddleware.
+    pub undercover_enabled: Arc<std::sync::atomic::AtomicBool>,
+    /// Plan gate enabled flag.
+    pub plan_gate_enabled: Arc<std::sync::atomic::AtomicBool>,
+    /// Trusted web router — whitelist-based documentation fetcher.
+    pub web_router: Arc<crate::web_router::WebRouter>,
+    /// Training job manager — spawns and monitors training processes.
+    pub training_jobs: Arc<crate::training_job::TrainingJobManager>,
+    /// Resource guard — concurrency limiter + memory pressure gate.
+    pub resource_guard: Arc<resource_guard::ResourceGuard>,
 }
 
 
@@ -478,7 +505,8 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init());
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
@@ -1169,6 +1197,62 @@ pub fn run() {
             let early_device_manager = crate::device_manager::DeviceManager::new();
             let early_omni_boot = crate::omni_boot::OmniBoot::new(cas_store.clone());
 
+            // ── Memory Node Store ─────────────────────────────────────────────
+            let memory_node_db = app_handle
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                .join("memory_nodes.db")
+                .to_string_lossy()
+                .to_string();
+            let memory_nodes_store = Arc::new(
+                tauri::async_runtime::block_on(
+                    memory_nodes::MemoryNodeStore::open(&memory_node_db)
+                ).unwrap_or_else(|e| {
+                    tracing::warn!("memory_nodes store init failed: {e}");
+                    tauri::async_runtime::block_on(
+                        memory_nodes::MemoryNodeStore::open_in_memory()
+                    ).expect("in-memory fallback failed")
+                }),
+            );
+
+            // ── Middleware pipeline ───────────────────────────────────────────
+            let undercover_enabled = Arc::new(std::sync::atomic::AtomicBool::new(
+                features::FeatureFlags::global().undercover_mode,
+            ));
+            let plan_gate_enabled = Arc::new(std::sync::atomic::AtomicBool::new(
+                features::FeatureFlags::global().plan_gate_enabled,
+            ));
+            let plan_gate_state = Arc::new(plan_gate::PlanGateState::new());
+            let middleware_registry = Arc::new(middleware::MiddlewareRegistry::new());
+
+            // Register safety gate (always on)
+            middleware_registry.register(Arc::new(middleware::SafetyGateMiddleware));
+            // Register undercover middleware
+            middleware_registry.register(Arc::new(middleware::UndercoverMiddleware {
+                enabled: undercover_enabled.clone(),
+            }));
+            // Register plan gate middleware
+            middleware_registry.register(Arc::new(plan_gate::PlanGateMiddleware {
+                state:      plan_gate_state.clone(),
+                app_handle: app_handle.clone(),
+                enabled:    plan_gate_enabled.clone(),
+            }));
+
+            // ── Trusted Web Router ────────────────────────────────────────────
+            let web_router = Arc::new(web_router::WebRouter::new(
+                web_router::WebRouterConfig::default()
+            ));
+
+            // ── Training Job Manager ──────────────────────────────────────────
+            let training_jobs = Arc::new(training_job::TrainingJobManager::new(
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+            ));
+            // Register web router middleware
+            middleware_registry.register(Arc::new(web_router::WebRouterMiddleware {
+                router: web_router.clone(),
+            }));
+
             app.manage(AppState {
                 orchestrator:     orchestrator.clone(),
                 whisper:          whisper.clone(),
@@ -1256,6 +1340,14 @@ pub fn run() {
                 omni_session: early_omni_session,
                 device_manager: early_device_manager,
                 omni_boot: early_omni_boot,
+                memory_nodes:        memory_nodes_store,
+                middleware_registry: middleware_registry.clone(),
+                plan_gate:           plan_gate_state,
+                undercover_enabled:  undercover_enabled,
+                plan_gate_enabled:   plan_gate_enabled,
+                web_router:          web_router,
+                training_jobs:       training_jobs,
+                resource_guard:      resource_guard::ResourceGuard::new(resource_guard::GuardConfig::default()),
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
@@ -1270,6 +1362,16 @@ pub fn run() {
                 .to_string_lossy()
                 .to_string();
             app.manage(survival::SurvivalState::new(&survival_db));
+
+            // ── Knowledge Database ────────────────────────────────────────────
+            let kdb_data_dir = app_handle
+                .path()
+                .app_data_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from(".bonsai"));
+            match kdb_state::KdbAppState::open(&kdb_data_dir) {
+                Ok(kdb) => { app.manage(kdb); }
+                Err(e) => { tracing::warn!("KDB state failed to open: {e}"); }
+            }
 
             // ── Start Copilot Orchestrator (local REST control) ─────────────
             {
@@ -1293,6 +1395,19 @@ pub fn run() {
                         let _ = bh.emit("training-loop-progress", payload);
                     }
                 });
+            }
+
+            // ── Hot model reload watcher ──────────────────────────────────────
+            // Watches ~/.bonsai/models/bonsai-latest.gguf for file changes and
+            // performs a zero-downtime slot swap via the ModelOrchestrator.
+            {
+                let watch_path = bootstrap::models_dir(&app_handle)
+                    .join("bonsai-latest.gguf");
+                hot_reload::spawn(
+                    app_handle.clone(),
+                    orchestrator.clone(),
+                    watch_path,
+                );
             }
 
             // ── Startup health gate ────────────────────────────────────────────
@@ -2152,6 +2267,32 @@ pub fn run() {
             transfer_commands::transfer_list_transfers,
             transfer_commands::transfer_store_put,
             transfer_commands::transfer_store_get,
+            // ── BONSAI.md ─────────────────────────────────────────────────────
+            commands::get_bonsai_md,
+            commands::set_bonsai_md,
+            // ── Memory nodes ──────────────────────────────────────────────────
+            commands::record_memory_node,
+            commands::get_memory_node_count,
+            // ── Middleware / undercover ───────────────────────────────────────
+            commands::set_undercover_mode,
+            commands::set_plan_gate_enabled,
+            // ── Plan gate ─────────────────────────────────────────────────────
+            commands::resolve_plan,
+            // ── Web router ────────────────────────────────────────────────────
+            commands::web_router_fetch,
+            // ── Hot reload ────────────────────────────────────────────────────
+            commands::hot_reload_model,
+            // ── Multi-Agent Coordinator ───────────────────────────────────────
+            commands::run_coordinated_task,
+            // ── Training Job Manager ─────────────────────────────────────────
+            commands::start_training,
+            commands::stop_training,
+            commands::get_trainer_job_status,
+            commands::get_adapters,
+            commands::deploy_adapter,
+            // ── Brain Metadata ────────────────────────────────────────────────
+            brain_metadata::get_brain_metadata,
+            brain_metadata::record_lesson_complete,
             // ── Survival System ───────────────────────────────────────────────
             survival::repair_error,
             survival::report_fix,
@@ -2159,6 +2300,20 @@ pub fn run() {
             survival::list_fixes,
             survival::export_survival_training_data,
             survival::sync_watchdog_kb,
+            // ── Knowledge Database (KDB) ──────────────────────────────────────
+            kdb_commands::kdb_list_modules,
+            kdb_commands::kdb_list_loaded_modules,
+            kdb_commands::kdb_load_module,
+            kdb_commands::kdb_unload_module,
+            kdb_commands::kdb_retrieve,
+            kdb_commands::kdb_format_context,
+            kdb_commands::kdb_delete_module,
+            // ── Package (.bkp) ────────────────────────────────────────────────
+            package_commands::package_inspect,
+            package_commands::package_import,
+            package_commands::package_export,
+            package_commands::package_list_entries,
+            package_commands::package_verify,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -21,6 +21,8 @@
   import VerificationPanel  from '$lib/components/VerificationPanel.svelte';
   import GlobalErrorBoundary from '$lib/components/GlobalErrorBoundary.svelte';
   import SystemHealthPanel  from '$lib/components/SystemHealthPanel.svelte';
+  import ModelBuilder        from '$lib/components/ModelBuilder.svelte';
+  import PackageImportDialog from '$lib/components/PackageImportDialog.svelte';
 
   import { showTerminal, toggleTerminal } from '$lib/stores/terminal';
   import { isBootstrapping, initModelStores } from '$lib/stores/models';
@@ -46,7 +48,10 @@
   let showPeers         = false;
   let showDataWorkbench = false;
   let showVerification  = false;
-  let showHealthPanel   = false;
+  let showHealthPanel    = false;
+  let showModelBuilder   = false;
+  let showPackageImport  = false;
+  let packageImportPath  = '';
   let sidebarWidth  = 280;
   let chatWidth     = 360;
   let resizingPane: 'sidebar' | 'chat' | null = null;
@@ -223,7 +228,7 @@
     void loadPersonas();
   }
 
-  onMount(async () => {
+  (onMount as (fn: () => Promise<() => void>) => void)(async () => {
     document.documentElement.dataset.theme = theme;
 
     // Detect Android before any conditional logic.
@@ -360,6 +365,8 @@
         on:click={() => (showVerification = !showVerification)}>Verify</button>
       <button class="btn-icon" class:active={showHealthPanel} title="System Health"
         on:click={() => (showHealthPanel = !showHealthPanel)}>Health</button>
+      <button class="btn-icon" class:active={showModelBuilder} title="Model Builder — combine base models with knowledge modules"
+        on:click={() => (showModelBuilder = !showModelBuilder)}>🧠 Builder</button>
       <button class="btn-icon" title="Settings"
         on:click={() => (showSettings = !showSettings)}>⚙</button>
 
@@ -464,7 +471,10 @@
   <Toasts />
 
   <!-- Status bar -->
-  <StatusBar />
+  <StatusBar
+    onOpenModelTrainer={() => (showSettings = true)}
+    onOpenHealthPanel={() => (showHealthPanel = true)}
+  />
 
   <!-- Overlays -->
   <CommandPalette />
@@ -505,6 +515,18 @@
   {#if showDataWorkbench}<DataWorkbench on:close={() => (showDataWorkbench = false)} />{/if}
   {#if showVerification}<VerificationPanel on:close={() => (showVerification = false)} />{/if}
   {#if showHealthPanel}<SystemHealthPanel onClose={() => (showHealthPanel = false)} />{/if}
+  {#if showModelBuilder}
+    <div class="floating-panel model-builder-panel">
+      <ModelBuilder />
+    </div>
+  {/if}
+  {#if showPackageImport}
+    <PackageImportDialog
+      initialPath={packageImportPath}
+      on:imported={(e) => { showPackageImport = false; showModelBuilder = true; }}
+      on:close={() => { showPackageImport = false; packageImportPath = ''; }}
+    />
+  {/if}
   <DownloadProgress />
   {#if $isBootstrapping}<BootstrapScreen />{/if}
 
@@ -515,6 +537,22 @@
 <GlobalErrorBoundary />
 
 <style>
+  /* ── Model Builder floating panel ── */
+  .floating-panel {
+    position: fixed;
+    z-index: 500;
+    background: var(--bg-primary, #13131f);
+    border: 1px solid var(--border, #333);
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+  .model-builder-panel {
+    top: 3rem; left: 50%; transform: translateX(-50%);
+    width: min(95vw, 1100px);
+    height: min(85vh, 720px);
+  }
+
   /* ── Runtime service-lost banner ── */
   .service-lost-banner {
     position: fixed; top: 0; left: 0; right: 0; z-index: 9000;

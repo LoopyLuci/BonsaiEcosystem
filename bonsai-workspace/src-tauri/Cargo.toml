@@ -8,6 +8,7 @@ name = "bonsai_workspace_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
+bonsai-coordinator       = { path = "../../crates/bonsai-coordinator" }
 bonsai-skill-compiler    = { path = "../../crates/bonsai-skill-compiler" }
 bonsai-transfer-crypto   = { path = "../../crates/bonsai-transfer-crypto" }
 bonsai-transfer-store    = { path = "../../crates/bonsai-transfer-store" }
@@ -30,8 +31,9 @@ tauri                        = { version = "2", features = ["protocol-asset", "d
 tauri-plugin-fs              = "2"
 tauri-plugin-shell           = "2"
 tauri-plugin-dialog          = "2"
-tauri-plugin-single-instance = "2"
-tauri-plugin-window-state    = "2"
+tauri-plugin-single-instance  = "2"
+tauri-plugin-window-state     = "2"
+tauri-plugin-notification     = "2"
 
 clap        = { version = "4", features = ["derive"] }
 serde       = { version = "1.0", features = ["derive"] }
@@ -122,7 +124,10 @@ portable-pty = "0.8"
 scrap        = "0.5"
 enigo        = "0.0.14"
 
-bonsai-native = { path = "../../bonsai-native", optional = true }
+bonsai-native  = { path = "../../bonsai-native", optional = true }
+bonsai-hnsw    = { path = "../../crates/bonsai-hnsw" }
+bonsai-kdb     = { path = "../../crates/bonsai-kdb" }
+bonsai-package = { path = "../../crates/bonsai-package" }
 
 [[bin]]
 name = "bonsai-music-worker"
