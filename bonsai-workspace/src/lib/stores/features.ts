@@ -11,6 +11,13 @@ export interface FeatureFlags {
     mcp_bridge_enabled: boolean;
     cluster_orchestrator_enabled: boolean;
     tts_enabled: boolean;
+    hybrid_engine_enabled: boolean;
+    bonsai_md_enabled: boolean;
+    undercover_mode: boolean;
+    plan_gate_enabled: boolean;
+    web_router_enabled: boolean;
+    eternal_workshop_enabled: boolean;
+    model_trainer_enabled: boolean;
 }
 
 const defaults: FeatureFlags = {
@@ -23,6 +30,13 @@ const defaults: FeatureFlags = {
     mcp_bridge_enabled: false,
     cluster_orchestrator_enabled: false,
     tts_enabled: false,
+    hybrid_engine_enabled: false,
+    bonsai_md_enabled: true,
+    undercover_mode: false,
+    plan_gate_enabled: false,
+    web_router_enabled: true,
+    eternal_workshop_enabled: true,
+    model_trainer_enabled: true,
 };
 
 export const featureFlags = writable<FeatureFlags>(defaults);

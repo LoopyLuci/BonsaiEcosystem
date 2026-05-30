@@ -26,26 +26,25 @@ teacher:
   # Set to null to skip distillation (still runs SFT/DPO from existing data).
   base_model_dir: null          # e.g. "D:/Models/general/Qwen3-35B-Instruct"
   # If the teacher is a GGUF for llama-server inference (distill via API):
-  gguf: null                    # e.g. "D:/Models/general/Qwen3-35B-A22B-Q4_K_M.gguf"
+  gguf: "D:/Models/general/Qwen3-35B-A22B-Q4_K_M.gguf"
   llama_server_port: 8080       # port for distillation inference calls
 
 # ── Local model catalogue ─────────────────────────────────────────────────────
-# All GGUF models available for use as teachers, evaluators, or alternates.
-# Add yours here — the training pipeline will use them as appropriate.
-# The model_orchestrator already manages loading/unloading automatically.
+# Windows/AMD 7900 XTX primary training machine model catalogue.
+# See config/model_registry.yaml for the full registry with domain routing.
 local_models:
   - role: student
-    name: "Bonsai-1.7B-Q2_K"
-    gguf: "~/.bonsai/models/Bonsai-1.7B-Q2_K.gguf"
-    vram_gb: 2
-  - role: student
     name: "Bonsai-1.7B-Q4_K"
-    gguf: "~/.bonsai/models/Bonsai-1.7B-Q4_K.gguf"
+    gguf: "~/.bonsai/models/bonsai-latest.gguf"
     vram_gb: 3
   - role: teacher
     name: "Qwen3-35B"
-    gguf: null     # fill in path when available
+    gguf: "D:/Models/general/Qwen3-35B-A22B-Q4_K_M.gguf"
     vram_gb: 22
+  - role: teacher_code
+    name: "DeepSeek-R1-32B"
+    gguf: "D:/Models/coding/DeepSeek-R1-Distill-Qwen-32B-Q4_K_M.gguf"
+    vram_gb: 20
   - role: critic
     name: "Bonsai-0.5B"
     gguf: "~/.bonsai/models/Bonsai-0.5B.gguf"
@@ -118,9 +117,24 @@ evaluation:
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
 hardware:
-  # "auto" detects CUDA → MPS (Apple Silicon) → DirectML (AMD/Intel Windows) → CPU
+  # Primary training machine: Windows 10, Ryzen 9 5900X, RX 7900 XTX (24 GB VRAM).
+  # "auto" detects CUDA → MPS (Apple Silicon) → DirectML (AMD/Intel Windows) → CPU.
+  # Override with "directml" on the Windows AMD machine, "cpu" as last resort.
   backend: "auto"
-  # Peak VRAM budget in GB (training stops if exceeded)
-  max_vram_gb: 20
+  # AMD RX 7900 XTX has 24 GB GDDR6 — keep a 2 GB buffer for system/driver overhead.
+  max_vram_gb: 22
   # Only run training when GPU is idle (0 = always train)
   idle_gpu_utilisation_threshold: 0.20
+  # DirectML note: transformer backward pass is NOT supported on DirectML.
+  # finetune.py and dpo_train.py fall back to CPU automatically when DirectML crashes.
+  # Workaround: pass --device cpu or use WSL2 + ROCm for GPU-accelerated training.
+  directml_fallback_to_cpu: true
+
+# ── Hot reload ────────────────────────────────────────────────────────────────
+hot_reload:
+  # Path watched for zero-downtime model swaps (see hot_reload.rs).
+  watch_path: "~/.bonsai/models/bonsai-latest.gguf"
+  # Poll interval in seconds.
+  poll_interval_secs: 2
+  # Drain grace period before the old slot is killed (seconds).
+  drain_grace_secs: 5

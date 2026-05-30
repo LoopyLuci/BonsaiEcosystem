@@ -39,10 +39,11 @@
   } from '$lib/stores/catalog';
   import { featureFlags, loadFeatureFlags } from '$lib/stores/features';
   import TrainingDashboard from '$lib/components/TrainingDashboard.svelte';
+  import ModelTrainer from '$lib/components/ModelTrainer.svelte';
   import ScriptEditor from '$lib/components/ScriptEditor.svelte';
   import { thinkingSettings } from '$lib/stores/thinkingSettings';
 
-  const dispatch = createEventDispatcher<{ close: void }>();
+  const dispatch = createEventDispatcher<{ close: void; openAndroidUsbLab: void }>();
 
   let hwInfo:          Record<string, unknown> = {};
   let loadingOp        = '';
@@ -343,6 +344,7 @@
 
   let showAdvanced = false;
   let showTrainingDashboard = false;
+  let showModelTrainer = false;
   let showScriptEditor = false;
 
   // ── Vision tool availability ──────────────────────────────────────────────
@@ -1852,7 +1854,7 @@
         <span>Max thinking tokens displayed</span>
         <input type="range" min="256" max="8192" step="256"
           value={$thinkingSettings.max_thinking_tokens}
-          on:change={(e) => thinkingSettings.save({ ...$thinkingSettings, max_thinking_tokens: Number((e.target as HTMLInputElement).value) })} />
+          on:change={(e) => thinkingSettings.save({ ...$thinkingSettings, max_thinking_tokens: Number(e.currentTarget.value) })} />
         <span class="slider-val">{$thinkingSettings.max_thinking_tokens}</span>
       </label>
     </section>
@@ -1990,6 +1992,12 @@
             <button class="btn-training" on:click={() => { showTrainingDashboard = true; }}>
               Dashboard
             </button>
+            {#if $featureFlags?.model_trainer_enabled}
+              <button class="btn-training" on:click={() => { showModelTrainer = true; }}
+                title="Open Model Trainer">
+                🧠 Trainer
+              </button>
+            {/if}
             <button class="btn-training" on:click={() => { showScriptEditor = true; }}>
               Scripts
             </button>
@@ -2127,6 +2135,12 @@
 {#if showTrainingDashboard}
   <div class="dashboard-overlay" role="dialog" aria-modal="true">
     <TrainingDashboard onClose={() => (showTrainingDashboard = false)} />
+  </div>
+{/if}
+
+{#if showModelTrainer}
+  <div class="dashboard-overlay" role="dialog" aria-modal="true">
+    <ModelTrainer onClose={() => (showModelTrainer = false)} />
   </div>
 {/if}
 

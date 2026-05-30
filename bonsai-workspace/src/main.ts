@@ -1,3 +1,7 @@
+import '$lib/styles/tokens.css';
+import { theme } from '$lib/stores/theme'; // initialises data-theme on <html>
+theme.subscribe(() => {}); // force subscription so the side-effect runs on load
+
 import App from './App.svelte';
 import { listen } from '@tauri-apps/api/event';
 import { addAssistantMessage, tokenSpeed } from '$lib/stores/chat';

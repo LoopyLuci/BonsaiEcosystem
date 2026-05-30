@@ -71,11 +71,13 @@ def dpo_loss(
 
 def gather_log_probs(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
     """Sum per-token log-probs for each sequence in the batch."""
-    log_probs = F.log_softmax(logits[:, :-1, :], dim=-1)
-    target    = labels[:, 1:].unsqueeze(-1)
-    token_lp  = log_probs.gather(-1, target).squeeze(-1)
-    # Mask padding tokens (label == -100)
-    mask = (labels[:, 1:] != -100).float()
+    log_probs  = F.log_softmax(logits[:, :-1, :], dim=-1)
+    raw_target = labels[:, 1:]
+    # Clamp -100 (ignore_index) to 0 before gather so indices stay in-bounds;
+    # the mask below zeroes out those positions in the final sum.
+    target     = raw_target.clamp(min=0).unsqueeze(-1)
+    token_lp   = log_probs.gather(-1, target).squeeze(-1)
+    mask       = (raw_target != -100).float()
     return (token_lp * mask).sum(-1)
 
 
@@ -124,6 +126,10 @@ def main():
     parser.add_argument("--max-pairs",   type=int,   default=2000,
         help="Cap training pairs to prevent OOM.")
     parser.add_argument("--lora-rank",   type=int,   default=16)
+    parser.add_argument("--device", default=None,
+        help="Force device: cpu | cuda | mps | directml. Default: auto-detect.")
+    parser.add_argument("--max-length", type=int, default=256,
+        help="Max token length per sequence. Lower = less RAM. Default: 256.")
     args = parser.parse_args()
 
     base = Path(args.base_model)
@@ -131,7 +137,30 @@ def main():
         raise SystemExit(f"[model] ERROR: No config.json at {base}. "
                          f"Pass a valid local HF snapshot directory.")
 
-    dev, dtype = get_device()
+    if args.device:
+        _forced = args.device.lower()
+        if _forced == "directml":
+            try:
+                import torch_directml
+                dev = torch_directml.device()
+                dtype = torch.float32
+                emit("device", using="directml_forced")
+            except ImportError:
+                emit("device", warning="torch-directml not installed, falling back to CPU")
+                dev, dtype = torch.device("cpu"), torch.float32
+        elif _forced == "cpu":
+            dev, dtype = torch.device("cpu"), torch.float32
+            emit("device", using="cpu_forced")
+        elif _forced == "cuda":
+            dev, dtype = torch.device("cuda"), torch.float16
+            emit("device", using="cuda_forced")
+        elif _forced == "mps":
+            dev, dtype = torch.device("mps"), torch.float32
+            emit("device", using="mps_forced")
+        else:
+            dev, dtype = get_device()
+    else:
+        dev, dtype = get_device()
     emit("dpo", beta=args.beta, epochs=args.epochs, lr=args.lr)
 
     # ── Load base model + LoRA ───────────────────────────────────────────────
@@ -210,7 +239,7 @@ def main():
             rejected = pair["rejected"]
 
             c_ids, c_labels, r_ids, r_labels = tokenize_pair(
-                tokenizer, system, prompt, chosen, rejected)
+                tokenizer, system, prompt, chosen, rejected, max_len=args.max_length)
             c_ids   = c_ids.to(dev);   c_labels   = c_labels.to(dev)
             r_ids   = r_ids.to(dev);   r_labels   = r_labels.to(dev)
 

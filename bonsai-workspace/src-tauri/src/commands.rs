@@ -611,6 +611,14 @@ pub async fn submit_chat(
     }
 
     let mut sys_prompt = tools::system_prompt_for(&tools, workspace_path.as_deref(), Some(&last_user_text));
+    // Inject BONSAI.md when the feature is enabled
+    if crate::features::FeatureFlags::global().bonsai_md_enabled {
+        sys_prompt = crate::bonsai_md::inject(&sys_prompt, workspace_path.as_deref());
+        // Ensure a BONSAI.md exists for the project (creates default if absent)
+        if let Some(ws) = workspace_path.as_deref() {
+            crate::bonsai_md::ensure_exists(ws);
+        }
+    }
     if is_file_inventory_request(&last_user_text) {
             sys_prompt.push_str(
                 "\n\n## Immediate instruction for this request\n\
@@ -1181,6 +1189,30 @@ pub async fn execute_tool_call(
         .as_str()
         .ok_or_else(|| "Missing tool name".to_string())?;
     let args = action["args"].clone();
+
+    // ── Run through middleware pipeline ──────────────────────────────────────
+    // AppState may not be available here (headless callers), so best-effort.
+    {
+        let call = crate::middleware::ToolCall {
+            tool:           tool.to_string(),
+            args:           args.clone(),
+            workspace_path: workspace_path.clone(),
+        };
+        if let Some(state) = app_handle.try_state::<crate::AppState>() {
+            match state.middleware_registry.run(call) {
+                Ok(_rewritten) => {
+                    // Use rewritten call — for now we just check for blocks
+                }
+                Err(msg) if msg == "__pending_approval__" => {
+                    return Err("Tool call held for plan review.".to_string());
+                }
+                Err(msg) => {
+                    return Err(msg);
+                }
+            }
+        }
+    }
+
     let tool_defs = tools::all_tools(workspace_path.as_deref());
     let tool_def = tool_defs
         .into_iter()
@@ -6369,6 +6401,145 @@ pub async fn clear_gpu_crash_flag(app_handle: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ── BONSAI.md commands ────────────────────────────────────────────────────────
+
+/// Read the BONSAI.md for a project workspace.
+#[tauri::command]
+pub async fn get_bonsai_md(workspace_path: String) -> Result<String, String> {
+    Ok(crate::bonsai_md::load(Some(&workspace_path)))
+}
+
+/// Write (overwrite) the BONSAI.md for a project workspace.
+#[tauri::command]
+pub async fn set_bonsai_md(workspace_path: String, content: String) -> Result<(), String> {
+    crate::bonsai_md::write(&workspace_path, &content)
+        .map_err(|e| format!("write failed: {e}"))
+}
+
+// ── Memory node commands ──────────────────────────────────────────────────────
+
+/// Record an activity memory node.  Called from the frontend activity handler.
+#[tauri::command]
+pub async fn record_memory_node(
+    state: State<'_, crate::AppState>,
+    node_type: String,
+    source: String,
+    content: String,
+    tags: Option<Vec<String>>,
+) -> Result<(), String> {
+    let node = crate::memory_nodes::MemoryNode::new(
+        crate::memory_nodes::NodeType::from_str(&node_type),
+        source,
+        content,
+    ).with_tags(tags.unwrap_or_default());
+    state.memory_nodes.insert(&node).await
+        .map_err(|e| format!("memory_nodes insert failed: {e}"))
+}
+
+/// Get pending (unconsolidated) memory node count.
+#[tauri::command]
+pub async fn get_memory_node_count(
+    state: State<'_, crate::AppState>,
+) -> Result<i64, String> {
+    state.memory_nodes.pending_count().await
+        .map_err(|e| format!("count failed: {e}"))
+}
+
+// ── Middleware / undercover commands ─────────────────────────────────────────
+
+/// Enable or disable undercover mode.
+#[tauri::command]
+pub async fn set_undercover_mode(
+    state: State<'_, crate::AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    state.undercover_enabled.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    // Persist to feature flags
+    let mut flags = crate::features::FeatureFlags::global();
+    flags.undercover_mode = enabled;
+    crate::features::FeatureFlags::set_global(flags);
+    Ok(())
+}
+
+/// Enable or disable the plan review gate.
+#[tauri::command]
+pub async fn set_plan_gate_enabled(
+    state: State<'_, crate::AppState>,
+    enabled: bool,
+) -> Result<(), String> {
+    state.plan_gate_enabled.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    let mut flags = crate::features::FeatureFlags::global();
+    flags.plan_gate_enabled = enabled;
+    crate::features::FeatureFlags::set_global(flags);
+    Ok(())
+}
+
+// ── Plan gate commands ────────────────────────────────────────────────────────
+
+/// Resolve a pending plan (approve or reject).  Called from PlanReview.svelte.
+#[tauri::command]
+pub async fn resolve_plan(
+    state: State<'_, crate::AppState>,
+    plan_id: String,
+    approved: bool,
+) -> Result<(), String> {
+    crate::plan_gate::resolve(&state.plan_gate, &plan_id, approved)
+}
+
+// ── Web router commands ───────────────────────────────────────────────────────
+
+/// Fetch a URL through the trusted documentation router.
+#[tauri::command]
+pub async fn web_router_fetch(
+    state: State<'_, crate::AppState>,
+    url: String,
+) -> Result<crate::web_router::WebResult, String> {
+    if !crate::features::FeatureFlags::global().web_router_enabled {
+        return Err("Web router is disabled.".into());
+    }
+    state.web_router.fetch(&url).await
+}
+
+/// Manually trigger a hot model reload for the given GGUF path.
+/// The watcher handles automatic reloads; this command is for UI-driven reloads.
+#[tauri::command]
+pub async fn hot_reload_model(
+    state: State<'_, crate::AppState>,
+    app_handle: AppHandle,
+    model_path: String,
+) -> Result<String, String> {
+    use std::path::PathBuf;
+    let path = PathBuf::from(&model_path);
+    if !path.exists() {
+        return Err(format!("Model file not found: {model_path}"));
+    }
+    let model_id = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("bonsai-latest")
+        .to_string();
+
+    let orchestrator = state.orchestrator.clone();
+    orchestrator.refresh_registry();
+
+    let rx = orchestrator.load(model_id.clone());
+    match rx.await {
+        Ok(Ok(())) => {
+            let _ = app_handle.emit(
+                "model-reloaded",
+                serde_json::json!({
+                    "model_id": model_id,
+                    "path": model_path,
+                    "status": "ready"
+                }),
+            );
+            Ok(format!("Model '{model_id}' loaded and ready"))
+        }
+        Ok(Err(e)) => Err(format!("Failed to load '{model_id}': {e}")),
+        Err(_)     => Err("Orchestrator unavailable".into()),
+    }
+}
+
 #[tauri::command]
 pub async fn generate_music_command(prompt: String, duration: Option<f32>) -> Result<String, String> {
     let dur = duration.unwrap_or(10.0).clamp(1.0, 60.0);
@@ -6378,4 +6549,111 @@ pub async fn generate_music_command(prompt: String, duration: Option<f32>) -> Re
     }
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     Ok(format!("data:audio/wav;base64,{}", STANDARD.encode(&wav)))
+}
+
+// ── Training Job Manager commands ─────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn start_training(
+    app:    tauri::AppHandle,
+    state:  tauri::State<'_, crate::AppState>,
+    phases: Option<Vec<String>>,
+) -> Result<String, String> {
+    state.training_jobs.start(app, phases).await
+}
+
+#[tauri::command]
+pub async fn stop_training(
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state.training_jobs.stop().await
+}
+
+#[tauri::command]
+pub async fn get_trainer_job_status(
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<Option<serde_json::Value>, String> {
+    let status = state.training_jobs.status().await;
+    match status {
+        None => Ok(None),
+        Some(s) => serde_json::to_value(s).map(Some).map_err(|e| e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn get_adapters() -> Result<serde_json::Value, String> {
+    let adapters = crate::training_job::list_adapters();
+    serde_json::to_value(adapters).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn deploy_adapter(
+    app:          tauri::AppHandle,
+    state:        tauri::State<'_, crate::AppState>,
+    adapter_path: String,
+) -> Result<(), String> {
+    use std::path::PathBuf;
+
+    let src = PathBuf::from(&adapter_path);
+    let target = dirs::home_dir()
+        .ok_or("No home dir")?
+        .join(".bonsai/models/bonsai-latest.gguf");
+
+    if src.extension().and_then(|e| e.to_str()) == Some("gguf") {
+        // Already a GGUF — just copy it
+        std::fs::create_dir_all(target.parent().unwrap()).ok();
+        std::fs::copy(&src, &target).map_err(|e| format!("Copy failed: {e}"))?;
+        tracing::info!("[deploy] Copied GGUF {} → {}", src.display(), target.display());
+    } else {
+        return Err("Only .gguf files can be deployed directly. Use convert_to_gguf.py to convert an adapter first.".into());
+    }
+
+    // Trigger hot-reload via the existing orchestrator
+    if let Some(orch) = app.try_state::<std::sync::Arc<crate::model_orchestrator::ModelOrchestrator>>() {
+        orch.refresh_registry();
+    }
+
+    // System-tray notification
+    {
+        use tauri_plugin_notification::NotificationExt;
+        let name = src.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("model");
+        let _ = app.notification()
+            .builder()
+            .title("🧠 BonsAI Brain Update Deployed")
+            .body(format!("{name} is now active. BonsAI just got smarter!"))
+            .show();
+    }
+
+    Ok(())
+}
+
+// ── Multi-Agent Coordinator ───────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn run_coordinated_task(
+    description: String,
+    items:       Vec<String>,
+    model_url:   Option<String>,
+    max_workers: Option<usize>,
+) -> Result<serde_json::Value, String> {
+    use bonsai_coordinator::{Coordinator, CoordinatorConfig, CoordinatorTask};
+
+    if items.is_empty() {
+        return Err("No items provided".into());
+    }
+
+    let cfg = CoordinatorConfig {
+        model_url:   model_url.unwrap_or_else(|| "http://127.0.0.1:8082".into()),
+        max_workers: max_workers.unwrap_or(4),
+        timeout_secs: 60,
+        max_tokens:   512,
+    };
+
+    let result = Coordinator::new(cfg)
+        .run(CoordinatorTask { description, items })
+        .await;
+
+    serde_json::to_value(result).map_err(|e| e.to_string())
 }

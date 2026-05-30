@@ -1,3 +1,5 @@
+import { invoke } from '@tauri-apps/api/core';
+
 export type ActivityPayload = {
   level?: 'debug' | 'info' | 'warn' | 'error';
   category?: 'tool' | 'swarm' | 'chat' | 'system' | 'terminal' | 'ui';
@@ -56,9 +58,20 @@ export function pushActivity(payload: ActivityPayload) {
     const safePayload = { ...payload, details: sanitizeDetail(payload.details) } as ActivityPayload;
     const ev = new CustomEvent('bonsai-activity', { detail: safePayload });
     window.dispatchEvent(ev);
+
+    // Persist to MemoryNode store (skip debug-level noise and raw UI clicks to avoid flood)
+    if (safePayload.level !== 'debug' && safePayload.category !== 'ui') {
+      const content = safePayload.summary
+        ? safePayload.summary + (safePayload.details ? ' | ' + JSON.stringify(safePayload.details).slice(0, 300) : '')
+        : JSON.stringify(safePayload).slice(0, 500);
+      invoke('record_memory_node', {
+        nodeType: safePayload.category ?? 'system',
+        source:   safePayload.source   ?? 'frontend',
+        content,
+      }).catch(() => { /* non-fatal */ });
+    }
   } catch (e) {
     // best-effort — swallow errors to avoid breaking UI
-    // fallback: try console log
     // eslint-disable-next-line no-console
     console.warn('[bonsai] pushActivity failed', e, payload);
   }
@@ -135,7 +148,7 @@ export function instrumentUserActions() {
         tag: (targetEl?.tagName ?? (ev.target as Element | null)?.tagName ?? '').toLowerCase(),
         id: targetEl?.id || null,
         classes: typeof targetEl?.className === 'string' ? targetEl.className : null,
-        dataset: targetEl ? { ...targetEl.dataset } : {},
+        dataset: targetEl ? { ...(targetEl as HTMLElement).dataset } : {},
       };
       pushActivity({ level: 'info', category: 'ui', source: 'user', summary: String(label), details });
     } catch (e) {

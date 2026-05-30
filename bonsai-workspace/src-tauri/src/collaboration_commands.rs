@@ -351,3 +351,83 @@ pub async fn close_collaboration_session(
     let _ = app_handle.emit("collab-session-closed", serde_json::json!({ "session_id": session_id }));
     Ok(())
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CrdtOperation {
+    pub file: String,
+    pub op_type: String,
+    pub position: usize,
+    pub text: Option<String>,
+    pub length: Option<usize>,
+    pub peer_id: String,
+    pub timestamp: u64,
+}
+
+#[tauri::command]
+pub async fn send_crdt_operation(
+    app_handle: tauri::AppHandle,
+    session_id: String,
+    operation: CrdtOperation,
+) -> Result<(), String> {
+    let _ = app_handle.emit("collab-crdt-operation", serde_json::json!({
+        "session_id": session_id,
+        "operation": operation,
+    }));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn add_chat_reaction(
+    state: State<'_, CollaborationState>,
+    app_handle: tauri::AppHandle,
+    session_id: String,
+    message_id: String,
+    emoji: String,
+    peer_id: String,
+) -> Result<(), String> {
+    let _ = app_handle.emit("collab-reaction-added", serde_json::json!({
+        "session_id": session_id,
+        "message_id": message_id,
+        "emoji": emoji,
+        "peer_id": peer_id,
+    }));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_media_mute(
+    app_handle: tauri::AppHandle,
+    session_id: String,
+    track: String,
+    muted: bool,
+) -> Result<(), String> {
+    let _ = app_handle.emit("collab-media-mute", serde_json::json!({
+        "session_id": session_id,
+        "track": track,
+        "muted": muted,
+    }));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn toggle_screen_share(
+    app_handle: tauri::AppHandle,
+    session_id: String,
+) -> Result<(), String> {
+    let _ = app_handle.emit("collab-screen-share-toggled", serde_json::json!({
+        "session_id": session_id,
+    }));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn execute_shared_command(
+    app_handle: tauri::AppHandle,
+    session_id: String,
+    command: String,
+) -> Result<(), String> {
+    let _ = app_handle.emit("collab-terminal-output", serde_json::json!({
+        "text": format!("[Command received: {}]", command),
+    }));
+    Ok(())
+}

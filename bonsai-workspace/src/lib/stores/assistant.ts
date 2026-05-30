@@ -55,7 +55,7 @@ export interface AssistantMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   tool_name: string | null;
-  tool_result: string | null;
+  tool_result: string | { content_type: string; data?: number[] } | null;
   tts_synthesized: boolean;
   created_at: number;
   game_state?: ChatGameState | null;

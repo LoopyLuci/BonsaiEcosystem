@@ -44,7 +44,9 @@
   let loadingInstalled = false;
   let loadingPeers = false;
 
-  let activeTab: 'installed' | 'marketplace' | 'import' = 'installed';
+  type SkillTab = 'installed' | 'marketplace' | 'import';
+  const SKILL_TABS: SkillTab[] = ['installed', 'marketplace', 'import'];
+  let activeTab: SkillTab = 'installed';
 
   // Marketplace search
   let searchQuery = '';
@@ -278,12 +280,12 @@
 
   <!-- Tabs -->
   <div class="flex border-b border-gray-700 text-sm">
-    {#each ['installed', 'marketplace', 'import'] as tab}
+    {#each SKILL_TABS as tab}
       <button
         class="px-4 py-2 transition-colors {activeTab === tab
           ? 'border-b-2 border-blue-500 text-white'
           : 'text-gray-400 hover:text-white'}"
-        on:click={() => { activeTab = tab as any; if (tab === 'marketplace') loadPeerSkills(); }}
+        on:click={() => { activeTab = tab; if (tab === 'marketplace') loadPeerSkills(); }}
       >
         {tab === 'installed' ? '📦 Installed' : tab === 'marketplace' ? '🌐 Marketplace' : '⬆ Import'}
       </button>

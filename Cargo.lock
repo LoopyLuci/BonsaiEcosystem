@@ -1417,6 +1417,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonsai-error"
+version = "0.1.0"
+
+[[package]]
+name = "bonsai-fabric"
+version = "0.1.0"
+dependencies = [
+ "bonsai-error",
+ "bonsai-transfer-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "bonsai-go"
 version = "0.1.0"
 dependencies = [
@@ -1828,6 +1845,7 @@ dependencies = [
  "bonsai-chess",
  "bonsai-coordinator",
  "bonsai-crdt",
+ "bonsai-fabric",
  "bonsai-go",
  "bonsai-go-nn",
  "bonsai-hnsw",

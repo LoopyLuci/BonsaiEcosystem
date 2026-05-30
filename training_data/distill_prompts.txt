@@ -1,0 +1,102 @@
+What is the capital of France?
+Explain the difference between a process and a thread.
+What is the Pythagorean theorem?
+How does garbage collection work in Java?
+Summarise the key ideas of the Stoic philosophy.
+What are the main differences between TCP and UDP?
+Explain what a Merkle tree is and why it is useful.
+What does the Rust borrow checker do, and why is it useful?
+Explain the difference between mutex and semaphore.
+What is the CAP theorem in distributed systems?
+How does HTTPS work?
+What is a neural network, and how does backpropagation train it?
+Explain the difference between SQL and NoSQL databases.
+What is the difference between supervised and unsupervised learning?
+How does a hash table work?
+Explain what a stack overflow error is and how to avoid it.
+What is the difference between a closure and a lambda?
+How does the Linux kernel scheduler work?
+What is eventual consistency?
+Explain what a Bloom filter is.
+What are SOLID principles in software design?
+How does memory-mapped I/O work?
+Explain the difference between a compiler and an interpreter.
+What is tail-call optimisation?
+How does RSA encryption work?
+What is the difference between concurrency and parallelism?
+Explain what a deadlock is and how to prevent it.
+What is the actor model in concurrent programming?
+How does a B-tree differ from a binary search tree?
+What is the difference between HTTP/1.1 and HTTP/2?
+Explain what a race condition is.
+What is context switching in operating systems?
+How does the VM (virtual machine) in the JVM work?
+What are macros in Rust and when should you use them?
+Explain the difference between stack and heap memory allocation.
+What is a zero-copy network transfer?
+How does DNS resolution work?
+What is the difference between optimistic and pessimistic locking?
+Explain what a segment tree is.
+What is a continuation-passing style (CPS)?
+How does QUIC improve on TCP?
+What is a phantom type in type theory?
+Explain the difference between mutable and immutable data structures.
+What is a monad in functional programming?
+How does a CPU pipeline work?
+What is speculative execution?
+Explain what branch prediction is.
+How do GPUs differ from CPUs architecturally?
+What is the difference between weak and strong typing?
+What is a software design pattern?
+How does Svelte differ from React?
+What is reactive programming?
+Explain what an event loop is in JavaScript.
+What are WebSockets and how do they differ from HTTP?
+Explain what CORS is and why it exists.
+What is a service worker?
+How does WebAssembly work?
+What is the difference between authentication and authorisation?
+Explain what a JWT (JSON Web Token) is.
+What is OAuth 2.0?
+How does two-factor authentication work?
+What is a SQL injection attack and how do you prevent it?
+Explain what XSS (cross-site scripting) is.
+What is CSRF and how do you protect against it?
+How does a firewall work?
+What is a VPN and how does it work?
+Explain what end-to-end encryption is.
+What is a timing attack in cryptography?
+How does AES work at a high level?
+What is a rainbow table attack?
+Explain what salting a password hash means.
+What is a buffer overflow vulnerability?
+How does ASLR (address space layout randomisation) help security?
+What is return-oriented programming (ROP)?
+Explain what fuzzing is in software testing.
+What is property-based testing?
+How does a mock differ from a stub in testing?
+What is test-driven development?
+Explain what integration testing means.
+What is a canary deployment?
+How does blue-green deployment work?
+What is a circuit breaker pattern?
+Explain what rate limiting is.
+What is a message queue and why is it useful?
+How does Kafka work?
+Explain what event sourcing is.
+What is CQRS?
+How does a container differ from a virtual machine?
+What is Kubernetes and what problem does it solve?
+What is a Helm chart?
+Explain what a service mesh is.
+How does load balancing work?
+What is a CDN (content delivery network)?
+Explain what a cache stampede is.
+What is LRU cache eviction?
+How does write-ahead logging (WAL) work in databases?
+What is database sharding?
+Explain what a foreign key constraint is.
+What is an index in a database and how does it speed up queries?
+What is an N+1 query problem?
+Explain what a database transaction is.
+What is two-phase commit in distributed transactions?

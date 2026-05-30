@@ -147,6 +147,7 @@ export interface ModelDataSummary {
   inference_mode: InferenceMode;
   tags:           string[];
   updated_at:     number;
+  extended_thinking?: boolean;
 }
 
 // ── Generator input ───────────────────────────────────────────────────────────

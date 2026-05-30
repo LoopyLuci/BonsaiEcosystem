@@ -82,6 +82,7 @@ mod collab {
     pub mod crdt;
 }
 mod collaboration_commands;
+mod fabric_commands;
 mod tool_registry;
 mod self_play;
 mod critic;
@@ -1377,6 +1378,9 @@ pub fn run() {
             // ── Collaboration State ───────────────────────────────────────────
             app.manage(collaboration_commands::CollaborationState::new());
 
+            // ── Compute Fabric ────────────────────────────────────────────────
+            app.manage(fabric_commands::FabricState::new());
+
             // ── Start Copilot Orchestrator (local REST control) ─────────────
             {
                 let ah = app_handle.clone();
@@ -2332,6 +2336,13 @@ pub fn run() {
             collaboration_commands::end_voice_call,
             collaboration_commands::send_webrtc_signal,
             collaboration_commands::close_collaboration_session,
+            collaboration_commands::send_crdt_operation,
+            collaboration_commands::add_chat_reaction,
+            collaboration_commands::set_media_mute,
+            collaboration_commands::toggle_screen_share,
+            collaboration_commands::execute_shared_command,
+            fabric_commands::fabric_submit_and_await,
+            fabric_commands::fabric_register_node,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

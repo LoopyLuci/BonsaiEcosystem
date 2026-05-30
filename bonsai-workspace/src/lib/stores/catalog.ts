@@ -5,7 +5,7 @@
 import { writable, get } from 'svelte/store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { availableModels, orchestratorStatus, refreshModels, modelSwitchStatus, activeModelId } from './models';
+import { availableModels, orchestratorStatus, refreshModels, modelSwitchStatus, activeModelId, refreshStatus } from './models';
 import type { ModelInfo } from './models';
 
 export interface CatalogEntry {

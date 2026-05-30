@@ -2,6 +2,8 @@
   import { invoke } from '@tauri-apps/api/core';
   import { onMount, onDestroy } from 'svelte';
 
+  export let onClose: (() => void) | undefined = undefined;
+
   // ── Tab state ────────────────────────────────────────────────────────────
   type Tab = 'overview' | 'data' | 'history' | 'curriculum' | 'federated' | 'settings';
   let activeTab: Tab = 'overview';
@@ -53,12 +55,12 @@
     try {
       [stats, dimensions, loopHistory, preferences, curriculumStatus, selfPlayState] =
         await Promise.all([
-          invoke('get_training_stats').catch(() => null),
-          invoke('get_evaluation_results').catch(() => []),
-          invoke('get_training_loop_history').catch(() => []),
-          invoke('get_training_preferences').catch(() => ({})),
-          invoke('get_curriculum_status').catch(() => null),
-          invoke('get_self_play_state').catch(() => ({})),
+          invoke<any>('get_training_stats').catch(() => null),
+          invoke<any[]>('get_evaluation_results').catch(() => []),
+          invoke<any[]>('get_training_loop_history').catch(() => []),
+          invoke<any>('get_training_preferences').catch(() => ({})),
+          invoke<any>('get_curriculum_status').catch(() => null),
+          invoke<any>('get_self_play_state').catch(() => ({})),
         ]);
       alerts = stats?.alerts ?? [];
     } catch (e) {
@@ -81,7 +83,7 @@
   }
 
   async function loadCiqHistory() {
-    ciqHistory = await invoke('get_ciq_history').catch(() => []);
+    ciqHistory = await invoke<any[]>('get_ciq_history').catch(() => []);
   }
 
   onMount(async () => {
@@ -97,6 +99,7 @@
   });
 
   // ── Tab switching ─────────────────────────────────────────────────────────
+  function setTabFromString(t: string) { setTab(t as Tab); }
   function setTab(t: Tab) {
     activeTab = t;
     if (t === 'data') loadExamples();
@@ -264,7 +267,7 @@
     {#each [['overview','Overview'],['data','Data'],['history','History'],['curriculum','Curriculum'],['federated','Federated'],['settings','Settings']] as [id, label]}
       <button
         class="px-3 py-2 rounded-t transition {activeTab === id ? 'text-white border-b-2 border-violet-500 bg-gray-900' : 'text-gray-400 hover:text-gray-200'}"
-        on:click={() => setTab(id)}>{label}</button>
+        on:click={() => setTabFromString(id)}>{label}</button>
     {/each}
   </div>
 

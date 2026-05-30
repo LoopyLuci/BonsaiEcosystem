@@ -8,6 +8,8 @@
 jobs = 1
 # Use incremental compilation even in release to speed up rebuilds.
 incremental = true
+# sccache caches compiled artifacts across clean builds and branches.
+rustc-wrapper = "sccache"
 
 [profile.release]
 # Keep minimal debug info for crash triage while allowing packaging-time stripping.

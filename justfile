@@ -127,6 +127,19 @@ lint:
     cargo clippy --workspace -- -D warnings
     npm --prefix bonsai-workspace/src run lint
 
+# ── Setup ─────────────────────────────────────────────────────────────────────
+
+# Create all ~/.bonsai training directories (run once before first training)
+setup-training-dirs:
+    #!/usr/bin/env sh
+    if [ "{{os}}" = "windows" ]; then
+        powershell -NoProfile -ExecutionPolicy Bypass \
+            -File "{{workspace_root}}/scripts/make_training_dirs.ps1"
+    else
+        mkdir -p ~/.bonsai/training_export ~/.bonsai/adapters ~/.bonsai/models ~/.bonsai/logs
+        echo "Training directories created."
+    fi
+
 # ── Training ──────────────────────────────────────────────────────────────────
 
 # Step 1: Export all training data from every source into ~/.bonsai/training_export/
@@ -180,6 +193,63 @@ distill:
         --teacher-api "http://127.0.0.1:8080" \
         --prompts "$PROMPTS" --output "$OUT"
 
+# Weekly full 8-phase training cycle for Windows/AMD (all phases, ~18 h total)
+# Phases: safety → survival → tool-use → code → chat → reason → SFT merge → GGUF
+weekly-train:
+    #!/usr/bin/env sh
+    if [ "{{os}}" = "windows" ]; then
+        powershell -NoProfile -ExecutionPolicy Bypass \
+            -File "{{workspace_root}}/scripts/weekly_train.ps1"
+    else
+        echo "weekly-train is Windows-only. Use platform-specific scripts on Linux/Mac."
+        exit 1
+    fi
+
+# Full training cycle for Windows/AMD (export → DPO → distill → deploy → hot-reload)
+# Primary path for the Windows 10 + RX 7900 XTX machine.
+train-windows:
+    #!/usr/bin/env sh
+    if [ "{{os}}" = "windows" ]; then
+        powershell -NoProfile -ExecutionPolicy Bypass \
+            -File "{{workspace_root}}/scripts/train-windows.ps1"
+    else
+        echo "train-windows is for Windows only. Use 'just train-full' on Linux/Mac."
+        exit 1
+    fi
+
+# Windows AMD: DPO only (no distillation)
+train-windows-dpo:
+    #!/usr/bin/env sh
+    if [ "{{os}}" = "windows" ]; then
+        powershell -NoProfile -ExecutionPolicy Bypass \
+            -File "{{workspace_root}}/scripts/train-windows.ps1" -SkipDistill
+    else
+        echo "Windows only."
+        exit 1
+    fi
+
+# Windows AMD: distillation only (teacher must already be loaded as llama-server)
+distill-windows:
+    #!/usr/bin/env sh
+    if [ "{{os}}" = "windows" ]; then
+        powershell -NoProfile -ExecutionPolicy Bypass \
+            -File "{{workspace_root}}/scripts/train-windows.ps1" -SkipExport -SkipDpo
+    else
+        echo "Windows only."
+        exit 1
+    fi
+
+# Deploy the latest adapter on Windows (copies to ~/.bonsai/models/bonsai-latest.gguf)
+deploy-windows ADAPTER_PATH="":
+    #!/usr/bin/env sh
+    if [ "{{os}}" = "windows" ]; then
+        powershell -NoProfile -ExecutionPolicy Bypass \
+            -File "{{workspace_root}}/scripts/train-windows.ps1" -SkipExport -SkipDpo -SkipDistill -SkipEval
+    else
+        echo "Windows only."
+        exit 1
+    fi
+
 # Full training cycle: export → SFT → DPO (use train-mlx on M1 instead)
 train-full:
     just export-data
@@ -213,6 +283,108 @@ deploy-model ADAPTER_PATH="":
         -H "Content-Type: application/json" \
         -d "{\"adapter_path\": \"$ADAPTER_PATH\"}" | python3 -m json.tool || \
     echo "App not running — copy adapter manually to ~/.bonsai/models/bonsai-latest.gguf"
+
+# ── Per-phase training recipes ────────────────────────────────────────────────
+
+# Phase 1: Generate safety DPO data (no teacher needed)
+generate-safety-data:
+    python "{{workspace_root}}/scripts/generate_safety_data.py"
+
+# Phase 1: Generate safety DPO data with teacher-generated rejected sides (teacher on port 8080)
+generate-safety-data-with-teacher:
+    python "{{workspace_root}}/scripts/generate_safety_data.py" --with-rejected
+
+# Phase 3: Generate tool-use DPO data (teacher must be running on port 8080)
+generate-tool-data:
+    python "{{workspace_root}}/scripts/generate_tool_data.py"
+
+# Phase 3: Generate tool-use data offline (template examples only, no teacher)
+generate-tool-data-offline:
+    python "{{workspace_root}}/scripts/generate_tool_data.py" --offline
+
+# Standard SFT fine-tuning (multi-task, cross-entropy loss)
+# Usage: just finetune-sft data=~/.bonsai/training_export/combined.jsonl output=~/.bonsai/adapters/sft-v1
+finetune-sft data output:
+    #!/usr/bin/env sh
+    MODEL_DIR="$(python3 -c \"import os,glob; h=os.path.expanduser('~/.cache/huggingface/hub'); snaps=glob.glob(h+'/models--Qwen--**/snapshots/*/config.json',recursive=True); print(os.path.dirname(snaps[0])) if snaps else print('')\" 2>/dev/null)"
+    if [ -z "$MODEL_DIR" ]; then echo "No local HF model snapshot found. Run: huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct"; exit 1; fi
+    python3 "{{workspace_root}}/bonsai-workspace/runtimes/bonsai-trainer/finetune_sft.py" \
+        --base-model "$MODEL_DIR" \
+        --data "{{data}}" \
+        --output "{{output}}" \
+        --device cpu
+
+# Fuse a LoRA adapter into the base model and convert to GGUF
+# Usage: just convert-to-gguf adapter=~/.bonsai/adapters/bonsai-final-v1 output=~/.bonsai/models/bonsai-latest.gguf
+convert-to-gguf adapter output llama-cpp-dir="~/llama.cpp":
+    #!/usr/bin/env sh
+    MODEL_DIR="$(python3 -c \"import os,glob; h=os.path.expanduser('~/.cache/huggingface/hub'); snaps=glob.glob(h+'/models--Qwen--**/snapshots/*/config.json',recursive=True); print(os.path.dirname(snaps[0])) if snaps else print('')\" 2>/dev/null)"
+    if [ -z "$MODEL_DIR" ]; then echo "No local HF model snapshot found."; exit 1; fi
+    python3 "{{workspace_root}}/scripts/convert_to_gguf.py" \
+        --base-model "$MODEL_DIR" \
+        --adapter "{{adapter}}" \
+        --output "{{output}}" \
+        --llama-cpp-dir "{{llama-cpp-dir}}"
+
+# Combine all JSONL files in training_export into a single shuffled file (max 20,000 examples)
+combine-training-data:
+    python3 -c "
+import json, pathlib, random
+export = pathlib.Path.home() / '.bonsai/training_export'
+all_data = []
+for f in export.glob('*.jsonl'):
+    if 'combined' in f.name or 'final' in f.name:
+        continue
+    with open(f, encoding='utf-8') as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                all_data.append(json.loads(line))
+random.shuffle(all_data)
+out = export / 'bonsai_combined_final.jsonl'
+with open(out, 'w', encoding='utf-8') as f:
+    for r in all_data[:20000]:
+        f.write(json.dumps(r) + '\n')
+print(f'Combined {min(len(all_data), 20000)} / {len(all_data)} examples → {out}')
+"
+
+# Full Phase 7: combine data + SFT fine-tune into bonsai-final adapter
+train-final:
+    just combine-training-data
+    just finetune-sft \
+        data="$HOME/.bonsai/training_export/bonsai_combined_final.jsonl" \
+        output="$HOME/.bonsai/adapters/bonsai-final-v1"
+
+# Full Phase 8: fuse bonsai-final adapter and hot-reload
+deploy-final llama-cpp-dir="~/llama.cpp":
+    just convert-to-gguf \
+        adapter="$HOME/.bonsai/adapters/bonsai-final-v1" \
+        output="$HOME/.bonsai/models/bonsai-latest.gguf" \
+        llama-cpp-dir="{{llama-cpp-dir}}"
+
+# Generate DreamAgent fine-tuning data (reads live memory DB; teacher must be on port 8080)
+generate-dreamagent-data:
+    #!/usr/bin/env sh
+    if [ "{{os}}" = "windows" ]; then
+        powershell -NoProfile -ExecutionPolicy Bypass \
+            -File "{{workspace_root}}/scripts/generate_dreamagent_data.ps1"
+    else
+        echo "generate-dreamagent-data requires PowerShell. On Linux/Mac, call the script directly."
+        exit 1
+    fi
+
+# Fine-tune the DreamAgent model for memory consolidation
+train-dreamagent:
+    just finetune-sft \
+        data="$HOME/.bonsai/training_export/dreamagent.jsonl" \
+        output="$HOME/.bonsai/adapters/bonsai-dreamagent-v1"
+
+# Convert DreamAgent adapter to GGUF and deploy to port 8082 path
+deploy-dreamagent llama-cpp-dir="~/llama.cpp":
+    just convert-to-gguf \
+        adapter="$HOME/.bonsai/adapters/bonsai-dreamagent-v1" \
+        output="D:/Models/bonsai-dreamagent.gguf" \
+        llama-cpp-dir="{{llama-cpp-dir}}"
 
 # Show training statistics from the running app
 training-stats:

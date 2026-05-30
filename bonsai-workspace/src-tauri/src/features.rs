@@ -18,7 +18,27 @@ pub struct FeatureFlags {
     pub tts_enabled:                 bool,
     #[serde(default)]
     pub hybrid_engine_enabled:       bool,
+    /// BONSAI.md — inject the self-evolving system prompt into every chat turn.
+    #[serde(default)]
+    pub bonsai_md_enabled:           bool,
+    /// Undercover Mode — strip internal product names from outputs and commits.
+    #[serde(default)]
+    pub undercover_mode:             bool,
+    /// Plan Gate — require human approval for high-risk tool calls.
+    #[serde(default)]
+    pub plan_gate_enabled:           bool,
+    /// Trusted Web Router — whitelist-based documentation fetcher.
+    #[serde(default)]
+    pub web_router_enabled:          bool,
+    /// EternalWorkshop — background memory consolidation daemon.
+    #[serde(default)]
+    pub eternal_workshop_enabled:    bool,
+    /// Model Trainer GUI — in-app training control panel.
+    #[serde(default = "default_true")]
+    pub model_trainer_enabled:       bool,
 }
+
+fn default_true() -> bool { true }
 
 impl Default for FeatureFlags {
     fn default() -> Self {
@@ -33,6 +53,12 @@ impl Default for FeatureFlags {
             cluster_orchestrator_enabled: false,
             tts_enabled:                 false,
             hybrid_engine_enabled:       false,
+            bonsai_md_enabled:           true,
+            undercover_mode:             false,
+            plan_gate_enabled:           false,
+            web_router_enabled:          true,
+            eternal_workshop_enabled:    true,
+            model_trainer_enabled:       true,
         }
     }
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { afterUpdate, onMount, onDestroy, createEventDispatcher } from 'svelte';
+  import TypingIndicator from '$lib/components/TypingIndicator.svelte';
   import { get } from 'svelte/store';
   import { invoke } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
@@ -1229,9 +1230,16 @@
   <div class="messages" bind:this={scrollEl} on:scroll={onChatScroll} aria-live="polite" aria-label="Chat messages">
     {#if $messages.length === 0 && !$isThinking}
       <div class="empty-chat">
-        <div class="empty-icon">💬</div>
-        <div>Ask Bonsai anything about your code</div>
-        <div class="empty-hint">Shift+Enter for newline</div>
+        <div class="empty-brain">🧠</div>
+        <h3 class="empty-title">Ask BonsAI anything</h3>
+        <p class="empty-sub">Your local AI assistant for code, debugging, and ideas.</p>
+        <div class="empty-chips">
+          <button class="empty-chip" on:click={() => input = 'Explain this file to me'}>Explain this file</button>
+          <button class="empty-chip" on:click={() => input = 'Find bugs in my code'}>Find bugs</button>
+          <button class="empty-chip" on:click={() => input = 'Write a unit test for the selected function'}>Write a test</button>
+          <button class="empty-chip" on:click={() => input = 'Refactor this for readability'}>Refactor</button>
+        </div>
+        <p class="empty-hint">Ctrl+Enter to send · Shift+Enter for newline</p>
       </div>
     {:else}
       {#each $messages as msg (msg.id)}
@@ -1336,7 +1344,7 @@
             {:else if isStreaming && streamingToolCallOnly}
               <span class="stream-placeholder">Preparing tool call…</span>
             {:else if !isStreaming}
-              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              <TypingIndicator label="BonsAI is thinking…" />
             {/if}
           </div>
         </div>
@@ -1758,20 +1766,57 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 10px;
     height: 100%;
-    color: var(--text-dim);
-    font-size: 13px;
+    color: var(--text-secondary, #a0a0b8);
     text-align: center;
+    padding: 24px;
+    animation: panel-fade-in 300ms ease-out;
   }
-  .empty-icon { font-size: 32px; }
+  .empty-brain { font-size: 48px; line-height: 1; margin-bottom: 4px; }
+  .empty-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary, #e8e8f0);
+    margin: 0;
+  }
+  .empty-sub {
+    font-size: 0.82rem;
+    color: var(--text-secondary, #a0a0b8);
+    margin: 0;
+    max-width: 260px;
+  }
+  .empty-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 4px;
+    max-width: 320px;
+  }
+  .empty-chip {
+    background: var(--bg-tertiary, #252535);
+    border: 1px solid var(--border, rgba(255,255,255,0.10));
+    border-radius: 20px;
+    color: var(--text-secondary, #a0a0b8);
+    font-size: 0.78rem;
+    padding: 5px 13px;
+    cursor: pointer;
+    transition: border-color 120ms, color 120ms, background 120ms;
+  }
+  .empty-chip:hover {
+    border-color: var(--accent, #5b6cff);
+    color: var(--text-primary, #e8e8f0);
+    background: var(--accent-dim, rgba(91,108,255,0.12));
+  }
   .empty-hint {
     font-size: 11px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    padding: 2px 8px;
-    border-radius: 6px;
+    color: var(--text-dim, #60607a);
     margin-top: 4px;
+  }
+  @keyframes panel-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   .msg-row {

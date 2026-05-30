@@ -25,6 +25,88 @@ mod tests;
 
 use kb::KnowledgeBase;
 
+// ── EternalWorkshop sidecar ───────────────────────────────────────────────────
+
+const WORKSHOP_HEALTH_SEC: u64 = 60;
+
+fn workshop_exe() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("BONSAI_WORKSHOP_EXE") {
+        return Some(PathBuf::from(p));
+    }
+    let exe_dir = std::env::current_exe()
+        .unwrap_or_default()
+        .parent()
+        .unwrap_or(&PathBuf::from("."))
+        .to_path_buf();
+
+    #[cfg(target_os = "windows")]
+    let candidate = exe_dir.join("eternal-workshop.exe");
+    #[cfg(not(target_os = "windows"))]
+    let candidate = exe_dir.join("eternal-workshop");
+
+    if candidate.exists() { Some(candidate) } else { None }
+}
+
+fn spawn_workshop() -> Option<Child> {
+    let exe = workshop_exe()?;
+    info!("[watchdog] launching EternalWorkshop at {}", exe.display());
+    match Command::new(&exe)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(child) => {
+            info!("[watchdog] EternalWorkshop running (PID {})", child.id());
+            Some(child)
+        }
+        Err(e) => {
+            warn!("[watchdog] failed to start EternalWorkshop: {e}");
+            None
+        }
+    }
+}
+
+/// Supervise EternalWorkshop in a background task.
+/// Restarts with exponential backoff on crash; gives up after MAX_RESTARTS.
+async fn supervise_workshop() {
+    let mut restarts: u32 = 0;
+    loop {
+        match spawn_workshop() {
+            None => {
+                // Binary not present — not an error, just not built yet
+                info!("[watchdog] EternalWorkshop binary not found — skipping");
+                return;
+            }
+            Some(mut child) => {
+                restarts = 0;
+                loop {
+                    sleep(Duration::from_secs(WORKSHOP_HEALTH_SEC)).await;
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            warn!("[watchdog] EternalWorkshop exited: {status}");
+                            break;
+                        }
+                        Ok(None) => { /* still running */ }
+                        Err(e) => {
+                            error!("[watchdog] EternalWorkshop wait error: {e}");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        restarts += 1;
+        if restarts >= MAX_RESTARTS {
+            error!("[watchdog] EternalWorkshop max restarts reached — giving up");
+            return;
+        }
+        let backoff = RESTART_BACKOFF_SEC * restarts as u64;
+        warn!("[watchdog] EternalWorkshop restarting in {backoff}s (attempt {restarts})");
+        sleep(Duration::from_secs(backoff)).await;
+    }
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const MAX_RESTARTS:        u32 = 10;
@@ -157,6 +239,10 @@ async fn main() {
         .to_string();
     let kb = Arc::new(KnowledgeBase::open(&kb_path).expect("KB init failed"));
     seed_kb(&kb);
+    let _ = kb.seed_defaults(); // load all historical project error patterns
+
+    // Start EternalWorkshop sidecar in a background task (non-fatal if absent)
+    tokio::spawn(supervise_workshop());
 
     let mut restarts: u32 = 0;
 

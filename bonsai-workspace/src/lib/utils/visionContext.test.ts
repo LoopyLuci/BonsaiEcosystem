@@ -15,6 +15,8 @@ describe('buildVisionContextMessage', () => {
       userText: 'can you see my screen?',
       streamActive: false,
       snapshot,
+      frameCaptured: false,
+      visionAttachmentReady: false,
     });
 
     expect(message).toBeNull();
@@ -25,6 +27,8 @@ describe('buildVisionContextMessage', () => {
       userText: 'can you see what is on my screen?',
       streamActive: true,
       snapshot,
+      frameCaptured: true,
+      visionAttachmentReady: false,
     });
 
     expect(message).toContain('Realtime collaboration context:');

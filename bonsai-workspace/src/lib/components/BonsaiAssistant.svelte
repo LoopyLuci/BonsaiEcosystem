@@ -6,6 +6,7 @@
   import AssistantInputBar from './AssistantInputBar.svelte';
   import QuickActionChips from './QuickActionChips.svelte';
   import ToolConfirmCard from './ToolConfirmCard.svelte';
+  import PlanReview from './PlanReview.svelte';
   import AssistantDiagnostics from './AssistantDiagnostics.svelte';
   import AssistantAvatar from './AssistantAvatar.svelte';
   import ProfileManager from './ProfileManager.svelte';
@@ -82,6 +83,7 @@
       {/if}
       <QuickActionChips />
       <ToolConfirmCard />
+      <PlanReview />
       <AssistantMessageList />
       <AssistantInputBar />
     {:else}

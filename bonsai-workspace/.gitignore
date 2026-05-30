@@ -45,4 +45,25 @@ coverage/
 *.temp
 ci-artifacts/
 
+# BonsAI model / training artifacts — never commit these
+*.gguf
+*.ggml
+*.safetensors
+*.bin
+runtimes/bonsai-trainer/adapters/
+runtimes/bonsai-trainer/outputs/
+runtimes/bonsai-trainer/__pycache__/
+scripts/__pycache__/
+*.jsonl
+memory_nodes.db
+memory_nodes.db-shm
+memory_nodes.db-wal
+survival.db
+survival.db-shm
+survival.db-wal
+brain_metadata.json
+survival_training_data/
+distillation_data/
+weekly_train.log
+
 

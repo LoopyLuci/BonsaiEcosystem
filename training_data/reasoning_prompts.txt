@@ -1,0 +1,67 @@
+If a train travels at 60 km/h for 2.5 hours and then at 80 km/h for 1.5 hours, what is the total distance?
+A factory produces 1,200 widgets per day. If 3% are defective, how many non-defective widgets are produced per week?
+You have 3 jars: one labelled "Apples", one labelled "Oranges", one labelled "Mixed". All labels are wrong. You can draw one fruit from one jar. How do you identify all jars?
+There are 100 lockers and 100 students. Student 1 opens all lockers. Student 2 closes every 2nd locker. Student 3 toggles every 3rd locker. Which lockers are open at the end?
+A snail is at the bottom of a 10-metre well. Each day it climbs 3 metres, each night it slips back 2 metres. How many days does it take to reach the top?
+If you flip a fair coin 3 times, what is the probability of getting exactly 2 heads?
+You have a 5-litre jug and a 3-litre jug. How do you measure exactly 4 litres of water?
+In a group of 23 people, what is the probability that at least two share a birthday?
+A store sells apples for $0.50 each and bananas for $0.30 each. You spend exactly $5.00 and buy 12 pieces of fruit. How many of each did you buy?
+If the area of a square is 144 cm², what is the length of its diagonal?
+A sequence starts: 2, 6, 12, 20, 30, 42... What is the 10th term?
+Two cyclists start from opposite ends of a 60 km road and ride toward each other at 15 km/h and 25 km/h respectively. How long until they meet?
+If you place one grain of rice on the first square of a chess board, two on the second, four on the third, and so on, how many grains are on the 64th square?
+A company has 50 employees. If 60% are women, and 40% of women are managers, how many women managers are there?
+A number is divisible by 3 if the sum of its digits is divisible by 3. Is 98,745 divisible by 3? Show your reasoning step by step.
+You have 12 balls that look identical, but one is slightly heavier or lighter. Using a balance scale only 3 times, how do you find the odd ball and whether it's heavier or lighter?
+A rectangle has a perimeter of 36 cm and an area of 80 cm². What are its dimensions?
+If log₂(x) = 5, what is x? If log₁₀(1000) = y, what is y?
+Three friends split a restaurant bill equally. Later they discover they were overcharged by $9. The waiter returns $9 but keeps $2 as a tip. How should they split the $7 refund?
+You have a 3×3 grid. How many different rectangles (including squares) can be formed using the grid lines?
+A clock shows 3:15. What is the exact angle between the hour and minute hands?
+If a pizza costs $12 and you eat 3/8 of it, then your friend eats 1/4 of what remains, how much pizza is left?
+A tank can be filled by pipe A in 4 hours and emptied by pipe B in 6 hours. If both are open, how long to fill the tank?
+You must cross a bridge that can hold at most 2 people; you have a torch. Four people take 1, 2, 7, and 10 minutes to cross. What's the minimum time for all four to cross?
+What is the sum of all integers from 1 to 100?
+A bag has 4 red, 3 blue, and 2 green balls. You draw 2 balls without replacement. What is the probability both are red?
+If f(x) = 2x + 3, what is the inverse function f⁻¹(x)?
+A car's value depreciates by 15% per year. If it costs $20,000 new, what is its value after 4 years?
+Two trains 300 km apart approach each other, one at 70 km/h and one at 80 km/h. A fly travels at 200 km/h between them until they meet. How far does the fly travel?
+Prove that the square root of 2 is irrational (outline the proof by contradiction).
+You are in a room with two doors. One leads to freedom, one to death. Two guards know which is which: one always lies, one always tells the truth. You can ask one guard one question. What do you ask?
+If a = b, prove why the statement "a² = ab, so a² - b² = ab - b², so (a-b)(a+b) = b(a-b), so a+b = b, so 2b = b, so 2 = 1" is wrong.
+A fair six-sided die is rolled 3 times. What is the probability that the sum is exactly 10?
+You have 5 different coloured balls to arrange in a row. How many distinct arrangements are there? How many if 2 specific balls must always be adjacent?
+A sphere has the same volume as a cube with a side of 6 cm. What is the sphere's radius? (Volume of sphere = 4/3 π r³)
+Explain why 0.999... (repeating) equals exactly 1. Give at least two different proofs.
+If the product of two numbers is 48 and their sum is 14, what are the numbers?
+A ladder 10 m long leans against a wall. The base is 6 m from the wall. How high does the ladder reach? If the base slides to 8 m from the wall, how far does the top slide down?
+A country has a simple tax system: 0% on the first $10,000, 20% on $10,001–$50,000, 40% on amounts above $50,000. What is the effective tax rate on an income of $80,000?
+What is the minimum number of moves to solve a 3-disk Tower of Hanoi puzzle? Derive the general formula for n disks.
+In a Monty Hall problem: you pick door 1, Monty opens door 3 (no prize), you switch to door 2. What is your probability of winning? Explain why.
+If you invest $1,000 at 5% annual interest compounded monthly, how much do you have after 10 years?
+A rectangle is inscribed in a circle of radius 5. What dimensions maximise the area of the rectangle?
+A sequence is defined as a₁ = 1, a₂ = 1, and aₙ = aₙ₋₁ + aₙ₋₂ for n > 2. What is the ratio aₙ₊₁/aₙ as n → ∞?
+You have a 4×4 grid of numbers 1–16. Can you arrange them so that every row, column, and diagonal sums to the same value?
+How many ways can you make change for $1 using quarters, dimes, nickels, and pennies?
+A fair coin is flipped until you get heads. You win $2ⁿ where n is the number of flips. What is the expected value? Why does this cause a paradox?
+Three boxes each contain 2 balls. Box A has 2 gold. Box B has 2 silver. Box C has 1 gold, 1 silver. You pick a box at random and draw a gold ball. What is the probability the other ball in your box is also gold?
+Given a sorted array of integers, write the most efficient algorithm to find if any two numbers sum to a target T. Analyse its time and space complexity.
+You must paint a fence with n posts. No two adjacent posts can have the same colour. You have k colours. How many valid colour combinations are there?
+If a function f has f(f(x)) = x for all x, what can you say about f?
+A 3-digit number equals 11 times the sum of its digits. What are the possible values?
+Explain big-O notation. What is the difference between O(n), O(n log n), and O(n²) in practical terms?
+Why is it impossible to sort a comparison-based algorithm faster than O(n log n) in the worst case?
+Explain P vs NP. Why does it matter if P = NP?
+A function runs in O(2ⁿ) time. For n=30 it takes 1 second. How long for n=40?
+Design an algorithm to find the median of two sorted arrays in O(log n) time. Explain the key insight.
+How would you detect if a linked list has a cycle? What is the time and space complexity of your approach?
+Explain why quicksort has O(n²) worst-case but O(n log n) average-case. When does the worst case occur?
+What is dynamic programming? Solve the coin change problem (minimum coins to make amount n) step by step.
+Explain the difference between greedy algorithms and dynamic programming. Give an example where greedy fails but DP works.
+Design a hash function. What properties make a good hash function? What is the birthday problem connection?
+How does consistent hashing work and why is it used in distributed systems?
+Why does rounding 0.1 + 0.2 not equal 0.3 in floating-point arithmetic? Explain at the bit level.
+A bug appears on line 50 of a 100-line program. You can test any line to see if the bug has already manifested. What is the optimal search strategy and its complexity?
+If you had to store 1 billion phone numbers with O(1) lookup and minimal memory, what data structure would you use and why?
+Explain the travelling salesman problem. Why is it NP-hard? What approximation strategies exist?

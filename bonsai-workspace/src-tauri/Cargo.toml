@@ -128,6 +128,7 @@ bonsai-native  = { path = "../../bonsai-native", optional = true }
 bonsai-hnsw    = { path = "../../crates/bonsai-hnsw" }
 bonsai-kdb     = { path = "../../crates/bonsai-kdb" }
 bonsai-package = { path = "../../crates/bonsai-package" }
+bonsai-fabric  = { path = "../../crates/bonsai-fabric" }
 
 [[bin]]
 name = "bonsai-music-worker"

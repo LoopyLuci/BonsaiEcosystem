@@ -19,7 +19,7 @@ describe('activity instrumentation', () => {
     const handler = (e: any) => received.push(e.detail);
     window.addEventListener('bonsai-activity', handler as EventListener);
 
-    pushActivity({ level: 'info', category: 'test', summary: 'hello', details: { foo: 1 } });
+    pushActivity({ level: 'info', category: 'ui' as any, summary: 'hello', details: { foo: 1 } });
 
     expect(received.length).toBeGreaterThanOrEqual(1);
     expect(received[0].summary).toBe('hello');

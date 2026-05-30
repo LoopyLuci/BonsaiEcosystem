@@ -18,7 +18,7 @@
   }
 
   const renderer = new Renderer();
-  renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
+  (renderer as any).code = ({ text, lang }: { text: string; lang?: string }) => {
     const encoded   = encodeURIComponent(text);
     const safeLang  = lang ? escapeHtml(lang) : '';
     const langClass = safeLang ? ` class="language-${safeLang}"` : '';
@@ -51,6 +51,11 @@
   }
 
   $: html = (!isUser && !isTool) ? renderMarkdown(message.content ?? '') : null;
+  $: goBoardSize = (message.game_state?.board_size ?? 19) as 9 | 13 | 19;
+  type ToolResultObj = { content_type: string; data?: number[] };
+  $: toolResultObj = (message.tool_result && typeof message.tool_result === 'object')
+    ? message.tool_result as ToolResultObj
+    : null;
 
   function handleBubbleClick(e: MouseEvent) {
     const btn = (e.target as HTMLElement).closest('.copy-btn') as HTMLButtonElement | null;
@@ -75,12 +80,12 @@
       <summary>{message.tool_name ?? 'tool'}</summary>
       <pre>{message.content}</pre>
       {#if message.tool_result}
-        {#if message.tool_result?.content_type === 'image/png'}
-          <img src="data:image/png;base64,{btoa(String.fromCharCode(...(message.tool_result.data ?? [])))}" alt="Generated" class="max-w-full rounded mt-1"/>
-        {:else if message.tool_result?.content_type === 'audio/wav'}
-          <button class="play-btn" on:click={() => { const a = new Audio(URL.createObjectURL(new Blob([new Uint8Array(message.tool_result.data ?? [])], {type:'audio/wav'}))); a.play(); }}>🔊 Play audio</button>
-        {:else if message.tool_result?.content_type === 'application/json'}
-          <pre class="result json">{JSON.stringify(JSON.parse(new TextDecoder().decode(new Uint8Array(message.tool_result.data ?? []))), null, 2)}</pre>
+        {#if toolResultObj?.content_type === 'image/png'}
+          <img src="data:image/png;base64,{btoa(String.fromCharCode(...(toolResultObj.data ?? [])))}" alt="Generated" class="max-w-full rounded mt-1"/>
+        {:else if toolResultObj?.content_type === 'audio/wav'}
+          <button class="play-btn" on:click={() => { const d = toolResultObj?.data ?? []; const a = new Audio(URL.createObjectURL(new Blob([new Uint8Array(d)], {type:'audio/wav'}))); a.play(); }}>🔊 Play audio</button>
+        {:else if toolResultObj?.content_type === 'application/json'}
+          <pre class="result json">{JSON.stringify(JSON.parse(new TextDecoder().decode(new Uint8Array(toolResultObj.data ?? []))), null, 2)}</pre>
         {:else if typeof message.tool_result === 'string' && message.tool_result.startsWith('data:audio/')}
           <div class="audio-result">
             <span class="audio-label">🎵 Generated audio</span>
@@ -107,7 +112,7 @@
           gameId={message.game_state.session_id}
           humanColor={message.game_state.orientation === 'black' ? 'black' : 'white'}
           playerName="Player"
-          boardSize={(message.game_state.board_size ?? 19) as 9 | 13 | 19}
+          boardSize={goBoardSize}
         />
       {/if}
     </div>
@@ -179,27 +184,33 @@
   /* Code block wrapper */
   .bubble.markdown :global(.code-block) {
     position: relative;
-    background: var(--bg, #1e1e1e);
-    border: 1px solid var(--border, #3e3e42);
-    border-radius: 6px;
-    margin: 0.5em 0;
+    background: var(--bg-primary, #13131f);
+    border: 1px solid var(--border, rgba(255,255,255,0.10));
+    border-radius: var(--radius-md, 8px);
+    margin: 0.6em 0;
     overflow: hidden;
   }
   .bubble.markdown :global(.copy-btn) {
     position: absolute;
-    top: 4px;
-    right: 6px;
-    font-size: 10px;
-    padding: 2px 6px;
-    background: var(--bg2, #252526);
-    color: var(--text-dim, #888);
-    border: 1px solid var(--border, #3e3e42);
-    border-radius: 4px;
+    top: 6px;
+    right: 8px;
+    font-size: 11px;
+    padding: 3px 9px;
+    background: var(--bg-tertiary, #252535);
+    color: var(--text-secondary, #a0a0b8);
+    border: 1px solid var(--border-strong, rgba(255,255,255,0.18));
+    border-radius: var(--radius-sm, 4px);
     cursor: pointer;
     z-index: 1;
+    transition: background 120ms, color 120ms, transform 80ms;
   }
-  .bubble.markdown :global(.copy-btn:hover) { color: var(--text, #ccc); }
-  .bubble.markdown :global(.code-block pre) { margin: 0; padding: 28px 10px 10px; overflow-x: auto; }
+  .bubble.markdown :global(.copy-btn:hover) {
+    background: var(--accent-dim, rgba(91,108,255,0.2));
+    color: var(--text-primary, #e8e8f0);
+    border-color: var(--accent, #5b6cff);
+  }
+  .bubble.markdown :global(.copy-btn:active) { transform: scale(0.95); }
+  .bubble.markdown :global(.code-block pre) { margin: 0; padding: 32px 12px 12px; overflow-x: auto; }
 
   .tool-card {
     font-size: 0.8rem;

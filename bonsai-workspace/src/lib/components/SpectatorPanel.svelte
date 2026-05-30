@@ -86,7 +86,7 @@
         <ChessBoard gameId={sessionId} humanColor="white" playerName="Spectator" />
       {:else}
         <GoBoard gameId={sessionId} humanColor="black" playerName="Spectator"
-          boardSize={(gameState.board_size ?? 19) as 9 | 13 | 19} />
+          boardSize={/** @type {9|13|19} */ (gameState.board_size ?? 19)} />
       {/if}
     </div>
 

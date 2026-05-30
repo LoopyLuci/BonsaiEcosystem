@@ -147,12 +147,37 @@ def main():
     parser.add_argument("--lr",      type=float, default=1e-4)
     parser.add_argument("--max-prompts", type=int, default=5000)
     parser.add_argument("--lora-rank",   type=int, default=16)
+    parser.add_argument("--device", default=None,
+        help="Force device: cpu | cuda | mps | directml. Default: auto-detect.")
     args = parser.parse_args()
 
     if not args.teacher_dir and not args.teacher_api:
         raise SystemExit("[distill] ERROR: Supply --teacher-dir or --teacher-api")
 
-    dev, dtype = get_device()
+    if args.device:
+        _forced = args.device.lower()
+        if _forced == "directml":
+            try:
+                import torch_directml
+                dev = torch_directml.device()
+                dtype = torch.float32
+                emit("device", using="directml_forced")
+            except ImportError:
+                emit("device", warning="torch-directml not installed, falling back to CPU")
+                dev, dtype = torch.device("cpu"), torch.float32
+        elif _forced == "cpu":
+            dev, dtype = torch.device("cpu"), torch.float32
+            emit("device", using="cpu_forced")
+        elif _forced == "cuda":
+            dev, dtype = torch.device("cuda"), torch.float16
+            emit("device", using="cuda_forced")
+        elif _forced == "mps":
+            dev, dtype = torch.device("mps"), torch.float32
+            emit("device", using="mps_forced")
+        else:
+            dev, dtype = get_device()
+    else:
+        dev, dtype = get_device()
     emit("distill", alpha=args.alpha, temperature=args.temperature,
          teacher="api" if args.teacher_api else "local")
 

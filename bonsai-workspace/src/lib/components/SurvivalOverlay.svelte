@@ -77,7 +77,7 @@
     recordingFix = true;
     try {
       await resilientInvoke('report_fix', {
-        error_pattern: description[..Math.min(description.length, 200)],
+        error_pattern: description.slice(0, 200),
         solution:      manualFix,
         created_by:    'user',
       });

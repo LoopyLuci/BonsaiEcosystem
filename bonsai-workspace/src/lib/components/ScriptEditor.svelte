@@ -47,7 +47,7 @@ local result = run({ test = true })
 bonsai.log(bonsai.json_encode(result))
 `;
 
-  onMount(async () => {
+  (onMount as (fn: () => Promise<() => void>) => void)(async () => {
     await loadScripts();
     await loadHistory();
     const unlisten = await listen('sylva-reload', async () => { await loadScripts(); });

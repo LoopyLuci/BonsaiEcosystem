@@ -74,6 +74,42 @@ mod tests {
         assert!(!fixed);
     }
 
+    // ── Seeded fixes: every SEEDED_FIXES pattern must be findable ────────────
+
+    #[test]
+    fn seeded_fixes_all_match() {
+        use crate::kb::SEEDED_FIXES;
+        let kb = make_kb();
+        kb.seed_defaults().unwrap();
+        let mut failures = vec![];
+        for (pattern, _) in SEEDED_FIXES {
+            let hits = kb.find_matching(pattern);
+            if hits.is_empty() {
+                failures.push(*pattern);
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "These seeded patterns did not match: {:?}",
+            failures
+        );
+    }
+
+    #[test]
+    fn seed_defaults_is_idempotent() {
+        let kb = make_kb();
+        kb.seed_defaults().unwrap();
+        kb.seed_defaults().unwrap(); // second call must not duplicate
+        use crate::kb::SEEDED_FIXES;
+        let total: i64 = kb.conn().query_row(
+            "SELECT COUNT(*) FROM fixes",
+            [],
+            |r| r.get(0),
+        ).unwrap();
+        assert_eq!(total as usize, SEEDED_FIXES.len(),
+            "Duplicate seeds detected");
+    }
+
     // ── Async repair with mock ────────────────────────────────────────────────
 
     #[tokio::test]

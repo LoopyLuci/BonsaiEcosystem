@@ -72,6 +72,11 @@
     }
   }
 
+  function watchGame(sessionId: string, gameType: string) {
+    spectatingId = sessionId;
+    spectatingType = (gameType === 'go' ? 'go' : 'chess') as 'chess' | 'go';
+  }
+
   function stateColor(s: string): string {
     switch (s) {
       case 'Running': return 'var(--green, #a6e3a1)';
@@ -162,7 +167,7 @@
                         {#if pairing.result}
                           <span class="pairing-result">{pairing.result}</span>
                         {:else}
-                          <button class="watch-btn" on:click={() => { spectatingId = pairing.session_id; spectatingType = t.game_type as 'chess' | 'go'; }}>
+                          <button class="watch-btn" on:click={() => watchGame(pairing.session_id, t.game_type)}>
                             Watch
                           </button>
                         {/if}

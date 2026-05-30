@@ -307,7 +307,7 @@
               try { return JSON.parse(editing.tags ?? '[]').join(', '); }
               catch { return editing.tags ?? ''; }
             })()}
-            on:input={(e) => { editing.tags = tagsFromInput((e.target as HTMLInputElement).value); }}
+            on:input={(e) => { editing.tags = tagsFromInput(e.currentTarget.value); }}
           />
         </div>
 

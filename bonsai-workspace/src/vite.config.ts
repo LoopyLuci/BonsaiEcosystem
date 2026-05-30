@@ -85,10 +85,4 @@ export default defineConfig({
   },
 
   envPrefix: ['VITE_', 'TAURI_'],
-
-  test: {
-    environment: 'node',
-    include: ['**/*.test.ts'],
-    globals: true,
-  },
 });
