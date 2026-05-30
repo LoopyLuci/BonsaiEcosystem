@@ -81,6 +81,7 @@ mod p2p {
 mod collab {
     pub mod crdt;
 }
+mod collaboration_commands;
 mod tool_registry;
 mod self_play;
 mod critic;
@@ -1373,6 +1374,9 @@ pub fn run() {
                 Err(e) => { tracing::warn!("KDB state failed to open: {e}"); }
             }
 
+            // ── Collaboration State ───────────────────────────────────────────
+            app.manage(collaboration_commands::CollaborationState::new());
+
             // ── Start Copilot Orchestrator (local REST control) ─────────────
             {
                 let ah = app_handle.clone();
@@ -2314,6 +2318,20 @@ pub fn run() {
             package_commands::package_export,
             package_commands::package_list_entries,
             package_commands::package_verify,
+            // ── Collaboration ─────────────────────────────────────────────────
+            collaboration_commands::create_collaboration_session,
+            collaboration_commands::join_collaboration_session,
+            collaboration_commands::leave_collaboration_session,
+            collaboration_commands::get_collaboration_session,
+            collaboration_commands::list_collaboration_sessions,
+            collaboration_commands::send_chat_message,
+            collaboration_commands::get_chat_history,
+            collaboration_commands::send_cursor_position,
+            collaboration_commands::update_participant_file,
+            collaboration_commands::start_voice_call,
+            collaboration_commands::end_voice_call,
+            collaboration_commands::send_webrtc_signal,
+            collaboration_commands::close_collaboration_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

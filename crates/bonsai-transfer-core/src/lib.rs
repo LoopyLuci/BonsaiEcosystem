@@ -13,6 +13,7 @@ pub mod scheduler;
 pub mod reassembly;
 pub mod transfer;
 pub mod error;
+pub mod streams;
 
 pub use lane::{TransportLane, LaneHealth, LaneKind};
 pub use gsn::GsnAllocator;

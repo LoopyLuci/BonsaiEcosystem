@@ -38,6 +38,7 @@ members = [
   "crates/bonsai-creator",
   "crates/eternal-workshop",
   "crates/bonsai-coordinator",
+  "crates/bonsai-error",
   "src-daemon", "crates/bonsai-hnsw", "crates/bonsai-kdb", "crates/bonsai-package",
   # bonsai-watchdog is intentionally excluded from the workspace members list.
   # It uses rusqlite 0.31 which links libsqlite3-sys 0.28, conflicting with
