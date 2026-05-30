@@ -6,6 +6,26 @@
 
  This README summarizes the product features, developer quick-starts, and where to find detailed docs in the repository.
 
+ ## Documentation
+
+ | Doc | Description |
+ |-----|-------------|
+ | [00 · Overview & Philosophy](docs/00-OVERVIEW.md) | Vision, principles, architecture, system requirements |
+ | [01 · Getting Started](docs/01-GETTING-STARTED.md) | Installation, first launch, quick tour |
+ | [02 · Core IDE Features](docs/02-CORE-IDE.md) | Editor, terminal, file tree, settings, feature flags |
+ | [03 · BonsAI Assistant](docs/03-BONSAI-ASSISTANT.md) | Chat, tool calls, Buddy window, Undercover Mode |
+ | [04 · Model Trainer](docs/04-MODEL-TRAINER.md) | Training pipeline, Brain Age, EternalTrainingLoop |
+ | [05 · Survival System](docs/05-SURVIVAL-SYSTEM.md) | Watchdog, self-healing, crash recovery |
+ | [06 · Knowledge Database](docs/06-KNOWLEDGE-DATABASE.md) | Knowledge modules, Model Builder, .bkp packages |
+ | [07 · Collaboration](docs/07-COLLABORATION.md) | TransferDaemon, shared editing, calls, permissions |
+ | [08 · Compute Fabric](docs/08-COMPUTE-FABRIC.md) | Distributed computing across personal devices |
+ | [09 · Mobile Apps](docs/09-MOBILE.md) | Bonsai Workspace Android, Bonsai Buddy Android |
+ | [10 · Sovereignty](docs/10-SOVEREIGNTY.md) | Replacing all external dependencies with custom crates |
+ | [11 · Security & Privacy](docs/11-SECURITY.md) | Encryption, sandboxing, threat model, audit logging |
+ | [12 · Developer Guide](docs/12-DEVELOPER.md) | Build, contribute, add features, architecture |
+ | [13 · Troubleshooting](docs/13-TROUBLESHOOTING.md) | Common issues and fixes |
+ | [14 · Glossary](docs/14-GLOSSARY.md) | Definitions for every Bonsai term |
+
  ## Demo
 
  **MLP walkthrough video:** [`docs/bonsai-mlp-demo.mp4`](docs/bonsai-mlp-demo.mp4) _(record with OBS following [`docs/VIDEO_TUTORIAL_SCRIPT.md`](docs/VIDEO_TUTORIAL_SCRIPT.md))_
