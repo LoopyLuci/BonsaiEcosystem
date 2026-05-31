@@ -18,6 +18,8 @@ use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+type EmitFn = Box<dyn Fn(&str, serde_json::Value) + Send + Sync>;
+
 // ── IDs ───────────────────────────────────────────────────────────────────────
 
 pub type ActorId = Uuid;
@@ -180,7 +182,7 @@ struct ActorSystemInner {
     /// Maps actor id → stopper fn (sends Stop envelope).
     stoppers: RwLock<HashMap<ActorId, Box<dyn Fn() + Send + Sync>>>,
     /// Optional Tauri emit function, wired in at startup.
-    emitter: Mutex<Option<Box<dyn Fn(&str, serde_json::Value) + Send + Sync>>>,
+    emitter: Mutex<Option<EmitFn>>,
     shutdown: tokio::sync::watch::Sender<bool>,
     shutdown_rx: tokio::sync::watch::Receiver<bool>,
 }

@@ -44,7 +44,7 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, ArrayError> {
         if c == ',' { out.push(Tok::Comma);    i += 1; continue; }
 
         // Numbers (including negative via leading ¯ or -)
-        let neg_prefix = (c == '¯' || (c == '-' && i + 1 < chars.len() && chars[i+1].is_ascii_digit()));
+        let neg_prefix = c == '¯' || (c == '-' && i + 1 < chars.len() && chars[i+1].is_ascii_digit());
         if c.is_ascii_digit() || neg_prefix {
             let start = i;
             if c == '¯' || c == '-' { i += 1; }

@@ -90,11 +90,11 @@ impl GoGameSession {
     }
 
     pub fn current_color(&self) -> GoColor {
-        if self.moves.len() % 2 == 0 { GoColor::Black } else { GoColor::White }
+        if self.moves.len().is_multiple_of(2) { GoColor::Black } else { GoColor::White }
     }
 
     pub fn current_player(&self) -> &GoPlayer {
-        if self.moves.len() % 2 == 0 { &self.black } else { &self.white }
+        if self.moves.len().is_multiple_of(2) { &self.black } else { &self.white }
     }
 
     /// Play a move. `gtp_coord` is a GTP string like "D4" or "pass".
@@ -116,7 +116,7 @@ impl GoGameSession {
             (None, vec![], "pass".to_string())
         } else {
             let p = Point::from_gtp(gtp_coord, self.size)
-                .ok_or_else(|| GoError::InvalidPosition(0, 0))?;
+                .ok_or(GoError::InvalidPosition(0, 0))?;
             let caps = self.board.place_stone(p, stone)?;
             (Some(p), caps, p.to_gtp(self.size))
         };

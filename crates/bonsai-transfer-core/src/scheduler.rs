@@ -3,14 +3,14 @@
 //! **Earliest Completion First with Reorder Guard** (ECF-RG):
 //!
 //! For each chunk, the scheduler:
-//!  1. Evaluates all available lanes and estimates completion time as:
-//!       ETA = rtt_ms/2 + (chunk_size / bandwidth_bps)
-//!  2. Selects the lane with the lowest ETA (Earliest Completion First).
-//!  3. Enforces a *Reorder Guard*: the selected lane must not push the
-//!     in-flight GSN gap beyond MAX_REORDER_GAP, preventing reassembly
-//!     deadlock at the receiver.
-//!  4. For critical chunks (is_critical=true), sends redundantly on a
-//!     second lane (QoS mirroring); the first arrival wins.
+//! 1. Evaluates all available lanes and estimates completion time as:
+//!    ETA = rtt_ms/2 + (chunk_size / bandwidth_bps)
+//! 2. Selects the lane with the lowest ETA (Earliest Completion First).
+//! 3. Enforces a *Reorder Guard*: the selected lane must not push the
+//!    in-flight GSN gap beyond MAX_REORDER_GAP, preventing reassembly
+//!    deadlock at the receiver.
+//! 4. For critical chunks (is_critical=true), sends redundantly on a
+//!    second lane (QoS mirroring); the first arrival wins.
 
 use std::collections::HashMap;
 use std::sync::Arc;

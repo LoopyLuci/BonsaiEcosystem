@@ -178,7 +178,7 @@ pub fn tokenize(src: &str) -> ParseResult<Vec<Token>> {
             ':' => { tokens.push(Token::Colon);    i += 1; }
             ';' => { tokens.push(Token::Semicolon); i += 1; }
             '.' => { tokens.push(Token::Dot);      i += 1; }
-            _ if c.is_ascii_digit() || (c == '-' && chars.get(i+1).map_or(false, |x| x.is_ascii_digit())) => {
+            _ if c.is_ascii_digit() || (c == '-' && chars.get(i+1).is_some_and(|x| x.is_ascii_digit())) => {
                 let start = i;
                 if c == '-' { i += 1; }
                 while i < chars.len() && (chars[i].is_ascii_digit()) { i += 1; }
@@ -712,9 +712,9 @@ impl Parser {
 
     fn parse_atom(&mut self) -> ParseResult<IrOp> {
         match self.peek().clone() {
-            Token::Int(n)  => { let n = n; self.advance(); Ok(IrOp::lit_i64(n)) }
-            Token::Float(f)=> { let f = f; self.advance(); Ok(IrOp::Lit(IrLit::F64(f))) }
-            Token::Bool(b) => { let b = b; self.advance(); Ok(IrOp::lit_bool(b)) }
+            Token::Int(n)  => { self.advance(); Ok(IrOp::lit_i64(n)) }
+            Token::Float(f)=> { self.advance(); Ok(IrOp::Lit(IrLit::F64(f))) }
+            Token::Bool(b) => { self.advance(); Ok(IrOp::lit_bool(b)) }
             Token::Str(s)  => { let s = s.clone(); self.advance(); Ok(IrOp::lit_str(s)) }
             Token::Unit    => { self.advance(); Ok(IrOp::unit()) }
             Token::Ident(name) => {

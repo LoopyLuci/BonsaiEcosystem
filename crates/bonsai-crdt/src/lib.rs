@@ -206,12 +206,18 @@ pub struct TwoPhaseSet<T> {
     _phantom: std::marker::PhantomData<T>,
 }
 
+impl<T> Default for TwoPhaseSet<T>
+where T: std::hash::Hash + Eq + Clone + std::fmt::Display
+{
+    fn default() -> Self {
+        Self { added: std::collections::HashSet::new(), removed: std::collections::HashSet::new(), _phantom: std::marker::PhantomData }
+    }
+}
+
 impl<T> TwoPhaseSet<T>
 where T: std::hash::Hash + Eq + Clone + std::fmt::Display
 {
-    pub fn new() -> Self {
-        Self { added: std::collections::HashSet::new(), removed: std::collections::HashSet::new(), _phantom: std::marker::PhantomData }
-    }
+    pub fn new() -> Self { Self::default() }
 
     pub fn add(&mut self, value: T) {
         if !self.removed.contains(&value.to_string()) {

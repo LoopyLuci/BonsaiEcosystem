@@ -42,8 +42,12 @@ pub struct RustCodegen {
     indent_size: usize,
 }
 
+impl Default for RustCodegen {
+    fn default() -> Self { Self { indent_size: 4 } }
+}
+
 impl RustCodegen {
-    pub fn new() -> Self { Self { indent_size: 4 } }
+    pub fn new() -> Self { Self::default() }
 
     fn indent(&self, level: usize) -> String {
         " ".repeat(level * self.indent_size)
@@ -118,14 +122,14 @@ impl RustCodegen {
 
             IrOp::Block(ops) => {
                 if ops.is_empty() { return Ok("()".into()); }
-                let mut out = format!("{{\n");
+                let mut out = "{\n".to_string();
                 for (i, op) in ops.iter().enumerate() {
                     let s = self.emit_op(op, depth + 1)?;
                     if i + 1 == ops.len() {
                         // Last expression — no semicolon (it's the block's value)
-                        write!(out, "{ind1}{s}\n").unwrap();
+                        writeln!(out, "{ind1}{s}").unwrap();
                     } else {
-                        write!(out, "{ind1}{s};\n").unwrap();
+                        writeln!(out, "{ind1}{s};").unwrap();
                     }
                 }
                 write!(out, "{ind}}}").unwrap();
@@ -270,7 +274,7 @@ impl RustCodegen {
                         }
                     };
                     let b = self.emit_op(body, depth + 1)?;
-                    write!(out, "{ind1}{pat_str} => {b},\n").unwrap();
+                    writeln!(out, "{ind1}{pat_str} => {b},").unwrap();
                 }
                 write!(out, "{ind}}}").unwrap();
                 out

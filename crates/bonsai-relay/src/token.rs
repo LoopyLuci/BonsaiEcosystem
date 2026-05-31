@@ -81,8 +81,8 @@ fn check_pow(token: &RelayToken, nonce: u64) -> bool {
     // Check POW_BITS leading zero bits across bytes
     let full_bytes = (POW_BITS / 8) as usize;
     let rem_bits = POW_BITS % 8;
-    for i in 0..full_bytes {
-        if h[i] != 0 { return false; }
+    for &byte in h.iter().take(full_bytes) {
+        if byte != 0 { return false; }
     }
     if rem_bits > 0 {
         let mask = 0xFF_u8 << (8 - rem_bits);

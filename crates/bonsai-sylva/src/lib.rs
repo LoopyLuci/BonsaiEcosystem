@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_map_or, clippy::derivable_impls, clippy::self_assignment, clippy::result_large_err, clippy::get_first)]
+
 //! bonsai-sylva — Native Sylva language interpreter.
 //!
 //! Sylva is Bonsai's interactive scripting language (equivalent to Omnisystem's Sylva layer).

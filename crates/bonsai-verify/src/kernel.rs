@@ -185,6 +185,7 @@ impl Context {
     }
 
     pub fn len(&self) -> usize { self.entries.len() }
+    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
 }
 
 // ── Type errors ───────────────────────────────────────────────────────────────
@@ -193,11 +194,11 @@ impl Context {
 pub enum KernelError {
     UnboundVariable(usize),
     UnknownConst(String),
-    NotAFunction(Term),
-    TypeMismatch { expected: Term, got: Term },
-    SortExpected(Term),
+    NotAFunction(Box<Term>),
+    TypeMismatch { expected: Box<Term>, got: Box<Term> },
+    SortExpected(Box<Term>),
     CannotProve(String),
-    ApplicationTypeMismatch { arg: Term, expected: Term, got: Term },
+    ApplicationTypeMismatch { arg: Box<Term>, expected: Box<Term>, got: Box<Term> },
 }
 
 impl fmt::Display for KernelError {
@@ -429,7 +430,7 @@ impl AxiomKernel {
                         let a_n = normalize(a, &self.env);
                         Ok(subst(&codomain, &a_n, 0))
                     }
-                    other => Err(KernelError::NotAFunction(other)),
+                    other => Err(KernelError::NotAFunction(Box::new(other))),
                 }
             }
 
@@ -471,7 +472,7 @@ impl AxiomKernel {
         let expected_n = normalize(expected, &self.env);
         let inferred_n = normalize(&inferred, &self.env);
         if !alpha_eq(&inferred_n, &expected_n) {
-            Err(KernelError::TypeMismatch { expected: expected_n, got: inferred_n })
+            Err(KernelError::TypeMismatch { expected: Box::new(expected_n), got: Box::new(inferred_n) })
         } else {
             Ok(())
         }
@@ -503,7 +504,7 @@ impl AxiomKernel {
         let ty_n = normalize(&ty, &self.env);
         match ty_n {
             Term::Sort(s) => Ok(s),
-            other => Err(KernelError::SortExpected(other)),
+            other => Err(KernelError::SortExpected(Box::new(other))),
         }
     }
 
@@ -512,7 +513,7 @@ impl AxiomKernel {
         let ty_n = normalize(&ty, &self.env);
         match ty_n {
             Term::Sort(s) => Ok(s),
-            other => Err(KernelError::SortExpected(other)),
+            other => Err(KernelError::SortExpected(Box::new(other))),
         }
     }
 }

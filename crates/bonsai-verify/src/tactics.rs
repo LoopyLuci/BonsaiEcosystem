@@ -120,7 +120,7 @@ impl ProofState {
         // The last proof term closes the root goal
         let term = self.proof_terms.last()
             .cloned()
-            .unwrap_or_else(|| Term::Sort(Sort::Prop));
+            .unwrap_or(Term::Sort(Sort::Prop));
         Ok(ProofWitness { proposition: self.proposition.clone(), term })
     }
 }
@@ -256,7 +256,7 @@ impl TacticEngine {
         let goal = state.pop_goal()?;
         // Find the variable in context by name
         let var_idx = (0..goal.ctx.len())
-            .find(|&i| goal.ctx.lookup(i).map_or(false, |(n, _)| n == var_name))
+            .find(|&i| goal.ctx.lookup(i).is_some_and(|(n, _)| n == var_name))
             .ok_or_else(|| TacticError::Failed(format!("induction: variable {var_name} not found")))?;
 
         let (_, var_ty) = goal.ctx.lookup(var_idx).unwrap();

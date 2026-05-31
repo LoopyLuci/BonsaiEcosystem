@@ -101,11 +101,11 @@ impl ChessGameSession {
 
     /// The player whose turn it is.
     pub fn current_player(&self) -> &Player {
-        if self.moves.len() % 2 == 0 { &self.white } else { &self.black }
+        if self.moves.len().is_multiple_of(2) { &self.white } else { &self.black }
     }
 
     pub fn current_color(&self) -> ChessColor {
-        if self.moves.len() % 2 == 0 { ChessColor::White } else { ChessColor::Black }
+        if self.moves.len().is_multiple_of(2) { ChessColor::White } else { ChessColor::Black }
     }
 
     /// Apply a move (UCI or SAN). Returns the move record.

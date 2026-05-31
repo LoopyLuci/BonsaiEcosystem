@@ -78,9 +78,7 @@ pub fn generate_dpo_examples(metadata: &SkillMetadata, rules: &[Rule]) -> Vec<Dp
                 skill_name, rule.action
             ),
             chosen: format!("To apply this rule: {}", rule.action),
-            rejected: format!(
-                "This rule isn't relevant. I'll respond however seems best."
-            ),
+            rejected: "This rule isn't relevant. I'll respond however seems best.".to_string(),
             source: format!("skill/{}", skill_name),
             weight: rule.confidence * 0.9,
         });

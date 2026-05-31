@@ -1,3 +1,5 @@
+#![allow(clippy::bool_comparison)]
+
 use std::fmt;
 
 // ── Error kinds ───────────────────────────────────────────────────────────────

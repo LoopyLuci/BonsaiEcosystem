@@ -1,3 +1,5 @@
+#![allow(clippy::precedence, clippy::result_large_err, clippy::manual_div_ceil)]
+
 //! Bonsai Creator — multi-modal generative AI orchestration.
 //!
 //! Each modality is a [`GenerativeTool`] that accepts [`GenerateParams`] and

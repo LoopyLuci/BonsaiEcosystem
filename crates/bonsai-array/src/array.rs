@@ -106,7 +106,7 @@ impl NdArray {
         let n = self.data.len();
         let rank = self.rank();
         let mut out = vec![0.0f64; n];
-        let old_strides = compute_strides(&self.shape);
+        let _old_strides = compute_strides(&self.shape);
         let new_strides = compute_strides(&new_shape);
         for flat in 0..n {
             let old_idx = flat_to_indices(flat, &self.shape);
@@ -142,7 +142,7 @@ impl NdArray {
         let axis_len = self.shape[0] as i64;
         let remaining = (axis_len - n.abs()).max(0) as i64;
         let from_end = n < 0;
-        let start_n = if from_end { remaining } else { n.abs() };
+        let _start_n = if from_end { remaining } else { n.abs() };
         self.take(if from_end { -remaining } else { remaining })
             .map(|_| ()) // discard to avoid unused variable warning
             .ok();

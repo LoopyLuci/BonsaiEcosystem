@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use serde::{de::DeserializeOwned, Serialize};
 
 /// Actors that implement this trait can be snapshotted and restored.
 /// The snapshot is a plain JSON value so it can be stored in any backing store.

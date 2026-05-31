@@ -78,11 +78,8 @@ impl RelayClient {
 
         // Read loop
         tokio::spawn(async move {
-            loop {
-                let len = match reader.read_u32().await {
-                    Ok(n) => n as usize,
-                    Err(_) => break,
-                };
+            while let Ok(n) = reader.read_u32().await {
+                let len = n as usize;
                 if len > MAX_FRAME { break; }
                 let mut buf = vec![0u8; len];
                 if reader.read_exact(&mut buf).await.is_err() { break; }

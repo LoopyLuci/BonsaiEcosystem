@@ -129,7 +129,7 @@ pub enum SelfPlayMsg {
     /// Play one game locally and store the record.
     PlayGame,
     /// Merge incoming state from a peer.
-    MergePeer(DistributedSelfPlayState),
+    MergePeer(Box<DistributedSelfPlayState>),
     /// Retrieve current state (request-reply).
     GetState(tokio::sync::oneshot::Sender<DistributedSelfPlayState>),
     /// Retrieve recent training examples.
@@ -262,12 +262,11 @@ impl PeerSyncManager {
             let our_state = match rx.await { Ok(s) => s, Err(_) => break };
 
             let peers = self.peers.read().await.clone();
+            // In a real deployment each peer_url receives a POST with our_state.
+            // HTTP sync is implemented at the app layer (axum handler) — log here for traceability.
             for peer_url in &peers {
-                // In a real deployment: POST our_state to peer, GET peer state
-                // Skipping actual HTTP here — implement via axum handler at the app layer
-                tracing::debug!(node=%self.node_id, peer=%peer_url, "sync tick (HTTP disabled in lib)");
-                let _ = &our_state; // reference used to suppress move-out before loop
-                break;
+                tracing::debug!(node=%self.node_id, peer=%peer_url, "sync tick — HTTP POST deferred to app layer");
+                drop(our_state.clone());
             }
         }
     }
@@ -308,7 +307,7 @@ impl DistributedSelfPlayEngine {
 
     /// Merge incoming peer state (called from REST POST handler).
     pub fn merge_peer(&self, state: DistributedSelfPlayState) {
-        let _ = self.worker.send(SelfPlayMsg::MergePeer(state));
+        let _ = self.worker.send(SelfPlayMsg::MergePeer(Box::new(state)));
     }
 
     /// Collect recent training examples from this node.

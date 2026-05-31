@@ -93,7 +93,7 @@ impl ReassemblyWindow {
             for gsn in self.next_expected..first_buffered {
                 if !self.nacked.contains(&gsn) {
                     // Only NACK if we've been waiting long enough
-                    if let Some(ref first_pending) = self.buffer.values().next() {
+                    if let Some(first_pending) = self.buffer.values().next() {
                         if now.duration_since(first_pending.arrived_at) >= timeout {
                             nacks.push(gsn);
                             self.nacked.insert(gsn);

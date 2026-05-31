@@ -2,7 +2,7 @@
 
 use polars::prelude::*;
 use serde_json::Value as JsonValue;
-use crate::error::{DfError, DfResult};
+use crate::error::DfResult;
 use crate::ops::{AggExpr, FilterExpr, Scalar, SortSpec};
 
 /// Eager DataFrame wrapper.

@@ -28,9 +28,9 @@ impl GoNet {
         let mut rng = StdRng::from_entropy();
 
         let mut w1 = vec![0.0f32; hidden * in_features];
-        let mut b1 = vec![0.0f32; hidden];
+        let b1 = vec![0.0f32; hidden];
         let mut w_policy = vec![0.0f32; policy_size * hidden];
-        let mut b_policy = vec![0.0f32; policy_size];
+        let b_policy = vec![0.0f32; policy_size];
         let mut w_value = vec![0.0f32; hidden];
 
         // He init for ReLU
@@ -53,15 +53,14 @@ impl GoNet {
         let mut activations = vec![vec![0.0f32; self.hidden]; batch];
 
         for (s, x) in inputs.iter().enumerate() {
-            let mut h = &mut activations[s];
-            for i in 0..self.hidden {
+            let h = &mut activations[s];
+            for (i, h_i) in h.iter_mut().enumerate() {
                 let mut sum = self.b1[i];
                 let base = i * self.in_features;
-                for j in 0..self.in_features {
-                    sum += self.w1[base + j] * x[j];
+                for (j, x_j) in x.iter().enumerate() {
+                    sum += self.w1[base + j] * x_j;
                 }
-                // ReLU
-                h[i] = if sum > 0.0 { sum } else { 0.0 };
+                *h_i = if sum > 0.0 { sum } else { 0.0 }; // ReLU
             }
         }
 
@@ -71,25 +70,25 @@ impl GoNet {
         for s in 0..batch {
             let h = &activations[s];
             // policy head
-            for k in 0..self.policy_size {
+            for (k, l) in logits[s].iter_mut().enumerate() {
                 let mut sum = self.b_policy[k];
                 let base = k * self.hidden;
-                for i in 0..self.hidden {
-                    sum += self.w_policy[base + i] * h[i];
+                for (i, h_i) in h.iter().enumerate() {
+                    sum += self.w_policy[base + i] * h_i;
                 }
-                logits[s][k] = sum;
+                *l = sum;
             }
             // value head
             let mut vsum = self.b_value;
-            for i in 0..self.hidden { vsum += self.w_value[i] * activations[s][i]; }
+            for (i, act_i) in activations[s].iter().enumerate() { vsum += self.w_value[i] * act_i; }
             values[s] = vsum;
         }
 
         (logits, values, activations)
     }
 
-    pub fn forward_single(&self, input: &Vec<f32>) -> (Vec<f32>, f32, Vec<f32>) {
-        let (l, v, act) = self.forward_batch(&[input.clone()]);
+    pub fn forward_single(&self, input: &[f32]) -> (Vec<f32>, f32, Vec<f32>) {
+        let (l, v, act) = self.forward_batch(std::slice::from_ref(&input.to_vec()));
         (l.into_iter().next().unwrap(), v.into_iter().next().unwrap(), act.into_iter().next().unwrap())
     }
 
@@ -97,7 +96,7 @@ impl GoNet {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
         let p = path.as_ref();
         if let Some(parent) = p.parent() { std::fs::create_dir_all(parent)?; }
-        let j = serde_json::to_vec(self).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let j = serde_json::to_vec(self).map_err(std::io::Error::other)?;
         std::fs::write(p, &j)
     }
 }

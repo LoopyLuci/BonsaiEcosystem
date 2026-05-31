@@ -108,12 +108,12 @@ impl ChessNetWeights {
     /// Hidden layer: linear + ReLU.  Only uses first INPUT_SIZE features.
     pub fn hidden(&self, input: &[f32]) -> Vec<f32> {
         let mut h = self.b1.clone();
-        for j in 0..HIDDEN_SIZE {
+        for (j, h_j) in h.iter_mut().enumerate() {
             let row_start = j * INPUT_SIZE;
             let sum: f32 = input[..INPUT_SIZE].iter().enumerate()
                 .map(|(i, &x)| x * self.w1[row_start + i])
                 .sum();
-            h[j] = (h[j] + sum).max(0.0); // ReLU
+            *h_j = (*h_j + sum).max(0.0); // ReLU
         }
         h
     }
@@ -123,9 +123,9 @@ impl ChessNetWeights {
         if n_moves == 0 { return vec![]; }
         let n = n_moves.min(POLICY_SIZE);
         let mut logits = vec![0.0f32; n];
-        for j in 0..n {
+        for (j, l) in logits.iter_mut().enumerate() {
             let row_start = j * HIDDEN_SIZE;
-            logits[j] = self.bp[j]
+            *l = self.bp[j]
                 + hidden.iter().enumerate()
                     .map(|(i, &h)| h * self.wp[row_start + i])
                     .sum::<f32>();
@@ -271,7 +271,7 @@ impl NetworkEvaluator {
     pub fn save(&self) -> std::io::Result<()> {
         match &self.weights {
             Some(w) => w.save(&self.weights_path),
-            None => Err(std::io::Error::new(std::io::ErrorKind::Other, "no weights loaded")),
+            None => Err(std::io::Error::other("no weights loaded")),
         }
     }
 }
@@ -396,8 +396,8 @@ pub fn train_epoch(
             }
 
             // Value head also contributes to d_hidden
-            for i in 0..HIDDEN_SIZE {
-                d_hidden[i] += d_value * weights.wv[i];
+            for (i, dh) in d_hidden.iter_mut().enumerate() {
+                *dh += d_value * weights.wv[i];
             }
 
             // ReLU gate

@@ -30,7 +30,7 @@ pub fn f32_to_f16(v: f32) -> u16 {
     let exp = ((bits >> 23) & 0xFF) as i32 - 127 + 15;
     let mantissa = (bits >> 13) & 0x3FF;
     if exp <= 0 {
-        (sign as u16) | 0
+        sign as u16
     } else if exp >= 31 {
         (sign as u16) | 0x7C00
     } else {

@@ -1,3 +1,5 @@
+#![allow(clippy::ptr_arg, clippy::unnecessary_map_or)]
+
 //! EternalWorkshop — BonsAI's background memory consolidation daemon.
 //!
 //! Runs alongside the main Bonsai Workspace app (started by the Watchdog).

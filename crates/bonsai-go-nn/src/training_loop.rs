@@ -54,7 +54,7 @@ impl GoTrainingLoop {
     pub async fn new(
         config: GoTrainingConfig,
         device: Device,
-        model_path: Option<PathBuf>,
+        _model_path: Option<PathBuf>,
         cas_store: Arc<CasStore>,
     ) -> Result<Self> {
         // Create a fresh model for now (placeholder)
@@ -107,7 +107,7 @@ impl GoTrainingLoop {
                 let mut policy = vec![0.0f32; (board.size as usize) * (board.size as usize)];
                 let mut sum = 0.0f32;
                 for (gtp, p) in ex.move_probs.iter() {
-                    if let Some(pt) = Point::from_gtp(&gtp, board.size) {
+                    if let Some(pt) = Point::from_gtp(gtp, board.size) {
                         let idx = pt.y as usize * board.size as usize + pt.x as usize;
                         policy[idx] = *p;
                         sum += *p;
@@ -161,7 +161,7 @@ impl GoTrainingLoop {
             for ex in batch {
                 inputs.push(ex.state.clone());
                 policy_targets.push(&ex.policy_target);
-                value_targets.push(ex.value_target as f32);
+                value_targets.push(ex.value_target);
             }
 
             // Forward
@@ -219,13 +219,13 @@ impl GoTrainingLoop {
 
                 // backprop into hidden: dL/da = W_policy^T * delta_policy + W_value * dvalue
                 let mut dadt = vec![0.0f32; self.model.hidden];
-                for i in 0..self.model.hidden {
+                for (i, dadt_i) in dadt.iter_mut().enumerate() {
                     let mut ssum = 0.0f32;
-                    for k in 0..self.model.policy_size {
-                        ssum += self.model.w_policy[k * self.model.hidden + i] * delta_policy[k];
+                    for (k, dp_k) in delta_policy.iter().enumerate() {
+                        ssum += self.model.w_policy[k * self.model.hidden + i] * dp_k;
                     }
                     ssum += self.model.w_value[i] * dvalue;
-                    dadt[i] = ssum;
+                    *dadt_i = ssum;
                 }
 
                 // apply ReLU derivative
@@ -340,7 +340,7 @@ impl AdamState {
         }
     }
 
-    pub fn step_adamw(&mut self, param: &mut Vec<f32>, grad: &Vec<f32>, lr: f32, weight_decay: f32) {
+    pub fn step_adamw(&mut self, param: &mut [f32], grad: &[f32], lr: f32, weight_decay: f32) {
         self.t += 1;
         let t = self.t;
         if param.len() == self.m_w_policy.len() {

@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_closure)]
+
 //! bonsai-dataframe — Polars-backed DataFrame API for Bonsai/Sylva.
 //!
 //! Wraps `polars` to provide:

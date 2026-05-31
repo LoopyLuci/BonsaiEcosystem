@@ -188,7 +188,7 @@ impl TrustGuard {
     pub fn audit_tail(&self, capability: Option<&str>, n: usize) -> Vec<EffectRow> {
         let log = self.log.lock().unwrap_or_else(|e| e.into_inner());
         let filtered: Vec<_> = log.iter()
-            .filter(|r| capability.map_or(true, |c| r.capability == c))
+            .filter(|r| capability.is_none_or(|c| r.capability == c))
             .cloned()
             .collect();
         let start = filtered.len().saturating_sub(n);

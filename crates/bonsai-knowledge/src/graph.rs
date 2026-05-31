@@ -1,11 +1,9 @@
 //! KnowledgeGraph — concurrent, queryable typed hypergraph.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use serde_json::Value;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::types::*;
 

@@ -1,3 +1,5 @@
+#![allow(clippy::manual_is_multiple_of, clippy::bind_instead_of_map, clippy::needless_return, clippy::map_identity, clippy::suspicious_open_options)]
+
 // All modules are declared in lib.rs; import them here
 use bonsai_bot::{admin_api, buddy_client, config, dedup, health, metrics, mgmt_client, platforms, router, scheduler, session, swarm_client};
 

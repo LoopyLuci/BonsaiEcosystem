@@ -1,10 +1,16 @@
+#![allow(clippy::assertions_on_constants)]
+
 use anyhow::Result;
 use std::path::Path;
 use std::sync::Once;
 use async_trait::async_trait;
 
+type JoinHandleOpt = tokio::task::JoinHandle<anyhow::Result<Option<i32>>>;
+type InProcessJoin = std::sync::Arc<std::sync::Mutex<Option<JoinHandleOpt>>>;
+
 static BB_VERSION_CHECK: Once = Once::new();
 
+#[derive(Default)]
 pub struct RuntimeManager {}
 
 #[async_trait]
@@ -123,7 +129,7 @@ impl RuntimeController for ProcessController {
 
 pub struct InProcessController {
     // Shared join handle (inside a Mutex) returning Option<i32> exit code
-    join: std::sync::Arc<std::sync::Mutex<Option<tokio::task::JoinHandle<anyhow::Result<Option<i32>>>>>>,
+    join: InProcessJoin,
     // We keep an interrupt handle optionally to support polite interruption (reserved)
     #[cfg(feature = "wasmtime-host")]
     #[allow(dead_code)]
@@ -164,7 +170,7 @@ impl RuntimeController for InProcessController {
 }
 
 impl RuntimeManager {
-    pub fn new() -> Self { Self {} }
+    pub fn new() -> Self { Self::default() }
 
     const DEFAULT_SKILL_MAX_CPU_SECONDS: u64 = 30;
     const DEFAULT_SKILL_MAX_MEMORY_MB: u64 = 512;
@@ -187,8 +193,8 @@ impl RuntimeManager {
             if let Some(pid) = child.id() {
                 match create_job_for_pid(
                     pid,
-                    Self::DEFAULT_SKILL_MAX_CPU_SECONDS as u64,
-                    Self::DEFAULT_SKILL_MAX_MEMORY_MB as u64,
+                    Self::DEFAULT_SKILL_MAX_CPU_SECONDS,
+                    Self::DEFAULT_SKILL_MAX_MEMORY_MB,
                 ) {
                     Ok(job) => Some(job),
                     Err(e) => {
@@ -221,7 +227,7 @@ impl RuntimeManager {
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
         let workspace_root = std::env::current_dir().unwrap_or_else(|_| script_root.clone());
-        let allowed_paths = build_allowed_paths_env(&workspace_root, &[script_root.clone()]);
+        let allowed_paths = build_allowed_paths_env(&workspace_root, std::slice::from_ref(&script_root));
 
         let mut cmd = tokio::process::Command::new("bb");
         cmd.current_dir(&script_root)
@@ -337,7 +343,7 @@ impl RuntimeManager {
             let mut cmd = tokio::process::Command::new("wasmtime");
             cmd.arg(module_path);
             let child = cmd.spawn()?;
-            return Ok(Box::new(ProcessController { child, #[cfg(windows)] _job: None }));
+            Ok(Box::new(ProcessController { child, #[cfg(windows)] _job: None }))
         }
     }
 }

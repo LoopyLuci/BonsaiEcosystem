@@ -455,9 +455,9 @@ impl Parser {
         let line = self.line();
         match self.peek().clone() {
             Token::Nil      => { self.advance(); Ok(Expr::new(ExprKind::Nil, line)) }
-            Token::Bool(b)  => { let b = b; self.advance(); Ok(Expr::new(ExprKind::Bool(b), line)) }
-            Token::Int(n)   => { let n = n; self.advance(); Ok(Expr::new(ExprKind::Int(n), line)) }
-            Token::Float(f) => { let f = f; self.advance(); Ok(Expr::new(ExprKind::Float(f), line)) }
+            Token::Bool(b)  => { self.advance(); Ok(Expr::new(ExprKind::Bool(b), line)) }
+            Token::Int(n)   => { self.advance(); Ok(Expr::new(ExprKind::Int(n), line)) }
+            Token::Float(f) => { self.advance(); Ok(Expr::new(ExprKind::Float(f), line)) }
             Token::Str(s)   => { let s = s.clone(); self.advance(); Ok(Expr::new(ExprKind::Str(s), line)) }
             Token::Ident(s) => {
                 let s = s.clone();
@@ -585,8 +585,8 @@ impl Parser {
         match self.peek().clone() {
             Token::Ident(s) if s == "_" => { self.advance(); Ok(Pattern::Wildcard) }
             Token::Nil => { self.advance(); Ok(Pattern::Nil) }
-            Token::Bool(b) => { let b = b; self.advance(); Ok(Pattern::Bool(b)) }
-            Token::Int(n)  => { let n = n; self.advance(); Ok(Pattern::Int(n)) }
+            Token::Bool(b) => { self.advance(); Ok(Pattern::Bool(b)) }
+            Token::Int(n)  => { self.advance(); Ok(Pattern::Int(n)) }
             Token::Str(s)  => { let s = s.clone(); self.advance(); Ok(Pattern::Str(s)) }
             Token::Ident(s) => {
                 let s = s.clone();

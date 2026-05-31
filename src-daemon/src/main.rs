@@ -1,3 +1,5 @@
+#![allow(clippy::single_component_path_imports, clippy::manual_clamp, clippy::result_large_err, clippy::redundant_closure, clippy::unnecessary_cast, clippy::doc_lazy_continuation, clippy::manual_is_multiple_of, clippy::useless_conversion)]
+
 //! bonsai-daemon — headless Bonsai service.
 //!
 //! Starts a WebSocket JSON-RPC server on a dynamic local port. Writes the

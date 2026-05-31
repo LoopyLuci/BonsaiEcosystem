@@ -98,19 +98,19 @@ impl GoNetWeights {
 
     pub fn hidden(&self, input: &[f32]) -> Vec<f32> {
         let mut h = self.b1.clone();
-        for j in 0..HIDDEN_SIZE {
+        for (j, h_j) in h.iter_mut().enumerate() {
             let row = j * INPUT_SIZE;
             let sum: f32 = input.iter().enumerate().map(|(i, &x)| x * self.w1[row + i]).sum();
-            h[j] = (h[j] + sum).max(0.0);
+            *h_j = (*h_j + sum).max(0.0);
         }
         h
     }
 
     pub fn policy(&self, hidden: &[f32]) -> Vec<f32> {
         let mut logits = self.bp.clone();
-        for j in 0..POLICY_SIZE {
+        for (j, l) in logits.iter_mut().enumerate() {
             let row = j * HIDDEN_SIZE;
-            logits[j] += hidden.iter().enumerate().map(|(i, &h)| h * self.wp[row + i]).sum::<f32>();
+            *l += hidden.iter().enumerate().map(|(i, &h)| h * self.wp[row + i]).sum::<f32>();
         }
         softmax(&mut logits);
         logits
@@ -238,7 +238,7 @@ impl NetworkGoEvaluator {
     pub fn save(&self) -> std::io::Result<()> {
         match &self.weights {
             Some(w) => w.save(&self.weights_path),
-            None => Err(std::io::Error::new(std::io::ErrorKind::Other, "no weights loaded")),
+            None => Err(std::io::Error::other("no weights loaded")),
         }
     }
 
@@ -307,7 +307,7 @@ pub fn mcts_to_train_examples(
         let board: GoBoard = serde_json::from_str(&ex.board_json)
             .unwrap_or_else(|_| GoBoard::new(board_size));
         // We don't know the color from the example directly — derive from move count
-        let color = if ex.selected_move.is_empty() { Stone::Black } else { Stone::Black };
+        let color = Stone::Black; // default; GameExample doesn't encode the color
         let input = board_to_canonical_input(&board, color);
 
         // Build policy target over POLICY_SIZE
@@ -389,7 +389,7 @@ pub fn train_epoch(
                 }
                 g_bp[j] += d_policy[j];
             }
-            for i in 0..HIDDEN_SIZE { d_hidden[i] += d_value * weights.wv[i]; }
+            for (i, dh) in d_hidden.iter_mut().enumerate() { *dh += d_value * weights.wv[i]; }
 
             // ReLU gate
             for i in 0..HIDDEN_SIZE { if h[i] <= 0.0 { d_hidden[i] = 0.0; } }

@@ -1,7 +1,7 @@
 //! Raw FFI bindings to the llama.cpp C API.
 //! Only the subset needed for BonsAI inference + LoRA is exposed here.
 
-use std::ffi::{c_char, c_float, c_int, c_uint, c_void};
+use std::ffi::{c_char, c_float, c_int, c_uint};
 
 // ── Opaque handle types ───────────────────────────────────────────────────────
 

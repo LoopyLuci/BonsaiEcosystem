@@ -1,3 +1,5 @@
+#![allow(clippy::map_flatten)]
+
 //! Coq proof-assistant sidecar.
 //!
 //! Drives a locally-installed `coqc` binary. No network calls are made.

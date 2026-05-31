@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop, clippy::manual_clamp, clippy::useless_format, clippy::needless_borrow, clippy::manual_unwrap_or)]
+
 /// bonsai-music-worker — persistent music synthesis sidecar.
 ///
 /// Protocol (stdin → stdout):

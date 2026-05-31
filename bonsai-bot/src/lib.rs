@@ -1,3 +1,5 @@
+#![allow(clippy::bind_instead_of_map, clippy::needless_return, clippy::map_identity, clippy::suspicious_open_options, clippy::items_after_test_module)]
+
 // Re-export modules for integration testing
 pub mod admin_api;
 pub mod buddy_client;

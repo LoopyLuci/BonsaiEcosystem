@@ -188,9 +188,12 @@ fn extract_title(html: &str) -> Option<String> {
 /// Handles headings, paragraphs, code blocks, links, and bold/italic.
 /// For trusted documentation this is good enough; we don't need a full parser.
 fn html_to_markdown(html: &str) -> String {
-    // Strip scripts and style blocks
-    let re_script = regex::Regex::new(r"(?si)<(script|style)[^>]*>.*?</\1>").unwrap();
-    let s = re_script.replace_all(html, "");
+    // Strip scripts and style blocks (regex crate doesn't support backreferences,
+    // so handle each tag separately).
+    let re_script = regex::Regex::new(r"(?si)<script[^>]*>.*?</script>").unwrap();
+    let re_style  = regex::Regex::new(r"(?si)<style[^>]*>.*?</style>").unwrap();
+    let stripped = re_script.replace_all(html, "");
+    let s = re_style.replace_all(&stripped, "").to_string();
 
     // Convert common tags
     let rules: &[(&str, &str)] = &[

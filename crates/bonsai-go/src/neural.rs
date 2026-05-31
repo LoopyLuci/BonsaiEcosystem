@@ -4,13 +4,9 @@ use crate::mcts::RandomGoEvaluator;
 
 /// Neural evaluator scaffold for Go. Replace the internals with a real
 /// model-backed evaluator (candle/tch/FI) when ready.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NeuralGoEvaluator {
     pub model_path: Option<String>,
-}
-
-impl Default for NeuralGoEvaluator {
-    fn default() -> Self { Self { model_path: None } }
 }
 
 impl NeuralGoEvaluator {
@@ -25,7 +21,7 @@ impl GoEvaluator for NeuralGoEvaluator {
         RandomGoEvaluator.evaluate_policy(board, color)
     }
 
-    fn evaluate_value(&self, board: &GoBoard, color: Stone) -> f32 {
+    fn evaluate_value(&self, _board: &GoBoard, _color: Stone) -> f32 {
         // TODO: Run model value head. Return neutral 0.5 until integrated.
         0.5
     }

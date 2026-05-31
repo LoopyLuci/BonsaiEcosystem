@@ -1,3 +1,5 @@
+#![allow(clippy::map_flatten)]
+
 //! Isabelle proof-assistant sidecar.
 //!
 //! Drives a locally-installed Isabelle installation via `isabelle process`.

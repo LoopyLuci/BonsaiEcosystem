@@ -59,7 +59,7 @@ impl LoadedModule {
             if zst_path.exists() {
                 let compressed = fs::read(&zst_path)?;
                 let decoded = zstd::decode_all(compressed.as_slice())
-                    .map_err(|e| KdbError::Io(e))?;
+                    .map_err(KdbError::Io)?;
                 String::from_utf8(decoded)
                     .map_err(|e| KdbError::Invalid(format!("values utf8: {e}")))?
             } else {

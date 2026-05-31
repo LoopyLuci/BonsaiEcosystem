@@ -12,8 +12,6 @@
 //! ECF-RG scheduler alongside TCP and relay lanes.
 
 use std::sync::Arc;
-use std::time::Duration;
-use async_trait::async_trait;
 use bonsai_transfer_core::{
     error::{TransferError, TransferResult},
     lane::{LaneHealth, LaneKind, TransportLane},

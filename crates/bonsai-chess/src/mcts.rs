@@ -306,8 +306,7 @@ fn run_simulation(
             child.total_value += v;
             1.0 - v
         } else {
-            let v = run_simulation(child, &child_pos, evaluator, config, depth + 1);
-            v
+            run_simulation(child, &child_pos, evaluator, config, depth + 1)
         }
     } else {
         0.5
@@ -387,7 +386,7 @@ pub fn self_play_game(
 
     // Fill game results
     let final_result = pos.result().unwrap_or(0.5);
-    let n = examples.len();
+    let _n = examples.len();
     for (i, ex) in examples.iter_mut().enumerate() {
         // Alternate perspective: even indices = white's perspective
         let perspective = if i % 2 == 0 { final_result } else { 1.0 - final_result };

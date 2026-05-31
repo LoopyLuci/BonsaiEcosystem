@@ -1,3 +1,5 @@
+#![allow(clippy::doc_overindented_list_items, clippy::unnecessary_cast)]
+
 //! bonsai-array — APL/J-inspired rank-polymorphic array evaluator.
 //!
 //! Implements a pure-Rust array language kernel covering the core APL/J

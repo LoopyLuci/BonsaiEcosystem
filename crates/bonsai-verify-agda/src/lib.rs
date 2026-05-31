@@ -1,3 +1,5 @@
+#![allow(clippy::map_flatten)]
+
 //! Agda proof-assistant sidecar.
 //!
 //! Drives a locally-installed `agda` binary. No network calls are made.

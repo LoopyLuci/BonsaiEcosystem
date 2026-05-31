@@ -8,7 +8,7 @@ use bonsai_cas::{CasKey, CasStore};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
-use tracing::{info, warn};
+use tracing::info;
 
 pub struct FineTuningActor {
     pub cas: Arc<CasStore>,

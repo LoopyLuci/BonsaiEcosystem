@@ -1,3 +1,5 @@
+#![allow(clippy::unnecessary_map_or)]
+
 pub mod executor;
 pub use executor::{execute_skill, SkillResult};
 

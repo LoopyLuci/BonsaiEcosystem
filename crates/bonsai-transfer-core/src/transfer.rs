@@ -122,7 +122,7 @@ impl Transfer {
 
         let id = self.id;
         let gsn = self.gsn.clone();
-        let chunk_size = chunk_size.min(MAX_CHUNK_SIZE).max(1);
+        let chunk_size = chunk_size.clamp(1, MAX_CHUNK_SIZE);
 
         tokio::spawn(async move {
             let chunks: Vec<&[u8]> = data.chunks(chunk_size).collect();
