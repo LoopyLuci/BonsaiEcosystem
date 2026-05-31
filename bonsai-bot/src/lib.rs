@@ -22,5 +22,6 @@ pub mod scheduler;
 pub mod session;
 pub mod swarm_client;
 
+pub mod issue_tracker;
 pub mod port_manager;
 pub mod rule_engine;

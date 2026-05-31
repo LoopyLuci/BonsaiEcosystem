@@ -825,6 +825,8 @@ pub struct EternalTrainingLoop {
     running: RwLock<bool>,
     /// CAS store for deduplicating training datasets and LoRA adapter weights.
     cas_store: Option<Arc<bonsai_cas::CasStore>>,
+    /// System event bus — emits TrainingComplete when an adapter is promoted.
+    event_bus: Option<crate::system_event_bus::SharedEventBus>,
     /// Maps cycle number → CAS key of the exported dataset snapshot.
     dataset_keys: RwLock<std::collections::VecDeque<(u64, String)>>,
     /// Knowledge graph shared with AppState — feeds reasoning self-play.
@@ -879,7 +881,22 @@ impl EternalTrainingLoop {
             dataset_keys: RwLock::new(std::collections::VecDeque::new()),
             knowledge,
             orchestrator,
+            event_bus: None,
         })
+    }
+
+    /// Attach a SystemEventBus so the loop can emit TrainingComplete events.
+    pub fn with_event_bus(
+        self: Arc<Self>,
+        bus: crate::system_event_bus::SharedEventBus,
+    ) -> Arc<Self> {
+        // SAFETY: only called once before spawn, no concurrent access yet.
+        #[allow(invalid_reference_casting)]
+        {
+            let ptr = Arc::as_ptr(&self) as *mut Self;
+            unsafe { (*ptr).event_bus = Some(bus); }
+        }
+        self
     }
 
     /// Start the eternal loop as a background task.
@@ -994,7 +1011,15 @@ impl EternalTrainingLoop {
                     crate::forgetting_prevention::ForgettingStatus::Safe => {
                         // 5. Evaluate and potentially promote (simplified — would call training script)
                         info!("[eternal] cycle {} — forgetting check passed", cycle);
-                        promotion_result = Some(format!("cycle_{cycle}_adapter"));
+                        let adapter_name = format!("cycle_{cycle}_adapter");
+                        if let Some(ref bus) = self.event_bus {
+                            bus.publish(crate::system_event_bus::SystemEvent::TrainingComplete {
+                                phase: format!("cycle_{cycle}"),
+                                adapter_path: adapter_name.clone(),
+                                metrics: std::collections::HashMap::new(),
+                            });
+                        }
+                        promotion_result = Some(adapter_name);
                     }
                 }
             }
