@@ -81,7 +81,7 @@
 
   {#if result?.image_b64}
     <div class="output">
-      <img src="data:image/png;base64,{result.image_b64}" alt="Generated image" />
+      <img src="data:image/png;base64,{result.image_b64}" alt="Generated output" />
       {#if result.path}
         <p class="path">Saved to: {result.path}</p>
       {/if}

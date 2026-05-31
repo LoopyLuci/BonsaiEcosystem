@@ -63,7 +63,7 @@
           height="22"
           rx="6"
         />
-        <text x={mid.x} y={mid.y + 4}>
+        <text x={mid.x} y={mid.y + 4} dominant-baseline="middle">
           {(conn.label ?? '').trim() || 'Double-click to label'}
         </text>
       </g>
@@ -120,7 +120,7 @@
     fill: rgba(226, 232, 240, 0.9);
     font-size: 11px;
     text-anchor: middle;
-    dominant-baseline: middle;
+    /* dominant-baseline applied inline on <text> elements (CSS linter doesn't recognize SVG props) */
     pointer-events: none;
   }
 

@@ -69,7 +69,8 @@
       filters: [{ name: 'Bonsai Package', extensions: ['bkp'] }],
     });
     if (!selected) return;
-    const path = typeof selected === 'string' ? selected : selected.path;
+    const path = typeof selected === 'string' ? selected : (selected as string[] | null)?.[0];
+    if (!path) return;
     try {
       loading = true;
       const summary = await invoke<any>('package_import', { path });

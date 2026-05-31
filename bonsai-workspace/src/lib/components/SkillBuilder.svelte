@@ -230,7 +230,7 @@
 
 <!-- ── Skill Editor Modal ─────────────────────────────────────────────── -->
 {#if showEditor}
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <!-- svelte-ignore a11y-no-static-element-interactions a11y-no-noninteractive-element-interactions -->
   <div
     class="modal-backdrop"
     on:click|self={closeEditor}

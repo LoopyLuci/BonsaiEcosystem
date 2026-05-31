@@ -39,7 +39,7 @@
       filters: [{ name: 'Bonsai Package', extensions: ['bkp'] }],
     });
     if (!selected) return;
-    path = typeof selected === 'string' ? selected : selected.path;
+    path = typeof selected === 'string' ? selected : ((selected as string[] | null)?.[0] ?? '');
     await inspect();
   }
 
@@ -84,7 +84,7 @@
   }
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
 <div class="overlay" on:click|self={close} role="dialog" aria-modal="true" aria-label="Import Bonsai Package">
   <div class="dialog">
     <button class="close-btn" on:click={close} aria-label="Close">✕</button>

@@ -2,7 +2,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { onMount, onDestroy } from 'svelte';
 
-  export let onClose: (() => void) | undefined = undefined;
+  export const onClose: (() => void) | undefined = undefined;
 
   // ── Tab state ────────────────────────────────────────────────────────────
   type Tab = 'overview' | 'data' | 'history' | 'curriculum' | 'federated' | 'settings';
@@ -721,22 +721,22 @@
           </div>
 
           <div>
-            <label class="text-sm text-gray-200">Minimum battery % before training stops</label>
-            <input type="range" min="5" max="50" step="5" bind:value={preferences.min_battery_pct}
+            <label for="pref-min-battery" class="text-sm text-gray-200">Minimum battery % before training stops</label>
+            <input id="pref-min-battery" type="range" min="5" max="50" step="5" bind:value={preferences.min_battery_pct}
               class="w-full mt-2 accent-violet-500"/>
             <div class="text-xs text-gray-400 mt-1">{preferences.min_battery_pct}%</div>
           </div>
 
           <div>
-            <label class="text-sm text-gray-200">GPU VRAM reserved for inference (MB)</label>
-            <input type="range" min="1024" max="16384" step="512" bind:value={preferences.gpu_vram_reserve_mb}
+            <label for="pref-gpu-vram" class="text-sm text-gray-200">GPU VRAM reserved for inference (MB)</label>
+            <input id="pref-gpu-vram" type="range" min="1024" max="16384" step="512" bind:value={preferences.gpu_vram_reserve_mb}
               class="w-full mt-2 accent-violet-500"/>
             <div class="text-xs text-gray-400 mt-1">{(preferences.gpu_vram_reserve_mb / 1024).toFixed(1)} GB</div>
           </div>
 
           <div>
-            <label class="text-sm text-gray-200">GPU idle seconds before training starts</label>
-            <input type="range" min="60" max="1800" step="60" bind:value={preferences.idle_seconds_needed}
+            <label for="pref-idle-secs" class="text-sm text-gray-200">GPU idle seconds before training starts</label>
+            <input id="pref-idle-secs" type="range" min="60" max="1800" step="60" bind:value={preferences.idle_seconds_needed}
               class="w-full mt-2 accent-violet-500"/>
             <div class="text-xs text-gray-400 mt-1">{preferences.idle_seconds_needed}s</div>
           </div>

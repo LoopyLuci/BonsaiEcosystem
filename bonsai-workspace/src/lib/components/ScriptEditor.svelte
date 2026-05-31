@@ -154,12 +154,13 @@ bonsai.log(bonsai.json_encode(result))
       <ul class="se-script-list">
         {#each scripts as script}
           <li class="se-script-item" class:selected={script.name === selectedName}
-            class:has-error={!!script.error}
-            role="button" tabindex="0"
-            on:click={() => selectScript(script.name)}
-            on:keydown={(e) => e.key === 'Enter' && selectScript(script.name)}>
-            <span class="se-script-name">{script.name}</span>
-            {#if script.error}<span class="se-error-dot" title={script.error}>⚠</span>{/if}
+            class:has-error={!!script.error}>
+            <button class="se-script-btn"
+              on:click={() => selectScript(script.name)}
+              on:keydown={(e) => e.key === 'Enter' && selectScript(script.name)}>
+              <span class="se-script-name">{script.name}</span>
+              {#if script.error}<span class="se-error-dot" title={script.error}>⚠</span>{/if}
+            </button>
           </li>
         {/each}
         {#if scripts.length === 0}
@@ -252,8 +253,12 @@ bonsai.log(bonsai.json_encode(result))
   .se-new-form { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #2a2d3a; }
   .se-script-list { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; flex: 1; }
   .se-script-item {
+    border-radius: 4px; margin: 1px 4px; transition: background .1s;
+  }
+  .se-script-btn {
     padding: 6px 10px; cursor: pointer; display: flex; align-items: center;
-    justify-content: space-between; border-radius: 4px; margin: 1px 4px; transition: background .1s;
+    justify-content: space-between; width: 100%; background: none; border: none;
+    color: inherit; text-align: left;
   }
   .se-script-item:hover { background: #1e2030; }
   .se-script-item.selected { background: #1e3a5f; color: #7ec8e3; }
