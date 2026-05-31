@@ -23,3 +23,4 @@ pub mod session;
 pub mod swarm_client;
 
 pub mod port_manager;
+pub mod rule_engine;

@@ -1310,8 +1310,10 @@ name = "bonsai-ci"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "bonsai-actors",
  "bonsai-capability-registry",
+ "log",
  "serde",
  "serde_json",
  "tokio",

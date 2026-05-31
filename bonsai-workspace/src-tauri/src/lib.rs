@@ -144,6 +144,8 @@ mod fabric_commands;
 mod extensions_commands;
 mod swarm_commands;
 mod terminal_launcher;
+pub mod system_event_bus;
+mod upgrade_dispatcher;
 mod gpu_controller;
 mod mcp_server;
 mod micro_bonsai;
@@ -414,6 +416,10 @@ pub struct AppState {
     pub training_jobs: Arc<crate::training_job::TrainingJobManager>,
     /// Resource guard — concurrency limiter + memory pressure gate.
     pub resource_guard: Arc<resource_guard::ResourceGuard>,
+    /// System event bus — typed broadcast channel connecting all subsystems.
+    pub event_bus: system_event_bus::SharedEventBus,
+    /// Upgrade dispatcher — zero-downtime hot-swap for binary, WASM, and UI components.
+    pub upgrade_dispatcher: Arc<upgrade_dispatcher::UpgradeDispatcher>,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1400,6 +1406,15 @@ pub fn run() {
                 web_router:          web_router,
                 training_jobs:       training_jobs,
                 resource_guard:      resource_guard::ResourceGuard::new(resource_guard::GuardConfig::default()),
+                event_bus:           {
+                    let bus = std::sync::Arc::new(system_event_bus::SystemEventBus::new(1024));
+                    bus
+                },
+                upgrade_dispatcher:  {
+                    // Placeholder — real UpgradeDispatcher wired after event_bus is in state
+                    let bus = std::sync::Arc::new(system_event_bus::SystemEventBus::new(16));
+                    std::sync::Arc::new(upgrade_dispatcher::UpgradeDispatcher::new(bus))
+                },
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
