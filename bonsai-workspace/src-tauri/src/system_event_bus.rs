@@ -60,6 +60,7 @@ pub enum SystemEvent {
     ExtensionUpdated { extension_id: String, old_version: String, new_version: String },
     ExtensionUninstalled { extension_id: String, reason: String },
     UserFeedback { context: String, rating: i8, comment: Option<String> },
+    FeatureRequest { description: String, requester: String },
 }
 
 impl SystemEvent {
@@ -104,6 +105,7 @@ impl SystemEvent {
             SystemEvent::ExtensionUpdated { .. } => "ExtensionUpdated",
             SystemEvent::ExtensionUninstalled { .. } => "ExtensionUninstalled",
             SystemEvent::UserFeedback { .. } => "UserFeedback",
+            SystemEvent::FeatureRequest { .. } => "FeatureRequest",
         }
     }
 }

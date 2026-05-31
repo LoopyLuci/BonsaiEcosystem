@@ -12,6 +12,7 @@ bonsai-coordinator       = { path = "../../crates/bonsai-coordinator" }
 bonsai-credits           = { path = "../../crates/bonsai-credits" }
 bonsai-marketplace       = { path = "../../crates/bonsai-marketplace" }
 bonsai-swarm             = { path = "../../crates/bonsai-swarm" }
+bonsai-universe          = { path = "../../crates/bonsai-universe" }
 bonsai-extensions        = { path = "../../crates/bonsai-extensions" }
 bonsai-skill-compiler    = { path = "../../crates/bonsai-skill-compiler" }
 bonsai-transfer-crypto   = { path = "../../crates/bonsai-transfer-crypto" }

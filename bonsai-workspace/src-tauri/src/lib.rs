@@ -146,6 +146,7 @@ mod swarm_commands;
 mod terminal_launcher;
 pub mod system_event_bus;
 mod upgrade_dispatcher;
+mod universe_commands;
 mod gpu_controller;
 mod mcp_server;
 mod micro_bonsai;
@@ -420,6 +421,8 @@ pub struct AppState {
     pub event_bus: system_event_bus::SharedEventBus,
     /// Upgrade dispatcher — zero-downtime hot-swap for binary, WASM, and UI components.
     pub upgrade_dispatcher: Arc<upgrade_dispatcher::UpgradeDispatcher>,
+    /// Universe — append-only time-travel event ledger + snapshot engine.
+    pub universe: Arc<bonsai_universe::Universe>,
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1415,10 +1418,40 @@ pub fn run() {
                     let bus = std::sync::Arc::new(system_event_bus::SystemEventBus::new(16));
                     std::sync::Arc::new(upgrade_dispatcher::UpgradeDispatcher::new(bus))
                 },
+                universe: {
+                    let data_dir = app_handle
+                        .path()
+                        .app_data_dir()
+                        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+                    let db_path = data_dir.join("universe.db");
+                    let device_id = gethostname::gethostname()
+                        .to_string_lossy()
+                        .to_string();
+                    // Block on async init — acceptable at startup
+                    tokio::runtime::Handle::current().block_on(async {
+                        bonsai_universe::Universe::open(&db_path, device_id)
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::error!("Universe init failed: {}", e);
+                                // Fallback to in-memory DB
+                                tokio::runtime::Handle::current().block_on(
+                                    bonsai_universe::Universe::open(
+                                        std::path::Path::new(":memory:"),
+                                        "fallback"
+                                    )
+                                ).expect("in-memory universe open failed")
+                            })
+                    })
+                },
             });
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
             app.manage(transfer_commands::TransferState::new());
+            // Universe time-travel ledger
+            {
+                let state = app.state::<AppState>();
+                app.manage(state.universe.clone());
+            }
 
             // Survival engine — self-repair with growing knowledge base
             let survival_db = app_handle
@@ -2464,6 +2497,13 @@ pub fn run() {
             extensions_commands::ext_get_detail,
             extensions_commands::ext_preview_scan,
             extensions_commands::ext_rate,
+            universe_commands::get_timeline,
+            universe_commands::get_snapshots,
+            universe_commands::create_snapshot,
+            universe_commands::get_universe_event,
+            universe_commands::universe_event_count,
+            universe_commands::revert_preview_event,
+            universe_commands::revert_preview_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

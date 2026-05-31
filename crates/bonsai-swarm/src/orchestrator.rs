@@ -388,6 +388,31 @@ impl SwarmRegistry {
     pub fn capability_registry(&self) -> &CapabilityRegistry {
         &self.registry
     }
+
+    /// Spawn a swarm from a `SwarmTemplate`, passing arbitrary JSON parameters
+    /// as the swarm goal description. Returns the new swarm's UUID.
+    pub async fn spawn_from_template(
+        &self,
+        template: &crate::templates::SwarmTemplate,
+        params: serde_json::Value,
+    ) -> Uuid {
+        let goal = format!(
+            "Template: {}. Params: {}",
+            template.name,
+            serde_json::to_string(&params).unwrap_or_default()
+        );
+        let spec = SwarmSpec {
+            name: format!("{}-{}", template.name, uuid::Uuid::new_v4()),
+            goal,
+            max_workers: template.max_agents as u32,
+            allowed_tools: template.members.iter()
+                .flat_map(|m| m.required_tools.clone())
+                .collect(),
+            timeout_secs: Some(template.timeout_secs),
+            workspace_path: None,
+        };
+        self.create_swarm(spec).await
+    }
 }
 
 impl Default for SwarmRegistry {

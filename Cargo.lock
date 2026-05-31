@@ -1878,6 +1878,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonsai-universe"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chrono",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-rusqlite",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "bonsai-verify"
 version = "0.1.0"
 dependencies = [
@@ -1984,6 +2000,7 @@ dependencies = [
  "bonsai-transfer-core",
  "bonsai-transfer-crypto",
  "bonsai-transfer-store",
+ "bonsai-universe",
  "bonsai-verify",
  "bytes",
  "candle-core",

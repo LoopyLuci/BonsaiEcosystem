@@ -72,21 +72,32 @@ struct RuleState {
     last_fired: HashMap<String, std::time::Instant>,
 }
 
+/// Callback invoked when a rule wants to spawn a swarm.
+/// Signature: (template_name, params_json) -> ()
+pub type SpawnSwarmFn = Arc<dyn Fn(String, serde_json::Value) + Send + Sync + 'static>;
+
 pub struct BotRuleEngine {
     rules: Arc<RwLock<Vec<BotRule>>>,
     state: Arc<RwLock<RuleState>>,
     event_tx: tokio::sync::broadcast::Sender<BotEvent>,
+    spawn_swarm: Option<SpawnSwarmFn>,
 }
 
 impl BotRuleEngine {
     pub fn new() -> Self {
         let (event_tx, _) = tokio::sync::broadcast::channel(256);
-        let engine = Self {
+        Self {
             rules: Arc::new(RwLock::new(Vec::new())),
             state: Arc::new(RwLock::new(RuleState::default())),
             event_tx,
-        };
-        engine
+            spawn_swarm: None,
+        }
+    }
+
+    /// Wire a real swarm spawner (called from the Tauri app that owns SwarmRegistry).
+    pub fn with_spawn_swarm(mut self, f: SpawnSwarmFn) -> Self {
+        self.spawn_swarm = Some(f);
+        self
     }
 
     pub async fn load_default_rules(&self) {
@@ -108,6 +119,7 @@ impl BotRuleEngine {
             let mut rx = engine.event_tx.subscribe();
             while let Ok(event) = rx.recv().await {
                 let rules = engine.rules.read().await.clone();
+                let spawn_fn = engine.spawn_swarm.clone();
                 for rule in &rules {
                     if !rule.enabled {
                         continue;
@@ -131,7 +143,7 @@ impl BotRuleEngine {
                         state.last_fired.insert(rule.name.clone(), std::time::Instant::now());
                     }
                     tracing::info!("BotRule '{}' firing", rule.name);
-                    Self::execute_action(&rule.action, &event).await;
+                    Self::execute_action(&rule.action, &event, spawn_fn.as_ref()).await;
                 }
             }
         });
@@ -168,11 +180,17 @@ impl BotRuleEngine {
         }
     }
 
-    async fn execute_action(action: &RuleAction, _event: &BotEvent) {
+    async fn execute_action(action: &RuleAction, _event: &BotEvent, spawn_fn: Option<&SpawnSwarmFn>) {
         match action {
             RuleAction::SpawnSwarm { template, params } => {
                 tracing::info!("Spawning swarm template='{}' params={:?}", template, params);
-                // Wired to SwarmOrchestrator in Phase 6
+                if let Some(f) = spawn_fn {
+                    let params_val: serde_json::Value = params.iter()
+                        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
+                        .collect::<serde_json::Map<_, _>>()
+                        .into();
+                    f(template.clone(), params_val);
+                }
             }
             RuleAction::RunCi { workspace_root } => {
                 tracing::info!("Triggering CI pipeline at {}", workspace_root);
