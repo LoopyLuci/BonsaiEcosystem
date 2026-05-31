@@ -23,6 +23,7 @@
   import SystemHealthPanel  from '$lib/components/SystemHealthPanel.svelte';
   import ModelBuilder        from '$lib/components/ModelBuilder.svelte';
   import PackageImportDialog from '$lib/components/PackageImportDialog.svelte';
+  import ExtensionsPanel     from '$lib/panels/ExtensionsPanel.svelte';
 
   import { showTerminal, toggleTerminal } from '$lib/stores/terminal';
   import { isBootstrapping, initModelStores } from '$lib/stores/models';
@@ -38,6 +39,7 @@
   let showSession   = false;
   let showAgentConnect = false;
   let showAgents       = false;
+  let showExtensions   = false;
   let showResources    = false;
   let showAgentVision  = false;
   let showCanvas       = false;
@@ -349,12 +351,16 @@
       </button>
       <button class="btn-icon" title="Toggle Terminal (Ctrl+`)"
         on:click={toggleTerminal}>Terminal</button>
+      <button class="btn-icon" title="Bonsai Terminal Interface (Ctrl+Alt+T)"
+        on:click={() => invoke('launch_bonsai_terminal', { panel: null, workspace: null })}>🖥 BTI</button>
       <button class="btn-icon" title="Toggle Chat"
         on:click={() => (showChat = !showChat)}>Chat</button>
       <button class="btn-icon" class:active={showCanvas} title="Spatial Code Canvas"
         on:click={() => (showCanvas = !showCanvas)}>Canvas</button>
       <button class="btn-icon" class:active={showAgents} title="Open Agents"
         on:click={() => (showAgents = true)}>⚡ Agents</button>
+      <button class="btn-icon" class:active={showExtensions} title="Extensions (🧩)"
+        on:click={() => (showExtensions = !showExtensions)}>🧩 Ext</button>
       <button class="btn-icon" class:active={showResources} title="Open Resources"
         on:click={() => (showResources = true)}>Resources</button>
       <button class="btn-icon" class:active={showPeers} title="P2P Peers"
@@ -482,6 +488,12 @@
   {#if showSession}<SessionPanel on:close={() => (showSession = false)} />{/if}
   {#if showAgentConnect}<AgentConnectPanel on:close={() => (showAgentConnect = false)} />{/if}
   {#if showAgents}<AgentsPanel on:close={() => (showAgents = false)} />{/if}
+  {#if showExtensions}
+    <div class="overlay-panel" role="dialog" aria-label="Extensions">
+      <ExtensionsPanel />
+      <button class="overlay-close" on:click={() => showExtensions = false} aria-label="Close">✕</button>
+    </div>
+  {/if}
   {#if showResources}<ResourcesPanel on:close={() => (showResources = false)} />{/if}
   {#if showAgentVision}
     {#if agentVisionPanelComponent}
@@ -537,6 +549,34 @@
 <GlobalErrorBoundary />
 
 <style>
+  /* ── Extensions overlay panel ── */
+  .overlay-panel {
+    position: fixed;
+    top: 40px;
+    right: 0;
+    bottom: 0;
+    width: 900px;
+    max-width: 90vw;
+    z-index: 600;
+    background: #1a1a2e;
+    border-left: 1px solid #2a2a4a;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -8px 0 40px rgba(0,0,0,0.5);
+  }
+  .overlay-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 16px;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .overlay-close:hover { color: #fff; }
+
   /* ── Model Builder floating panel ── */
   .floating-panel {
     position: fixed;

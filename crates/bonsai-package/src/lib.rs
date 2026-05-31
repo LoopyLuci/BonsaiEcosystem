@@ -1,10 +1,10 @@
-pub mod writer;
-pub mod reader;
 pub mod manifest;
+pub mod reader;
+pub mod writer;
 
-pub use writer::PackageWriter;
+pub use manifest::{AdapterInfo, BaseModelInfo, KnowledgeModuleRef, PackageManifest};
 pub use reader::PackageReader;
-pub use manifest::{PackageManifest, BaseModelInfo, AdapterInfo, KnowledgeModuleRef};
+pub use writer::PackageWriter;
 
 use thiserror::Error;
 

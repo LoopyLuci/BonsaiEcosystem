@@ -1,8 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
+use tokio::sync::RwLock;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -77,9 +77,9 @@ fn now_ms() -> u64 {
 
 fn generate_invitation_code() -> String {
     const WORDS: &[&str] = &[
-        "bonsai", "tree", "leaf", "root", "branch", "seed", "grow", "green",
-        "fox", "owl", "bear", "wolf", "hawk", "deer", "fish", "bird",
-        "star", "moon", "sun", "wind", "rain", "snow", "fire", "stone",
+        "bonsai", "tree", "leaf", "root", "branch", "seed", "grow", "green", "fox", "owl", "bear",
+        "wolf", "hawk", "deer", "fish", "bird", "star", "moon", "sun", "wind", "rain", "snow",
+        "fire", "stone",
     ];
     let a = WORDS[rand::random::<usize>() % WORDS.len()];
     let b = WORDS[rand::random::<usize>() % WORDS.len()];
@@ -120,12 +120,19 @@ pub async fn create_collaboration_session(
         created_at: now_ms(),
     };
 
-    state.active_sessions.write().await.insert(session_id.clone(), data);
+    state
+        .active_sessions
+        .write()
+        .await
+        .insert(session_id.clone(), data);
 
-    let _ = app_handle.emit("collab-session-created", serde_json::json!({
-        "session_id": &session_id,
-        "invitation_code": &invitation_code,
-    }));
+    let _ = app_handle.emit(
+        "collab-session-created",
+        serde_json::json!({
+            "session_id": &session_id,
+            "invitation_code": &invitation_code,
+        }),
+    );
 
     tracing::info!("Collaboration session created: {session_id} code={invitation_code}");
 
@@ -182,7 +189,10 @@ pub async fn leave_collaboration_session(
     let mut sessions = state.active_sessions.write().await;
     if let Some(session) = sessions.get_mut(&session_id) {
         session.participants.retain(|p| p.peer_id != peer_id);
-        let _ = app_handle.emit("collab-participant-left", serde_json::json!({ "peer_id": &peer_id }));
+        let _ = app_handle.emit(
+            "collab-participant-left",
+            serde_json::json!({ "peer_id": &peer_id }),
+        );
     }
     Ok(())
 }
@@ -206,12 +216,15 @@ pub async fn list_collaboration_sessions(
     state: State<'_, CollaborationState>,
 ) -> Result<Vec<CollaborationSession>, String> {
     let sessions = state.active_sessions.read().await;
-    Ok(sessions.values().map(|s| CollaborationSession {
-        session_id: s.session_id.clone(),
-        invitation_code: s.invitation_code.clone(),
-        participants: s.participants.clone(),
-        is_active: s.is_active,
-    }).collect())
+    Ok(sessions
+        .values()
+        .map(|s| CollaborationSession {
+            session_id: s.session_id.clone(),
+            invitation_code: s.invitation_code.clone(),
+            participants: s.participants.clone(),
+            is_active: s.is_active,
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -233,7 +246,10 @@ pub async fn send_chat_message(
         parent_id,
     };
 
-    state.chat_messages.write().await
+    state
+        .chat_messages
+        .write()
+        .await
         .entry(session_id.clone())
         .or_default()
         .push(msg.clone());
@@ -264,13 +280,16 @@ pub async fn send_cursor_position(
     line: u32,
     column: u32,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-cursor-update", serde_json::json!({
-        "session_id": session_id,
-        "peer_id": peer_id,
-        "file": file,
-        "line": line,
-        "column": column,
-    }));
+    let _ = app_handle.emit(
+        "collab-cursor-update",
+        serde_json::json!({
+            "session_id": session_id,
+            "peer_id": peer_id,
+            "file": file,
+            "line": line,
+            "column": column,
+        }),
+    );
     Ok(())
 }
 
@@ -284,14 +303,21 @@ pub async fn update_participant_file(
 ) -> Result<(), String> {
     let mut sessions = state.active_sessions.write().await;
     if let Some(session) = sessions.get_mut(&session_id) {
-        if let Some(p) = session.participants.iter_mut().find(|p| p.peer_id == peer_id) {
+        if let Some(p) = session
+            .participants
+            .iter_mut()
+            .find(|p| p.peer_id == peer_id)
+        {
             p.current_file = file.clone();
         }
     }
-    let _ = app_handle.emit("collab-participant-file", serde_json::json!({
-        "peer_id": peer_id,
-        "file": file,
-    }));
+    let _ = app_handle.emit(
+        "collab-participant-file",
+        serde_json::json!({
+            "peer_id": peer_id,
+            "file": file,
+        }),
+    );
     Ok(())
 }
 
@@ -301,10 +327,13 @@ pub async fn start_voice_call(
     session_id: String,
     initiator_id: String,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-call-started", serde_json::json!({
-        "session_id": session_id,
-        "initiator_id": initiator_id,
-    }));
+    let _ = app_handle.emit(
+        "collab-call-started",
+        serde_json::json!({
+            "session_id": session_id,
+            "initiator_id": initiator_id,
+        }),
+    );
     Ok(())
 }
 
@@ -313,9 +342,12 @@ pub async fn end_voice_call(
     app_handle: tauri::AppHandle,
     session_id: String,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-call-ended", serde_json::json!({
-        "session_id": session_id,
-    }));
+    let _ = app_handle.emit(
+        "collab-call-ended",
+        serde_json::json!({
+            "session_id": session_id,
+        }),
+    );
     Ok(())
 }
 
@@ -328,13 +360,16 @@ pub async fn send_webrtc_signal(
     signal_type: String,
     payload: String,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-webrtc-signal", serde_json::json!({
-        "session_id": session_id,
-        "from": from_peer_id,
-        "to": to_peer_id,
-        "type": signal_type,
-        "payload": payload,
-    }));
+    let _ = app_handle.emit(
+        "collab-webrtc-signal",
+        serde_json::json!({
+            "session_id": session_id,
+            "from": from_peer_id,
+            "to": to_peer_id,
+            "type": signal_type,
+            "payload": payload,
+        }),
+    );
     Ok(())
 }
 
@@ -348,7 +383,10 @@ pub async fn close_collaboration_session(
     if let Some(session) = sessions.get_mut(&session_id) {
         session.is_active = false;
     }
-    let _ = app_handle.emit("collab-session-closed", serde_json::json!({ "session_id": session_id }));
+    let _ = app_handle.emit(
+        "collab-session-closed",
+        serde_json::json!({ "session_id": session_id }),
+    );
     Ok(())
 }
 
@@ -369,10 +407,13 @@ pub async fn send_crdt_operation(
     session_id: String,
     operation: CrdtOperation,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-crdt-operation", serde_json::json!({
-        "session_id": session_id,
-        "operation": operation,
-    }));
+    let _ = app_handle.emit(
+        "collab-crdt-operation",
+        serde_json::json!({
+            "session_id": session_id,
+            "operation": operation,
+        }),
+    );
     Ok(())
 }
 
@@ -385,12 +426,15 @@ pub async fn add_chat_reaction(
     emoji: String,
     peer_id: String,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-reaction-added", serde_json::json!({
-        "session_id": session_id,
-        "message_id": message_id,
-        "emoji": emoji,
-        "peer_id": peer_id,
-    }));
+    let _ = app_handle.emit(
+        "collab-reaction-added",
+        serde_json::json!({
+            "session_id": session_id,
+            "message_id": message_id,
+            "emoji": emoji,
+            "peer_id": peer_id,
+        }),
+    );
     Ok(())
 }
 
@@ -401,11 +445,14 @@ pub async fn set_media_mute(
     track: String,
     muted: bool,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-media-mute", serde_json::json!({
-        "session_id": session_id,
-        "track": track,
-        "muted": muted,
-    }));
+    let _ = app_handle.emit(
+        "collab-media-mute",
+        serde_json::json!({
+            "session_id": session_id,
+            "track": track,
+            "muted": muted,
+        }),
+    );
     Ok(())
 }
 
@@ -414,9 +461,12 @@ pub async fn toggle_screen_share(
     app_handle: tauri::AppHandle,
     session_id: String,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-screen-share-toggled", serde_json::json!({
-        "session_id": session_id,
-    }));
+    let _ = app_handle.emit(
+        "collab-screen-share-toggled",
+        serde_json::json!({
+            "session_id": session_id,
+        }),
+    );
     Ok(())
 }
 
@@ -426,8 +476,11 @@ pub async fn execute_shared_command(
     session_id: String,
     command: String,
 ) -> Result<(), String> {
-    let _ = app_handle.emit("collab-terminal-output", serde_json::json!({
-        "text": format!("[Command received: {}]", command),
-    }));
+    let _ = app_handle.emit(
+        "collab-terminal-output",
+        serde_json::json!({
+            "text": format!("[Command received: {}]", command),
+        }),
+    );
     Ok(())
 }

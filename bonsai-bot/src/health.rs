@@ -7,23 +7,23 @@ use crate::config::CircuitBreakerConfig;
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreakerState {
-    Closed   = 0,
-    Open     = 1,
+    Closed = 0,
+    Open = 1,
     HalfOpen = 2,
 }
 
 pub struct CircuitBreaker {
-    state:        AtomicU8,
-    fail_count:   AtomicU32,
+    state: AtomicU8,
+    fail_count: AtomicU32,
     success_count: AtomicU32,
-    cfg:          CircuitBreakerConfig,
+    cfg: CircuitBreakerConfig,
 }
 
 impl CircuitBreaker {
     pub fn new(cfg: CircuitBreakerConfig) -> Arc<Self> {
         Arc::new(Self {
-            state:         AtomicU8::new(BreakerState::Closed as u8),
-            fail_count:    AtomicU32::new(0),
+            state: AtomicU8::new(BreakerState::Closed as u8),
+            fail_count: AtomicU32::new(0),
             success_count: AtomicU32::new(0),
             cfg,
         })
@@ -48,7 +48,8 @@ impl CircuitBreaker {
                 let n = self.success_count.fetch_add(1, Ordering::AcqRel) + 1;
                 if n >= self.cfg.close_on_successes {
                     self.success_count.store(0, Ordering::Release);
-                    self.state.store(BreakerState::Closed as u8, Ordering::Release);
+                    self.state
+                        .store(BreakerState::Closed as u8, Ordering::Release);
                     tracing::info!("[breaker] Closed after probe succeeded");
                 }
             }
@@ -63,13 +64,15 @@ impl CircuitBreaker {
             BreakerState::Closed => {
                 let n = self.fail_count.fetch_add(1, Ordering::AcqRel) + 1;
                 if n >= self.cfg.open_after_failures {
-                    self.state.store(BreakerState::Open as u8, Ordering::Release);
+                    self.state
+                        .store(BreakerState::Open as u8, Ordering::Release);
                     tracing::warn!("[breaker] Opened after {n} consecutive failures");
                     let me = self.clone();
                     let probe_secs = self.cfg.half_open_probe_secs;
                     tokio::spawn(async move {
                         sleep(Duration::from_secs(probe_secs)).await;
-                        me.state.store(BreakerState::HalfOpen as u8, Ordering::Release);
+                        me.state
+                            .store(BreakerState::HalfOpen as u8, Ordering::Release);
                         me.success_count.store(0, Ordering::Release);
                         tracing::info!("[breaker] HalfOpen — probing");
                     });
@@ -77,12 +80,14 @@ impl CircuitBreaker {
             }
             BreakerState::HalfOpen => {
                 // Probe failed — stay open, schedule another probe
-                self.state.store(BreakerState::Open as u8, Ordering::Release);
+                self.state
+                    .store(BreakerState::Open as u8, Ordering::Release);
                 let me = self.clone();
                 let probe_secs = self.cfg.half_open_probe_secs;
                 tokio::spawn(async move {
                     sleep(Duration::from_secs(probe_secs)).await;
-                    me.state.store(BreakerState::HalfOpen as u8, Ordering::Release);
+                    me.state
+                        .store(BreakerState::HalfOpen as u8, Ordering::Release);
                     tracing::info!("[breaker] HalfOpen — retrying probe");
                 });
             }

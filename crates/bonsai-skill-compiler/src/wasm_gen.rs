@@ -1,7 +1,7 @@
 use anyhow::Result;
 use wasm_encoder::{
-    CodeSection, EntityType, ExportKind, ExportSection, Function, FunctionSection,
-    ImportSection, Module, TypeSection, ValType,
+    CodeSection, EntityType, ExportKind, ExportSection, Function, FunctionSection, ImportSection,
+    Module, TypeSection, ValType,
 };
 
 use crate::{extractor::Rule, parser::SkillMetadata};

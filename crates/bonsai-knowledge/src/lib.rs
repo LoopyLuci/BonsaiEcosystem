@@ -1,7 +1,7 @@
 //! Bonsai Knowledge Graph — typed hypergraph with uncertainty and provenance.
 
-pub mod types;
 pub mod graph;
+pub mod types;
 
+pub use graph::{GraphStats, KnowledgeGraph};
 pub use types::*;
-pub use graph::{KnowledgeGraph, GraphStats};

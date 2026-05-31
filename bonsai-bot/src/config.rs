@@ -56,16 +56,24 @@ pub struct RuntimeLimits {
 impl Default for RuntimeLimits {
     fn default() -> Self {
         Self {
-            max_runtime_secs: Some(300),      // 5 minutes
-            max_instances_per_user: Some(5),  // 5 concurrent runtimes
+            max_runtime_secs: Some(300),     // 5 minutes
+            max_instances_per_user: Some(5), // 5 concurrent runtimes
         }
     }
 }
 
-fn default_schema_version() -> u8 { 1 }
-fn default_buddy_api_url() -> String { "http://127.0.0.1:11420".to_string() }
-fn default_workspace_api_url() -> String { "http://127.0.0.1:11369".to_string() }
-fn default_admin_port() -> u16 { 11666 }
+fn default_schema_version() -> u8 {
+    1
+}
+fn default_buddy_api_url() -> String {
+    "http://127.0.0.1:11420".to_string()
+}
+fn default_workspace_api_url() -> String {
+    "http://127.0.0.1:11369".to_string()
+}
+fn default_admin_port() -> u16 {
+    11666
+}
 fn default_preferred_model_tags() -> Vec<String> {
     vec!["chatbot".into(), "instruction".into(), "capable".into()]
 }
@@ -77,22 +85,22 @@ impl Default for BotConfig {
             .unwrap_or_else(|| "bonsai-bot.db".to_string());
         Self {
             schema_version: 1,
-            buddy_api_url:       "http://127.0.0.1:11420".to_string(),
-            workspace_api_url:    "http://127.0.0.1:11369".to_string(),
+            buddy_api_url: "http://127.0.0.1:11420".to_string(),
+            workspace_api_url: "http://127.0.0.1:11369".to_string(),
             workspace_pair_token: String::new(),
-            admin_port:           11666,
+            admin_port: 11666,
             preferred_model_tags: default_preferred_model_tags(),
             reclaim_allowed_ports: Vec::new(),
             allowed_script_paths: Vec::new(),
             runtime_limits: RuntimeLimits::default(),
             db_path,
-            discord:         PlatformSlot::default(),
-            telegram:        PlatformSlot::default(),
-            matrix:          PlatformSlot::default(),
-            email:           PlatformSlot::default(),
-            backpressure:    BackpressureConfig::default(),
+            discord: PlatformSlot::default(),
+            telegram: PlatformSlot::default(),
+            matrix: PlatformSlot::default(),
+            email: PlatformSlot::default(),
+            backpressure: BackpressureConfig::default(),
             circuit_breaker: CircuitBreakerConfig::default(),
-            swarm_peers:     Vec::new(),
+            swarm_peers: Vec::new(),
         }
     }
 }
@@ -102,71 +110,81 @@ impl Default for BotConfig {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct PlatformSlot<T: Default> {
     pub enabled: bool,
-    pub config:  T,
+    pub config: T,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct DiscordConfig {
-    pub allowed_guild_ids:   Vec<String>,
+    pub allowed_guild_ids: Vec<String>,
     pub allowed_channel_ids: Vec<String>,
-    pub allowed_user_ids:    Vec<String>,
+    pub allowed_user_ids: Vec<String>,
     #[serde(default = "default_command_prefix")]
     pub command_prefix: String,
 }
-fn default_command_prefix() -> String { "!".to_string() }
+fn default_command_prefix() -> String {
+    "!".to_string()
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct TelegramConfig {
-    pub allowed_chat_ids:   Vec<i64>,
+    pub allowed_chat_ids: Vec<i64>,
     #[serde(default = "default_poll_timeout")]
     pub poll_timeout_secs: u64,
 }
-fn default_poll_timeout() -> u64 { 30 }
+fn default_poll_timeout() -> u64 {
+    30
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct MatrixConfig {
     pub homeserver_url: String,
-    pub username:       String,
-    pub allowed_rooms:  Vec<String>,
-    pub allowed_users:  Vec<String>,
+    pub username: String,
+    pub allowed_rooms: Vec<String>,
+    pub allowed_users: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct EmailConfig {
-    pub imap_host:           String,
+    pub imap_host: String,
     #[serde(default = "default_imap_port")]
-    pub imap_port:           u16,
-    pub imap_username:       String,
+    pub imap_port: u16,
+    pub imap_username: String,
     #[serde(default = "default_subject_prefix")]
-    pub subject_prefix:      String,
-    pub smtp_host:           String,
-    pub smtp_username:       String,
-    pub smtp_from:           String,
-    pub allowed_from_addrs:  Vec<String>,
+    pub subject_prefix: String,
+    pub smtp_host: String,
+    pub smtp_username: String,
+    pub smtp_from: String,
+    pub allowed_from_addrs: Vec<String>,
     #[serde(default = "default_poll_interval")]
-    pub poll_interval_secs:  u64,
-    pub delete_processed:    bool,
+    pub poll_interval_secs: u64,
+    pub delete_processed: bool,
 }
-fn default_imap_port() -> u16 { 993 }
-fn default_subject_prefix() -> String { "[BONSAI]".to_string() }
-fn default_poll_interval() -> u64 { 30 }
+fn default_imap_port() -> u16 {
+    993
+}
+fn default_subject_prefix() -> String {
+    "[BONSAI]".to_string()
+}
+fn default_poll_interval() -> u64 {
+    30
+}
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BackpressureConfig {
-    pub inbound_queue_capacity:  usize,
-    pub worker_count:            usize,
-    pub global_semaphore:        usize,
+    pub inbound_queue_capacity: usize,
+    pub worker_count: usize,
+    pub global_semaphore: usize,
     pub per_platform_send_queue: usize,
 }
 
 impl Default for BackpressureConfig {
     fn default() -> Self {
         Self {
-            inbound_queue_capacity:  1024,
-            worker_count:            8,
-            global_semaphore:        64,
+            inbound_queue_capacity: 1024,
+            worker_count: 8,
+            global_semaphore: 64,
             per_platform_send_queue: 256,
         }
     }
@@ -174,17 +192,17 @@ impl Default for BackpressureConfig {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CircuitBreakerConfig {
-    pub open_after_failures:  u32,
+    pub open_after_failures: u32,
     pub half_open_probe_secs: u64,
-    pub close_on_successes:   u32,
+    pub close_on_successes: u32,
 }
 
 impl Default for CircuitBreakerConfig {
     fn default() -> Self {
         Self {
-            open_after_failures:  5,
+            open_after_failures: 5,
             half_open_probe_secs: 30,
-            close_on_successes:   1,
+            close_on_successes: 1,
         }
     }
 }
@@ -194,11 +212,11 @@ impl Default for CircuitBreakerConfig {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwarmPeer {
     /// Human name for this peer (used in logs and routing rules)
-    pub name:      String,
+    pub name: String,
     /// Full URL of the peer's admin API (e.g. "http://10.0.0.2:11666")
     pub admin_url: String,
     /// Admin token for the peer's API
-    pub token:     String,
+    pub token: String,
     /// Message routing rules: if the inbound text contains any of these
     /// keywords, prefer forwarding to this peer over handling locally.
     #[serde(default)]
@@ -258,7 +276,11 @@ fn read_workspace_config() -> Option<serde_json::Value> {
 /// needs a manual copy-paste.
 pub fn read_workspace_pair_token() -> Option<String> {
     let tok = read_workspace_config()?["pair_token"].as_str()?.to_string();
-    if tok.is_empty() { None } else { Some(tok) }
+    if tok.is_empty() {
+        None
+    } else {
+        Some(tok)
+    }
 }
 
 /// Read the workspace API port from bonsai-config.json (`api_port` field).
@@ -267,7 +289,9 @@ pub fn read_workspace_api_url() -> Option<String> {
     let cfg = read_workspace_config()?;
     let host = cfg["api_host"].as_str().unwrap_or("127.0.0.1");
     let port = cfg["api_port"].as_u64()?;
-    if port == 0 { return None; }
+    if port == 0 {
+        return None;
+    }
     Some(format!("http://{host}:{port}"))
 }
 
@@ -305,7 +329,9 @@ pub fn save_config(cfg: &BotConfig) {
         let _ = std::fs::create_dir_all(dir);
     }
     match serde_json::to_string_pretty(cfg) {
-        Ok(s) => { let _ = std::fs::write(&path, s); }
+        Ok(s) => {
+            let _ = std::fs::write(&path, s);
+        }
         Err(e) => tracing::error!("[config] Serialize error: {e}"),
     }
 }

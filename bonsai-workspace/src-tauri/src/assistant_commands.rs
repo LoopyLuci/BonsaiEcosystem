@@ -1,8 +1,8 @@
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use std::sync::atomic::Ordering;
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
+use crate::assistant_store::{AssistantMessage, AssistantProfile, AssistantSession, AvatarAsset};
 use crate::AppState;
-use crate::assistant_store::{AssistantProfile, AvatarAsset, AssistantSession, AssistantMessage};
 
 // ── Profile commands ──────────────────────────────────────────────────────────
 
@@ -47,9 +47,7 @@ pub async fn set_active_assistant_profile(
 // ── Avatar commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn list_avatar_assets(
-    state: State<'_, AppState>,
-) -> Result<Vec<AvatarAsset>, String> {
+pub async fn list_avatar_assets(state: State<'_, AppState>) -> Result<Vec<AvatarAsset>, String> {
     state.assistant_store.list_avatars().await
 }
 
@@ -62,10 +60,7 @@ pub async fn upsert_avatar_asset(
 }
 
 #[tauri::command]
-pub async fn delete_avatar_asset(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<(), String> {
+pub async fn delete_avatar_asset(state: State<'_, AppState>, id: String) -> Result<(), String> {
     state.assistant_store.delete_avatar(&id).await
 }
 
@@ -76,7 +71,10 @@ pub async fn list_assistant_sessions(
     state: State<'_, AppState>,
     profile_id: Option<String>,
 ) -> Result<Vec<AssistantSession>, String> {
-    state.assistant_store.list_sessions(profile_id.as_deref()).await
+    state
+        .assistant_store
+        .list_sessions(profile_id.as_deref())
+        .await
 }
 
 #[tauri::command]
@@ -185,21 +183,19 @@ pub async fn toggle_android_usb_lab_window(app: AppHandle) -> Result<(), String>
         let mut config = crate::config::load_config(&app)?;
         let window = match app.get_webview_window("android-usb-lab") {
             Some(w) => w,
-            None => {
-                WebviewWindowBuilder::new(
-                    &app,
-                    "android-usb-lab",
-                    WebviewUrl::App("android-usb-lab.html".into()),
-                )
-                .title("Android USB Lab")
-                .inner_size(880.0, 640.0)
-                .min_inner_size(520.0, 360.0)
-                .resizable(true)
-                .visible(false)
-                .decorations(true)
-                .build()
-                .map_err(|e| e.to_string())?
-            }
+            None => WebviewWindowBuilder::new(
+                &app,
+                "android-usb-lab",
+                WebviewUrl::App("android-usb-lab.html".into()),
+            )
+            .title("Android USB Lab")
+            .inner_size(880.0, 640.0)
+            .min_inner_size(520.0, 360.0)
+            .resizable(true)
+            .visible(false)
+            .decorations(true)
+            .build()
+            .map_err(|e| e.to_string())?,
         };
 
         if window.is_visible().unwrap_or(false) {
@@ -226,10 +222,16 @@ pub async fn set_smtp_credentials(
     password: String,
     from_addr: String,
 ) -> Result<(), String> {
-    use crate::secrets_store::{ACCOUNT_SMTP_HOST, ACCOUNT_SMTP_USERNAME, ACCOUNT_SMTP_PASSWORD, ACCOUNT_SMTP_FROM};
+    use crate::secrets_store::{
+        ACCOUNT_SMTP_FROM, ACCOUNT_SMTP_HOST, ACCOUNT_SMTP_PASSWORD, ACCOUNT_SMTP_USERNAME,
+    };
     state.secrets_store.store(ACCOUNT_SMTP_HOST, &host)?;
-    state.secrets_store.store(ACCOUNT_SMTP_USERNAME, &username)?;
-    state.secrets_store.store(ACCOUNT_SMTP_PASSWORD, &password)?;
+    state
+        .secrets_store
+        .store(ACCOUNT_SMTP_USERNAME, &username)?;
+    state
+        .secrets_store
+        .store(ACCOUNT_SMTP_PASSWORD, &password)?;
     state.secrets_store.store(ACCOUNT_SMTP_FROM, &from_addr)?;
     Ok(())
 }
@@ -242,7 +244,9 @@ pub async fn has_smtp_credentials(state: State<'_, AppState>) -> Result<bool, St
 
 #[tauri::command]
 pub async fn clear_smtp_credentials(state: State<'_, AppState>) -> Result<(), String> {
-    use crate::secrets_store::{ACCOUNT_SMTP_HOST, ACCOUNT_SMTP_USERNAME, ACCOUNT_SMTP_PASSWORD, ACCOUNT_SMTP_FROM};
+    use crate::secrets_store::{
+        ACCOUNT_SMTP_FROM, ACCOUNT_SMTP_HOST, ACCOUNT_SMTP_PASSWORD, ACCOUNT_SMTP_USERNAME,
+    };
     state.secrets_store.delete(ACCOUNT_SMTP_HOST)?;
     state.secrets_store.delete(ACCOUNT_SMTP_USERNAME)?;
     state.secrets_store.delete(ACCOUNT_SMTP_PASSWORD)?;
@@ -263,24 +267,45 @@ pub async fn submit_assistant_chat(
     if let Some(cmd) = crate::games::parse_slash_command(&user_message) {
         // Persist user message first
         let user_msg = AssistantMessage {
-            id: String::new(), session_id: session_id.clone(), role: "user".into(),
-            content: user_message.clone(), tool_name: None, tool_result: None,
-            tts_synthesized: false, created_at: 0, tool_call_id: None, game_state: None,
+            id: String::new(),
+            session_id: session_id.clone(),
+            role: "user".into(),
+            content: user_message.clone(),
+            tool_name: None,
+            tool_result: None,
+            tts_synthesized: false,
+            created_at: 0,
+            tool_call_id: None,
+            game_state: None,
         };
         state.assistant_store.append_message(user_msg).await?;
 
-        let profile = state.assistant_store.get_active_profile().await?
+        let profile = state
+            .assistant_store
+            .get_active_profile()
+            .await?
             .ok_or("No active assistant profile")?;
         let player_name = profile.name.clone();
 
         let (reply, game_state) = crate::games::execute_slash_command(
-            cmd, &state.game_sessions, &player_name, None, None,
-        ).await;
+            cmd,
+            &state.game_sessions,
+            &player_name,
+            None,
+            None,
+        )
+        .await;
 
         let asst_msg = AssistantMessage {
-            id: String::new(), session_id: session_id.clone(), role: "assistant".into(),
-            content: reply.clone(), tool_name: None, tool_result: None,
-            tts_synthesized: false, created_at: 0, tool_call_id: None,
+            id: String::new(),
+            session_id: session_id.clone(),
+            role: "assistant".into(),
+            content: reply.clone(),
+            tool_name: None,
+            tool_result: None,
+            tts_synthesized: false,
+            created_at: 0,
+            tool_call_id: None,
             game_state,
         };
         state.assistant_store.append_message(asst_msg).await?;
@@ -308,7 +333,10 @@ pub async fn submit_assistant_chat(
     };
     state.assistant_store.append_message(user_msg).await?;
 
-    let profile = state.assistant_store.get_active_profile().await?
+    let profile = state
+        .assistant_store
+        .get_active_profile()
+        .await?
         .ok_or("No active assistant profile")?;
 
     // Build history from persisted messages + new user turn
@@ -323,9 +351,8 @@ pub async fn submit_assistant_chat(
         (prior_all.as_slice(), false)
     };
 
-    let mut history: Vec<serde_json::Value> = vec![
-        serde_json::json!({ "role": "system", "content": profile.system_prompt }),
-    ];
+    let mut history: Vec<serde_json::Value> =
+        vec![serde_json::json!({ "role": "system", "content": profile.system_prompt })];
     if truncated {
         history.push(serde_json::json!({
             "role": "user",
@@ -343,7 +370,9 @@ pub async fn submit_assistant_chat(
             }
             "tool" => {
                 // Prefer stored tool_call_id; fall back to synthetic stable ID for old rows.
-                let call_id = m.tool_call_id.clone()
+                let call_id = m
+                    .tool_call_id
+                    .clone()
                     .filter(|s| !s.is_empty())
                     .unwrap_or_else(|| format!("call_{i}"));
                 history.push(serde_json::json!({
@@ -372,7 +401,8 @@ pub async fn submit_assistant_chat(
         cancel,
         None,
         &session_id,
-    ).await?;
+    )
+    .await?;
 
     // Persist final assistant reply
     let asst_msg = AssistantMessage {
@@ -408,15 +438,14 @@ pub async fn confirm_tool_action(
     token: String,
 ) -> Result<String, String> {
     let (tool, _args) = state.confirmation_gate.consume(&token)?;
-    state.audit_log.log_decision(&tool, "confirmed", "{}", None, None);
+    state
+        .audit_log
+        .log_decision(&tool, "confirmed", "{}", None, None);
     Ok(format!("Confirmed: {tool}"))
 }
 
 #[tauri::command]
-pub async fn cancel_tool_action(
-    state: State<'_, AppState>,
-    token: String,
-) -> Result<(), String> {
+pub async fn cancel_tool_action(state: State<'_, AppState>, token: String) -> Result<(), String> {
     state.confirmation_gate.cancel(&token);
     Ok(())
 }
@@ -439,19 +468,13 @@ pub async fn stop_tts(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn set_tts_voice(
-    state: State<'_, AppState>,
-    voice: String,
-) -> Result<(), String> {
+pub async fn set_tts_voice(state: State<'_, AppState>, voice: String) -> Result<(), String> {
     state.tts_manager.set_voice(&voice);
     Ok(())
 }
 
 #[tauri::command]
-pub async fn set_tts_speed(
-    state: State<'_, AppState>,
-    speed: f32,
-) -> Result<(), String> {
+pub async fn set_tts_speed(state: State<'_, AppState>, speed: f32) -> Result<(), String> {
     state.tts_manager.set_speed(speed);
     Ok(())
 }
@@ -464,7 +487,9 @@ pub async fn is_tts_available(state: State<'_, AppState>) -> Result<bool, String
 // ── Avatar validation ─────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn validate_avatar_svg(svg: String) -> Result<crate::avatar_validator::AvatarRigReport, String> {
+pub async fn validate_avatar_svg(
+    svg: String,
+) -> Result<crate::avatar_validator::AvatarRigReport, String> {
     let cleaned = crate::avatar_validator::sanitize_svg(&svg)?;
     crate::avatar_validator::validate_rig(&cleaned)
 }
@@ -489,8 +514,8 @@ pub async fn get_assistant_health(
         .as_secs() as i64;
     // Return a lightweight snapshot; the live health is emitted by the watchdog.
     Ok(crate::assistant_metrics::AssistantHealth {
-        sidecars:   vec![],
-        db_ok:      true,
+        sidecars: vec![],
+        db_ok: true,
         last_error: None,
         checked_at: ts,
     })
@@ -514,12 +539,12 @@ pub async fn get_assistant_audit_log(state: State<'_, AppState>) -> Result<Vec<S
 
 #[tauri::command]
 pub async fn export_assistant_backup(
-    app:              AppHandle,
-    state:            State<'_, AppState>,
+    app: AppHandle,
+    state: State<'_, AppState>,
     include_sessions: bool,
-    include_avatars:  bool,
-    encrypt:          bool,
-    passphrase:       Option<String>,
+    include_avatars: bool,
+    encrypt: bool,
+    passphrase: Option<String>,
 ) -> Result<String, String> {
     crate::assistant_backup::export_backup(
         &app,
@@ -528,17 +553,18 @@ pub async fn export_assistant_backup(
         include_avatars,
         encrypt,
         passphrase.as_deref(),
-    ).await
+    )
+    .await
 }
 
 #[tauri::command]
 pub async fn import_assistant_backup(
-    app:        AppHandle,
-    state:      State<'_, AppState>,
-    zip_path:   String,
-    mode:       crate::assistant_backup::ImportMode,
+    app: AppHandle,
+    state: State<'_, AppState>,
+    zip_path: String,
+    mode: crate::assistant_backup::ImportMode,
     passphrase: Option<String>,
-    dry_run:    bool,
+    dry_run: bool,
 ) -> Result<crate::assistant_backup::ImportSummary, String> {
     crate::assistant_backup::import_backup(
         &app,
@@ -547,7 +573,8 @@ pub async fn import_assistant_backup(
         mode,
         passphrase.as_deref(),
         dry_run,
-    ).await
+    )
+    .await
 }
 
 #[tauri::command]
@@ -559,7 +586,7 @@ pub async fn list_assistant_backups(
 
 #[tauri::command]
 pub async fn verify_backup_integrity(
-    zip_path:   String,
+    zip_path: String,
     passphrase: Option<String>,
 ) -> Result<bool, String> {
     crate::assistant_backup::verify_backup(&zip_path, passphrase.as_deref()).await
@@ -568,7 +595,7 @@ pub async fn verify_backup_integrity(
 #[tauri::command]
 pub async fn delete_assistant_backup_entry(
     state: State<'_, AppState>,
-    id:    String,
+    id: String,
 ) -> Result<(), String> {
     state.assistant_store.delete_backup_entry(&id).await
 }
@@ -578,23 +605,37 @@ pub async fn delete_assistant_backup_entry(
 #[tauri::command]
 pub async fn auto_title_session(
     app_handle: tauri::AppHandle,
-    state:      State<'_, AppState>,
+    state: State<'_, AppState>,
     session_id: String,
-    user_msg:   String,
-    reply_msg:  String,
+    user_msg: String,
+    reply_msg: String,
 ) -> Result<String, String> {
     use tauri::Emitter;
-    let profiles = state.assistant_store.list_profiles().await.unwrap_or_default();
-    let base_profile = profiles.into_iter().find(|p| p.is_active).unwrap_or_else(|| {
-        crate::assistant_store::AssistantProfile {
-            id: "auto-title".to_string(), name: "Bonsai Buddy".to_string(),
-            persona_id: None, avatar_id: None,
-            tts_voice: "en-us".to_string(), tts_speed: 1.0, tts_pitch: 1.0,
-            tts_enabled: false, wake_word: None, tool_permissions: "{}".to_string(),
-            system_prompt: String::new(), model_id: None, is_active: true,
-            created_at: 0, updated_at: 0,
-        }
-    });
+    let profiles = state
+        .assistant_store
+        .list_profiles()
+        .await
+        .unwrap_or_default();
+    let base_profile = profiles
+        .into_iter()
+        .find(|p| p.is_active)
+        .unwrap_or_else(|| crate::assistant_store::AssistantProfile {
+            id: "auto-title".to_string(),
+            name: "Bonsai Buddy".to_string(),
+            persona_id: None,
+            avatar_id: None,
+            tts_voice: "en-us".to_string(),
+            tts_speed: 1.0,
+            tts_pitch: 1.0,
+            tts_enabled: false,
+            wake_word: None,
+            tool_permissions: "{}".to_string(),
+            system_prompt: String::new(),
+            model_id: None,
+            is_active: true,
+            created_at: 0,
+            updated_at: 0,
+        });
 
     let title_profile = crate::assistant_store::AssistantProfile {
         system_prompt: "Summarize this exchange as a 4-6 word session title. Return ONLY the title, no punctuation, no quotes.".to_string(),
@@ -609,22 +650,43 @@ pub async fn auto_title_session(
 
     let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let turn = crate::assistant_manager::run_assistant_turn(
-        history, &title_profile,
-        &state.assistant_store, &state.policy_engine, &state.confirmation_gate,
-        &state.orchestrator, &state.secrets_store, &state.audit_log,
-        &app_handle, cancel, None, &format!("auto-title-{session_id}"),
-    ).await?;
+        history,
+        &title_profile,
+        &state.assistant_store,
+        &state.policy_engine,
+        &state.confirmation_gate,
+        &state.orchestrator,
+        &state.secrets_store,
+        &state.audit_log,
+        &app_handle,
+        cancel,
+        None,
+        &format!("auto-title-{session_id}"),
+    )
+    .await?;
 
-    let title = turn.reply.trim()
+    let title = turn
+        .reply
+        .trim()
         .trim_matches(|c: char| !c.is_alphanumeric() && c != ' ')
         .to_string();
-    let title = if title.is_empty() { "New conversation".to_string() } else { title };
+    let title = if title.is_empty() {
+        "New conversation".to_string()
+    } else {
+        title
+    };
 
-    state.assistant_store.set_session_title(&session_id, &title).await?;
-    let _ = app_handle.emit("assistant-session-titled", serde_json::json!({
-        "session_id": session_id,
-        "title": title,
-    }));
+    state
+        .assistant_store
+        .set_session_title(&session_id, &title)
+        .await?;
+    let _ = app_handle.emit(
+        "assistant-session-titled",
+        serde_json::json!({
+            "session_id": session_id,
+            "title": title,
+        }),
+    );
     Ok(title)
 }
 
@@ -655,10 +717,7 @@ pub async fn upsert_user_skill(
 }
 
 #[tauri::command]
-pub async fn delete_user_skill(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<(), String> {
+pub async fn delete_user_skill(state: State<'_, AppState>, id: String) -> Result<(), String> {
     state.user_skill_store.delete(&id).await?;
     crate::assistant_manager::reload_user_skills(&state.user_skill_store).await?;
     Ok(())
@@ -696,14 +755,19 @@ pub async fn list_mcp_servers(
     state: State<'_, AppState>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let configs = state.assistant_store.list_mcp_servers().await?;
-    Ok(configs.iter().map(|c| serde_json::json!({
-        "id":        c.id,
-        "name":      c.name,
-        "command":   c.command,
-        "args":      c.args,
-        "namespace": c.namespace,
-        "enabled":   c.enabled,
-    })).collect())
+    Ok(configs
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "id":        c.id,
+                "name":      c.name,
+                "command":   c.command,
+                "args":      c.args,
+                "namespace": c.namespace,
+                "enabled":   c.enabled,
+            })
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -713,23 +777,25 @@ pub async fn upsert_mcp_server(
 ) -> Result<(), String> {
     use crate::mcp_bridge::McpServerConfig;
     let cfg = McpServerConfig {
-        id:        config["id"].as_str().unwrap_or("").to_string(),
-        name:      config["name"].as_str().unwrap_or("").to_string(),
-        command:   config["command"].as_str().unwrap_or("").to_string(),
-        args:      config["args"].as_array()
-                       .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-                       .unwrap_or_default(),
+        id: config["id"].as_str().unwrap_or("").to_string(),
+        name: config["name"].as_str().unwrap_or("").to_string(),
+        command: config["command"].as_str().unwrap_or("").to_string(),
+        args: config["args"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
         namespace: config["namespace"].as_str().unwrap_or("").to_string(),
-        enabled:   config["enabled"].as_bool().unwrap_or(true),
+        enabled: config["enabled"].as_bool().unwrap_or(true),
     };
     state.assistant_store.upsert_mcp_server(&cfg).await
 }
 
 #[tauri::command]
-pub async fn delete_mcp_server(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<(), String> {
+pub async fn delete_mcp_server(state: State<'_, AppState>, id: String) -> Result<(), String> {
     state.assistant_store.delete_mcp_server(&id).await
 }
 
@@ -745,6 +811,9 @@ pub async fn reconnect_mcp_servers(
     state.mcp_manager.load_configs(configs).await;
     let registry = crate::assistant_manager::assistant_registry();
     let mut reg = registry.write().await;
-    let connected = state.mcp_manager.connect_all_into_registry(&mut *reg, &allowed_commands).await;
+    let connected = state
+        .mcp_manager
+        .connect_all_into_registry(&mut *reg, &allowed_commands)
+        .await;
     Ok(connected)
 }

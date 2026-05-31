@@ -15,17 +15,17 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Asset {
-    pub id:          String,
-    pub name:        String,
+    pub id: String,
+    pub name: String,
     pub description: String,
-    pub asset_type:  AssetType,
-    pub author:      String,
-    pub version:     String,
+    pub asset_type: AssetType,
+    pub author: String,
+    pub version: String,
     /// Content hash (SHA-256 hex) for integrity verification.
-    pub cid:         String,
+    pub cid: String,
     /// Installation instructions or model path.
     pub install_hint: String,
-    pub tags:        Vec<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +47,9 @@ pub struct MarketState {
 
 impl MarketState {
     pub fn new() -> Self {
-        Self { catalog: Mutex::new(load_catalog()) }
+        Self {
+            catalog: Mutex::new(load_catalog()),
+        }
     }
 }
 
@@ -59,8 +61,11 @@ fn catalog_path() -> PathBuf {
 
 fn load_catalog() -> Vec<Asset> {
     let path = catalog_path();
-    let Ok(content) = std::fs::read_to_string(&path) else { return vec![]; };
-    content.lines()
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return vec![];
+    };
+    content
+        .lines()
         .filter_map(|l| serde_json::from_str(l).ok())
         .collect()
 }
@@ -70,7 +75,8 @@ fn persist_catalog(catalog: &[Asset]) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let lines: String = catalog.iter()
+    let lines: String = catalog
+        .iter()
         .filter_map(|a| serde_json::to_string(a).ok())
         .collect::<Vec<_>>()
         .join("\n");
@@ -90,20 +96,20 @@ pub async fn publish_asset(
     tags: Vec<String>,
 ) -> Result<Asset, String> {
     let atype = match asset_type.as_str() {
-        "plugin"       => AssetType::Plugin,
-        "tool"         => AssetType::Tool,
+        "plugin" => AssetType::Plugin,
+        "tool" => AssetType::Tool,
         "lora_adapter" => AssetType::LoraAdapter,
-        "prompt"       => AssetType::Prompt,
-        _              => AssetType::Model,
+        "prompt" => AssetType::Prompt,
+        _ => AssetType::Model,
     };
     let asset = Asset {
-        id:           Uuid::new_v4().to_string(),
-        name:         name.clone(),
+        id: Uuid::new_v4().to_string(),
+        name: name.clone(),
         description,
-        asset_type:   atype,
+        asset_type: atype,
         author,
         version,
-        cid:          format!("{:x}", rand::random::<u64>()),
+        cid: format!("{:x}", rand::random::<u64>()),
         install_hint: format!("Place in ~/.bonsai/models/{name}/"),
         tags,
     };
@@ -121,11 +127,12 @@ pub async fn search_marketplace(
 ) -> Result<Vec<Asset>, String> {
     let catalog = state.catalog.lock().await;
     let q = query.to_lowercase();
-    let results: Vec<Asset> = catalog.iter()
+    let results: Vec<Asset> = catalog
+        .iter()
         .filter(|a| {
-            a.name.to_lowercase().contains(&q) ||
-            a.description.to_lowercase().contains(&q) ||
-            a.tags.iter().any(|t| t.to_lowercase().contains(&q))
+            a.name.to_lowercase().contains(&q)
+                || a.description.to_lowercase().contains(&q)
+                || a.tags.iter().any(|t| t.to_lowercase().contains(&q))
         })
         .cloned()
         .collect();
@@ -133,12 +140,11 @@ pub async fn search_marketplace(
 }
 
 #[tauri::command]
-pub async fn install_asset(
-    state: State<'_, MarketState>,
-    cid: String,
-) -> Result<String, String> {
+pub async fn install_asset(state: State<'_, MarketState>, cid: String) -> Result<String, String> {
     let catalog = state.catalog.lock().await;
-    let asset = catalog.iter().find(|a| a.cid == cid)
+    let asset = catalog
+        .iter()
+        .find(|a| a.cid == cid)
         .ok_or_else(|| format!("Asset {cid} not found in catalog"))?;
     info!(cid, "[marketplace] install requested");
     Ok(asset.install_hint.clone())
@@ -167,15 +173,15 @@ pub async fn publish_compiled_skill_to_marketplace(
     let wasm_b64 = base64::engine::general_purpose::STANDARD.encode(&wasm_bytes);
 
     let asset = Asset {
-        id:           Uuid::new_v4().to_string(),
-        name:         compiled.name.clone(),
-        description:  compiled.description.clone(),
-        asset_type:   AssetType::Skill,
-        author:       compiled.id.split('/').next().unwrap_or("local").to_string(),
-        version:      "1.0".into(),
-        cid:          compiled.wasm_hash.clone(),
-        install_hint: wasm_b64,  // base64 WASM for P2P transfer
-        tags:         compiled.tags.clone(),
+        id: Uuid::new_v4().to_string(),
+        name: compiled.name.clone(),
+        description: compiled.description.clone(),
+        asset_type: AssetType::Skill,
+        author: compiled.id.split('/').next().unwrap_or("local").to_string(),
+        version: "1.0".into(),
+        cid: compiled.wasm_hash.clone(),
+        install_hint: wasm_b64, // base64 WASM for P2P transfer
+        tags: compiled.tags.clone(),
     };
 
     let mut catalog = state.catalog.lock().await;
@@ -189,9 +195,7 @@ pub async fn publish_compiled_skill_to_marketplace(
 
 /// Discover skills published by local peers in the catalog.
 #[tauri::command]
-pub async fn discover_peer_skills(
-    state: State<'_, MarketState>,
-) -> Result<Vec<Asset>, String> {
+pub async fn discover_peer_skills(state: State<'_, MarketState>) -> Result<Vec<Asset>, String> {
     let catalog = state.catalog.lock().await;
     let skills: Vec<Asset> = catalog
         .iter()
@@ -275,7 +279,13 @@ pub async fn install_skill_from_marketplace(
 fn slugify(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())

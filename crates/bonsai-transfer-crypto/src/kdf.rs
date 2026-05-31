@@ -3,18 +3,18 @@
 //! The 12-word recovery phrase is the cryptographic root of a Bonsai identity.
 //! An optional password/PIN adds a second layer above the phrase.
 
-use argon2::{Argon2, Params, Algorithm, Version};
-use bip39::{Mnemonic, Language};
+use crate::error::{CryptoError, CryptoResult};
+use crate::identity::BonsaiIdentity;
+use argon2::{Algorithm, Argon2, Params, Version};
+use bip39::{Language, Mnemonic};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use crate::identity::BonsaiIdentity;
-use crate::error::{CryptoError, CryptoResult};
 
 // Argon2id parameters — balanced for desktop security vs. speed.
 // Production: memory=65536 KiB (64 MiB), t_cost=3, p_cost=4
 // For CI / tests: reduced (see ARGON2_PARAMS_TEST)
 const ARGON2_MEMORY_KIB: u32 = 65_536;
-const ARGON2_TIME_COST:   u32 = 3;
+const ARGON2_TIME_COST: u32 = 3;
 const ARGON2_PARALLELISM: u32 = 4;
 
 /// Test-speed parameters (1 MiB memory, 1 iteration).
@@ -57,7 +57,8 @@ pub fn kdf_phrase_to_seed(
     // Phrase bytes → password for Argon2id
     let phrase_bytes = mnemonic.to_entropy();
     let pwd_layer = password.unwrap_or("");
-    let full_password: Vec<u8> = phrase_bytes.iter()
+    let full_password: Vec<u8> = phrase_bytes
+        .iter()
         .chain(pwd_layer.as_bytes())
         .copied()
         .collect();
@@ -67,13 +68,19 @@ pub fn kdf_phrase_to_seed(
     let salt = &salt_hash.as_bytes()[..16];
 
     let params = test_params.unwrap_or_else(|| {
-        Params::new(ARGON2_MEMORY_KIB, ARGON2_TIME_COST, ARGON2_PARALLELISM, Some(32))
-            .expect("valid argon2 params")
+        Params::new(
+            ARGON2_MEMORY_KIB,
+            ARGON2_TIME_COST,
+            ARGON2_PARALLELISM,
+            Some(32),
+        )
+        .expect("valid argon2 params")
     });
 
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut output = [0u8; 32];
-    argon2.hash_password_into(&full_password, salt, &mut output)
+    argon2
+        .hash_password_into(&full_password, salt, &mut output)
         .map_err(|e| CryptoError::KdfError(e.to_string()))?;
 
     Ok(output)
@@ -90,8 +97,10 @@ mod tests {
         let phrase = generate_phrase().unwrap();
         let id1 = derive_identity_from_phrase(&phrase, None, Some(ARGON2_PARAMS_TEST)).unwrap();
         let id2 = derive_identity_from_phrase(&phrase, None, Some(ARGON2_PARAMS_TEST)).unwrap();
-        assert_eq!(id1.public_key.ed25519_pk, id2.public_key.ed25519_pk,
-            "same phrase must yield same identity");
+        assert_eq!(
+            id1.public_key.ed25519_pk, id2.public_key.ed25519_pk,
+            "same phrase must yield same identity"
+        );
     }
 
     #[test]
@@ -106,13 +115,21 @@ mod tests {
     #[test]
     fn password_changes_identity() {
         let phrase = generate_phrase().unwrap();
-        let id_no_pwd  = derive_identity_from_phrase(&phrase, None,        Some(ARGON2_PARAMS_TEST)).unwrap();
-        let id_with_pwd = derive_identity_from_phrase(&phrase, Some("pin"), Some(ARGON2_PARAMS_TEST)).unwrap();
-        assert_ne!(id_no_pwd.public_key.ed25519_pk, id_with_pwd.public_key.ed25519_pk);
+        let id_no_pwd =
+            derive_identity_from_phrase(&phrase, None, Some(ARGON2_PARAMS_TEST)).unwrap();
+        let id_with_pwd =
+            derive_identity_from_phrase(&phrase, Some("pin"), Some(ARGON2_PARAMS_TEST)).unwrap();
+        assert_ne!(
+            id_no_pwd.public_key.ed25519_pk,
+            id_with_pwd.public_key.ed25519_pk
+        );
     }
 
     #[test]
     fn invalid_phrase_rejected() {
-        assert!(derive_identity_from_phrase("not a valid phrase", None, Some(ARGON2_PARAMS_TEST)).is_err());
+        assert!(
+            derive_identity_from_phrase("not a valid phrase", None, Some(ARGON2_PARAMS_TEST))
+                .is_err()
+        );
     }
 }

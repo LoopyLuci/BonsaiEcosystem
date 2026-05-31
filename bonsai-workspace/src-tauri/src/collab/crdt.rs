@@ -1,6 +1,6 @@
-use automerge::{AutoCommit, sync, Change};
 use automerge::transaction::Transactable;
-use serde::{Serialize, Deserialize};
+use automerge::{sync, AutoCommit, Change};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -13,7 +13,10 @@ impl CollaborativeDoc {
     pub fn new() -> Self {
         let mut doc = AutoCommit::new();
         let _ = doc.put_object(automerge::ROOT, "content", automerge::ObjType::Text);
-        Self { doc: Arc::new(Mutex::new(doc)), sync_state: Arc::new(Mutex::new(sync::State::new())) }
+        Self {
+            doc: Arc::new(Mutex::new(doc)),
+            sync_state: Arc::new(Mutex::new(sync::State::new())),
+        }
     }
 
     pub async fn apply_change(&self, change: Change) -> Result<(), String> {

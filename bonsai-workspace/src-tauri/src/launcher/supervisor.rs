@@ -42,7 +42,10 @@ impl LaunchSupervisor {
         for s in &specs {
             states.insert(s.name.clone(), ComponentState::Pending);
         }
-        Self { specs, states: Arc::new(RwLock::new(states)) }
+        Self {
+            specs,
+            states: Arc::new(RwLock::new(states)),
+        }
     }
 
     pub async fn status(&self) -> LaunchStatus {
@@ -51,21 +54,31 @@ impl LaunchSupervisor {
             .specs
             .iter()
             .map(|s| {
-                let state = states.get(&s.name).cloned().unwrap_or(ComponentState::Pending);
+                let state = states
+                    .get(&s.name)
+                    .cloned()
+                    .unwrap_or(ComponentState::Pending);
                 let message = match &state {
-                    ComponentState::Pending  => "waiting for dependencies".into(),
+                    ComponentState::Pending => "waiting for dependencies".into(),
                     ComponentState::Starting => format!("probing port {}", s.health_port),
-                    ComponentState::Ready    => "ready".into(),
+                    ComponentState::Ready => "ready".into(),
                     ComponentState::Failed(e) => e.clone(),
-                    ComponentState::Skipped  => "skipped (optional)".into(),
+                    ComponentState::Skipped => "skipped (optional)".into(),
                 };
-                ComponentProgress { name: s.name.clone(), state, message }
+                ComponentProgress {
+                    name: s.name.clone(),
+                    state,
+                    message,
+                }
             })
             .collect();
-        let all_ready = components.iter().all(|c| {
-            matches!(c.state, ComponentState::Ready | ComponentState::Skipped)
-        });
-        LaunchStatus { all_ready, components }
+        let all_ready = components
+            .iter()
+            .all(|c| matches!(c.state, ComponentState::Ready | ComponentState::Skipped));
+        LaunchStatus {
+            all_ready,
+            components,
+        }
     }
 
     /// Run the full probe sequence. Returns Ok when all required components are ready.
@@ -96,7 +109,8 @@ impl LaunchSupervisor {
                 }
                 Err(e) => {
                     if spec.required {
-                        self.set_state(&spec.name, ComponentState::Failed(e.clone())).await;
+                        self.set_state(&spec.name, ComponentState::Failed(e.clone()))
+                            .await;
                         self.emit_progress(&app_handle).await;
                         return Err(format!("Required component '{}' failed: {}", spec.name, e));
                     } else {
@@ -142,10 +156,14 @@ impl LaunchSupervisor {
                     Some(ComponentState::Failed(e)) => {
                         return Err(format!("Dependency '{dep}' failed: {e}"));
                     }
-                    _ => { all_ok = false; }
+                    _ => {
+                        all_ok = false;
+                    }
                 }
             }
-            if all_ok { return Ok(()); }
+            if all_ok {
+                return Ok(());
+            }
             drop(states);
             sleep(Duration::from_millis(200)).await;
         }
@@ -166,11 +184,7 @@ impl LaunchSupervisor {
     /// When a previously-Ready component fails its health probe, emits
     /// `bonsai:service-lost` and marks it Failed so the frontend can show
     /// a reconnecting overlay.
-    pub async fn monitor(
-        self: Arc<Self>,
-        app_handle: tauri::AppHandle,
-        interval: Duration,
-    ) {
+    pub async fn monitor(self: Arc<Self>, app_handle: tauri::AppHandle, interval: Duration) {
         loop {
             sleep(interval).await;
 
@@ -189,7 +203,8 @@ impl LaunchSupervisor {
                 };
                 if probe_health(spec).await.is_err() {
                     warn!(component=%name, "[launcher] component became unhealthy");
-                    self.set_state(&name, ComponentState::Failed("health check failed".into())).await;
+                    self.set_state(&name, ComponentState::Failed("health check failed".into()))
+                        .await;
                     let _ = app_handle.emit(
                         "bonsai:service-lost",
                         serde_json::json!({ "component": name }),
@@ -209,7 +224,10 @@ async fn probe_health(spec: &ComponentSpec) -> Result<(), String> {
     // Always check TCP first.
     let tcp_ok = timeout(deadline, wait_tcp(port)).await.unwrap_or(false);
     if !tcp_ok {
-        return Err(format!("port {} not reachable within {}s", port, spec.timeout_secs));
+        return Err(format!(
+            "port {} not reachable within {}s",
+            port, spec.timeout_secs
+        ));
     }
 
     // Optionally check HTTP.
@@ -224,7 +242,10 @@ async fn probe_health(spec: &ComponentSpec) -> Result<(), String> {
 
 async fn wait_tcp(port: u16) -> bool {
     loop {
-        if tokio::net::TcpStream::connect(format!("127.0.0.1:{port}")).await.is_ok() {
+        if tokio::net::TcpStream::connect(format!("127.0.0.1:{port}"))
+            .await
+            .is_ok()
+        {
             return true;
         }
         sleep(Duration::from_millis(250)).await;
@@ -260,7 +281,9 @@ fn topo_sort(specs: &[ComponentSpec]) -> Result<Vec<String>, String> {
         in_progress: &mut std::collections::HashSet<String>,
         order: &mut Vec<String>,
     ) -> Result<(), String> {
-        if visited.contains(name) { return Ok(()); }
+        if visited.contains(name) {
+            return Ok(());
+        }
         if in_progress.contains(name) {
             return Err(format!("Circular dependency involving '{name}'"));
         }
@@ -277,7 +300,13 @@ fn topo_sort(specs: &[ComponentSpec]) -> Result<Vec<String>, String> {
     }
 
     for spec in specs {
-        visit(&spec.name, specs, &mut visited, &mut in_progress, &mut order)?;
+        visit(
+            &spec.name,
+            specs,
+            &mut visited,
+            &mut in_progress,
+            &mut order,
+        )?;
     }
     Ok(order)
 }

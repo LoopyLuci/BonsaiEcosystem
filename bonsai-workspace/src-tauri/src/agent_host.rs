@@ -11,11 +11,16 @@ pub struct AgentHost {
 
 impl AgentHost {
     pub fn new() -> Self {
-        Self { agents: RwLock::new(HashMap::new()) }
+        Self {
+            agents: RwLock::new(HashMap::new()),
+        }
     }
 
     pub async fn register(&self, agent: Arc<dyn Agent>) {
-        self.agents.write().await.insert(agent.metadata().id.clone(), agent);
+        self.agents
+            .write()
+            .await
+            .insert(agent.metadata().id.clone(), agent);
     }
 
     pub async fn unregister(&self, id: &str) {
@@ -23,7 +28,12 @@ impl AgentHost {
     }
 
     pub async fn list(&self) -> Vec<AgentMetadata> {
-        self.agents.read().await.values().map(|a| a.metadata()).collect()
+        self.agents
+            .read()
+            .await
+            .values()
+            .map(|a| a.metadata())
+            .collect()
     }
 
     pub async fn handle(
@@ -33,9 +43,9 @@ impl AgentHost {
         msg: AgentMessage,
     ) -> Result<AgentOutput, BonsaiError> {
         let agents = self.agents.read().await;
-        let agent  = agents.get(agent_id).ok_or_else(|| {
-            BonsaiError::Internal(format!("Agent '{agent_id}' not found"))
-        })?;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| BonsaiError::Internal(format!("Agent '{agent_id}' not found")))?;
         agent.handle_message(ctx, msg).await
     }
 }

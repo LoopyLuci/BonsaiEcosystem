@@ -11,10 +11,9 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use bonsai_knowledge::{
-    Belief, BeliefId, Entity, Evidence, KnowledgeGraph, ProvenanceSource,
-    new_belief_id,
+    new_belief_id, Belief, BeliefId, Entity, Evidence, KnowledgeGraph, ProvenanceSource,
 };
-use bonsai_verify::{AxiomKernel, Context as VerifyContext, Term, definitionally_equal};
+use bonsai_verify::{definitionally_equal, AxiomKernel, Context as VerifyContext, Term};
 
 use crate::belief_reviser::{BeliefReviser, ConsistencyResult};
 use crate::metacognitive_monitor::{
@@ -104,7 +103,10 @@ impl ReasoningEngine {
         self.metacognitive.write().await.record(record);
 
         // Calibrate confidence
-        let calibrated = self.metacognitive.read().await
+        let calibrated = self
+            .metacognitive
+            .read()
+            .await
             .calibrated_confidence(&strategy, result.confidence);
         result.confidence = calibrated;
 
@@ -121,7 +123,9 @@ impl ReasoningEngine {
         let outcome = if correct {
             Outcome::Correct
         } else if let Some(ans) = correction {
-            Outcome::UserCorrected { corrected_answer: ans }
+            Outcome::UserCorrected {
+                corrected_answer: ans,
+            }
         } else {
             Outcome::Incorrect
         };
@@ -169,7 +173,8 @@ impl ReasoningEngine {
 
         // 2. Search knowledge graph for relevant beliefs
         let relevant = self.knowledge.text_search(query, 5);
-        let belief_hits: Vec<Belief> = relevant.iter()
+        let belief_hits: Vec<Belief> = relevant
+            .iter()
             .filter_map(|r| match &r.kind {
                 bonsai_knowledge::SearchResultKind::Belief(b) => Some(b.clone()),
                 _ => None,
@@ -182,24 +187,38 @@ impl ReasoningEngine {
         }
 
         // 3. Chain the highest-confidence beliefs
-        let top: &Belief = belief_hits.iter()
+        let top: &Belief = belief_hits
+            .iter()
             .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap())
             .unwrap();
-        steps.push(format!("Anchoring on: \"{}\" (confidence {:.2})", top.statement, top.confidence));
+        steps.push(format!(
+            "Anchoring on: \"{}\" (confidence {:.2})",
+            top.statement, top.confidence
+        ));
 
         // 4. Check for transitive Is-A relations
-        let transitive = self.knowledge.transitive_closure(&bonsai_knowledge::Predicate::Implies);
-        let relevant_transitive: Vec<_> = transitive.iter()
+        let transitive = self
+            .knowledge
+            .transitive_closure(&bonsai_knowledge::Predicate::Implies);
+        let relevant_transitive: Vec<_> = transitive
+            .iter()
             .filter(|r| {
                 if let bonsai_knowledge::RelationTarget::Entity(eid) = &r.object {
                     self.knowledge.get_entity(eid).map_or(false, |e| {
-                        e.name.to_lowercase().contains(&query.to_lowercase()[..query.len().min(20)])
+                        e.name
+                            .to_lowercase()
+                            .contains(&query.to_lowercase()[..query.len().min(20)])
                     })
-                } else { false }
+                } else {
+                    false
+                }
             })
             .collect();
         if !relevant_transitive.is_empty() {
-            steps.push(format!("Found {} transitive implications", relevant_transitive.len()));
+            steps.push(format!(
+                "Found {} transitive implications",
+                relevant_transitive.len()
+            ));
         }
 
         let confidence = top.confidence * 0.9;
@@ -224,11 +243,16 @@ impl ReasoningEngine {
         let ctx = VerifyContext::new();
 
         // Find beliefs with formal statements
-        let beliefs_with_formal: Vec<Belief> = self.knowledge.all_beliefs().into_iter()
+        let beliefs_with_formal: Vec<Belief> = self
+            .knowledge
+            .all_beliefs()
+            .into_iter()
             .filter(|b| b.formal_statement.is_some())
             .collect();
 
-        if beliefs_with_formal.is_empty() { return None; }
+        if beliefs_with_formal.is_empty() {
+            return None;
+        }
 
         // For each pair, check if one implies the other
         for b in &beliefs_with_formal {
@@ -263,12 +287,16 @@ impl ReasoningEngine {
 
         let entities = self.knowledge.text_search(query, 10);
         if entities.len() < 3 {
-            steps.push(format!("Insufficient observations (need ≥3, found {})", entities.len()));
+            steps.push(format!(
+                "Insufficient observations (need ≥3, found {})",
+                entities.len()
+            ));
             return self.insufficient_data_result(query, ReasoningStrategy::Induction, steps);
         }
 
         // Find common properties among entities
-        let entity_list: Vec<Entity> = entities.iter()
+        let entity_list: Vec<Entity> = entities
+            .iter()
             .filter_map(|r| match &r.kind {
                 bonsai_knowledge::SearchResultKind::Entity(e) => Some(e.clone()),
                 _ => None,
@@ -281,29 +309,46 @@ impl ReasoningEngine {
 
         // Collect shared relation patterns
         let common_predicates: Vec<String> = {
-            let pred_lists: Vec<Vec<String>> = entity_list.iter()
-                .map(|e| self.knowledge.relations_of(&e.id).into_iter()
-                    .map(|r| r.predicate.to_string())
-                    .collect())
+            let pred_lists: Vec<Vec<String>> = entity_list
+                .iter()
+                .map(|e| {
+                    self.knowledge
+                        .relations_of(&e.id)
+                        .into_iter()
+                        .map(|r| r.predicate.to_string())
+                        .collect()
+                })
                 .collect();
             if pred_lists.is_empty() {
                 vec![]
             } else {
-                let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+                let mut counts: std::collections::HashMap<String, usize> =
+                    std::collections::HashMap::new();
                 for list in &pred_lists {
                     for p in list {
                         *counts.entry(p.clone()).or_insert(0) += 1;
                     }
                 }
                 let threshold = (pred_lists.len() / 2).max(1);
-                counts.into_iter().filter(|(_, c)| *c >= threshold).map(|(p, _)| p).collect()
+                counts
+                    .into_iter()
+                    .filter(|(_, c)| *c >= threshold)
+                    .map(|(p, _)| p)
+                    .collect()
             }
         };
 
         let pattern = if common_predicates.is_empty() {
-            format!("All {} instances share no common structural pattern", entity_list.len())
+            format!(
+                "All {} instances share no common structural pattern",
+                entity_list.len()
+            )
         } else {
-            format!("All {} instances share predicates: {}", entity_list.len(), common_predicates.join(", "))
+            format!(
+                "All {} instances share predicates: {}",
+                entity_list.len(),
+                common_predicates.join(", ")
+            )
         };
         steps.push(format!("Identified pattern: {}", pattern));
 
@@ -330,7 +375,8 @@ impl ReasoningEngine {
 
         // Find beliefs that could explain the observation
         let candidates = self.knowledge.text_search(query, 8);
-        let mut scored: Vec<(Belief, f32)> = candidates.iter()
+        let mut scored: Vec<(Belief, f32)> = candidates
+            .iter()
             .filter_map(|r| match &r.kind {
                 bonsai_knowledge::SearchResultKind::Belief(b) => {
                     // Score = belief confidence × search score
@@ -347,7 +393,10 @@ impl ReasoningEngine {
 
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let (best, score) = &scored[0];
-        steps.push(format!("Best explanation: \"{}\" (posterior {:.2})", best.statement, score));
+        steps.push(format!(
+            "Best explanation: \"{}\" (posterior {:.2})",
+            best.statement, score
+        ));
 
         for (b, s) in scored.iter().skip(1).take(3) {
             steps.push(format!("Alternative: \"{}\" ({:.2})", b.statement, s));
@@ -383,27 +432,38 @@ impl ReasoningEngine {
         }
 
         // Compute structural overlap via shared predicate counts
-        let source_rels: Vec<_> = source_ents.iter()
+        let source_rels: Vec<_> = source_ents
+            .iter()
             .flat_map(|e| self.knowledge.relations_of(&e.id))
             .map(|r| r.predicate.to_string())
             .collect();
-        let target_rels: Vec<_> = target_ents.iter()
+        let target_rels: Vec<_> = target_ents
+            .iter()
             .flat_map(|e| self.knowledge.relations_of(&e.id))
             .map(|r| r.predicate.to_string())
             .collect();
 
-        let overlap: usize = source_rels.iter()
+        let overlap: usize = source_rels
+            .iter()
             .filter(|p| target_rels.contains(p))
             .count();
         let total = source_rels.len().max(target_rels.len()).max(1);
         let similarity = overlap as f32 / total as f32;
 
-        steps.push(format!("Structural similarity: {:.0}% ({} shared predicates)", similarity * 100.0, overlap));
+        steps.push(format!(
+            "Structural similarity: {:.0}% ({} shared predicates)",
+            similarity * 100.0,
+            overlap
+        ));
 
         let conclusion = format!(
             "{} and {} share structural patterns (similarity {:.0}%); \
             by analogy, properties of {} likely apply to {}",
-            source, target, similarity * 100.0, source, target
+            source,
+            target,
+            similarity * 100.0,
+            source,
+            target
         );
         let confidence = similarity * 0.8;
 
@@ -429,12 +489,16 @@ impl ReasoningEngine {
         steps.push(format!("Counterfactual change: {}", changed));
 
         // Find beliefs affected by the change via Causes/DependsOn relations
-        let affected: Vec<Entity> = self.knowledge.transitive_closure(&bonsai_knowledge::Predicate::Causes)
+        let affected: Vec<Entity> = self
+            .knowledge
+            .transitive_closure(&bonsai_knowledge::Predicate::Causes)
             .into_iter()
             .filter_map(|r| {
                 if let bonsai_knowledge::RelationTarget::Entity(eid) = r.object {
                     self.knowledge.get_entity(&eid)
-                } else { None }
+                } else {
+                    None
+                }
             })
             .take(5)
             .collect();
@@ -449,10 +513,17 @@ impl ReasoningEngine {
                 "If {}, then {} downstream effects would follow: {}",
                 changed,
                 consequence_count,
-                affected.iter().map(|e| e.name.as_str()).collect::<Vec<_>>().join(", ")
+                affected
+                    .iter()
+                    .map(|e| e.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )
         } else {
-            format!("If {}, the impact cannot be determined from available knowledge", changed)
+            format!(
+                "If {}, the impact cannot be determined from available knowledge",
+                changed
+            )
         };
 
         let confidence = if consequence_count > 0 { 0.55 } else { 0.3 };
@@ -471,7 +542,8 @@ impl ReasoningEngine {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     fn insufficient_data_result(
-        &self, query: &str,
+        &self,
+        query: &str,
         strategy: ReasoningStrategy,
         mut steps: Vec<String>,
     ) -> ReasoningResult {
@@ -479,7 +551,10 @@ impl ReasoningEngine {
         ReasoningResult {
             strategy: strategy.name().into(),
             query: query.to_string(),
-            conclusion: format!("Cannot determine answer to: \"{}\" from available knowledge", query),
+            conclusion: format!(
+                "Cannot determine answer to: \"{}\" from available knowledge",
+                query
+            ),
             confidence: 0.1,
             steps,
             new_beliefs: vec![],
@@ -489,8 +564,13 @@ impl ReasoningEngine {
 
     // ── Training data generation ──────────────────────────────────────────────
 
-    pub fn reasoning_to_dpo_pair(result: &ReasoningResult, correction: Option<&str>) -> Option<DpoTrainingPair> {
-        if result.confidence < 0.4 { return None; }
+    pub fn reasoning_to_dpo_pair(
+        result: &ReasoningResult,
+        correction: Option<&str>,
+    ) -> Option<DpoTrainingPair> {
+        if result.confidence < 0.4 {
+            return None;
+        }
 
         if let Some(corrected) = correction {
             Some(DpoTrainingPair {
@@ -522,13 +602,28 @@ fn extract_analogy_domains(query: &str) -> (String, String) {
     // "X is like Y", "X and Y are similar", "analogize X to Y"
     let q = query.to_lowercase();
     if let Some(idx) = q.find(" like ") {
-        let source = q[..idx].trim_start_matches(|c: char| !c.is_alphanumeric()).trim().to_string();
-        let target = q[idx + 6..].split_whitespace().next().unwrap_or("").to_string();
+        let source = q[..idx]
+            .trim_start_matches(|c: char| !c.is_alphanumeric())
+            .trim()
+            .to_string();
+        let target = q[idx + 6..]
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_string();
         return (source, target);
     }
     if let Some(idx) = q.find(" to ") {
-        let source = q[..idx].split_whitespace().last().unwrap_or("domain").to_string();
-        let target = q[idx + 4..].split_whitespace().next().unwrap_or("target").to_string();
+        let source = q[..idx]
+            .split_whitespace()
+            .last()
+            .unwrap_or("domain")
+            .to_string();
+        let target = q[idx + 4..]
+            .split_whitespace()
+            .next()
+            .unwrap_or("target")
+            .to_string();
         return (source, target);
     }
     // Default: use the query itself as both (degenerate case)
@@ -555,12 +650,15 @@ fn extract_counterfactual_change(query: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonsai_knowledge::{KnowledgeGraph, Belief, Entity, EntityType};
+    use bonsai_knowledge::{Belief, Entity, EntityType, KnowledgeGraph};
 
     fn engine_with_knowledge() -> ReasoningEngine {
         let kg = Arc::new(KnowledgeGraph::new());
         kg.add_belief(Belief::new("Rust is a systems programming language", 0.95));
-        kg.add_belief(Belief::new("Rust has a borrow checker for memory safety", 0.97));
+        kg.add_belief(Belief::new(
+            "Rust has a borrow checker for memory safety",
+            0.97,
+        ));
         kg.upsert_entity(Entity::new("Rust", EntityType::Concept));
         kg.upsert_entity(Entity::new("C++", EntityType::Concept));
         ReasoningEngine::new(kg)
@@ -577,14 +675,21 @@ mod tests {
     #[tokio::test]
     async fn induction_runs_without_panic() {
         let e = engine_with_knowledge();
-        let r = e.reason("What patterns do programming languages share?", "induce").await;
+        let r = e
+            .reason("What patterns do programming languages share?", "induce")
+            .await;
         assert!(r.confidence >= 0.0);
     }
 
     #[tokio::test]
     async fn counterfactual_parses_query() {
         let e = engine_with_knowledge();
-        let r = e.reason("If Rust had garbage collection, how would it differ?", "counterfactual").await;
+        let r = e
+            .reason(
+                "If Rust had garbage collection, how would it differ?",
+                "counterfactual",
+            )
+            .await;
         assert!(r.strategy == "counterfactual");
     }
 

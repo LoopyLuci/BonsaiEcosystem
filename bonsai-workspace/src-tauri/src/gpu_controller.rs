@@ -36,45 +36,45 @@ const DEFAULT_LAYER_COUNT: u64 = 40;
 
 #[derive(Debug, Clone)]
 pub(crate) struct LayerAlloc {
-    layers:      u32,
+    layers: u32,
     vram_est_mb: u64,
-    last_used:   std::time::Instant,
+    last_used: std::time::Instant,
 }
 
 // ── Health report ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GpuHealthReport {
-    pub backend:               String,
-    pub healthy:               bool,
-    pub vram_total_mb:         u64,
-    pub vram_free_mb:          u64,
-    pub loaded_models:         Vec<String>,
+    pub backend: String,
+    pub healthy: bool,
+    pub vram_total_mb: u64,
+    pub vram_free_mb: u64,
+    pub loaded_models: Vec<String>,
     pub total_vram_reserved_mb: u64,
-    pub allocation_ok:         bool,
-    pub fallback_active:       bool,
-    pub recovery_pending:      bool,
-    pub uptime_secs:           u64,
+    pub allocation_ok: bool,
+    pub fallback_active: bool,
+    pub recovery_pending: bool,
+    pub uptime_secs: u64,
 }
 
 // ── Controller ────────────────────────────────────────────────────────────────
 
 pub struct GpuController {
-    pub gpu:          Arc<GpuLayer>,
-    arena:            Arc<SharedMemoryArena>,
-    micro:            Arc<MicroBonsai>,
+    pub gpu: Arc<GpuLayer>,
+    arena: Arc<SharedMemoryArena>,
+    micro: Arc<MicroBonsai>,
     /// Map model_path → current layer allocation.
     pub(crate) allocs: RwLock<HashMap<String, LayerAlloc>>,
     /// Last-used times for models (separate view used by TTL monitor).
     pub(crate) model_usage: RwLock<HashMap<String, Instant>>,
     /// True if a recovery task is already scheduled.
     pub recovery_pending: Arc<RwLock<bool>>,
-    started_at:       std::time::Instant,
+    started_at: std::time::Instant,
 }
 
 impl GpuController {
     pub fn new(
-        gpu:   Arc<GpuLayer>,
+        gpu: Arc<GpuLayer>,
         arena: Arc<SharedMemoryArena>,
         micro: Arc<MicroBonsai>,
     ) -> Arc<Self> {
@@ -82,10 +82,10 @@ impl GpuController {
             gpu,
             arena,
             micro,
-            allocs:           RwLock::new(HashMap::new()),
-            model_usage:      RwLock::new(HashMap::new()),
+            allocs: RwLock::new(HashMap::new()),
+            model_usage: RwLock::new(HashMap::new()),
             recovery_pending: Arc::new(RwLock::new(false)),
-            started_at:       std::time::Instant::now(),
+            started_at: std::time::Instant::now(),
         })
     }
 
@@ -129,17 +129,31 @@ impl GpuController {
                 // Treat 0 MB free as a potential GPU hang (true in practice when driver is gone)
                 if vram == 0 {
                     consecutive_failures += 1;
-                    warn!("[gpu-health] probe failed (consecutive={})", consecutive_failures);
+                    warn!(
+                        "[gpu-health] probe failed (consecutive={})",
+                        consecutive_failures
+                    );
                     if consecutive_failures >= 2 {
-                        let _ = tauri::Emitter::emit(&app_handle, "gpu-unhealthy", serde_json::json!({
-                            "consecutive_failures": consecutive_failures,
-                            "vram_free_mb": vram,
-                        }));
+                        let _ = tauri::Emitter::emit(
+                            &app_handle,
+                            "gpu-unhealthy",
+                            serde_json::json!({
+                                "consecutive_failures": consecutive_failures,
+                                "vram_free_mb": vram,
+                            }),
+                        );
                     }
                 } else {
                     if consecutive_failures > 0 {
-                        info!("[gpu-health] GPU recovered after {} failures", consecutive_failures);
-                        let _ = tauri::Emitter::emit(&app_handle, "gpu-recovered", serde_json::json!({}));
+                        info!(
+                            "[gpu-health] GPU recovered after {} failures",
+                            consecutive_failures
+                        );
+                        let _ = tauri::Emitter::emit(
+                            &app_handle,
+                            "gpu-recovered",
+                            serde_json::json!({}),
+                        );
                     }
                     consecutive_failures = 0;
                 }
@@ -149,7 +163,10 @@ impl GpuController {
 
     /// Update last-used timestamp for a model.
     pub async fn touch_model(&self, model_path: &str) {
-        self.model_usage.write().await.insert(model_path.to_string(), Instant::now());
+        self.model_usage
+            .write()
+            .await
+            .insert(model_path.to_string(), Instant::now());
     }
 
     /// Return VRAM/profile summary as JSON value.
@@ -175,7 +192,7 @@ impl GpuController {
     pub async fn decide_layers(
         &self,
         model_path: &str,
-        requested:  Option<u32>,
+        requested: Option<u32>,
         power_saving: bool,
     ) -> u32 {
         let vram_free = self.gpu.free_vram_mb();
@@ -213,24 +230,29 @@ impl GpuController {
         let max_layers = auto_layers.min(power_cap);
 
         // Evict LRU if we still don't have enough headroom after the cap.
-        let allocated_mb: u64 = self.allocs.read().await
-            .values().map(|a| a.vram_est_mb).sum();
+        let allocated_mb: u64 = self
+            .allocs
+            .read()
+            .await
+            .values()
+            .map(|a| a.vram_est_mb)
+            .sum();
         if allocated_mb + (max_layers as u64 * per_layer_mb) > usable + allocated_mb {
             self.evict_lru().await;
         }
 
         let final_layers = match requested {
             Some(r) => r.min(max_layers),
-            None    => max_layers,
+            None => max_layers,
         };
 
         let vram_est = final_layers as u64 * per_layer_mb;
         self.allocs.write().await.insert(
             model_path.to_string(),
             LayerAlloc {
-                layers:      final_layers,
+                layers: final_layers,
                 vram_est_mb: vram_est,
-                last_used:   std::time::Instant::now(),
+                last_used: std::time::Instant::now(),
             },
         );
 
@@ -249,7 +271,8 @@ impl GpuController {
     /// Evict the least-recently-used model's layer allocation.
     async fn evict_lru(&self) {
         let mut allocs = self.allocs.write().await;
-        if let Some(lru_key) = allocs.iter()
+        if let Some(lru_key) = allocs
+            .iter()
             .min_by_key(|(_, v)| v.last_used)
             .map(|(k, _)| k.clone())
         {
@@ -278,8 +301,8 @@ impl GpuController {
     pub async fn with_fallback<T, F, G, Fut1, Fut2>(
         &self,
         op_name: &str,
-        gpu_fn:  F,
-        cpu_fn:  G,
+        gpu_fn: F,
+        cpu_fn: G,
     ) -> Result<T, String>
     where
         F: FnOnce(BackendType) -> Fut1,
@@ -300,7 +323,9 @@ impl GpuController {
             }
             Err(e) => {
                 warn!(op = op_name, err = %e, "[gpu_ctrl] GPU op failed — falling back to CPU");
-                self.gpu.record_result(backend.clone(), false, Some(e.clone())).await;
+                self.gpu
+                    .record_result(backend.clone(), false, Some(e.clone()))
+                    .await;
                 self.schedule_recovery(backend).await;
                 cpu_fn().await
             }
@@ -309,12 +334,14 @@ impl GpuController {
 
     async fn schedule_recovery(&self, backend: BackendType) {
         let mut pending = self.recovery_pending.write().await;
-        if *pending { return; }
+        if *pending {
+            return;
+        }
         *pending = true;
         drop(pending);
 
-        let gpu   = Arc::clone(&self.gpu);
-        let flag  = Arc::clone(&self.recovery_pending); // Arc<RwLock<bool>>
+        let gpu = Arc::clone(&self.gpu);
+        let flag = Arc::clone(&self.recovery_pending); // Arc<RwLock<bool>>
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(300)).await;
             let recovered = gpu.pre_check(&backend).await;
@@ -342,21 +369,21 @@ impl GpuController {
     pub async fn health_report(&self) -> GpuHealthReport {
         let backend = self.best_backend().await;
         let healthy = backend != BackendType::Cpu;
-        let allocs  = self.allocs.read().await;
+        let allocs = self.allocs.read().await;
         let total_reserved: u64 = allocs.values().map(|a| a.vram_est_mb).sum();
         let vram_free = self.gpu.free_vram_mb();
 
         GpuHealthReport {
-            backend:                format!("{:?}", backend),
+            backend: format!("{:?}", backend),
             healthy,
-            vram_total_mb:          vram_free, // proxy; real figure via llama.cpp
-            vram_free_mb:           vram_free.saturating_sub(total_reserved),
-            loaded_models:          allocs.keys().cloned().collect(),
+            vram_total_mb: vram_free, // proxy; real figure via llama.cpp
+            vram_free_mb: vram_free.saturating_sub(total_reserved),
+            loaded_models: allocs.keys().cloned().collect(),
             total_vram_reserved_mb: total_reserved,
-            allocation_ok:          true,
-            fallback_active:        !healthy,
-            recovery_pending:       *self.recovery_pending.read().await,
-            uptime_secs:            self.started_at.elapsed().as_secs(),
+            allocation_ok: true,
+            fallback_active: !healthy,
+            recovery_pending: *self.recovery_pending.read().await,
+            uptime_secs: self.started_at.elapsed().as_secs(),
         }
     }
 
@@ -384,9 +411,9 @@ pub async fn run_startup_health_check(gpu: &GpuLayer) -> GpuHealthReport {
     let allocation_ok = vram_free >= 100;
 
     // Backend health test.
-    let vulkan_ok  = gpu.pre_check(&BackendType::Vulkan).await;
+    let vulkan_ok = gpu.pre_check(&BackendType::Vulkan).await;
     let directml_ok = gpu.pre_check(&BackendType::DirectML).await;
-    let healthy    = vulkan_ok || directml_ok;
+    let healthy = vulkan_ok || directml_ok;
 
     let backend = if vulkan_ok {
         "Vulkan"
@@ -435,9 +462,7 @@ pub async fn profile_vram_cmd(
 }
 
 #[tauri::command]
-pub async fn reset_gpu_controller(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<(), String> {
+pub async fn reset_gpu_controller(state: tauri::State<'_, crate::AppState>) -> Result<(), String> {
     // Clear all layer allocations (user-initiated GPU reset).
     state.gpu_controller.allocs.write().await.clear();
     *state.gpu_controller.recovery_pending.write().await = false;

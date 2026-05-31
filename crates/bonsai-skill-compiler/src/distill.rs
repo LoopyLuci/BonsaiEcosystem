@@ -90,7 +90,11 @@ pub fn generate_dpo_examples(metadata: &SkillMetadata, rules: &[Rule]) -> Vec<Dp
         chosen: format!(
             "The {} skill provides the following guidelines: {}",
             skill_name,
-            rules.iter().map(|r| r.action.as_str()).collect::<Vec<_>>().join("; ")
+            rules
+                .iter()
+                .map(|r| r.action.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
         ),
         rejected: "I don't know what that skill does.".into(),
         source: format!("skill/{}/meta", skill_name),

@@ -98,7 +98,11 @@ fn parse_bonsai_output(raw: &str) -> ParsedModelOutput {
 
     // Fallback: structured string search against known JSON field patterns
     let intent_candidates = [
-        "tool_use", "chat", "swarm_task", "model_query", "system_command",
+        "tool_use",
+        "chat",
+        "swarm_task",
+        "model_query",
+        "system_command",
     ];
     let intent = intent_candidates
         .iter()
@@ -106,8 +110,16 @@ fn parse_bonsai_output(raw: &str) -> ParsedModelOutput {
         .map(|s| s.to_string());
 
     let tool_names = [
-        "read_file", "write_file", "list_files", "grep_files", "run_command",
-        "search_knowledge", "get_datetime", "get_system_stats", "get_weather", "fetch_url",
+        "read_file",
+        "write_file",
+        "list_files",
+        "grep_files",
+        "run_command",
+        "search_knowledge",
+        "get_datetime",
+        "get_system_stats",
+        "get_weather",
+        "fetch_url",
     ];
     let tools: Vec<String> = tool_names
         .iter()
@@ -193,7 +205,9 @@ impl SharedServer {
         }
 
         let _ = child.kill().await;
-        Err(format!("Server on port {port} did not become healthy within 120s"))
+        Err(format!(
+            "Server on port {port} did not become healthy within 120s"
+        ))
     }
 
     pub fn port(&self) -> u16 {
@@ -211,7 +225,10 @@ impl SharedServer {
 
     pub async fn shutdown(&self) {
         if let Some(mut child) = self.child.lock().await.take() {
-            info!(port = self.port, "[dual_inference] shutting down shared server");
+            info!(
+                port = self.port,
+                "[dual_inference] shutting down shared server"
+            );
             let _ = child.kill().await;
         }
     }
@@ -302,8 +319,15 @@ impl DualModelSession {
         })
     }
 
-    async fn infer(&self, lora_path: Option<&str>, prompt: &str) -> Result<ParsedModelOutput, String> {
-        let url = format!("http://127.0.0.1:{}/v1/chat/completions", self.server.port());
+    async fn infer(
+        &self,
+        lora_path: Option<&str>,
+        prompt: &str,
+    ) -> Result<ParsedModelOutput, String> {
+        let url = format!(
+            "http://127.0.0.1:{}/v1/chat/completions",
+            self.server.port()
+        );
         let mut body = json!({
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,

@@ -14,8 +14,8 @@
 //!   eternal-workshop [--db-path <path>] [--api-port <port>] [--dream-agent-port <port>]
 
 mod config;
-mod memory_nodes;
 mod dream_executor;
+mod memory_nodes;
 mod scheduler;
 
 use log::{error, info};
@@ -23,13 +23,15 @@ use tokio::signal;
 
 #[tokio::main]
 async fn main() {
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info")
-    ).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let cfg = config::Config::from_env_or_defaults();
-    info!("[eternal-workshop] starting — db={} api=:{} dream=:{}",
-        cfg.db_path.display(), cfg.api_port, cfg.dream_agent_port);
+    info!(
+        "[eternal-workshop] starting — db={} api=:{} dream=:{}",
+        cfg.db_path.display(),
+        cfg.api_port,
+        cfg.dream_agent_port
+    );
 
     let store = match memory_nodes::MemoryNodeStore::open(&cfg.db_path).await {
         Ok(s) => s,

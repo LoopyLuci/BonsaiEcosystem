@@ -1,5 +1,5 @@
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
@@ -68,15 +68,22 @@ impl Distance {
                 let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
                 let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
                 let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if na == 0.0 || nb == 0.0 { 1.0 } else { 1.0 - dot / (na * nb) }
+                if na == 0.0 || nb == 0.0 {
+                    1.0
+                } else {
+                    1.0 - dot / (na * nb)
+                }
             }
             Distance::DotProduct => {
                 let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
                 -dot
             }
-            Distance::Euclidean => {
-                a.iter().zip(b).map(|(x, y)| (x - y).powi(2)).sum::<f32>().sqrt()
-            }
+            Distance::Euclidean => a
+                .iter()
+                .zip(b)
+                .map(|(x, y)| (x - y).powi(2))
+                .sum::<f32>()
+                .sqrt(),
         }
     }
 }
@@ -93,7 +100,9 @@ impl Eq for Candidate {}
 
 impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.dist.partial_cmp(&other.dist).unwrap_or(Ordering::Equal)
+        self.dist
+            .partial_cmp(&other.dist)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -131,10 +140,10 @@ pub struct HnswIndex {
     nodes: Vec<Node>,
     entry_point: Option<usize>,
     dim: usize,
-    m: usize,       // max connections per layer
-    m_max0: usize,  // max connections on layer 0
+    m: usize,      // max connections per layer
+    m_max0: usize, // max connections on layer 0
     ef_construction: usize,
-    ml: f64,        // level multiplier = 1/ln(M)
+    ml: f64, // level multiplier = 1/ln(M)
     distance: Distance,
 }
 
@@ -173,7 +182,10 @@ impl HnswIndex {
 
     pub fn insert(&mut self, key: Vec<f32>) -> Result<usize> {
         if key.len() != self.dim {
-            return Err(HnswError::DimMismatch { expected: self.dim, got: key.len() });
+            return Err(HnswError::DimMismatch {
+                expected: self.dim,
+                got: key.len(),
+            });
         }
 
         let new_id = self.nodes.len();
@@ -192,7 +204,10 @@ impl HnswIndex {
         // Greedy descent from top layer to level+1
         for lc in ((level + 1)..=max_level).rev() {
             let results = self.search_layer(&key, curr_ep, 1, lc);
-            if let Some(best) = results.iter().min_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap()) {
+            if let Some(best) = results
+                .iter()
+                .min_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap())
+            {
                 curr_ep = best.id;
             }
         }
@@ -216,10 +231,16 @@ impl HnswIndex {
                         let layer_ids: Vec<usize> = self.nodes[nb].layers[lc].clone();
                         let mut scored: Vec<(f32, usize)> = layer_ids
                             .iter()
-                            .map(|&id| (self.distance.compute(&nb_key, &self.nodes[id].key_f32()), id))
+                            .map(|&id| {
+                                (
+                                    self.distance.compute(&nb_key, &self.nodes[id].key_f32()),
+                                    id,
+                                )
+                            })
                             .collect();
                         scored.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-                        self.nodes[nb].layers[lc] = scored.into_iter().take(m_layer).map(|s| s.1).collect();
+                        self.nodes[nb].layers[lc] =
+                            scored.into_iter().take(m_layer).map(|s| s.1).collect();
                     }
                 }
             }
@@ -243,10 +264,16 @@ impl HnswIndex {
         visited.insert(ep);
 
         let mut candidates: BinaryHeap<std::cmp::Reverse<Candidate>> = BinaryHeap::new();
-        candidates.push(std::cmp::Reverse(Candidate { dist: ep_dist, id: ep }));
+        candidates.push(std::cmp::Reverse(Candidate {
+            dist: ep_dist,
+            id: ep,
+        }));
 
         let mut result: BinaryHeap<Candidate> = BinaryHeap::new();
-        result.push(Candidate { dist: ep_dist, id: ep });
+        result.push(Candidate {
+            dist: ep_dist,
+            id: ep,
+        });
 
         while let Some(std::cmp::Reverse(curr)) = candidates.pop() {
             let worst_result = result.peek().map(|c| c.dist).unwrap_or(f32::MAX);
@@ -260,8 +287,14 @@ impl HnswIndex {
                         let nb_dist = self.dist(query, nb);
                         let worst = result.peek().map(|c| c.dist).unwrap_or(f32::MAX);
                         if nb_dist < worst || result.len() < ef {
-                            candidates.push(std::cmp::Reverse(Candidate { dist: nb_dist, id: nb }));
-                            result.push(Candidate { dist: nb_dist, id: nb });
+                            candidates.push(std::cmp::Reverse(Candidate {
+                                dist: nb_dist,
+                                id: nb,
+                            }));
+                            result.push(Candidate {
+                                dist: nb_dist,
+                                id: nb,
+                            });
                             if result.len() > ef {
                                 result.pop();
                             }
@@ -276,7 +309,10 @@ impl HnswIndex {
 
     pub fn search(&self, query: &[f32], k: usize) -> Result<Vec<(usize, f32)>> {
         if query.len() != self.dim {
-            return Err(HnswError::DimMismatch { expected: self.dim, got: query.len() });
+            return Err(HnswError::DimMismatch {
+                expected: self.dim,
+                got: query.len(),
+            });
         }
         let Some(ep) = self.entry_point else {
             return Err(HnswError::Empty);
@@ -287,7 +323,10 @@ impl HnswIndex {
 
         for lc in (1..=max_level).rev() {
             let results = self.search_layer(query, curr_ep, 1, lc);
-            if let Some(best) = results.iter().min_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap()) {
+            if let Some(best) = results
+                .iter()
+                .min_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap())
+            {
                 curr_ep = best.id;
             }
         }
@@ -296,7 +335,11 @@ impl HnswIndex {
         let mut candidates = self.search_layer(query, curr_ep, ef, 0);
         candidates.sort_by(|a, b| a.dist.partial_cmp(&b.dist).unwrap());
 
-        Ok(candidates.into_iter().take(k).map(|c| (c.id, c.dist)).collect())
+        Ok(candidates
+            .into_iter()
+            .take(k)
+            .map(|c| (c.id, c.dist))
+            .collect())
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
@@ -325,7 +368,12 @@ impl HnswIndex {
 }
 
 /// Convenience: build an index from a batch of vectors.
-pub fn build(vectors: Vec<Vec<f32>>, m: usize, ef_construction: usize, distance: Distance) -> Result<HnswIndex> {
+pub fn build(
+    vectors: Vec<Vec<f32>>,
+    m: usize,
+    ef_construction: usize,
+    distance: Distance,
+) -> Result<HnswIndex> {
     let dim = vectors.first().map(|v| v.len()).unwrap_or(0);
     let mut idx = HnswIndex::new(dim, m, ef_construction, distance);
     for v in vectors {
@@ -345,7 +393,10 @@ mod tests {
             let encoded = f32_to_f16(v);
             let decoded = f16_to_f32(encoded);
             let err = (v - decoded).abs();
-            assert!(err < 0.01 * v.abs().max(0.01), "f16 roundtrip failed for {v}: got {decoded}");
+            assert!(
+                err < 0.01 * v.abs().max(0.01),
+                "f16 roundtrip failed for {v}: got {decoded}"
+            );
         }
     }
 

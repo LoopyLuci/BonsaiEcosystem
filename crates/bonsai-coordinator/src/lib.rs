@@ -36,10 +36,10 @@ pub struct CoordinatorConfig {
 impl Default for CoordinatorConfig {
     fn default() -> Self {
         Self {
-            model_url:    "http://127.0.0.1:8082".into(),
-            max_workers:  4,
+            model_url: "http://127.0.0.1:8082".into(),
+            max_workers: 4,
             timeout_secs: 60,
-            max_tokens:   512,
+            max_tokens: 512,
         }
     }
 }
@@ -54,19 +54,19 @@ pub struct CoordinatorTask {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerResult {
-    pub item:    String,
-    pub output:  String,
-    pub error:   Option<String>,
+    pub item: String,
+    pub output: String,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoordinatorResult {
-    pub task_id:       String,
-    pub total_items:   usize,
-    pub succeeded:     usize,
-    pub failed:        usize,
-    pub results:       Vec<WorkerResult>,
-    pub elapsed_ms:    u64,
+    pub task_id: String,
+    pub total_items: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+    pub results: Vec<WorkerResult>,
+    pub elapsed_ms: u64,
 }
 
 // ── Coordinator ───────────────────────────────────────────────────────────────
@@ -87,22 +87,25 @@ impl Coordinator {
     /// Run the task: distribute items across workers, collect results.
     pub async fn run(&self, task: CoordinatorTask) -> CoordinatorResult {
         let task_id = uuid::Uuid::new_v4().to_string();
-        let start   = std::time::Instant::now();
+        let start = std::time::Instant::now();
 
         let num_workers = self.cfg.max_workers.min(task.items.len()).max(1);
-        info!("[coordinator] task={task_id} items={} workers={num_workers}", task.items.len());
+        info!(
+            "[coordinator] task={task_id} items={} workers={num_workers}",
+            task.items.len()
+        );
 
         // Shared work queue
         let queue: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(task.items.clone()));
         let description = Arc::new(task.description.clone());
-        let cfg         = Arc::new(self.cfg.clone());
+        let cfg = Arc::new(self.cfg.clone());
 
         // Spawn workers
         let mut handles = Vec::with_capacity(num_workers);
         for worker_id in 0..num_workers {
-            let queue       = Arc::clone(&queue);
+            let queue = Arc::clone(&queue);
             let description = Arc::clone(&description);
-            let cfg         = Arc::clone(&cfg);
+            let cfg = Arc::clone(&cfg);
 
             handles.push(tokio::spawn(async move {
                 worker_loop(worker_id, queue, description, cfg).await
@@ -117,10 +120,12 @@ impl Coordinator {
 
         let results: Vec<WorkerResult> = worker_results.into_iter().flatten().collect();
         let succeeded = results.iter().filter(|r| r.error.is_none()).count();
-        let failed    = results.len() - succeeded;
+        let failed = results.len() - succeeded;
 
-        info!("[coordinator] task={task_id} done: {succeeded} ok, {failed} failed, {}ms",
-              start.elapsed().as_millis());
+        info!(
+            "[coordinator] task={task_id} done: {succeeded} ok, {failed} failed, {}ms",
+            start.elapsed().as_millis()
+        );
 
         CoordinatorResult {
             task_id,
@@ -137,9 +142,9 @@ impl Coordinator {
 
 async fn worker_loop(
     worker_id: usize,
-    queue:       Arc<Mutex<Vec<String>>>,
+    queue: Arc<Mutex<Vec<String>>>,
     description: Arc<String>,
-    cfg:         Arc<CoordinatorConfig>,
+    cfg: Arc<CoordinatorConfig>,
 ) -> Vec<WorkerResult> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(cfg.timeout_secs))
@@ -151,18 +156,28 @@ async fn worker_loop(
     loop {
         let item = {
             let mut q = queue.lock().await;
-            if q.is_empty() { break; }
+            if q.is_empty() {
+                break;
+            }
             q.remove(0)
         };
 
         let result = call_model(&client, &cfg.model_url, &description, &item, cfg.max_tokens).await;
         match result {
             Ok(output) => {
-                results.push(WorkerResult { item, output, error: None });
+                results.push(WorkerResult {
+                    item,
+                    output,
+                    error: None,
+                });
             }
             Err(e) => {
                 warn!("[coordinator] worker={worker_id} item={item:?} err={e}");
-                results.push(WorkerResult { item, output: String::new(), error: Some(e) });
+                results.push(WorkerResult {
+                    item,
+                    output: String::new(),
+                    error: Some(e),
+                });
             }
         }
     }
@@ -171,11 +186,11 @@ async fn worker_loop(
 }
 
 async fn call_model(
-    client:      &reqwest::Client,
-    model_url:   &str,
+    client: &reqwest::Client,
+    model_url: &str,
     description: &str,
-    item:        &str,
-    max_tokens:  u32,
+    item: &str,
+    max_tokens: u32,
 ) -> Result<String, String> {
     let prompt = format!("{description}\n\nItem:\n{item}");
     let payload = serde_json::json!({
@@ -197,7 +212,9 @@ async fn call_model(
         return Err(format!("model returned HTTP {}", resp.status()));
     }
 
-    let json: serde_json::Value = resp.json().await
+    let json: serde_json::Value = resp
+        .json()
+        .await
         .map_err(|e| format!("parse failed: {e}"))?;
 
     let content = json["choices"][0]["message"]["content"]
@@ -212,19 +229,19 @@ async fn call_model(
 
 /// Analyse a list of files for issues using the DreamAgent (port 8082) or any model.
 pub async fn analyse_files(
-    file_paths:  Vec<String>,
+    file_paths: Vec<String>,
     task_prompt: &str,
-    model_url:   Option<&str>,
+    model_url: Option<&str>,
 ) -> CoordinatorResult {
     let cfg = CoordinatorConfig {
-        model_url:   model_url.unwrap_or("http://127.0.0.1:8082").into(),
+        model_url: model_url.unwrap_or("http://127.0.0.1:8082").into(),
         max_workers: num_cpus(),
         ..Default::default()
     };
     Coordinator::new(cfg)
         .run(CoordinatorTask {
             description: task_prompt.to_string(),
-            items:       file_paths,
+            items: file_paths,
         })
         .await
 }

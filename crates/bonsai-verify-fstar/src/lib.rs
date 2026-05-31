@@ -8,10 +8,10 @@
 //! 2. Spawn `fstar.exe --ide <file>` in batch mode (or plain `fstar.exe <file>`).
 //! 3. Parse exit code + stderr for "Verified module" / error lines.
 
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 // ── Error ─────────────────────────────────────────────────────────────────────
@@ -64,9 +64,15 @@ pub struct FStarSidecar {
 }
 
 impl FStarSidecar {
-    pub fn new() -> Self { Self { fstar_path: None } }
+    pub fn new() -> Self {
+        Self { fstar_path: None }
+    }
 
-    pub fn with_path(path: PathBuf) -> Self { Self { fstar_path: Some(path) } }
+    pub fn with_path(path: PathBuf) -> Self {
+        Self {
+            fstar_path: Some(path),
+        }
+    }
 
     pub fn verify(&self, req: &FStarRequest) -> FStarResult<FStarResponse> {
         let bin = self.find_fstar()?;
@@ -85,7 +91,9 @@ impl FStarSidecar {
 
     fn find_fstar(&self) -> FStarResult<PathBuf> {
         if let Some(p) = &self.fstar_path {
-            if p.exists() { return Ok(p.clone()); }
+            if p.exists() {
+                return Ok(p.clone());
+            }
         }
         // Try fstar.exe (Windows) then fstar
         which_binary("fstar.exe")
@@ -93,16 +101,25 @@ impl FStarSidecar {
             .ok_or(FStarError::BinaryNotFound)
     }
 
-    fn run_fstar(&self, bin: &PathBuf, file: &PathBuf, req: &FStarRequest) -> FStarResult<FStarResponse> {
+    fn run_fstar(
+        &self,
+        bin: &PathBuf,
+        file: &PathBuf,
+        req: &FStarRequest,
+    ) -> FStarResult<FStarResponse> {
         let mut cmd = Command::new(bin);
         cmd.arg(file);
-        for flag in &req.extra_flags { cmd.arg(flag); }
+        for flag in &req.extra_flags {
+            cmd.arg(flag);
+        }
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-        let output = cmd.output().map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
-            FStarError::BinaryNotFound
-        } else {
-            FStarError::Io(e)
+        let output = cmd.output().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                FStarError::BinaryNotFound
+            } else {
+                FStarError::Io(e)
+            }
         })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -110,11 +127,16 @@ impl FStarSidecar {
 
         // Parse output for verified modules and errors
         let mut verified = Vec::new();
-        let mut errors   = Vec::new();
+        let mut errors = Vec::new();
 
         for line in stdout.lines().chain(stderr.lines()) {
             if line.contains("Verified module:") {
-                let module = line.split("Verified module:").nth(1).unwrap_or("").trim().to_string();
+                let module = line
+                    .split("Verified module:")
+                    .nth(1)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
                 verified.push(module);
             } else if line.contains("(Error") || line.starts_with("Error") {
                 errors.push(FStarDiagnostic {
@@ -134,21 +156,35 @@ impl FStarSidecar {
         let success = output.status.success() && errors.iter().all(|e| e.level != "error");
 
         if !success && !errors.is_empty() {
-            let msg = errors.iter().filter(|e| e.level == "error")
-                .map(|e| e.message.as_str()).collect::<Vec<_>>().join("\n");
+            let msg = errors
+                .iter()
+                .filter(|e| e.level == "error")
+                .map(|e| e.message.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
             return Err(FStarError::VerificationFailed(msg));
         }
 
-        Ok(FStarResponse { success, verified_modules: verified, errors, stdout, stderr })
+        Ok(FStarResponse {
+            success,
+            verified_modules: verified,
+            errors,
+            stdout,
+            stderr,
+        })
     }
 }
 
 impl Default for FStarSidecar {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn which_binary(name: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH")?.to_str()?.split(if cfg!(windows) { ';' } else { ':' })
+    std::env::var_os("PATH")?
+        .to_str()?
+        .split(if cfg!(windows) { ';' } else { ':' })
         .map(|dir| {
             let mut p = PathBuf::from(dir);
             p.push(name);
@@ -158,11 +194,15 @@ fn which_binary(name: &str) -> Option<PathBuf> {
 }
 
 pub fn fstar_available() -> bool {
-    which_binary("fstar.exe").or_else(|| which_binary("fstar")).is_some()
+    which_binary("fstar.exe")
+        .or_else(|| which_binary("fstar"))
+        .is_some()
 }
 
 pub fn verify_fstar_source(source: &str) -> FStarResult<bool> {
-    if !fstar_available() { return Ok(false); }
+    if !fstar_available() {
+        return Ok(false);
+    }
     FStarSidecar::new().verify(&FStarRequest {
         source: source.into(),
         extra_flags: vec![],

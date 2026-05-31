@@ -16,7 +16,9 @@ pub struct MemoryManager {
 
 impl MemoryManager {
     pub fn new() -> Self {
-        Self { sys: System::new_all() }
+        Self {
+            sys: System::new_all(),
+        }
     }
 
     pub fn refresh(&mut self) {
@@ -45,7 +47,7 @@ impl MemoryManager {
         let total_ram_mb = self.sys.total_memory() / 1024 / 1024;
         let free_ram_mb = self.sys.free_memory() / 1024 / 1024;
         MemoryStatus {
-            total_vram_mb: 0,   // populated by HybridEngine after vulkan query
+            total_vram_mb: 0, // populated by HybridEngine after vulkan query
             free_vram_mb: 0,
             total_ram_mb,
             free_ram_mb,

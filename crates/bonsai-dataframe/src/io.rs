@@ -1,9 +1,9 @@
 //! I/O helpers — CSV, JSON, Parquet reading/writing (100% offline, no network).
 
-use std::path::Path;
-use polars::prelude::*;
 use crate::error::DfResult;
 use crate::frame::BonsaiFrame;
+use polars::prelude::*;
+use std::path::Path;
 
 // ── CSV ───────────────────────────────────────────────────────────────────────
 

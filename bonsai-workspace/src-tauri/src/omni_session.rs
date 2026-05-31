@@ -13,13 +13,13 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use bonsai_cas::CasStore;
 use crate::auth_commands::{AuthState, UserProfile};
 use crate::omni_desktop::OmniDesktop;
 use crate::omni_shell::OmniShellState;
 use crate::omnipresent_capture::OmnipresentCapture;
 use crate::predictive_engine::PredictiveEngine;
 use crate::process_manager::ProcessManager;
+use bonsai_cas::CasStore;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1 — Session state types
@@ -153,7 +153,10 @@ impl OmniSession {
         state.last_activity = state.login_time;
         state.is_locked = false;
 
-        info!("[omni-session] login: user={} session={}", user_id, state.active_session_id);
+        info!(
+            "[omni-session] login: user={} session={}",
+            user_id, state.active_session_id
+        );
 
         // Restore previous snapshot if available
         let snap_key = self.last_snapshot_key.read().await.clone();
@@ -197,7 +200,11 @@ impl OmniSession {
             timestamp: Utc::now().timestamp_millis(),
         };
         let bytes = serde_json::to_vec(&snap).map_err(|e| e.to_string())?;
-        let key = self.cas.put(&bytes, "application/x-omni-session").await.map_err(|e| e.to_string())?;
+        let key = self
+            .cas
+            .put(&bytes, "application/x-omni-session")
+            .await
+            .map_err(|e| e.to_string())?;
         let hex = key.hex();
         *self.last_snapshot_key.write().await = Some(hex.clone());
         info!("[omni-session] snapshot saved: {}", hex);
@@ -224,8 +231,12 @@ impl OmniSession {
                 | crate::omnipresent_capture::OmnEventType::WindowFocus { app_id, .. } => {
                     apps_set.insert(app_id.clone());
                 }
-                crate::omnipresent_capture::OmnEventType::CommandCompleted { .. } => commands_run += 1,
-                crate::omnipresent_capture::OmnEventType::ModelInference { .. } => ai_inferences += 1,
+                crate::omnipresent_capture::OmnEventType::CommandCompleted { .. } => {
+                    commands_run += 1
+                }
+                crate::omnipresent_capture::OmnEventType::ModelInference { .. } => {
+                    ai_inferences += 1
+                }
                 crate::omnipresent_capture::OmnEventType::FileSave { .. }
                 | crate::omnipresent_capture::OmnEventType::FileOpen { .. } => files_touched += 1,
                 _ => {}
@@ -237,9 +248,15 @@ impl OmniSession {
         let duration_mins = (now_ms - login_ms) / 60_000;
 
         let mut highlights = vec![];
-        if commands_run > 0 { highlights.push(format!("Ran {} shell commands", commands_run)); }
-        if ai_inferences > 0 { highlights.push(format!("Made {} AI inferences", ai_inferences)); }
-        if files_touched > 0 { highlights.push(format!("Touched {} files", files_touched)); }
+        if commands_run > 0 {
+            highlights.push(format!("Ran {} shell commands", commands_run));
+        }
+        if ai_inferences > 0 {
+            highlights.push(format!("Made {} AI inferences", ai_inferences));
+        }
+        if files_touched > 0 {
+            highlights.push(format!("Touched {} files", files_touched));
+        }
 
         SessionSummaryReport {
             user_id: state.user_id.clone(),
@@ -265,7 +282,6 @@ impl OmniSession {
     }
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // § 5 — Tauri commands
 // ─────────────────────────────────────────────────────────────────────────────
@@ -289,9 +305,7 @@ pub async fn omni_session_login(
 }
 
 #[tauri::command]
-pub async fn omni_session_logout(
-    state: State<'_, AppState>,
-) -> Result<serde_json::Value, String> {
+pub async fn omni_session_logout(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let snap_key = state.omni_session.logout().await?;
     Ok(serde_json::json!({ "snapshot_key": snap_key }))
 }
@@ -315,9 +329,7 @@ pub async fn omni_session_snapshot(
 }
 
 #[tauri::command]
-pub async fn omni_session_state(
-    state: State<'_, AppState>,
-) -> Result<serde_json::Value, String> {
+pub async fn omni_session_state(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let s = state.omni_session.get_state().await;
     Ok(serde_json::to_value(s).map_err(|e| e.to_string())?)
 }

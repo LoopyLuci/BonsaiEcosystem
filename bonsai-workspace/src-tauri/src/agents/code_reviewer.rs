@@ -11,7 +11,7 @@ pub struct CodeReviewer;
 // ── Inference ─────────────────────────────────────────────────────────────────
 
 async fn call_model(model_url: &str, system: &str, user: &str) -> Result<String, BonsaiError> {
-    let url  = format!("{}/v1/chat/completions", model_url.trim_end_matches('/'));
+    let url = format!("{}/v1/chat/completions", model_url.trim_end_matches('/'));
     let body = json!({
         "messages": [
             { "role": "system", "content": system },
@@ -36,11 +36,15 @@ async fn call_model(model_url: &str, system: &str, user: &str) -> Result<String,
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text   = resp.text().await.unwrap_or_default();
-        return Err(BonsaiError::Network(format!("model returned {status}: {text}")));
+        let text = resp.text().await.unwrap_or_default();
+        return Err(BonsaiError::Network(format!(
+            "model returned {status}: {text}"
+        )));
     }
 
-    let json: serde_json::Value = resp.json().await
+    let json: serde_json::Value = resp
+        .json()
+        .await
         .map_err(|e| BonsaiError::Serde(e.to_string()))?;
 
     json["choices"][0]["message"]["content"]
@@ -55,9 +59,9 @@ async fn call_model(model_url: &str, system: &str, user: &str) -> Result<String,
 impl Agent for CodeReviewer {
     fn metadata(&self) -> AgentMetadata {
         AgentMetadata {
-            id:           "code-reviewer".into(),
-            name:         "Code Reviewer".into(),
-            description:  "Reviews code files and provides actionable suggestions.".into(),
+            id: "code-reviewer".into(),
+            name: "Code Reviewer".into(),
+            description: "Reviews code files and provides actionable suggestions.".into(),
             capabilities: vec![
                 AgentCapability::TextGeneration,
                 AgentCapability::CodeEditing,
@@ -75,7 +79,8 @@ impl Agent for CodeReviewer {
         })?;
 
         // Optionally read a file supplied via metadata["file_path"]
-        let file_content = msg.metadata
+        let file_content = msg
+            .metadata
             .as_ref()
             .and_then(|m| m.get("file_path"))
             .and_then(|v| v.as_str())
@@ -97,8 +102,8 @@ impl Agent for CodeReviewer {
         let review = call_model(model_url, system, &user).await?;
 
         Ok(AgentOutput {
-            content:  review,
-            actions:  vec![],
+            content: review,
+            actions: vec![],
             metadata: None,
         })
     }

@@ -1,9 +1,9 @@
 //! `BonsaiLazyFrame` — lazy query builder wrapping `polars::LazyFrame`.
 
-use polars::prelude::*;
 use crate::error::DfResult;
 use crate::frame::BonsaiFrame;
 use crate::ops::{AggExpr, FilterExpr, SortSpec};
+use polars::prelude::*;
 
 pub struct BonsaiLazyFrame(LazyFrame);
 
@@ -26,7 +26,9 @@ impl BonsaiLazyFrame {
     }
 
     pub fn sort(self, specs: &[SortSpec]) -> Self {
-        if specs.is_empty() { return self; }
+        if specs.is_empty() {
+            return self;
+        }
         let opts = SortMultipleOptions::default()
             .with_order_descending_multi(specs.iter().map(|s| s.descending).collect::<Vec<_>>())
             .with_nulls_last_multi(specs.iter().map(|s| s.nulls_last).collect::<Vec<_>>());
@@ -55,43 +57,55 @@ impl BonsaiLazyFrame {
 
 fn filter_to_expr(f: &FilterExpr) -> Expr {
     match f {
-        FilterExpr::Eq  { col: c, val } => col(c).eq(scalar_to_lit(val)),
-        FilterExpr::Ne  { col: c, val } => col(c).neq(scalar_to_lit(val)),
-        FilterExpr::Lt  { col: c, val } => col(c).lt(scalar_to_lit(val)),
-        FilterExpr::Le  { col: c, val } => col(c).lt_eq(scalar_to_lit(val)),
-        FilterExpr::Gt  { col: c, val } => col(c).gt(scalar_to_lit(val)),
-        FilterExpr::Ge  { col: c, val } => col(c).gt_eq(scalar_to_lit(val)),
+        FilterExpr::Eq { col: c, val } => col(c).eq(scalar_to_lit(val)),
+        FilterExpr::Ne { col: c, val } => col(c).neq(scalar_to_lit(val)),
+        FilterExpr::Lt { col: c, val } => col(c).lt(scalar_to_lit(val)),
+        FilterExpr::Le { col: c, val } => col(c).lt_eq(scalar_to_lit(val)),
+        FilterExpr::Gt { col: c, val } => col(c).gt(scalar_to_lit(val)),
+        FilterExpr::Ge { col: c, val } => col(c).gt_eq(scalar_to_lit(val)),
         FilterExpr::Contains { col: c, pat } => col(c).str().contains(lit(pat.as_str()), false),
-        FilterExpr::IsNull   { col: c }  => col(c).is_null(),
-        FilterExpr::IsNotNull{ col: c }  => col(c).is_not_null(),
-        FilterExpr::And(exprs) => exprs.iter().map(filter_to_expr).reduce(|a, b| a.and(b)).unwrap_or(lit(true)),
-        FilterExpr::Or(exprs)  => exprs.iter().map(filter_to_expr).reduce(|a, b| a.or(b)).unwrap_or(lit(false)),
+        FilterExpr::IsNull { col: c } => col(c).is_null(),
+        FilterExpr::IsNotNull { col: c } => col(c).is_not_null(),
+        FilterExpr::And(exprs) => exprs
+            .iter()
+            .map(filter_to_expr)
+            .reduce(|a, b| a.and(b))
+            .unwrap_or(lit(true)),
+        FilterExpr::Or(exprs) => exprs
+            .iter()
+            .map(filter_to_expr)
+            .reduce(|a, b| a.or(b))
+            .unwrap_or(lit(false)),
         FilterExpr::Not(inner) => filter_to_expr(inner).not(),
     }
 }
 
 fn agg_to_expr(a: &AggExpr) -> Expr {
     let base = match a {
-        AggExpr::Sum   { col: c, .. } => col(c).sum(),
-        AggExpr::Mean  { col: c, .. } => col(c).mean(),
-        AggExpr::Min   { col: c, .. } => col(c).min(),
-        AggExpr::Max   { col: c, .. } => col(c).max(),
+        AggExpr::Sum { col: c, .. } => col(c).sum(),
+        AggExpr::Mean { col: c, .. } => col(c).mean(),
+        AggExpr::Min { col: c, .. } => col(c).min(),
+        AggExpr::Max { col: c, .. } => col(c).max(),
         AggExpr::Count { col: c, .. } => col(c).count(),
         AggExpr::First { col: c, .. } => col(c).first(),
-        AggExpr::Last  { col: c, .. } => col(c).last(),
-        AggExpr::Std   { col: c, .. } => col(c).std(1),
-        AggExpr::Median{ col: c, .. } => col(c).median(),
+        AggExpr::Last { col: c, .. } => col(c).last(),
+        AggExpr::Std { col: c, .. } => col(c).std(1),
+        AggExpr::Median { col: c, .. } => col(c).median(),
     };
-    if let Some(alias_name) = a.alias() { base.alias(alias_name) } else { base }
+    if let Some(alias_name) = a.alias() {
+        base.alias(alias_name)
+    } else {
+        base
+    }
 }
 
 fn scalar_to_lit(s: &crate::ops::Scalar) -> Expr {
     use crate::ops::Scalar;
     match s {
-        Scalar::Null      => lit(NULL),
-        Scalar::Bool(b)   => lit(*b),
-        Scalar::Int(n)    => lit(*n),
-        Scalar::Float(f)  => lit(*f),
-        Scalar::Str(s)    => lit(s.as_str()),
+        Scalar::Null => lit(NULL),
+        Scalar::Bool(b) => lit(*b),
+        Scalar::Int(n) => lit(*n),
+        Scalar::Float(f) => lit(*f),
+        Scalar::Str(s) => lit(s.as_str()),
     }
 }

@@ -1,5 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(clippy::too_many_arguments, clippy::useless_format, clippy::needless_borrow)]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::useless_format,
+    clippy::needless_borrow
+)]
 
 use clap::Parser;
 

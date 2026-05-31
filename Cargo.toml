@@ -42,6 +42,10 @@ members = [
   "crates/bonsai-fabric",
   "src-daemon", "crates/bonsai-hnsw", "crates/bonsai-kdb", "crates/bonsai-package",
   "crates/bonsai-credits", "crates/bonsai-marketplace",
+  "crates/bonsai-swarm",
+  "crates/bonsai-tui",
+  "crates/bonsai-extensions",
+  "crates/bonsai-extension-converter",
   # bonsai-watchdog is intentionally excluded from the workspace members list.
   # It uses rusqlite 0.31 which links libsqlite3-sys 0.28, conflicting with
   # sqlx's libsqlite3-sys 0.30 requirement elsewhere in the workspace.

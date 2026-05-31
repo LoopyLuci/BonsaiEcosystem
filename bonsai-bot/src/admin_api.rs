@@ -1,5 +1,3 @@
-use std::sync::{Arc, RwLock};
-use std::collections::HashMap;
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -9,17 +7,19 @@ use axum::{
 };
 use dashmap::DashMap;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
-use tokio::process::Command;
 use tokio::time::Duration;
 // CORS intentionally omitted — admin API is loopback-only (127.0.0.1) and
 // must never be accessible from browser origins.
-use sha2::Digest;
-use std::path::PathBuf;
-use std::fs::OpenOptions;
-use hex;
 use chrono::{self};
+use hex;
+use sha2::Digest;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 use crate::config::keyring_set;
 use crate::metrics::SharedMetrics;
@@ -28,11 +28,16 @@ use crate::session::Db;
 fn pid_running(pid: i64) -> bool {
     #[cfg(target_os = "windows")]
     {
-        match std::process::Command::new("tasklist").args(["/FI", &format!("PID eq {}", pid), "/NH"]).output() {
+        match std::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+            .output()
+        {
             Ok(out) => {
                 let s = String::from_utf8_lossy(&out.stdout);
                 let s = s.trim();
-                if s.is_empty() || s.contains("No tasks") { return false; }
+                if s.is_empty() || s.contains("No tasks") {
+                    return false;
+                }
                 // crude check: if output contains pid number
                 s.contains(&pid.to_string())
             }
@@ -41,7 +46,11 @@ fn pid_running(pid: i64) -> bool {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        match std::process::Command::new("ps").arg("-p").arg(pid.to_string()).status() {
+        match std::process::Command::new("ps")
+            .arg("-p")
+            .arg(pid.to_string())
+            .status()
+        {
             Ok(st) => st.success(),
             Err(_) => false,
         }
@@ -51,7 +60,10 @@ fn pid_running(pid: i64) -> bool {
 fn kill_pid(pid: i64) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        match std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).status() {
+        match std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .status()
+        {
             Ok(s) if s.success() => Ok(()),
             Ok(s) => Err(format!("taskkill exit: {}", s)),
             Err(e) => Err(e.to_string()),
@@ -59,7 +71,11 @@ fn kill_pid(pid: i64) -> Result<(), String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        match std::process::Command::new("kill").arg("-TERM").arg(pid.to_string()).status() {
+        match std::process::Command::new("kill")
+            .arg("-TERM")
+            .arg(pid.to_string())
+            .status()
+        {
             Ok(s) if s.success() => Ok(()),
             Ok(s) => Err(format!("kill exit: {}", s)),
             Err(e) => Err(e.to_string()),
@@ -73,18 +89,18 @@ pub type PlatformStates = Arc<DashMap<String, String>>;
 /// A broadcast request forwarded from the admin API to the main dispatch loop.
 #[derive(Debug, Clone)]
 pub struct BroadcastRequest {
-    pub message:   String,
+    pub message: String,
     pub platforms: Vec<String>,
 }
 
 #[derive(Clone)]
 pub struct AdminState {
-    pub metrics:         SharedMetrics,
+    pub metrics: SharedMetrics,
     pub platform_states: PlatformStates,
-    pub db:              Db,
-    pub broadcast_tx:    mpsc::Sender<BroadcastRequest>,
+    pub db: Db,
+    pub broadcast_tx: mpsc::Sender<BroadcastRequest>,
     /// In-memory token, wrapped for atomic rotation without restart.
-    pub admin_token:     Arc<RwLock<String>>,
+    pub admin_token: Arc<RwLock<String>>,
     /// Allowed ports for reclaim operations — hot-reloadable.
     pub reclaim_allowed_ports: Arc<RwLock<Vec<u16>>>,
     /// Allowed script path prefixes for runtime start requests — hot-reloadable.
@@ -114,8 +130,8 @@ pub struct RuntimeInfo {
 #[allow(dead_code)]
 pub struct AdminHandle {
     shutdown_tx: Option<oneshot::Sender<()>>,
-    join:        JoinHandle<()>,
-    pub port:    u16,
+    join: JoinHandle<()>,
+    pub port: u16,
 }
 
 impl AdminHandle {
@@ -136,12 +152,12 @@ impl AdminHandle {
 }
 
 pub async fn start(
-    preferred_port:  u16,
-    metrics:         SharedMetrics,
+    preferred_port: u16,
+    metrics: SharedMetrics,
     platform_states: PlatformStates,
-    db:              Db,
-    broadcast_tx:    mpsc::Sender<BroadcastRequest>,
-    admin_token:     String,
+    db: Db,
+    broadcast_tx: mpsc::Sender<BroadcastRequest>,
+    admin_token: String,
 ) -> Result<AdminHandle, String> {
     // If a persisted port file exists but points to an unhealthy API, remove it
     if let Some(dir) = crate::config::config_dir() {
@@ -153,7 +169,9 @@ pub async fn start(
                         let p = p as u16;
                         if !crate::port_manager::is_api_healthy("127.0.0.1", p).await {
                             let _ = std::fs::remove_file(&path);
-                            tracing::info!("[admin-api] removed stale port file {path:?} (port={p})");
+                            tracing::info!(
+                                "[admin-api] removed stale port file {path:?} (port={p})"
+                            );
                         }
                     }
                 }
@@ -191,9 +209,9 @@ pub async fn start(
         allowed_script_paths: Arc::new(RwLock::new(cfg.allowed_script_paths.clone())),
         runtime_limits: Arc::new(RwLock::new(cfg.runtime_limits.clone())),
         runtime_children: Arc::new(Mutex::new(HashMap::new())),
-        buddy_api_url:    cfg.buddy_api_url.clone(),
+        buddy_api_url: cfg.buddy_api_url.clone(),
         workspace_api_url: cfg.workspace_api_url.clone(),
-        swarm_peers:      cfg.swarm_peers.clone(),
+        swarm_peers: cfg.swarm_peers.clone(),
     };
 
     // Reconcile persisted runtime records on startup; populate in-memory map with metadata
@@ -215,7 +233,8 @@ pub async fn start(
                     // Check whether PID is running; if not, mark as orphan
                     let alive = pid.and_then(|p| Some(pid_running(p))).unwrap_or(false);
                     if !alive {
-                        let _ = crate::session::update_runtime_status(&db, &id, "orphan", None).await;
+                        let _ =
+                            crate::session::update_runtime_status(&db, &id, "orphan", None).await;
                         continue;
                     }
                     // Insert metadata with no controller handle (cannot reattach)
@@ -235,24 +254,24 @@ pub async fn start(
     }
 
     let app = Router::new()
-        .route("/health",                    get(health))
-        .route("/reclaim-listener",          post(reclaim_listener))
-        .route("/runtime/start",            post(start_runtime))
-        .route("/runtime/stop",             post(stop_runtime))
-        .route("/runtime/list",             get(list_runtimes))
-        .route("/status",                    get(status))
-        .route("/sessions",                  get(sessions_handler))
-        .route("/broadcast",                 post(broadcast_handler))
-        .route("/metrics",                   get(metrics_handler))
-        .route("/config/reload",             post(config_reload))
+        .route("/health", get(health))
+        .route("/reclaim-listener", post(reclaim_listener))
+        .route("/runtime/start", post(start_runtime))
+        .route("/runtime/stop", post(stop_runtime))
+        .route("/runtime/list", get(list_runtimes))
+        .route("/status", get(status))
+        .route("/sessions", get(sessions_handler))
+        .route("/broadcast", post(broadcast_handler))
+        .route("/metrics", get(metrics_handler))
+        .route("/config/reload", post(config_reload))
         .route("/config/rotate-admin-token", post(rotate_token))
-        .route("/runtime/create-skill",      post(create_skill))
-        .route("/skills",                    get(list_skills_handler))
-        .route("/skills/:id/toggle",         post(toggle_skill_handler))
-        .route("/skills/:id",               axum::routing::delete(delete_skill_handler))
-        .route("/health/full",               get(health_full))
-        .route("/audit-log",                 get(audit_log_handler))
-        .route("/metrics/prometheus",        get(prometheus_handler))
+        .route("/runtime/create-skill", post(create_skill))
+        .route("/skills", get(list_skills_handler))
+        .route("/skills/:id/toggle", post(toggle_skill_handler))
+        .route("/skills/:id", axum::routing::delete(delete_skill_handler))
+        .route("/health/full", get(health_full))
+        .route("/audit-log", get(audit_log_handler))
+        .route("/metrics/prometheus", get(prometheus_handler))
         .with_state(state);
 
     tracing::info!("[admin-api] Listening on http://127.0.0.1:{port}");
@@ -267,7 +286,11 @@ pub async fn start(
         }
     });
 
-    Ok(AdminHandle { shutdown_tx: Some(shutdown_tx), join, port })
+    Ok(AdminHandle {
+        shutdown_tx: Some(shutdown_tx),
+        join,
+        port,
+    })
 }
 
 #[derive(serde::Deserialize)]
@@ -285,8 +308,11 @@ async fn reclaim_listener(
     Json(body): Json<ReclaimRequest>,
 ) -> impl IntoResponse {
     // extract presented token (for audit) and verify auth
-    let presented_token = headers.get("authorization").and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer ")).map(|s| s.to_string());
+    let presented_token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(|s| s.to_string());
     let token_hash = presented_token.as_ref().map(|t| {
         let digest = sha2::Sha256::digest(t.as_bytes());
         format!("sha256:{}", hex::encode(digest))
@@ -297,19 +323,33 @@ async fn reclaim_listener(
     let audit_details = json!({ "ports": body.ports, "force_kill": body.force_kill, "use_handle": body.use_handle });
     let _ = write_admin_audit("reclaim_attempt", token_hash.as_deref(), &audit_details);
     if !authorized {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
 
     // Try several likely locations for the script: current dir and exe parent.
     let mut candidates = Vec::new();
-    if let Ok(cwd) = std::env::current_dir() { candidates.push(cwd.join("scripts").join("reclaim-listener.ps1")); }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("scripts").join("reclaim-listener.ps1"));
+    }
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(p) = exe.parent() { candidates.push(p.join("scripts").join("reclaim-listener.ps1")); }
+        if let Some(p) = exe.parent() {
+            candidates.push(p.join("scripts").join("reclaim-listener.ps1"));
+        }
     }
     let script = candidates.into_iter().find(|p| p.exists());
     let script = match script {
         Some(p) => p,
-        None => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "reclaim script not found"}))).into_response(),
+        None => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "reclaim script not found"})),
+            )
+                .into_response()
+        }
     };
 
     // Enforce whitelist: only allow requested ports that are in the configured reclaim_allowed_ports
@@ -354,22 +394,42 @@ async fn reclaim_listener(
         if !ports.is_empty() {
             // validate ports against allowed list
             if allowed_ports.is_empty() {
-                return (StatusCode::FORBIDDEN, Json(json!({"error": "No ports are allowed to be reclaimed on this host"}))).into_response();
+                return (
+                    StatusCode::FORBIDDEN,
+                    Json(json!({"error": "No ports are allowed to be reclaimed on this host"})),
+                )
+                    .into_response();
             }
             for p in ports.iter() {
                 if !allowed_ports.contains(p) {
-                    return (StatusCode::FORBIDDEN, Json(json!({"error": format!("port {} not allowed", p)}))).into_response();
+                    return (
+                        StatusCode::FORBIDDEN,
+                        Json(json!({"error": format!("port {} not allowed", p)})),
+                    )
+                        .into_response();
                 }
             }
-            let ports_str = ports.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(",");
+            let ports_str = ports
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
             ps_cmd.push_str(&format!(" -Ports {}", ports_str));
         }
     }
-    if body.force_kill { ps_cmd.push_str(" -ForceKill"); }
-    if body.use_handle { ps_cmd.push_str(" -UseHandle"); }
+    if body.force_kill {
+        ps_cmd.push_str(" -ForceKill");
+    }
+    if body.use_handle {
+        ps_cmd.push_str(" -UseHandle");
+    }
 
     let mut cmd = Command::new("powershell");
-    cmd.arg("-NoProfile").arg("-ExecutionPolicy").arg("Bypass").arg("-Command").arg(ps_cmd);
+    cmd.arg("-NoProfile")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-Command")
+        .arg(ps_cmd);
     #[cfg(windows)]
     {
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
@@ -383,12 +443,20 @@ async fn reclaim_listener(
             let _ = write_admin_audit("reclaim_result", token_hash.as_deref(), &res);
             Json(res).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
 /// Append a small JSON audit line to the admin audit log in the config dir (or local file).
-fn write_admin_audit(action: &str, token_hash: Option<&str>, details: &Value) -> Result<(), String> {
+fn write_admin_audit(
+    action: &str,
+    token_hash: Option<&str>,
+    details: &Value,
+) -> Result<(), String> {
     let entry = json!({
         "ts": chrono::Utc::now().to_rfc3339(),
         "action": action,
@@ -408,14 +476,22 @@ fn write_admin_audit(action: &str, token_hash: Option<&str>, details: &Value) ->
         tracing::warn!("[admin-audit] rotation check failed: {}", e);
     }
     let s = serde_json::to_string(&entry).map_err(|e| e.to_string())?;
-    let mut f = OpenOptions::new().create(true).append(true).open(&target_path).map_err(|e| e.to_string())?;
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&target_path)
+        .map_err(|e| e.to_string())?;
     use std::io::Write;
     f.write_all(s.as_bytes()).map_err(|e| e.to_string())?;
     f.write_all(b"\n").map_err(|e| e.to_string())?;
     Ok(())
 }
 
-fn rotate_and_prune_audit_log(target: &PathBuf, max_bytes: u64, retain_days: i64) -> Result<(), String> {
+fn rotate_and_prune_audit_log(
+    target: &PathBuf,
+    max_bytes: u64,
+    retain_days: i64,
+) -> Result<(), String> {
     use std::fs;
     if !target.exists() {
         return Ok(());
@@ -438,8 +514,9 @@ fn rotate_and_prune_audit_log(target: &PathBuf, max_bytes: u64, retain_days: i64
                         if let Ok(meta) = e.metadata() {
                             if let Ok(mtime) = meta.modified() {
                                 if let Ok(since) = mtime.duration_since(std::time::UNIX_EPOCH) {
-                                    let dt = chrono::DateTime::from_timestamp(since.as_secs() as i64, 0)
-                                        .unwrap_or_else(chrono::Utc::now);
+                                    let dt =
+                                        chrono::DateTime::from_timestamp(since.as_secs() as i64, 0)
+                                            .unwrap_or_else(chrono::Utc::now);
                                     if dt < cutoff {
                                         let _ = std::fs::remove_file(e.path());
                                     }
@@ -476,7 +553,11 @@ async fn start_runtime(
     Json(body): Json<StartRuntimeRequest>,
 ) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
 
     // Resolve script path and enforce allowed-script-paths policy.
@@ -484,7 +565,9 @@ async fn start_runtime(
     let script_abs = if script_candidate.is_absolute() {
         script_candidate
     } else {
-        std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")).join(script_candidate)
+        std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(script_candidate)
     };
     let script_canon = script_abs.canonicalize().unwrap_or(script_abs.clone());
 
@@ -498,8 +581,14 @@ async fn start_runtime(
             allowed_bases.push(canon);
         }
     } else {
-        if let Ok(cwd) = std::env::current_dir() { allowed_bases.push(cwd.join("runtimes")); }
-        if let Ok(exe) = std::env::current_exe() { if let Some(p) = exe.parent() { allowed_bases.push(p.join("runtimes")); } }
+        if let Ok(cwd) = std::env::current_dir() {
+            allowed_bases.push(cwd.join("runtimes"));
+        }
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(p) = exe.parent() {
+                allowed_bases.push(p.join("runtimes"));
+            }
+        }
     }
 
     let mut allowed = false;
@@ -510,7 +599,11 @@ async fn start_runtime(
         }
     }
     if !allowed {
-        return (StatusCode::FORBIDDEN, Json(json!({"error": "script path not allowed"}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "script path not allowed"})),
+        )
+            .into_response();
     }
 
     // Enforce per-user concurrency limit (if present)
@@ -521,9 +614,16 @@ async fn start_runtime(
     if let Some(user) = &body.user {
         if let Some(max) = max_instances {
             let map = s.runtime_children.lock().await;
-            let count = map.values().filter(|info| info.user.as_deref() == Some(user.as_str())).count();
+            let count = map
+                .values()
+                .filter(|info| info.user.as_deref() == Some(user.as_str()))
+                .count();
             if (count as u32) >= max {
-                return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "user runtime limit reached"}))).into_response();
+                return (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(json!({"error": "user runtime limit reached"})),
+                )
+                    .into_response();
             }
         }
     }
@@ -533,7 +633,11 @@ async fn start_runtime(
         Some(t) => {
             if let Some(max) = max_secs {
                 if t > max {
-                    return (StatusCode::BAD_REQUEST, Json(json!({"error": "requested timeout exceeds configured maximum"}))).into_response();
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(json!({"error": "requested timeout exceeds configured maximum"})),
+                    )
+                        .into_response();
                 }
             }
             Some(t)
@@ -546,11 +650,24 @@ async fn start_runtime(
     let controller_res = match body.kind.as_str() {
         "python" => {
             let port = body.port.unwrap_or(0);
-            rm.start_python_worker(&script_canon.to_string_lossy(), port).await
+            rm.start_python_worker(&script_canon.to_string_lossy(), port)
+                .await
         }
-        "clojurewasm" => rm.start_clojurewasm_worker(&script_canon.to_string_lossy(), timeout).await,
-        "babashka" => rm.start_babashka_worker(&script_canon.to_string_lossy()).await,
-        _ => return (StatusCode::BAD_REQUEST, Json(json!({"error": "unknown runtime kind"}))).into_response(),
+        "clojurewasm" => {
+            rm.start_clojurewasm_worker(&script_canon.to_string_lossy(), timeout)
+                .await
+        }
+        "babashka" => {
+            rm.start_babashka_worker(&script_canon.to_string_lossy())
+                .await
+        }
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "unknown runtime kind"})),
+            )
+                .into_response()
+        }
     };
 
     match controller_res {
@@ -559,14 +676,17 @@ async fn start_runtime(
             // store controller for lifecycle management and persist metadata
             {
                 let mut map = s.runtime_children.lock().await;
-                map.insert(id.clone(), RuntimeInfo {
-                    controller: Some(controller),
-                    pid: Some(pid),
-                    user: body.user.clone(),
-                    script: script_canon.to_string_lossy().into_owned(),
-                    started_at: chrono::Utc::now(),
-                    timeout_secs: timeout,
-                });
+                map.insert(
+                    id.clone(),
+                    RuntimeInfo {
+                        controller: Some(controller),
+                        pid: Some(pid),
+                        user: body.user.clone(),
+                        script: script_canon.to_string_lossy().into_owned(),
+                        started_at: chrono::Utc::now(),
+                        timeout_secs: timeout,
+                    },
+                );
             }
             let _ = crate::session::upsert_runtime_record(
                 &s.db,
@@ -578,7 +698,8 @@ async fn start_runtime(
                 "running",
                 chrono::Utc::now().timestamp(),
                 timeout.map(|t| t as i64),
-            ).await;
+            )
+            .await;
 
             // If timeout was requested, spawn a monitor that will kill the runtime after timeout
             if let Some(tsec) = timeout {
@@ -596,15 +717,26 @@ async fn start_runtime(
                         } else if let Some(p) = info.pid {
                             let _ = kill_pid(p);
                         }
-                        let _ = write_admin_audit("runtime_timeout", None, &json!({"id": id_clone}));
-                        let _ = crate::session::update_runtime_status(&db_clone, &id_clone, "timed_out", None).await;
+                        let _ =
+                            write_admin_audit("runtime_timeout", None, &json!({"id": id_clone}));
+                        let _ = crate::session::update_runtime_status(
+                            &db_clone,
+                            &id_clone,
+                            "timed_out",
+                            None,
+                        )
+                        .await;
                     }
                 });
             }
 
             Json(json!({ "id": id, "pid": pid })).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -614,59 +746,90 @@ async fn stop_runtime(
     Json(body): Json<StopRuntimeRequest>,
 ) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     let mut map = s.runtime_children.lock().await;
     if let Some(mut info) = map.remove(&body.id) {
         // attempt graceful kill: prefer controller handle, otherwise kill by PID
         if let Some(mut ctrl) = info.controller.take() {
             if let Err(e) = ctrl.kill().await {
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("kill failed: {}", e)}))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": format!("kill failed: {}", e)})),
+                )
+                    .into_response();
             }
             match ctrl.wait().await {
                 Ok(code_opt) => {
-                    let _ = crate::session::update_runtime_status(&s.db, &body.id, "stopped", None).await;
-                    return Json(json!({"ok": true, "code": code_opt})).into_response()
+                    let _ = crate::session::update_runtime_status(&s.db, &body.id, "stopped", None)
+                        .await;
+                    return Json(json!({"ok": true, "code": code_opt})).into_response();
                 }
-                Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+                Err(e) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error": e.to_string()})),
+                    )
+                        .into_response()
+                }
             }
         } else if let Some(pid) = info.pid {
             // Kill by PID via platform command
             if let Err(e) = kill_pid(pid) {
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("kill-pid failed: {}", e)}))).into_response();
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": format!("kill-pid failed: {}", e)})),
+                )
+                    .into_response();
             }
             let _ = crate::session::update_runtime_status(&s.db, &body.id, "stopped", None).await;
             return Json(json!({"ok": true, "killed_pid": pid})).into_response();
         } else {
             let _ = crate::session::update_runtime_status(&s.db, &body.id, "unknown", None).await;
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "no handle or pid for runtime"}))).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "no handle or pid for runtime"})),
+            )
+                .into_response();
         }
     } else {
-        (StatusCode::NOT_FOUND, Json(json!({"error": "runtime id not found"}))).into_response()
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "runtime id not found"})),
+        )
+            .into_response()
     }
 }
 
-async fn list_runtimes(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn list_runtimes(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     let map = s.runtime_children.lock().await;
     let mut out = Vec::new();
     for (id, info) in map.iter() {
-        let pid = info.pid.or_else(|| info.controller.as_ref().and_then(|c| c.pid())).unwrap_or(0);
+        let pid = info
+            .pid
+            .or_else(|| info.controller.as_ref().and_then(|c| c.pid()))
+            .unwrap_or(0);
         let controllable = info.controller.is_some();
         out.push(json!({"id": id, "pid": pid, "controllable": controllable, "user": info.user, "script": info.script, "started_at": info.started_at.to_rfc3339()}));
     }
     Json(json!({"runtimes": out})).into_response()
 }
 
-
 fn check_auth(headers: &HeaderMap, state: &AdminState) -> bool {
     let token = state.admin_token.read().unwrap();
-    headers.get("authorization")
+    headers
+        .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(|tok| tok == token.as_str())
@@ -677,47 +840,53 @@ async fn health() -> impl IntoResponse {
     Json(json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION") }))
 }
 
-async fn status(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn status(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
-    let platforms: serde_json::Map<String, Value> = s.platform_states
+    let platforms: serde_json::Map<String, Value> = s
+        .platform_states
         .iter()
         .map(|entry| (entry.key().clone(), Value::String(entry.value().clone())))
         .collect();
     Json(json!({
         "status": "ok",
         "platforms": platforms,
-    })).into_response()
+    }))
+    .into_response()
 }
 
-async fn metrics_handler(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn metrics_handler(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     Json(s.metrics.snapshot()).into_response()
 }
 
-async fn config_reload(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn config_reload(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     let cfg = crate::config::load_config();
     {
         *s.reclaim_allowed_ports.write().unwrap() = cfg.reclaim_allowed_ports.clone();
-        *s.allowed_script_paths.write().unwrap()  = cfg.allowed_script_paths.clone();
-        *s.runtime_limits.write().unwrap()         = cfg.runtime_limits.clone();
+        *s.allowed_script_paths.write().unwrap() = cfg.allowed_script_paths.clone();
+        *s.runtime_limits.write().unwrap() = cfg.runtime_limits.clone();
     }
-    tracing::info!("[admin-api] Config reloaded from disk (reclaim_ports={}, script_paths={}, max_secs={:?})",
+    tracing::info!(
+        "[admin-api] Config reloaded from disk (reclaim_ports={}, script_paths={}, max_secs={:?})",
         cfg.reclaim_allowed_ports.len(),
         cfg.allowed_script_paths.len(),
         cfg.runtime_limits.max_runtime_secs,
@@ -725,12 +894,13 @@ async fn config_reload(
     Json(json!({ "status": "reloaded" })).into_response()
 }
 
-async fn rotate_token(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn rotate_token(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     let new_tok = uuid::Uuid::new_v4().to_string();
     match keyring_set("bot_admin_token", &new_tok) {
@@ -743,12 +913,13 @@ async fn rotate_token(
     }
 }
 
-async fn sessions_handler(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn sessions_handler(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     let sessions = crate::session::list_active_sessions(&s.db).await;
     Json(json!({ "sessions": sessions })).into_response()
@@ -756,7 +927,7 @@ async fn sessions_handler(
 
 #[derive(serde::Deserialize)]
 struct BroadcastBody {
-    message:   String,
+    message: String,
     #[serde(default)]
     platforms: Vec<String>,
 }
@@ -767,18 +938,30 @@ async fn broadcast_handler(
     Json(body): Json<BroadcastBody>,
 ) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     if body.message.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "message is required"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "message is required"})),
+        )
+            .into_response();
     }
     let req = BroadcastRequest {
-        message:   body.message,
+        message: body.message,
         platforms: body.platforms,
     };
     match s.broadcast_tx.try_send(req) {
         Ok(()) => Json(json!({ "status": "queued" })).into_response(),
-        Err(_) => (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"error": "broadcast queue full"}))).into_response(),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error": "broadcast queue full"})),
+        )
+            .into_response(),
     }
 }
 
@@ -786,8 +969,8 @@ async fn broadcast_handler(
 mod tests {
     use super::*;
     use crate::metrics::Metrics;
-    use tokio_rusqlite::Connection;
     use std::path::PathBuf;
+    use tokio_rusqlite::Connection;
 
     #[tokio::test]
     async fn audit_write_and_readable() {
@@ -819,9 +1002,9 @@ mod tests {
             allowed_script_paths: Arc::new(RwLock::new(vec![])),
             runtime_limits: Arc::new(RwLock::new(crate::config::RuntimeLimits::default())),
             runtime_children: Arc::new(Mutex::new(HashMap::new())),
-            buddy_api_url:    "http://127.0.0.1:11420".into(),
+            buddy_api_url: "http://127.0.0.1:11420".into(),
             workspace_api_url: "http://127.0.0.1:11369".into(),
-            swarm_peers:      vec![],
+            swarm_peers: vec![],
         };
 
         let mut headers = HeaderMap::new();
@@ -837,10 +1020,10 @@ mod tests {
 
 #[derive(serde::Deserialize)]
 struct CreateSkillBody {
-    name:        String,
+    name: String,
     description: String,
-    script:      String,
-    language:    String,
+    script: String,
+    language: String,
 }
 
 async fn create_skill(
@@ -849,23 +1032,45 @@ async fn create_skill(
     Json(body): Json<CreateSkillBody>,
 ) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
 
     // Validate language
     let ext = match body.language.as_str() {
-        "python"   => "py",
-        "clojure"  => "clj",
+        "python" => "py",
+        "clojure" => "clj",
         "babashka" => "clj",
-        other => return (StatusCode::BAD_REQUEST, Json(json!({"error": format!("unsupported language: {other}")}))).into_response(),
+        other => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": format!("unsupported language: {other}")})),
+            )
+                .into_response()
+        }
     };
 
     // Sanitize name to safe filename (alphanumeric + underscore)
-    let safe_name: String = body.name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+    let safe_name: String = body
+        .name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if safe_name.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "name is required"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "name is required"})),
+        )
+            .into_response();
     }
 
     // Determine skills directory (first allowed_script_paths entry, else config_dir/skills)
@@ -881,7 +1086,11 @@ async fn create_skill(
     };
 
     if let Err(e) = std::fs::create_dir_all(&skills_dir) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("mkdir: {e}")}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("mkdir: {e}")})),
+        )
+            .into_response();
     }
 
     let skill_id = uuid::Uuid::new_v4().to_string();
@@ -889,7 +1098,11 @@ async fn create_skill(
     let script_path = skills_dir.join(&filename);
 
     if let Err(e) = std::fs::write(&script_path, &body.script) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": format!("write: {e}")}))).into_response();
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("write: {e}")})),
+        )
+            .into_response();
     }
 
     // Persist skill manifest alongside the script
@@ -902,47 +1115,61 @@ async fn create_skill(
         "created_at":  chrono::Utc::now().to_rfc3339(),
     });
     let manifest_path = script_path.with_extension("skill.json");
-    let _ = std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest).unwrap_or_default());
+    let _ = std::fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).unwrap_or_default(),
+    );
 
-    tracing::info!("[admin-api] Skill created: id={skill_id} name={} lang={}", body.name, body.language);
+    tracing::info!(
+        "[admin-api] Skill created: id={skill_id} name={} lang={}",
+        body.name,
+        body.language
+    );
 
     // Also persist the skill record in SQLite so it survives restarts
     let now = chrono::Utc::now().timestamp();
     let skill_rec = crate::session::SkillRecord {
-        id:          skill_id.clone(),
-        name:        body.name.clone(),
+        id: skill_id.clone(),
+        name: body.name.clone(),
         description: body.description.clone(),
-        language:    body.language.clone(),
+        language: body.language.clone(),
         script_path: script_path.to_string_lossy().to_string(),
-        version:     1,
-        enabled:     true,
-        created_at:  now,
-        updated_at:  now,
+        version: 1,
+        enabled: true,
+        created_at: now,
+        updated_at: now,
     };
     let _ = crate::session::upsert_skill(&s.db, skill_rec).await;
 
-    (StatusCode::CREATED, Json(json!({
-        "status":      "created",
-        "skill_id":    skill_id,
-        "script_path": script_path.to_string_lossy(),
-    }))).into_response()
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "status":      "created",
+            "skill_id":    skill_id,
+            "script_path": script_path.to_string_lossy(),
+        })),
+    )
+        .into_response()
 }
 
 // ── Skill registry endpoints ──────────────────────────────────────────────────
 
-async fn list_skills_handler(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn list_skills_handler(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     let skills = crate::session::list_skills(&s.db).await;
     Json(json!({ "skills": skills })).into_response()
 }
 
 #[derive(serde::Deserialize)]
-struct ToggleBody { enabled: bool }
+struct ToggleBody {
+    enabled: bool,
+}
 
 async fn toggle_skill_handler(
     State(s): State<AdminState>,
@@ -951,14 +1178,22 @@ async fn toggle_skill_handler(
     Json(body): Json<ToggleBody>,
 ) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     match crate::session::toggle_skill(&s.db, id.clone(), body.enabled).await {
         Ok(()) => {
             tracing::info!("[admin-api] Skill {id} enabled={}", body.enabled);
             Json(json!({ "status": "updated", "id": id, "enabled": body.enabled })).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -968,25 +1203,34 @@ async fn delete_skill_handler(
     axum::extract::Path(id): axum::extract::Path<String>,
 ) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
     match crate::session::delete_skill(&s.db, id.clone()).await {
         Ok(()) => {
             tracing::info!("[admin-api] Skill {id} deleted");
             Json(json!({ "status": "deleted", "id": id })).into_response()
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
 // ── Full health dashboard ─────────────────────────────────────────────────────
 
-async fn health_full(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn health_full(State(s): State<AdminState>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers, &s) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": "Unauthorized"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Unauthorized"})),
+        )
+            .into_response();
     }
 
     let http = reqwest::Client::builder()
@@ -997,9 +1241,13 @@ async fn health_full(
     // Buddy API check
     let buddy_check = {
         let url = format!("{}/health", s.buddy_api_url);
-        let t0  = std::time::Instant::now();
-        let ok  = tokio::time::timeout(Duration::from_secs(3), http.get(&url).send())
-            .await.ok().and_then(|r| r.ok()).map(|r| r.status().is_success()).unwrap_or(false);
+        let t0 = std::time::Instant::now();
+        let ok = tokio::time::timeout(Duration::from_secs(3), http.get(&url).send())
+            .await
+            .ok()
+            .and_then(|r| r.ok())
+            .map(|r| r.status().is_success())
+            .unwrap_or(false);
         json!({ "healthy": ok, "url": s.buddy_api_url, "latency_ms": t0.elapsed().as_millis() })
     };
 
@@ -1013,11 +1261,13 @@ async fn health_full(
                     let slots = body["slots"].as_array().cloned().unwrap_or_default();
                     let ready = slots.iter().find(|s| s["state"]["state"] == "ready");
                     let (slot_idx, model_id, loaded) = ready
-                        .map(|s| (
-                            s["index"].as_u64().unwrap_or(0),
-                            s["state"]["model_id"].as_str().unwrap_or("").to_string(),
-                            true,
-                        ))
+                        .map(|s| {
+                            (
+                                s["index"].as_u64().unwrap_or(0),
+                                s["state"]["model_id"].as_str().unwrap_or("").to_string(),
+                                true,
+                            )
+                        })
                         .unwrap_or((0, String::new(), false));
                     json!({ "healthy": loaded, "slot": slot_idx, "model": model_id, "loaded": loaded, "latency_ms": t0.elapsed().as_millis() })
                 } else {
@@ -1031,18 +1281,33 @@ async fn health_full(
     // Platform checks
     let mut platform_checks = serde_json::Map::new();
     for name in &["discord", "telegram", "email", "matrix"] {
-        let state_str = s.platform_states.get(*name).map(|v| v.clone()).unwrap_or_else(|| "not configured".to_string());
+        let state_str = s
+            .platform_states
+            .get(*name)
+            .map(|v| v.clone())
+            .unwrap_or_else(|| "not configured".to_string());
         let healthy = matches!(state_str.as_str(), "connected" | "polling" | "syncing");
-        platform_checks.insert(name.to_string(), json!({ "healthy": healthy, "state": state_str }));
+        platform_checks.insert(
+            name.to_string(),
+            json!({ "healthy": healthy, "state": state_str }),
+        );
     }
 
     // Swarm peer checks
     let mut peer_results = Vec::new();
     for peer in &s.swarm_peers {
         let url = format!("{}/health", peer.admin_url);
-        let ok = tokio::time::timeout(Duration::from_secs(2),
-            http.get(&url).header("authorization", format!("Bearer {}", peer.token)).send())
-            .await.ok().and_then(|r| r.ok()).map(|r| r.status().is_success()).unwrap_or(false);
+        let ok = tokio::time::timeout(
+            Duration::from_secs(2),
+            http.get(&url)
+                .header("authorization", format!("Bearer {}", peer.token))
+                .send(),
+        )
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .map(|r| r.status().is_success())
+        .unwrap_or(false);
         peer_results.push(json!({ "name": peer.name, "healthy": ok, "url": peer.admin_url }));
     }
 
@@ -1052,19 +1317,32 @@ async fn health_full(
             .map(|d| d.join("bonsai").join("scheduled_tasks.json"))
             .unwrap_or_else(|| std::path::PathBuf::from("scheduled_tasks.json"));
         let (count, exists) = if path.exists() {
-            let n = std::fs::read_to_string(&path).ok()
+            let n = std::fs::read_to_string(&path)
+                .ok()
                 .and_then(|s| serde_json::from_str::<Vec<Value>>(&s).ok())
-                .map(|v| v.iter().filter(|t| t["enabled"].as_bool().unwrap_or(false)).count())
+                .map(|v| {
+                    v.iter()
+                        .filter(|t| t["enabled"].as_bool().unwrap_or(false))
+                        .count()
+                })
                 .unwrap_or(0);
             (n, true)
-        } else { (0, false) };
+        } else {
+            (0, false)
+        };
         json!({ "healthy": exists, "enabled_tasks": count })
     };
 
     // Aggregate
     let buddy_ok = buddy_check["healthy"].as_bool().unwrap_or(false);
     let llama_ok = llama_check["healthy"].as_bool().unwrap_or(false);
-    let overall  = if buddy_ok && llama_ok { "healthy" } else if buddy_ok || llama_ok { "degraded" } else { "unhealthy" };
+    let overall = if buddy_ok && llama_ok {
+        "healthy"
+    } else if buddy_ok || llama_ok {
+        "degraded"
+    } else {
+        "unhealthy"
+    };
 
     Json(json!({
         "status": overall,
@@ -1075,38 +1353,38 @@ async fn health_full(
             "swarm_peers":  peer_results,
             "scheduler":    scheduler_check,
         }
-    })).into_response()
+    }))
+    .into_response()
 }
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
 
 use axum::response::Response;
 
-async fn audit_log_handler(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> Response {
+async fn audit_log_handler(State(s): State<AdminState>, headers: HeaderMap) -> Response {
     if !check_auth(&headers, &s) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
     let entries = crate::session::list_audit(&s.db, 200).await;
-    let rows: Vec<_> = entries.iter().map(|e| json!({
-        "id":       e.id,
-        "ts":       e.ts,
-        "event":    e.event,
-        "platform": e.platform,
-        "user_id":  e.user_id,
-        "detail":   e.detail,
-    })).collect();
+    let rows: Vec<_> = entries
+        .iter()
+        .map(|e| {
+            json!({
+                "id":       e.id,
+                "ts":       e.ts,
+                "event":    e.event,
+                "platform": e.platform,
+                "user_id":  e.user_id,
+                "detail":   e.detail,
+            })
+        })
+        .collect();
     Json(json!({ "entries": rows })).into_response()
 }
 
 // ── Prometheus metrics ────────────────────────────────────────────────────────
 
-async fn prometheus_handler(
-    State(s): State<AdminState>,
-    headers: HeaderMap,
-) -> Response {
+async fn prometheus_handler(State(s): State<AdminState>, headers: HeaderMap) -> Response {
     if !check_auth(&headers, &s) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
@@ -1154,5 +1432,6 @@ async fn prometheus_handler(
         StatusCode::OK,
         [("content-type", "text/plain; version=0.0.4")],
         body,
-    ).into_response()
+    )
+        .into_response()
 }

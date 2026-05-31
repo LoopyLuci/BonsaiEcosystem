@@ -25,7 +25,11 @@ pub struct Critic {
 
 impl Critic {
     pub fn new(orchestrator: Arc<ModelOrchestrator>, threshold: f32, max_retries: usize) -> Self {
-        Self { orchestrator, threshold, max_retries }
+        Self {
+            orchestrator,
+            threshold,
+            max_retries,
+        }
     }
 
     /// Score a (prompt, response) pair.  Returns a value in [0.0, 1.0].
@@ -39,11 +43,15 @@ impl Critic {
              AI response: {response}\n\n\
              Quality score (0.0–1.0):"
         );
-        match self.orchestrator.infer_simple(&eval_prompt, 8, "critic").await {
+        match self
+            .orchestrator
+            .infer_simple(&eval_prompt, 8, "critic")
+            .await
+        {
             Ok((text, _)) => parse_score(&text),
             Err(e) => {
                 debug!("[critic] score error (using default): {e}");
-                self.threshold  // non-blocking fallback
+                self.threshold // non-blocking fallback
             }
         }
     }
@@ -124,37 +132,79 @@ impl TaskDomain {
     /// Heuristic domain classifier — runs in microseconds, no model needed.
     pub fn classify(prompt: &str) -> Self {
         let lower = prompt.to_lowercase();
-        if lower.contains("music") || lower.contains("beat") || lower.contains("melody")
-            || lower.contains("chord") || lower.contains("bpm") || lower.contains("audio")
-            || lower.contains("song") || lower.contains("compose") {
+        if lower.contains("music")
+            || lower.contains("beat")
+            || lower.contains("melody")
+            || lower.contains("chord")
+            || lower.contains("bpm")
+            || lower.contains("audio")
+            || lower.contains("song")
+            || lower.contains("compose")
+        {
             return Self::Music;
         }
-        if lower.contains("image") || lower.contains("photo") || lower.contains("picture")
-            || lower.contains("vision") || lower.contains("screenshot") || lower.contains("visual") {
+        if lower.contains("image")
+            || lower.contains("photo")
+            || lower.contains("picture")
+            || lower.contains("vision")
+            || lower.contains("screenshot")
+            || lower.contains("visual")
+        {
             return Self::Vision;
         }
-        if lower.contains("code") || lower.contains("function") || lower.contains("rust")
-            || lower.contains("python") || lower.contains("javascript") || lower.contains("debug")
-            || lower.contains("compile") || lower.contains("error") || lower.contains("api")
-            || lower.contains("implement") || lower.contains("script") || lower.contains("program") {
+        if lower.contains("code")
+            || lower.contains("function")
+            || lower.contains("rust")
+            || lower.contains("python")
+            || lower.contains("javascript")
+            || lower.contains("debug")
+            || lower.contains("compile")
+            || lower.contains("error")
+            || lower.contains("api")
+            || lower.contains("implement")
+            || lower.contains("script")
+            || lower.contains("program")
+        {
             return Self::Code;
         }
-        if lower.contains("math") || lower.contains("calcul") || lower.contains("equation")
-            || lower.contains("formula") || lower.contains("proof") || lower.contains("derive")
-            || lower.contains("integral") || lower.contains("statistic") {
+        if lower.contains("math")
+            || lower.contains("calcul")
+            || lower.contains("equation")
+            || lower.contains("formula")
+            || lower.contains("proof")
+            || lower.contains("derive")
+            || lower.contains("integral")
+            || lower.contains("statistic")
+        {
             return Self::Math;
         }
-        if lower.contains("write") || lower.contains("story") || lower.contains("creative")
-            || lower.contains("poem") || lower.contains("essay") || lower.contains("narrative") {
+        if lower.contains("write")
+            || lower.contains("story")
+            || lower.contains("creative")
+            || lower.contains("poem")
+            || lower.contains("essay")
+            || lower.contains("narrative")
+        {
             return Self::Creative;
         }
-        if lower.contains("search") || lower.contains("explain") || lower.contains("research")
-            || lower.contains("what is") || lower.contains("how does") || lower.contains("why") {
+        if lower.contains("search")
+            || lower.contains("explain")
+            || lower.contains("research")
+            || lower.contains("what is")
+            || lower.contains("how does")
+            || lower.contains("why")
+        {
             return Self::Research;
         }
-        if lower.contains("system") || lower.contains("file") || lower.contains("disk")
-            || lower.contains("process") || lower.contains("memory") || lower.contains("cpu")
-            || lower.contains("run command") || lower.contains("shell") {
+        if lower.contains("system")
+            || lower.contains("file")
+            || lower.contains("disk")
+            || lower.contains("process")
+            || lower.contains("memory")
+            || lower.contains("cpu")
+            || lower.contains("run command")
+            || lower.contains("shell")
+        {
             return Self::System;
         }
         Self::General

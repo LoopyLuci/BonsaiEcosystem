@@ -1,11 +1,11 @@
 //! AgentMailbox — per-agent inbox/outbox with local and remote delivery.
 
-use std::sync::Arc;
-use dashmap::DashMap;
-use tokio::sync::mpsc;
-use bonsai_transfer_crypto::identity::BonsaiIdentity;
 use crate::envelope::{AgentId, MailEnvelope};
 use crate::error::{MailboxError, MailboxResult};
+use bonsai_transfer_crypto::identity::BonsaiIdentity;
+use dashmap::DashMap;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 const INBOX_CAPACITY: usize = 1024;
 
@@ -25,17 +25,22 @@ pub struct AgentMailbox {
 
 impl AgentMailbox {
     pub fn new() -> Self {
-        Self { agents: Arc::new(DashMap::new()) }
+        Self {
+            agents: Arc::new(DashMap::new()),
+        }
     }
 
     /// Register an agent, returning its inbox receiver.
-    pub fn register(
-        &self,
-        identity: Arc<BonsaiIdentity>,
-    ) -> mpsc::Receiver<MailEnvelope> {
+    pub fn register(&self, identity: Arc<BonsaiIdentity>) -> mpsc::Receiver<MailEnvelope> {
         let agent_id = identity.fingerprint().to_string();
         let (tx, rx) = mpsc::channel(INBOX_CAPACITY);
-        self.agents.insert(agent_id, AgentEntry { identity, inbox_tx: tx });
+        self.agents.insert(
+            agent_id,
+            AgentEntry {
+                identity,
+                inbox_tx: tx,
+            },
+        );
         rx
     }
 
@@ -47,7 +52,10 @@ impl AgentMailbox {
     /// Send a pre-built envelope. Local delivery is synchronous (channel push).
     pub async fn deliver(&self, envelope: MailEnvelope) -> MailboxResult<()> {
         if let Some(entry) = self.agents.get(&envelope.to) {
-            entry.inbox_tx.send(envelope).await
+            entry
+                .inbox_tx
+                .send(envelope)
+                .await
                 .map_err(|_| MailboxError::Closed)?;
             Ok(())
         } else {
@@ -83,7 +91,11 @@ impl AgentMailbox {
     pub fn verify_signature(&self, envelope: &MailEnvelope) -> MailboxResult<bool> {
         if let Some(entry) = self.agents.get(&envelope.from) {
             let signed = envelope.signed_bytes();
-            Ok(entry.identity.public_key.verify(&signed, &envelope.signature).is_ok())
+            Ok(entry
+                .identity
+                .public_key
+                .verify(&signed, &envelope.signature)
+                .is_ok())
         } else {
             Err(MailboxError::UnknownRecipient(envelope.from.clone()))
         }
@@ -96,7 +108,9 @@ impl AgentMailbox {
 }
 
 impl Default for AgentMailbox {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -108,13 +122,16 @@ mod tests {
     async fn local_delivery() {
         let mailbox = AgentMailbox::new();
         let alice = Arc::new(BonsaiIdentity::generate());
-        let bob   = Arc::new(BonsaiIdentity::generate());
+        let bob = Arc::new(BonsaiIdentity::generate());
 
         let bob_id = bob.fingerprint().to_string();
         let mut bob_rx = mailbox.register(bob.clone());
         mailbox.register(alice.clone());
 
-        mailbox.send_to(&alice, &bob_id, "ping", b"hello bob".to_vec()).await.unwrap();
+        mailbox
+            .send_to(&alice, &bob_id, "ping", b"hello bob".to_vec())
+            .await
+            .unwrap();
 
         let env = bob_rx.recv().await.unwrap();
         assert_eq!(env.topic, "ping");
@@ -127,7 +144,9 @@ mod tests {
         let alice = Arc::new(BonsaiIdentity::generate());
         mailbox.register(alice.clone());
 
-        let result = mailbox.send_to(&alice, &"nonexistent".to_string(), "x", vec![]).await;
+        let result = mailbox
+            .send_to(&alice, &"nonexistent".to_string(), "x", vec![])
+            .await;
         assert!(matches!(result, Err(MailboxError::UnknownRecipient(_))));
     }
 }

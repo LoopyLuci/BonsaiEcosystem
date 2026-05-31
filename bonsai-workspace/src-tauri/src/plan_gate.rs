@@ -30,7 +30,11 @@ use crate::middleware::{MiddlewareOutcome, ToolCall, ToolMiddleware};
 /// Risk tiers.  `High` triggers the plan gate; `Medium` is logged but allowed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum RiskLevel { Low, Medium, High }
+pub enum RiskLevel {
+    Low,
+    Medium,
+    High,
+}
 
 /// Patterns that elevate a shell command to high risk.
 const HIGH_RISK_PATTERNS: &[&str] = &[
@@ -57,16 +61,25 @@ pub fn assess_risk(call: &ToolCall) -> RiskLevel {
     // File deletion is high risk (outside obvious temp dirs)
     if tool == "delete_file" || tool == "omnfs_delete" {
         let path = call.args["path"].as_str().unwrap_or("");
-        let is_temp = path.contains("target/") || path.contains("tmp/")
-            || path.contains("temp/") || path.contains(".cache/");
-        if !is_temp { return RiskLevel::High; }
+        let is_temp = path.contains("target/")
+            || path.contains("tmp/")
+            || path.contains("temp/")
+            || path.contains(".cache/");
+        if !is_temp {
+            return RiskLevel::High;
+        }
     }
 
     // Shell commands with high-risk patterns
-    if matches!(tool, "run_command" | "run_terminal_command" | "omni_shell_exec") {
+    if matches!(
+        tool,
+        "run_command" | "run_terminal_command" | "omni_shell_exec"
+    ) {
         let cmd = call.args["command"].as_str().unwrap_or("").to_lowercase();
         for pat in HIGH_RISK_PATTERNS {
-            if cmd.contains(*pat) { return RiskLevel::High; }
+            if cmd.contains(*pat) {
+                return RiskLevel::High;
+            }
         }
     }
 
@@ -77,10 +90,10 @@ pub fn assess_risk(call: &ToolCall) -> RiskLevel {
 
 #[derive(Debug, Serialize)]
 pub struct PendingPlan {
-    pub plan_id:   String,
-    pub tool:      String,
-    pub args:      Value,
-    pub risk:      RiskLevel,
+    pub plan_id: String,
+    pub tool: String,
+    pub args: Value,
+    pub risk: RiskLevel,
     pub workspace: Option<String>,
 }
 
@@ -92,7 +105,9 @@ pub struct PlanGateState {
 
 impl PlanGateState {
     pub fn new() -> Self {
-        Self { pending: Mutex::new(HashMap::new()) }
+        Self {
+            pending: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Register a pending plan and return the rx to await.
@@ -114,13 +129,15 @@ impl PlanGateState {
 // ── Middleware implementation ─────────────────────────────────────────────────
 
 pub struct PlanGateMiddleware {
-    pub state:      Arc<PlanGateState>,
+    pub state: Arc<PlanGateState>,
     pub app_handle: AppHandle,
-    pub enabled:    Arc<std::sync::atomic::AtomicBool>,
+    pub enabled: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl ToolMiddleware for PlanGateMiddleware {
-    fn name(&self) -> &'static str { crate::middleware::PLAN_GATE_MW_NAME }
+    fn name(&self) -> &'static str {
+        crate::middleware::PLAN_GATE_MW_NAME
+    }
 
     fn intercept(&self, call: ToolCall) -> MiddlewareOutcome {
         if !self.enabled.load(std::sync::atomic::Ordering::Relaxed) {
@@ -133,10 +150,10 @@ impl ToolMiddleware for PlanGateMiddleware {
 
         let plan_id = uuid::Uuid::new_v4().to_string();
         let plan = PendingPlan {
-            plan_id:   plan_id.clone(),
-            tool:      call.tool.clone(),
-            args:      call.args.clone(),
-            risk:      RiskLevel::High,
+            plan_id: plan_id.clone(),
+            tool: call.tool.clone(),
+            args: call.args.clone(),
+            risk: RiskLevel::High,
             workspace: call.workspace_path.clone(),
         };
 
@@ -150,10 +167,10 @@ impl ToolMiddleware for PlanGateMiddleware {
         // The frontend must call `resolve_plan` within 5 minutes.
         let approved = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                tokio::time::timeout(
-                    std::time::Duration::from_secs(300),
-                    rx,
-                ).await.unwrap_or(Ok(false)).unwrap_or(false)
+                tokio::time::timeout(std::time::Duration::from_secs(300), rx)
+                    .await
+                    .unwrap_or(Ok(false))
+                    .unwrap_or(false)
             })
         });
 

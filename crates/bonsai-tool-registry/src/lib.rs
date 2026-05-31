@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use std::sync::Arc;
 use anyhow::Result;
 use arc_swap::ArcSwap;
 use bonsai_skill_compiler::{CompiledSkill, SecurityReport, SkillToolDef, ToolRegistryMut};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Thread-safe, hot-swappable registry of compiled skills.
 ///
@@ -15,7 +15,9 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     pub fn new() -> Self {
-        Self { tools: ArcSwap::new(Arc::new(HashMap::new())) }
+        Self {
+            tools: ArcSwap::new(Arc::new(HashMap::new())),
+        }
     }
 
     /// Register or replace a skill by name.
@@ -32,14 +34,18 @@ impl ToolRegistry {
 
     /// List all registered tool definitions (without WASM bytes).
     pub fn list(&self) -> Vec<SkillToolDef> {
-        self.tools.load().values().map(|s| SkillToolDef {
-            name: s.name.clone(),
-            description: s.description.clone(),
-            category: "skill".into(),
-            tags: s.tags.clone(),
-            requires_permissions: s.requires_permissions.clone(),
-            sandbox_tier: "wasm".into(),
-        }).collect()
+        self.tools
+            .load()
+            .values()
+            .map(|s| SkillToolDef {
+                name: s.name.clone(),
+                description: s.description.clone(),
+                category: "skill".into(),
+                tags: s.tags.clone(),
+                requires_permissions: s.requires_permissions.clone(),
+                sandbox_tier: "wasm".into(),
+            })
+            .collect()
     }
 
     /// Atomically replace the entire registry (used for bulk hot-reload).
@@ -49,7 +55,9 @@ impl ToolRegistry {
 }
 
 impl Default for ToolRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Implement the compiler's `ToolRegistryMut` so `register_compiled_skill()`

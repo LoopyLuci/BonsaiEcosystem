@@ -1,7 +1,7 @@
 #![cfg(feature = "email")]
 
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 
 use crate::admin_api::PlatformStates;
@@ -11,25 +11,38 @@ use crate::metrics::SharedMetrics;
 use crate::platforms::{InboundMessage, MessagingPlatform, ShedNotice};
 
 pub struct EmailPlatform {
-    pub imap_password:   String,
-    pub smtp_password:   String,
-    pub config:          EmailConfig,
-    pub metrics:         SharedMetrics,
+    pub imap_password: String,
+    pub smtp_password: String,
+    pub config: EmailConfig,
+    pub metrics: SharedMetrics,
     pub platform_states: PlatformStates,
 }
 
 impl EmailPlatform {
     pub fn new(
-        imap_password:   String,
-        smtp_password:   String,
-        config:          EmailConfig,
-        metrics:         SharedMetrics,
+        imap_password: String,
+        smtp_password: String,
+        config: EmailConfig,
+        metrics: SharedMetrics,
         platform_states: PlatformStates,
     ) -> Arc<Self> {
-        Arc::new(Self { imap_password, smtp_password, config, metrics, platform_states })
+        Arc::new(Self {
+            imap_password,
+            smtp_password,
+            config,
+            metrics,
+            platform_states,
+        })
     }
 
-    fn dedup_key(&self, message_id: Option<&str>, from: &str, date: &str, subject: &str, body: &str) -> String {
+    fn dedup_key(
+        &self,
+        message_id: Option<&str>,
+        from: &str,
+        date: &str,
+        subject: &str,
+        body: &str,
+    ) -> String {
         match message_id {
             Some(mid) if !mid.is_empty() => mid.to_string(),
             _ => email_fallback_key(from, date, subject, body),
@@ -39,14 +52,17 @@ impl EmailPlatform {
 
 #[async_trait]
 impl MessagingPlatform for EmailPlatform {
-    fn name(&self) -> &'static str { "email" }
+    fn name(&self) -> &'static str {
+        "email"
+    }
 
     async fn run(
         self: Arc<Self>,
         tx: tokio::sync::mpsc::Sender<InboundMessage>,
         shed_tx: tokio::sync::mpsc::Sender<ShedNotice>,
     ) {
-        self.platform_states.insert("email".to_string(), "connecting".to_string());
+        self.platform_states
+            .insert("email".to_string(), "connecting".to_string());
 
         // Try IMAP IDLE for push notifications; fall back to 60s polling on error
         loop {
@@ -54,11 +70,13 @@ impl MessagingPlatform for EmailPlatform {
                 Ok(()) => {
                     // IDLE ended normally (server changed, 28-min keepalive) — reconnect
                     tracing::debug!("[email] IDLE session ended, reconnecting");
-                    self.platform_states.insert("email".to_string(), "connecting".to_string());
+                    self.platform_states
+                        .insert("email".to_string(), "connecting".to_string());
                 }
                 Err(e) => {
                     tracing::warn!("[email] IDLE error: {e}; falling back to 60s poll");
-                    self.platform_states.insert("email".to_string(), "polling".to_string());
+                    self.platform_states
+                        .insert("email".to_string(), "polling".to_string());
                     // poll once then wait before retrying IDLE
                     let _ = self.poll_once(&tx, &shed_tx).await;
                     sleep(Duration::from_secs(60)).await;
@@ -74,16 +92,18 @@ impl MessagingPlatform for EmailPlatform {
         text: &str,
         in_reply_to: Option<&str>,
     ) -> Result<(), String> {
-        use lettre::{Message as EmailMessage, SmtpTransport, Transport};
         use lettre::message::header::ContentType;
         use lettre::transport::smtp::authentication::Credentials;
+        use lettre::{Message as EmailMessage, SmtpTransport, Transport};
 
         let html = crate::formatter::format(text, "email").chunks.join("\n");
 
-        let from_addr = self.config.smtp_from.parse()
+        let from_addr = self
+            .config
+            .smtp_from
+            .parse()
             .map_err(|e| format!("from: {e}"))?;
-        let to_addr   = to.parse()
-            .map_err(|e| format!("to: {e}"))?;
+        let to_addr = to.parse().map_err(|e| format!("to: {e}"))?;
 
         let mut builder = EmailMessage::builder()
             .from(from_addr)
@@ -138,15 +158,15 @@ impl EmailPlatform {
         tx: &tokio::sync::mpsc::Sender<InboundMessage>,
         shed_tx: &tokio::sync::mpsc::Sender<ShedNotice>,
     ) -> Result<(), String> {
-        use async_native_tls::TlsConnector;
         use async_imap::Client;
+        use async_native_tls::TlsConnector;
         use tokio_util::compat::TokioAsyncReadCompatExt;
 
         let addr = format!("{}:{}", self.config.imap_host, self.config.imap_port);
-        let tcp  = tokio::net::TcpStream::connect(&addr)
+        let tcp = tokio::net::TcpStream::connect(&addr)
             .await
             .map_err(|e| format!("TCP connect: {e}"))?;
-        let tls  = TlsConnector::new()
+        let tls = TlsConnector::new()
             .connect(&self.config.imap_host, tcp.compat())
             .await
             .map_err(|e| format!("TLS: {e}"))?;
@@ -157,16 +177,23 @@ impl EmailPlatform {
             .await
             .map_err(|(e, _)| format!("IMAP login: {e}"))?;
 
-        session.select("INBOX").await.map_err(|e| format!("SELECT: {e}"))?;
+        session
+            .select("INBOX")
+            .await
+            .map_err(|e| format!("SELECT: {e}"))?;
 
         // Process any messages that arrived while we were offline
         let uid_set = {
             let query = format!("UNSEEN SUBJECT \"{}\"", self.config.subject_prefix);
-            session.uid_search(&query).await.map_err(|e| format!("SEARCH: {e}"))?
+            session
+                .uid_search(&query)
+                .await
+                .map_err(|e| format!("SEARCH: {e}"))?
         };
         self.drain_uids(&mut session, uid_set, tx, shed_tx).await?;
 
-        self.platform_states.insert("email".to_string(), "idle".to_string());
+        self.platform_states
+            .insert("email".to_string(), "idle".to_string());
 
         // IDLE — wait up to 25 minutes (server max is 29)
         let mut idle = session.idle();
@@ -177,7 +204,10 @@ impl EmailPlatform {
         // Process what arrived during IDLE
         let uid_set = {
             let query = format!("UNSEEN SUBJECT \"{}\"", self.config.subject_prefix);
-            session.uid_search(&query).await.map_err(|e| format!("SEARCH: {e}"))?
+            session
+                .uid_search(&query)
+                .await
+                .map_err(|e| format!("SEARCH: {e}"))?
         };
         self.drain_uids(&mut session, uid_set, tx, shed_tx).await?;
 
@@ -198,8 +228,9 @@ impl EmailPlatform {
         use futures::TryStreamExt;
 
         for uid in uid_set {
-            let uid_str     = uid.to_string();
-            let fetch_query = "(BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)] BODY.PEEK[TEXT]<0.2000>)";
+            let uid_str = uid.to_string();
+            let fetch_query =
+                "(BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)] BODY.PEEK[TEXT]<0.2000>)";
             let messages: Vec<_> = session
                 .uid_fetch(&uid_str, fetch_query)
                 .await
@@ -210,35 +241,57 @@ impl EmailPlatform {
 
             for msg in messages.iter() {
                 let header_bytes = msg.header().unwrap_or_default();
-                let body_bytes   = msg.text().unwrap_or_default();
-                let headers      = parse_headers(header_bytes);
-                let from         = headers.get("from").cloned().unwrap_or_default();
-                let subject      = headers.get("subject").cloned().unwrap_or_default();
-                let date         = headers.get("date").cloned().unwrap_or_default();
-                let message_id   = headers.get("message-id").cloned();
-                let body         = String::from_utf8_lossy(body_bytes).to_string();
+                let body_bytes = msg.text().unwrap_or_default();
+                let headers = parse_headers(header_bytes);
+                let from = headers.get("from").cloned().unwrap_or_default();
+                let subject = headers.get("subject").cloned().unwrap_or_default();
+                let date = headers.get("date").cloned().unwrap_or_default();
+                let message_id = headers.get("message-id").cloned();
+                let body = String::from_utf8_lossy(body_bytes).to_string();
 
                 let from_lower = from.to_lowercase();
-                if !self.config.allowed_from_addrs.iter().any(|a| from_lower.contains(&a.to_lowercase())) {
+                if !self
+                    .config
+                    .allowed_from_addrs
+                    .iter()
+                    .any(|a| from_lower.contains(&a.to_lowercase()))
+                {
                     let _ = session.uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)").await;
-                    self.metrics.allowlist_denials.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.metrics
+                        .allowlist_denials
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     continue;
                 }
 
                 let event_id = self.dedup_key(message_id.as_deref(), &from, &date, &subject, &body);
-                let inbound  = InboundMessage {
-                    platform: "email".to_string(), platform_id: from.clone(),
-                    user_id: from.clone(), display_name: from.clone(),
-                    event_id, text: body, reply_to: message_id,
+                let inbound = InboundMessage {
+                    platform: "email".to_string(),
+                    platform_id: from.clone(),
+                    user_id: from.clone(),
+                    display_name: from.clone(),
+                    event_id,
+                    text: body,
+                    reply_to: message_id,
                 };
-                self.metrics.messages_inbound.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.metrics
+                    .messages_inbound
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if tx.try_send(inbound).is_err() {
-                    self.metrics.messages_queued_full.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    let _ = shed_tx.try_send(ShedNotice { platform: "email".to_string(), chat_id: from.clone(), user_id: from, reply_to: None });
+                    self.metrics
+                        .messages_queued_full
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let _ = shed_tx.try_send(ShedNotice {
+                        platform: "email".to_string(),
+                        chat_id: from.clone(),
+                        user_id: from,
+                        reply_to: None,
+                    });
                 }
                 let _ = session.uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)").await;
                 if self.config.delete_processed {
-                    let _ = session.uid_store(&uid_str, "+FLAGS.SILENT (\\Deleted)").await;
+                    let _ = session
+                        .uid_store(&uid_str, "+FLAGS.SILENT (\\Deleted)")
+                        .await;
                 }
             }
         }
@@ -256,8 +309,8 @@ impl EmailPlatform {
         // IMAP polling using async-imap with native-tls
         // Note: async-imap 0.9 uses tokio + async-native-tls for TLS connections
 
-        use async_native_tls::TlsConnector;
         use async_imap::Client;
+        use async_native_tls::TlsConnector;
         use futures::TryStreamExt;
         use tokio_util::compat::TokioAsyncReadCompatExt;
 
@@ -277,7 +330,10 @@ impl EmailPlatform {
             .await
             .map_err(|(e, _)| format!("IMAP login: {e}"))?;
 
-        imap_session.select("INBOX").await.map_err(|e| format!("SELECT: {e}"))?;
+        imap_session
+            .select("INBOX")
+            .await
+            .map_err(|e| format!("SELECT: {e}"))?;
 
         // Safe search: UNSEEN SUBJECT only (FROM filter is applied in code)
         let query = format!("UNSEEN SUBJECT \"{}\"", self.config.subject_prefix);
@@ -288,7 +344,8 @@ impl EmailPlatform {
 
         for uid in uid_set.into_iter() {
             let uid_str = uid.to_string();
-            let fetch_query = "(BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)] BODY.PEEK[TEXT]<0.2000>)";
+            let fetch_query =
+                "(BODY[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)] BODY.PEEK[TEXT]<0.2000>)";
 
             let messages: Vec<_> = imap_session
                 .uid_fetch(&uid_str, fetch_query)
@@ -300,56 +357,71 @@ impl EmailPlatform {
 
             for msg in messages.iter() {
                 let header_bytes = msg.header().unwrap_or_default();
-                let body_bytes   = msg.text().unwrap_or_default();
+                let body_bytes = msg.text().unwrap_or_default();
 
-                let headers    = parse_headers(header_bytes);
-                let from       = headers.get("from").cloned().unwrap_or_default();
-                let subject    = headers.get("subject").cloned().unwrap_or_default();
-                let date       = headers.get("date").cloned().unwrap_or_default();
+                let headers = parse_headers(header_bytes);
+                let from = headers.get("from").cloned().unwrap_or_default();
+                let subject = headers.get("subject").cloned().unwrap_or_default();
+                let date = headers.get("date").cloned().unwrap_or_default();
                 let message_id = headers.get("message-id").cloned();
-                let body       = String::from_utf8_lossy(body_bytes).to_string();
+                let body = String::from_utf8_lossy(body_bytes).to_string();
 
                 // Code-side allowlist check
                 let from_lower = from.to_lowercase();
-                let allowed = self.config.allowed_from_addrs.iter()
+                let allowed = self
+                    .config
+                    .allowed_from_addrs
+                    .iter()
                     .any(|a| from_lower.contains(&a.to_lowercase()));
 
                 if !allowed {
-                    let _ = imap_session.uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)").await;
-                    self.metrics.allowlist_denials.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let _ = imap_session
+                        .uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)")
+                        .await;
+                    self.metrics
+                        .allowlist_denials
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     continue;
                 }
 
                 let event_id = self.dedup_key(message_id.as_deref(), &from, &date, &subject, &body);
 
                 let inbound = InboundMessage {
-                    platform:     "email".to_string(),
-                    platform_id:  from.clone(),
-                    user_id:      from.clone(),
+                    platform: "email".to_string(),
+                    platform_id: from.clone(),
+                    user_id: from.clone(),
                     display_name: from.clone(),
                     event_id,
-                    text:         body,
-                    reply_to:     message_id,
+                    text: body,
+                    reply_to: message_id,
                 };
 
-                self.metrics.messages_inbound.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.metrics
+                    .messages_inbound
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 if tx.try_send(inbound).is_err() {
-                    self.metrics.messages_queued_full.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.metrics
+                        .messages_queued_full
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     let _ = shed_tx.try_send(ShedNotice {
                         platform: "email".to_string(),
-                        chat_id:  from.clone(),
-                        user_id:  from,
+                        chat_id: from.clone(),
+                        user_id: from,
                         reply_to: None,
                     });
                 }
 
                 // Mark as seen
-                let _ = imap_session.uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)").await;
+                let _ = imap_session
+                    .uid_store(&uid_str, "+FLAGS.SILENT (\\Seen)")
+                    .await;
 
                 // Optionally delete the message (IMAP EXPUNGE) if configured
                 if self.config.delete_processed {
-                    let _ = imap_session.uid_store(&uid_str, "+FLAGS.SILENT (\\Deleted)").await;
+                    let _ = imap_session
+                        .uid_store(&uid_str, "+FLAGS.SILENT (\\Deleted)")
+                        .await;
                 }
             }
         }
@@ -359,7 +431,10 @@ impl EmailPlatform {
             let _ = imap_session.expunge().await;
         }
 
-        imap_session.logout().await.map_err(|e| format!("LOGOUT: {e}"))?;
+        imap_session
+            .logout()
+            .await
+            .map_err(|e| format!("LOGOUT: {e}"))?;
         Ok(())
     }
 }
@@ -369,7 +444,7 @@ fn parse_headers(raw: &[u8]) -> std::collections::HashMap<String, String> {
     let text = String::from_utf8_lossy(raw);
     for line in text.lines() {
         if let Some(colon) = line.find(':') {
-            let key   = line[..colon].trim().to_lowercase();
+            let key = line[..colon].trim().to_lowercase();
             let value = line[colon + 1..].trim().to_string();
             map.entry(key).or_insert(value);
         }

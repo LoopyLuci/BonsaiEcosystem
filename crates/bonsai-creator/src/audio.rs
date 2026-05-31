@@ -18,7 +18,9 @@ pub struct MusicGenTool {
 }
 
 impl MusicGenTool {
-    pub fn new(cas: Arc<CasStore>) -> Self { Self { cas } }
+    pub fn new(cas: Arc<CasStore>) -> Self {
+        Self { cas }
+    }
 }
 
 #[async_trait]
@@ -59,13 +61,17 @@ pub struct BarkTtsTool {
 }
 
 impl BarkTtsTool {
-    pub fn new(cas: Arc<CasStore>) -> Self { Self { cas } }
+    pub fn new(cas: Arc<CasStore>) -> Self {
+        Self { cas }
+    }
 }
 
 #[async_trait]
 impl GenerativeTool for BarkTtsTool {
     async fn generate(&self, params: GenerateParams) -> anyhow::Result<GenerationResult> {
-        let voice_preset = params.extra["voice_preset"].as_str().unwrap_or("v2/en_speaker_6");
+        let voice_preset = params.extra["voice_preset"]
+            .as_str()
+            .unwrap_or("v2/en_speaker_6");
 
         // === Production path (stubbed) ===
         // 1. Text → semantic tokens via Bark text encoder

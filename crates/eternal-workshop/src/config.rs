@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub db_path:          PathBuf,
-    pub workspace_path:   Option<PathBuf>,
-    pub api_port:         u16,
+    pub db_path: PathBuf,
+    pub workspace_path: Option<PathBuf>,
+    pub api_port: u16,
     pub dream_agent_port: u16,
     /// Minutes of user inactivity before triggering an opportunistic consolidation.
     pub idle_trigger_mins: u64,

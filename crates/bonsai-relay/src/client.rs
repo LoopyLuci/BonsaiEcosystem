@@ -1,16 +1,16 @@
 //! Relay client — connects to a blind relay server and wraps it as a `TransportLane`.
 
+use crate::error::{RelayError, RelayResult};
+use crate::token::{RegisterRequest, RelayToken};
+use async_trait::async_trait;
+use bonsai_transfer_core::error::TransferResult;
+use bonsai_transfer_core::lane::{LaneHealth, LaneKind, TransportLane};
+use bonsai_transfer_crypto::cipher::ChunkCiphertext;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use async_trait::async_trait;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
-use bonsai_transfer_core::lane::{LaneHealth, LaneKind, TransportLane};
-use bonsai_transfer_core::error::TransferResult;
-use crate::error::{RelayError, RelayResult};
-use crate::token::{RegisterRequest, RelayToken};
 
 const MAX_FRAME: usize = 18 * 1024 * 1024;
 
@@ -58,7 +58,9 @@ impl RelayClient {
         let ack_len = stream.read_u32().await? as usize;
         let mut ack = vec![0u8; ack_len];
         stream.read_exact(&mut ack).await?;
-        if &ack != b"OK" { return Err(RelayError::InvalidToken); }
+        if &ack != b"OK" {
+            return Err(RelayError::InvalidToken);
+        }
 
         let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Vec<u8>>();
         let (in_tx, in_rx) = mpsc::unbounded_channel::<Vec<u8>>();
@@ -71,8 +73,12 @@ impl RelayClient {
         // Write loop
         tokio::spawn(async move {
             while let Some(data) = out_rx.recv().await {
-                if writer.write_u32(data.len() as u32).await.is_err() { break; }
-                if writer.write_all(&data).await.is_err() { break; }
+                if writer.write_u32(data.len() as u32).await.is_err() {
+                    break;
+                }
+                if writer.write_all(&data).await.is_err() {
+                    break;
+                }
             }
         });
 
@@ -80,10 +86,16 @@ impl RelayClient {
         tokio::spawn(async move {
             while let Ok(n) = reader.read_u32().await {
                 let len = n as usize;
-                if len > MAX_FRAME { break; }
+                if len > MAX_FRAME {
+                    break;
+                }
                 let mut buf = vec![0u8; len];
-                if reader.read_exact(&mut buf).await.is_err() { break; }
-                if in_tx.send(buf).is_err() { break; }
+                if reader.read_exact(&mut buf).await.is_err() {
+                    break;
+                }
+                if in_tx.send(buf).is_err() {
+                    break;
+                }
             }
         });
 
@@ -93,14 +105,17 @@ impl RelayClient {
     fn send_raw(&self, data: Vec<u8>) -> TransferResult<()> {
         let guard = self.tx.lock().unwrap();
         if let Some(ref tx) = *guard {
-            tx.send(data)
-                .map_err(|_| bonsai_transfer_core::error::TransferError::LaneFailed(
-                    self.name.clone(), "relay channel closed".into()
-                ))?;
+            tx.send(data).map_err(|_| {
+                bonsai_transfer_core::error::TransferError::LaneFailed(
+                    self.name.clone(),
+                    "relay channel closed".into(),
+                )
+            })?;
             Ok(())
         } else {
             Err(bonsai_transfer_core::error::TransferError::LaneFailed(
-                self.name.clone(), "not connected".into()
+                self.name.clone(),
+                "not connected".into(),
             ))
         }
     }
@@ -108,9 +123,15 @@ impl RelayClient {
 
 #[async_trait]
 impl TransportLane for RelayClient {
-    fn name(&self) -> &str { &self.name }
-    fn kind(&self) -> LaneKind { LaneKind::Relay }
-    fn health(&self) -> LaneHealth { self.health.lock().unwrap().clone() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn kind(&self) -> LaneKind {
+        LaneKind::Relay
+    }
+    fn health(&self) -> LaneHealth {
+        self.health.lock().unwrap().clone()
+    }
 
     async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
         let bytes = serde_json::to_vec(chunk)

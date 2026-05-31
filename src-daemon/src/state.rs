@@ -1,19 +1,19 @@
 //! Shared daemon state.
 
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use bonsai_transfer_crypto::identity::BonsaiIdentity;
-use bonsai_transfer_store::EncryptedStore;
-use bonsai_mailbox::AgentMailbox;
-use bonsai_query::sql::SqlEngine;
-use bonsai_transfer_core::transfer::{TransferStatus, TransferHandle};
 use bonsai_ci::OrchestratorActor;
+use bonsai_creator::CreatorOrchestrator;
+use bonsai_mailbox::AgentMailbox;
+use bonsai_p2p::WebRtcLane;
+use bonsai_query::sql::SqlEngine;
 use bonsai_tool_registry::ToolRegistry;
 use bonsai_transfer_core::lane::TransportLane;
-use bonsai_p2p::WebRtcLane;
-use bonsai_creator::CreatorOrchestrator;
+use bonsai_transfer_core::transfer::{TransferHandle, TransferStatus};
+use bonsai_transfer_crypto::identity::BonsaiIdentity;
+use bonsai_transfer_store::EncryptedStore;
 
 pub struct DaemonState {
     /// Auth token — compared on every WebSocket connection handshake.

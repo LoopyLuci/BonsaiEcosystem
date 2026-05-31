@@ -1,9 +1,9 @@
 #![allow(clippy::assertions_on_constants)]
 
 use anyhow::Result;
+use async_trait::async_trait;
 use std::path::Path;
 use std::sync::Once;
-use async_trait::async_trait;
 
 type JoinHandleOpt = tokio::task::JoinHandle<anyhow::Result<Option<i32>>>;
 type InProcessJoin = std::sync::Arc<std::sync::Mutex<Option<JoinHandleOpt>>>;
@@ -31,7 +31,9 @@ struct JobHandle(windows_sys::Win32::Foundation::HANDLE);
 #[cfg(windows)]
 impl Drop for JobHandle {
     fn drop(&mut self) {
-        unsafe { windows_sys::Win32::Foundation::CloseHandle(self.0); }
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
     }
 }
 
@@ -54,12 +56,10 @@ fn create_job_for_pid(pid: u32, max_cpu_secs: u64, max_memory_mb: u64) -> Result
         Foundation::{CloseHandle, HANDLE},
         System::{
             JobObjects::{
-                AssignProcessToJobObject, CreateJobObjectW, SetInformationJobObject,
-                JobObjectExtendedLimitInformation,
-                JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-                JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+                AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+                SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+                JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
                 JOB_OBJECT_LIMIT_PROCESS_TIME,
-                JOB_OBJECT_LIMIT_PROCESS_MEMORY,
             },
             Threading::{OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE},
         },
@@ -74,12 +74,14 @@ fn create_job_for_pid(pid: u32, max_cpu_secs: u64, max_memory_mb: u64) -> Result
         let job: HANDLE = CreateJobObjectW(std::ptr::null(), std::ptr::null());
         if job.is_null() {
             CloseHandle(process);
-            anyhow::bail!("CreateJobObjectW failed: {}", std::io::Error::last_os_error());
+            anyhow::bail!(
+                "CreateJobObjectW failed: {}",
+                std::io::Error::last_os_error()
+            );
         }
 
         let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
-        info.BasicLimitInformation.LimitFlags =
-            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
             | JOB_OBJECT_LIMIT_PROCESS_TIME
             | JOB_OBJECT_LIMIT_PROCESS_MEMORY;
         // CPU time in 100-nanosecond intervals.
@@ -96,14 +98,20 @@ fn create_job_for_pid(pid: u32, max_cpu_secs: u64, max_memory_mb: u64) -> Result
         if ok == 0 {
             CloseHandle(job);
             CloseHandle(process);
-            anyhow::bail!("SetInformationJobObject failed: {}", std::io::Error::last_os_error());
+            anyhow::bail!(
+                "SetInformationJobObject failed: {}",
+                std::io::Error::last_os_error()
+            );
         }
 
         let ok = AssignProcessToJobObject(job, process);
         CloseHandle(process);
         if ok == 0 {
             CloseHandle(job);
-            anyhow::bail!("AssignProcessToJobObject failed: {}", std::io::Error::last_os_error());
+            anyhow::bail!(
+                "AssignProcessToJobObject failed: {}",
+                std::io::Error::last_os_error()
+            );
         }
 
         Ok(JobHandle(job))
@@ -122,9 +130,16 @@ pub struct ProcessController {
 
 #[async_trait]
 impl RuntimeController for ProcessController {
-    fn pid(&self) -> Option<i64> { self.child.id().map(|p| p as i64) }
-    async fn kill(&mut self) -> Result<()> { self.child.kill().await.map_err(|e| e.into()) }
-    async fn wait(&mut self) -> Result<Option<i32>> { let s = self.child.wait().await?; Ok(s.code()) }
+    fn pid(&self) -> Option<i64> {
+        self.child.id().map(|p| p as i64)
+    }
+    async fn kill(&mut self) -> Result<()> {
+        self.child.kill().await.map_err(|e| e.into())
+    }
+    async fn wait(&mut self) -> Result<Option<i32>> {
+        let s = self.child.wait().await?;
+        Ok(s.code())
+    }
 }
 
 pub struct InProcessController {
@@ -141,7 +156,9 @@ pub struct InProcessController {
 
 #[async_trait]
 impl RuntimeController for InProcessController {
-    fn pid(&self) -> Option<i64> { None }
+    fn pid(&self) -> Option<i64> {
+        None
+    }
     async fn kill(&mut self) -> Result<()> {
         // Best-effort: try polite interruption first (if available), then abort the join
         // (interrupt_handle reserved for future use)
@@ -160,7 +177,10 @@ impl RuntimeController for InProcessController {
         };
         if let Some(h) = handle_opt {
             match h.await {
-                Ok(res) => match res { Ok(code_opt) => Ok(code_opt), Err(e) => Err(e) },
+                Ok(res) => match res {
+                    Ok(code_opt) => Ok(code_opt),
+                    Err(e) => Err(e),
+                },
                 Err(e) => Err(e.into()),
             }
         } else {
@@ -170,14 +190,20 @@ impl RuntimeController for InProcessController {
 }
 
 impl RuntimeManager {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     const DEFAULT_SKILL_MAX_CPU_SECONDS: u64 = 30;
     const DEFAULT_SKILL_MAX_MEMORY_MB: u64 = 512;
 
     /// Start a Python worker by spawning the given script path with the provided port.
     /// Returns a boxed `RuntimeController` that can be used to manage the runtime.
-    pub async fn start_python_worker(&self, script_path: &str, port: u16) -> Result<Box<dyn RuntimeController + Send + Sync>> {
+    pub async fn start_python_worker(
+        &self,
+        script_path: &str,
+        port: u16,
+    ) -> Result<Box<dyn RuntimeController + Send + Sync>> {
         let mut cmd = tokio::process::Command::new(resolve_python_binary());
         cmd.arg(script_path)
             .arg(port.to_string())
@@ -215,19 +241,22 @@ impl RuntimeManager {
     }
 
     /// Start a Babashka (Clojure) worker by spawning `bb` with the given script.
-    pub async fn start_babashka_worker(&self, script_path: &str) -> Result<Box<dyn RuntimeController + Send + Sync>> {
+    pub async fn start_babashka_worker(
+        &self,
+        script_path: &str,
+    ) -> Result<Box<dyn RuntimeController + Send + Sync>> {
         BB_VERSION_CHECK.call_once(|| {
             let required = std::env::var("BONSAI_REQUIRED_BB_VERSION").ok();
             warn_if_bb_version_mismatch(required.as_deref());
         });
 
         let script = std::path::PathBuf::from(script_path);
-        let script_root = script
-            .parent()
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+        let script_root = script.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+        });
         let workspace_root = std::env::current_dir().unwrap_or_else(|_| script_root.clone());
-        let allowed_paths = build_allowed_paths_env(&workspace_root, std::slice::from_ref(&script_root));
+        let allowed_paths =
+            build_allowed_paths_env(&workspace_root, std::slice::from_ref(&script_root));
 
         let mut cmd = tokio::process::Command::new("bb");
         cmd.current_dir(&script_root)
@@ -243,28 +272,40 @@ impl RuntimeManager {
         }
 
         let child = cmd.spawn()?;
-        Ok(Box::new(ProcessController { child, #[cfg(windows)] _job: None }))
+        Ok(Box::new(ProcessController {
+            child,
+            #[cfg(windows)]
+            _job: None,
+        }))
     }
 
     /// Start a ClojureWasm (Wasm/WASI) module.
     /// If the crate feature `wasmtime-host` is enabled, this will run the module in-process
     /// via the `wasmtime` crate. Otherwise it will fall back to spawning the `wasmtime` CLI.
-    pub async fn start_clojurewasm_worker(&self, module_path: &str, _timeout_secs: Option<u64>) -> Result<Box<dyn RuntimeController + Send + Sync>> {
+    pub async fn start_clojurewasm_worker(
+        &self,
+        module_path: &str,
+        _timeout_secs: Option<u64>,
+    ) -> Result<Box<dyn RuntimeController + Send + Sync>> {
         let p = Path::new(module_path);
         if !p.exists() {
             // fall back to trying to spawn CLI which may accept WAT files too
             let mut cmd = tokio::process::Command::new("wasmtime");
             cmd.arg(module_path);
             let child = cmd.spawn()?;
-            return Ok(Box::new(ProcessController { child, #[cfg(windows)] _job: None }));
+            return Ok(Box::new(ProcessController {
+                child,
+                #[cfg(windows)]
+                _job: None,
+            }));
         }
 
         // Try in-process wasmtime if feature is enabled
         #[cfg(feature = "wasmtime-host")]
         {
+            use std::sync::{Arc, Mutex};
             use wasmtime::*;
             use wasmtime_wasi::sync::WasiCtxBuilder;
-            use std::sync::{Arc, Mutex};
 
             let module_path = module_path.to_string();
 
@@ -276,37 +317,39 @@ impl RuntimeManager {
             let module = Module::from_file(&engine, &module_path)?;
 
             // Shared join handle so watchdog can abort if needed
-            let join_arc: Arc<Mutex<Option<tokio::task::JoinHandle<anyhow::Result<Option<i32>>>>>> = Arc::new(Mutex::new(None));
+            let join_arc: Arc<Mutex<Option<tokio::task::JoinHandle<anyhow::Result<Option<i32>>>>>> =
+                Arc::new(Mutex::new(None));
 
             let engine_for_task = engine.clone();
             let module_for_task = module.clone();
             let join_arc_clone = join_arc.clone();
 
-            let join_handle = tokio::task::spawn_blocking(move || -> anyhow::Result<Option<i32>> {
-                // Build WASI context
-                let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build();
+            let join_handle =
+                tokio::task::spawn_blocking(move || -> anyhow::Result<Option<i32>> {
+                    // Build WASI context
+                    let wasi_ctx = WasiCtxBuilder::new().inherit_stdio().build();
 
-                let mut store = Store::new(&engine_for_task, wasi_ctx);
+                    let mut store = Store::new(&engine_for_task, wasi_ctx);
 
-                // Add some fuel budget if requested
-                if let Some(sec) = _timeout_secs {
-                    let _ = store.add_fuel(1_000_000_u64.saturating_mul(sec));
-                } else {
-                    let _ = store.add_fuel(1_000_000_u64);
-                }
+                    // Add some fuel budget if requested
+                    if let Some(sec) = _timeout_secs {
+                        let _ = store.add_fuel(1_000_000_u64.saturating_mul(sec));
+                    } else {
+                        let _ = store.add_fuel(1_000_000_u64);
+                    }
 
-                let mut linker = Linker::new(&engine_for_task);
-                wasmtime_wasi::add_to_linker(&mut linker, |cx: &mut _| cx).unwrap();
+                    let mut linker = Linker::new(&engine_for_task);
+                    wasmtime_wasi::add_to_linker(&mut linker, |cx: &mut _| cx).unwrap();
 
-                let instance = linker.instantiate(&mut store, &module_for_task)?;
+                    let instance = linker.instantiate(&mut store, &module_for_task)?;
 
-                // call _start if present
-                if let Some(start) = instance.get_func(&mut store, "_start") {
-                    let typed = start.typed::<(), ()>(&mut store)?;
-                    let _ = typed.call(&mut store, ())?;
-                }
-                Ok(Some(0))
-            });
+                    // call _start if present
+                    if let Some(start) = instance.get_func(&mut store, "_start") {
+                        let typed = start.typed::<(), ()>(&mut store)?;
+                        let _ = typed.call(&mut store, ())?;
+                    }
+                    Ok(Some(0))
+                });
 
             // store join handle in Arc<Mutex<Option<JoinHandle>>> so we can abort/wait later
             {
@@ -333,7 +376,13 @@ impl RuntimeManager {
             }
 
             // No real PID for in-process runs
-            let controller = InProcessController { join: join_arc, #[cfg(feature = "wasmtime-host")] interrupt_handle: None, #[cfg(not(feature = "wasmtime-host"))] interrupt_handle: None };
+            let controller = InProcessController {
+                join: join_arc,
+                #[cfg(feature = "wasmtime-host")]
+                interrupt_handle: None,
+                #[cfg(not(feature = "wasmtime-host"))]
+                interrupt_handle: None,
+            };
             return Ok(Box::new(controller));
         }
 
@@ -343,7 +392,11 @@ impl RuntimeManager {
             let mut cmd = tokio::process::Command::new("wasmtime");
             cmd.arg(module_path);
             let child = cmd.spawn()?;
-            Ok(Box::new(ProcessController { child, #[cfg(windows)] _job: None }))
+            Ok(Box::new(ProcessController {
+                child,
+                #[cfg(windows)]
+                _job: None,
+            }))
         }
     }
 }
@@ -360,7 +413,10 @@ fn resolve_python_binary() -> String {
     }
 }
 
-fn build_allowed_paths_env(workspace_root: &Path, additional_paths: &[std::path::PathBuf]) -> String {
+fn build_allowed_paths_env(
+    workspace_root: &Path,
+    additional_paths: &[std::path::PathBuf],
+) -> String {
     let mut unique = std::collections::BTreeSet::new();
 
     unique.insert(workspace_root.to_string_lossy().to_string());
@@ -368,13 +424,19 @@ fn build_allowed_paths_env(workspace_root: &Path, additional_paths: &[std::path:
         unique.insert(p.to_string_lossy().to_string());
     }
 
-    let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+    let sep = if cfg!(target_os = "windows") {
+        ";"
+    } else {
+        ":"
+    };
     unique.into_iter().collect::<Vec<_>>().join(sep)
 }
 
 fn warn_if_bb_version_mismatch(required: Option<&str>) {
     let required = required.map(str::trim).filter(|v| !v.is_empty());
-    let Some(required) = required else { return; };
+    let Some(required) = required else {
+        return;
+    };
 
     let output = std::process::Command::new("bb").arg("--version").output();
     match output {

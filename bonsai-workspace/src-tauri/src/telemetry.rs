@@ -139,15 +139,15 @@ impl TelemetryStore {
         Ok(rows
             .into_iter()
             .map(|r| TrainingRun {
-                id:               r.get("id"),
-                started_at:       r.get("started_at"),
-                finished_at:      r.get("finished_at"),
-                base_model:       r.get("base_model"),
-                data_path:        r.get("data_path"),
-                adapter_path:     r.get("adapter_path"),
-                status:           r.get("status"),
-                metrics:          r.get("metrics"),
-                total_examples:   r.get("total_examples"),
+                id: r.get("id"),
+                started_at: r.get("started_at"),
+                finished_at: r.get("finished_at"),
+                base_model: r.get("base_model"),
+                data_path: r.get("data_path"),
+                adapter_path: r.get("adapter_path"),
+                status: r.get("status"),
+                metrics: r.get("metrics"),
+                total_examples: r.get("total_examples"),
                 curated_examples: r.get("curated_examples"),
             })
             .collect())
@@ -164,15 +164,15 @@ impl TelemetryStore {
         .await?;
 
         Ok(row.map(|r| TrainingRun {
-            id:               r.get("id"),
-            started_at:       r.get("started_at"),
-            finished_at:      r.get("finished_at"),
-            base_model:       r.get("base_model"),
-            data_path:        r.get("data_path"),
-            adapter_path:     r.get("adapter_path"),
-            status:           r.get("status"),
-            metrics:          r.get("metrics"),
-            total_examples:   r.get("total_examples"),
+            id: r.get("id"),
+            started_at: r.get("started_at"),
+            finished_at: r.get("finished_at"),
+            base_model: r.get("base_model"),
+            data_path: r.get("data_path"),
+            adapter_path: r.get("adapter_path"),
+            status: r.get("status"),
+            metrics: r.get("metrics"),
+            total_examples: r.get("total_examples"),
             curated_examples: r.get("curated_examples"),
         }))
     }
@@ -187,15 +187,15 @@ impl TelemetryStore {
         .await?;
 
         Ok(row.map(|r| TrainingRun {
-            id:               r.get("id"),
-            started_at:       r.get("started_at"),
-            finished_at:      r.get("finished_at"),
-            base_model:       r.get("base_model"),
-            data_path:        r.get("data_path"),
-            adapter_path:     r.get("adapter_path"),
-            status:           r.get("status"),
-            metrics:          r.get("metrics"),
-            total_examples:   r.get("total_examples"),
+            id: r.get("id"),
+            started_at: r.get("started_at"),
+            finished_at: r.get("finished_at"),
+            base_model: r.get("base_model"),
+            data_path: r.get("data_path"),
+            adapter_path: r.get("adapter_path"),
+            status: r.get("status"),
+            metrics: r.get("metrics"),
+            total_examples: r.get("total_examples"),
             curated_examples: r.get("curated_examples"),
         }))
     }
@@ -236,12 +236,12 @@ impl TelemetryStore {
         .await?;
 
         Ok(InferenceStats {
-            total_requests:        row.get::<i64, _>("total"),
-            success_rate:          row.get::<f64, _>("success_rate"),
-            avg_latency_ms:        row.get::<f64, _>("avg_latency"),
-            total_prompt_tokens:   row.get::<i64, _>("prompt_total"),
+            total_requests: row.get::<i64, _>("total"),
+            success_rate: row.get::<f64, _>("success_rate"),
+            avg_latency_ms: row.get::<f64, _>("avg_latency"),
+            total_prompt_tokens: row.get::<i64, _>("prompt_total"),
             total_completion_tokens: row.get::<i64, _>("completion_total"),
-            window_hours:          hours,
+            window_hours: hours,
         })
     }
 }

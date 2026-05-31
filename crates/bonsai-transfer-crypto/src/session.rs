@@ -9,11 +9,11 @@
 //! Note: post-quantum (ML-KEM-768) layer can be added once the ml-kem crate
 //! API stabilises. X25519 alone provides 128-bit classical security.
 
-use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
+use crate::error::CryptoResult;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
 use zeroize::Zeroize;
-use crate::error::CryptoResult;
 
 // ── Session key ───────────────────────────────────────────────────────────────
 
@@ -23,7 +23,9 @@ use crate::error::CryptoResult;
 pub struct SessionKey(pub [u8; 32]);
 
 impl SessionKey {
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 impl std::fmt::Debug for SessionKey {
@@ -57,7 +59,9 @@ impl HybridHandshake {
     pub fn initiate() -> CryptoResult<(InitiatorHello, InitiatorPending)> {
         let secret = EphemeralSecret::random_from_rng(OsRng);
         let pk = X25519PublicKey::from(&secret);
-        let hello = InitiatorHello { x25519_pk: pk.to_bytes() };
+        let hello = InitiatorHello {
+            x25519_pk: pk.to_bytes(),
+        };
         Ok((hello, InitiatorPending { secret }))
     }
 
@@ -68,7 +72,12 @@ impl HybridHandshake {
         let their_pk = X25519PublicKey::from(hello.x25519_pk);
         let shared = secret.diffie_hellman(&their_pk);
         let session_key = derive_session_key(shared.as_bytes());
-        Ok((ResponderHello { x25519_pk: pk.to_bytes() }, session_key))
+        Ok((
+            ResponderHello {
+                x25519_pk: pk.to_bytes(),
+            },
+            session_key,
+        ))
     }
 }
 

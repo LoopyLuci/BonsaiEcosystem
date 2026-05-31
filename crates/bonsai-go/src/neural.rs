@@ -1,5 +1,5 @@
+use crate::board::{GoBoard, Point, Stone};
 use crate::mcts::GoEvaluator;
-use crate::board::{GoBoard, Stone, Point};
 use crate::mcts::RandomGoEvaluator;
 
 /// Neural evaluator scaffold for Go. Replace the internals with a real
@@ -11,7 +11,9 @@ pub struct NeuralGoEvaluator {
 
 impl NeuralGoEvaluator {
     pub fn with_model(path: impl Into<String>) -> Self {
-        Self { model_path: Some(path.into()) }
+        Self {
+            model_path: Some(path.into()),
+        }
     }
 }
 

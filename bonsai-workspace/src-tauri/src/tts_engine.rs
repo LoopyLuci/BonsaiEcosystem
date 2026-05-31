@@ -56,10 +56,7 @@ pub async fn synthesize_speech(text: &str, voice: Option<&str>) -> Result<TtsRes
         .map_err(|e| format!("Piper error: {e}"))?;
 
     if !out.status.success() {
-        return Err(format!(
-            "Piper exited {:?}",
-            out.status.code()
-        ));
+        return Err(format!("Piper exited {:?}", out.status.code()));
     }
 
     let pcm = out.stdout;
@@ -77,7 +74,11 @@ pub async fn synthesize_speech(text: &str, voice: Option<&str>) -> Result<TtsRes
         0
     };
 
-    info!(duration_ms, elapsed_ms = elapsed, "[tts] synthesis complete");
+    info!(
+        duration_ms,
+        elapsed_ms = elapsed,
+        "[tts] synthesis complete"
+    );
 
     Ok(TtsResult {
         audio_b64: base64::engine::general_purpose::STANDARD.encode(&wav),
@@ -99,8 +100,8 @@ fn build_wav(pcm: &[u8], sample_rate: u32, channels: u16, bits_per_sample: u16) 
     w.extend_from_slice(&(36 + data_len).to_le_bytes());
     w.extend_from_slice(b"WAVE");
     w.extend_from_slice(b"fmt ");
-    w.extend_from_slice(&16u32.to_le_bytes());        // chunk size
-    w.extend_from_slice(&1u16.to_le_bytes());          // PCM
+    w.extend_from_slice(&16u32.to_le_bytes()); // chunk size
+    w.extend_from_slice(&1u16.to_le_bytes()); // PCM
     w.extend_from_slice(&channels.to_le_bytes());
     w.extend_from_slice(&sample_rate.to_le_bytes());
     w.extend_from_slice(&byte_rate.to_le_bytes());
@@ -117,7 +118,9 @@ fn build_wav(pcm: &[u8], sample_rate: u32, channels: u16, bits_per_sample: u16) 
 fn find_piper() -> Result<PathBuf, String> {
     if let Ok(path) = std::env::var("PIPER_PATH") {
         let p = PathBuf::from(&path);
-        if p.exists() { return Ok(p); }
+        if p.exists() {
+            return Ok(p);
+        }
     }
     let candidates = [
         dirs::data_local_dir()
@@ -130,7 +133,9 @@ fn find_piper() -> Result<PathBuf, String> {
         PathBuf::from("piper"),
     ];
     for p in &candidates {
-        if p.exists() { return Ok(p.clone()); }
+        if p.exists() {
+            return Ok(p.clone());
+        }
     }
     Err("piper not found. Set PIPER_PATH or place piper.exe in sidecars/.".into())
 }
@@ -143,17 +148,26 @@ fn find_voice_model(voice: Option<&str>) -> Result<PathBuf, String> {
 
     if let Some(name) = voice {
         let p = voices_dir.join(name);
-        if p.exists() { return Ok(p); }
+        if p.exists() {
+            return Ok(p);
+        }
         // Try with .onnx extension
         let p2 = voices_dir.join(format!("{name}.onnx"));
-        if p2.exists() { return Ok(p2); }
+        if p2.exists() {
+            return Ok(p2);
+        }
         return Err(format!("Voice model not found: {name}"));
     }
 
     // Auto-discover first .onnx file
     if let Ok(mut rd) = std::fs::read_dir(&voices_dir) {
         while let Some(Ok(entry)) = rd.next() {
-            if entry.path().extension().map(|e| e == "onnx").unwrap_or(false) {
+            if entry
+                .path()
+                .extension()
+                .map(|e| e == "onnx")
+                .unwrap_or(false)
+            {
                 return Ok(entry.path());
             }
         }

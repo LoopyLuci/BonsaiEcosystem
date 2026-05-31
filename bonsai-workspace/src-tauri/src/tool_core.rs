@@ -1,11 +1,11 @@
+use serde_json::{json, Value};
 /// Shared foundation for all Bonsai tool runtimes.
 ///
 /// Both the assistant window (assistant_tools) and the workspace chat (tools)
 /// implement the `Tool` trait defined here. They each maintain a separate
 /// `ToolRegistry` instance — no forced merger of semantically distinct tool sets.
 use std::collections::HashMap;
-use std::sync::{atomic::AtomicBool, Arc, OnceLock, Mutex};
-use serde_json::{json, Value};
+use std::sync::{atomic::AtomicBool, Arc, Mutex, OnceLock};
 use tokio::sync::mpsc;
 
 /// Deduplicated string interning pool for `&'static str` tool names / descriptions.
@@ -86,27 +86,52 @@ pub enum RiskLevel {
 
 #[derive(Debug, Clone)]
 pub struct ToolPolicyHint {
-    pub max_risk:        RiskLevel,
-    pub is_network:      bool,
-    pub is_filesystem:   bool,
+    pub max_risk: RiskLevel,
+    pub is_network: bool,
+    pub is_filesystem: bool,
     pub max_duration_ms: u64,
 }
 
 impl ToolPolicyHint {
     pub fn safe() -> Self {
-        Self { max_risk: RiskLevel::Safe, is_network: false, is_filesystem: false, max_duration_ms: 5_000 }
+        Self {
+            max_risk: RiskLevel::Safe,
+            is_network: false,
+            is_filesystem: false,
+            max_duration_ms: 5_000,
+        }
     }
     pub fn network() -> Self {
-        Self { max_risk: RiskLevel::Safe, is_network: true, is_filesystem: false, max_duration_ms: 30_000 }
+        Self {
+            max_risk: RiskLevel::Safe,
+            is_network: true,
+            is_filesystem: false,
+            max_duration_ms: 30_000,
+        }
     }
     pub fn filesystem_read() -> Self {
-        Self { max_risk: RiskLevel::Safe, is_network: false, is_filesystem: true, max_duration_ms: 5_000 }
+        Self {
+            max_risk: RiskLevel::Safe,
+            is_network: false,
+            is_filesystem: true,
+            max_duration_ms: 5_000,
+        }
     }
     pub fn filesystem_write() -> Self {
-        Self { max_risk: RiskLevel::Destructive, is_network: false, is_filesystem: true, max_duration_ms: 10_000 }
+        Self {
+            max_risk: RiskLevel::Destructive,
+            is_network: false,
+            is_filesystem: true,
+            max_duration_ms: 10_000,
+        }
     }
     pub fn external() -> Self {
-        Self { max_risk: RiskLevel::AlwaysConfirm, is_network: true, is_filesystem: false, max_duration_ms: 60_000 }
+        Self {
+            max_risk: RiskLevel::AlwaysConfirm,
+            is_network: true,
+            is_filesystem: false,
+            max_duration_ms: 60_000,
+        }
     }
 }
 
@@ -115,7 +140,10 @@ impl ToolPolicyHint {
 #[derive(Debug, Clone)]
 pub enum ToolError {
     /// Network hiccup, server 503, DNS timeout — safe to retry.
-    Transient { message: String, retry_after_ms: Option<u64> },
+    Transient {
+        message: String,
+        retry_after_ms: Option<u64>,
+    },
     /// Missing credentials or misconfigured integration.
     Configuration { message: String, fix_hint: String },
     /// OS or policy denied access.
@@ -140,7 +168,10 @@ pub enum ToolError {
 
 impl ToolError {
     pub fn is_retryable(&self) -> bool {
-        matches!(self, Self::Transient { .. } | Self::RateLimited { .. } | Self::Timeout { .. })
+        matches!(
+            self,
+            Self::Transient { .. } | Self::RateLimited { .. } | Self::Timeout { .. }
+        )
     }
 
     /// Human-readable message suitable for feeding back into the LLM context.
@@ -182,13 +213,23 @@ impl std::fmt::Display for ToolError {
 
 #[derive(Debug, Clone)]
 pub struct RetryPolicy {
-    pub max_attempts:  u8,
+    pub max_attempts: u8,
     pub base_delay_ms: u64,
 }
 
 impl RetryPolicy {
-    pub fn none()    -> Self { Self { max_attempts: 1, base_delay_ms: 0 } }
-    pub fn network() -> Self { Self { max_attempts: 3, base_delay_ms: 500 } }
+    pub fn none() -> Self {
+        Self {
+            max_attempts: 1,
+            base_delay_ms: 0,
+        }
+    }
+    pub fn network() -> Self {
+        Self {
+            max_attempts: 3,
+            base_delay_ms: 500,
+        }
+    }
     pub fn backoff_ms(&self, attempt: u8) -> u64 {
         self.base_delay_ms * (1u64 << attempt.min(4))
     }
@@ -198,8 +239,8 @@ impl RetryPolicy {
 
 pub struct ToolChunk {
     pub delta: String,
-    pub done:  bool,
-    pub data:  Option<Value>, // final structured result when done=true
+    pub done: bool,
+    pub data: Option<Value>, // final structured result when done=true
 }
 
 pub enum ToolOutput {
@@ -225,17 +266,17 @@ pub struct ToolContext {
     /// Current open workspace root (None if no workspace loaded).
     pub workspace_path: Option<String>,
     /// Profile ID whose tool_permissions apply to this execution.
-    pub profile_id:     String,
+    pub profile_id: String,
     /// Session ID for cache tenancy and audit correlation.
-    pub session_id:     String,
+    pub session_id: String,
     /// Turn-level correlation ID — every tool call in a turn shares this.
-    pub turn_id:        String,
+    pub turn_id: String,
     /// Prevents tool→tool recursion. Starts at 0; tools must reject if ≥ 4.
-    pub call_depth:     u8,
+    pub call_depth: u8,
     /// Cancellation: `true` means the user cancelled the turn.
-    pub cancel:         Arc<AtomicBool>,
+    pub cancel: Arc<AtomicBool>,
     /// OS keychain abstraction for SMTP and future secrets.
-    pub secrets:        Arc<crate::secrets_store::SecretsStore>,
+    pub secrets: Arc<crate::secrets_store::SecretsStore>,
 }
 
 impl ToolContext {
@@ -245,7 +286,10 @@ impl ToolContext {
 
     /// Produce a child context for a nested tool call with depth incremented.
     pub fn child(&self) -> Self {
-        Self { call_depth: self.call_depth + 1, ..self.clone() }
+        Self {
+            call_depth: self.call_depth + 1,
+            ..self.clone()
+        }
     }
 
     /// Turn a raw args Value into a typed struct, returning ValidationFailed on error.
@@ -262,26 +306,34 @@ impl ToolContext {
 #[async_trait::async_trait]
 pub trait Tool: Send + Sync + 'static {
     /// Stable machine-readable name used in LLM tool_calls and the registry key.
-    fn name(&self)         -> &'static str;
+    fn name(&self) -> &'static str;
     /// Natural-language description injected into the LLM's tool schema.
-    fn description(&self)  -> &'static str;
+    fn description(&self) -> &'static str;
     /// JSON Schema object for the `input_schema` field in the tool definition.
-    fn schema(&self)       -> Value;
+    fn schema(&self) -> Value;
     /// Advisory policy ceiling — PolicyEngine may only raise risk, never lower.
-    fn policy_hint(&self)  -> ToolPolicyHint;
+    fn policy_hint(&self) -> ToolPolicyHint;
     /// Execution side-effect classification — drives the parallel scheduler.
     fn side_effects(&self) -> SideEffectProfile;
     /// Topic tags for the semantic selector keyword index.
-    fn tags(&self)         -> &'static [&'static str];
+    fn tags(&self) -> &'static [&'static str];
     /// Cache TTL in seconds. `None` disables caching (default for side-effecting tools).
     fn cache_ttl_secs(&self) -> Option<u64> {
-        if self.side_effects().is_cacheable() { Some(300) } else { None }
+        if self.side_effects().is_cacheable() {
+            Some(300)
+        } else {
+            None
+        }
     }
     /// Retry policy for transient failures.
-    fn retry_policy(&self) -> RetryPolicy { RetryPolicy::none() }
+    fn retry_policy(&self) -> RetryPolicy {
+        RetryPolicy::none()
+    }
     /// Minimum sandbox tier required to execute this tool safely.
     /// Executor enforces: actual tier must be >= declared tier.
-    fn sandbox_requirement(&self) -> SandboxRequirement { SandboxRequirement::Native }
+    fn sandbox_requirement(&self) -> SandboxRequirement {
+        SandboxRequirement::Native
+    }
 
     /// Execute the tool. Called only after PolicyEngine has approved the call.
     async fn execute(&self, args: &Value, ctx: &ToolContext) -> ToolResult;
@@ -293,19 +345,19 @@ pub trait Tool: Send + Sync + 'static {
 /// any `ToolRegistry` without depending on `tools::ToolDef`.
 #[derive(Debug, Clone)]
 pub struct ReactArgDef {
-    pub name:        String,
-    pub arg_type:    String,
+    pub name: String,
+    pub arg_type: String,
     pub description: String,
-    pub required:    bool,
+    pub required: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct ReactBridgeDef {
-    pub name:              String,
-    pub description:       String,
-    pub args:              Vec<ReactArgDef>,
+    pub name: String,
+    pub description: String,
+    pub args: Vec<ReactArgDef>,
     pub requires_approval: bool,
-    pub sandbox:           SandboxRequirement,
+    pub sandbox: SandboxRequirement,
 }
 
 // ── Tool registry ─────────────────────────────────────────────────────────────
@@ -316,7 +368,9 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     pub fn new() -> Self {
-        Self { tools: HashMap::new() }
+        Self {
+            tools: HashMap::new(),
+        }
     }
 
     pub fn register(&mut self, tool: impl Tool) {
@@ -336,8 +390,12 @@ impl ToolRegistry {
         self.tools.keys().cloned().collect()
     }
 
-    pub fn len(&self) -> usize { self.tools.len() }
-    pub fn is_empty(&self) -> bool { self.tools.is_empty() }
+    pub fn len(&self) -> usize {
+        self.tools.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.tools.is_empty()
+    }
 
     /// Iterate all registered tools (used by the ReAct bridge and MCP server).
     pub fn iter_tools(&self) -> impl Iterator<Item = Arc<dyn Tool>> + '_ {
@@ -347,69 +405,94 @@ impl ToolRegistry {
     /// Lightweight bridge descriptors for the ReAct system prompt — no JSON Schema,
     /// just name + description + required-arg list suitable for tag-based calling.
     pub fn react_bridge_defs(&self) -> Vec<ReactBridgeDef> {
-        self.tools.values().map(|t| {
-            let schema = t.schema();
-            let props = schema.get("properties").and_then(|p| p.as_object());
-            let required_set: std::collections::HashSet<&str> = schema
-                .get("required")
-                .and_then(|r| r.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
-                .unwrap_or_default();
-            let args: Vec<ReactArgDef> = props.map(|m| {
-                m.iter().map(|(name, prop)| ReactArgDef {
-                    name:        name.clone(),
-                    arg_type:    prop.get("type").and_then(|t| t.as_str()).unwrap_or("string").to_string(),
-                    description: prop.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string(),
-                    required:    required_set.contains(name.as_str()),
-                }).collect()
-            }).unwrap_or_default();
-            ReactBridgeDef {
-                name:              t.name().to_string(),
-                description:       t.description().to_string(),
-                args,
-                requires_approval: t.policy_hint().max_risk >= RiskLevel::Destructive,
-                sandbox:           t.sandbox_requirement(),
-            }
-        }).collect()
+        self.tools
+            .values()
+            .map(|t| {
+                let schema = t.schema();
+                let props = schema.get("properties").and_then(|p| p.as_object());
+                let required_set: std::collections::HashSet<&str> = schema
+                    .get("required")
+                    .and_then(|r| r.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+                    .unwrap_or_default();
+                let args: Vec<ReactArgDef> = props
+                    .map(|m| {
+                        m.iter()
+                            .map(|(name, prop)| ReactArgDef {
+                                name: name.clone(),
+                                arg_type: prop
+                                    .get("type")
+                                    .and_then(|t| t.as_str())
+                                    .unwrap_or("string")
+                                    .to_string(),
+                                description: prop
+                                    .get("description")
+                                    .and_then(|d| d.as_str())
+                                    .unwrap_or("")
+                                    .to_string(),
+                                required: required_set.contains(name.as_str()),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                ReactBridgeDef {
+                    name: t.name().to_string(),
+                    description: t.description().to_string(),
+                    args,
+                    requires_approval: t.policy_hint().max_risk >= RiskLevel::Destructive,
+                    sandbox: t.sandbox_requirement(),
+                }
+            })
+            .collect()
     }
 
     /// Full tool definitions (JSON schema array for the LLM).
     /// Optionally filtered to `names` subset; filtered by profile permissions.
-    pub fn definitions(
-        &self,
-        names:   Option<&[String]>,
-        perms:   Option<&Value>,
-    ) -> Vec<Value> {
-        self.tools.values()
+    pub fn definitions(&self, names: Option<&[String]>, perms: Option<&Value>) -> Vec<Value> {
+        self.tools
+            .values()
             .filter(|t| {
                 if let Some(n) = names {
-                    if !n.iter().any(|x| x == t.name()) { return false; }
+                    if !n.iter().any(|x| x == t.name()) {
+                        return false;
+                    }
                 }
                 if let Some(p) = perms {
-                    if p.get(t.name()) == Some(&Value::Bool(false)) { return false; }
+                    if p.get(t.name()) == Some(&Value::Bool(false)) {
+                        return false;
+                    }
                 }
                 true
             })
-            .map(|t| json!({
-                "name":         t.name(),
-                "description":  t.description(),
-                "input_schema": t.schema(),
-            }))
+            .map(|t| {
+                json!({
+                    "name":         t.name(),
+                    "description":  t.description(),
+                    "input_schema": t.schema(),
+                })
+            })
             .collect()
     }
 
     /// All tool definitions (no permission filter) — used by the selector to build its index.
     pub fn all_definitions(&self) -> Vec<Value> {
-        self.tools.values().map(|t| json!({
-            "name":         t.name(),
-            "description":  t.description(),
-            "tags":         t.tags(),
-        })).collect()
+        self.tools
+            .values()
+            .map(|t| {
+                json!({
+                    "name":         t.name(),
+                    "description":  t.description(),
+                    "tags":         t.tags(),
+                })
+            })
+            .collect()
     }
 }
 
 impl Default for ToolRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Execution result envelope (for the ReAct loop) ────────────────────────────
@@ -417,12 +500,12 @@ impl Default for ToolRegistry {
 #[derive(Debug, Clone)]
 pub struct ToolCallOutcome {
     pub tool_call_id: String,
-    pub tool_name:    String,
-    pub args:         Value,
-    pub result_json:  String,   // serialised ToolOutput or error message
-    pub decision:     String,   // "allowed" | "denied" | "confirm_required" | "injected" | "cached"
-    pub duration_ms:  u64,
-    pub from_cache:   bool,
+    pub tool_name: String,
+    pub args: Value,
+    pub result_json: String, // serialised ToolOutput or error message
+    pub decision: String,    // "allowed" | "denied" | "confirm_required" | "injected" | "cached"
+    pub duration_ms: u64,
+    pub from_cache: bool,
 }
 
 impl ToolCallOutcome {
@@ -442,22 +525,42 @@ mod tests {
 
     #[test]
     fn retryable_errors_are_limited_to_transient_rate_limited_and_timeout() {
-        assert!(ToolError::Transient { message: "tmp".into(), retry_after_ms: None }.is_retryable());
-        assert!(ToolError::RateLimited { retry_after_ms: 250 }.is_retryable());
+        assert!(ToolError::Transient {
+            message: "tmp".into(),
+            retry_after_ms: None
+        }
+        .is_retryable());
+        assert!(ToolError::RateLimited {
+            retry_after_ms: 250
+        }
+        .is_retryable());
         assert!(ToolError::Timeout { duration_ms: 5_000 }.is_retryable());
     }
 
     #[test]
     fn non_retryable_errors_remain_non_retryable() {
-        assert!(!ToolError::ValidationFailed { field: "path".into(), reason: "missing".into() }.is_retryable());
-        assert!(!ToolError::PolicyDenied { reason: "blocked".into() }.is_retryable());
-        assert!(!ToolError::Permission { message: "denied".into() }.is_retryable());
+        assert!(!ToolError::ValidationFailed {
+            field: "path".into(),
+            reason: "missing".into()
+        }
+        .is_retryable());
+        assert!(!ToolError::PolicyDenied {
+            reason: "blocked".into()
+        }
+        .is_retryable());
+        assert!(!ToolError::Permission {
+            message: "denied".into()
+        }
+        .is_retryable());
         assert!(!ToolError::InjectionBlocked.is_retryable());
     }
 
     #[test]
     fn retry_backoff_is_bounded_exponential() {
-        let policy = RetryPolicy { max_attempts: 5, base_delay_ms: 100 };
+        let policy = RetryPolicy {
+            max_attempts: 5,
+            base_delay_ms: 100,
+        };
         assert_eq!(policy.backoff_ms(0), 100);
         assert_eq!(policy.backoff_ms(1), 200);
         assert_eq!(policy.backoff_ms(2), 400);
@@ -516,13 +619,13 @@ mod tests {
     fn make_test_ctx(cancel: Arc<std::sync::atomic::AtomicBool>) -> ToolContext {
         use crate::secrets_store::SecretsStore;
         ToolContext {
-            session_id:     "s1".into(),
-            turn_id:        "t1".into(),
+            session_id: "s1".into(),
+            turn_id: "t1".into(),
             workspace_path: Some("/tmp".into()),
-            profile_id:     "default".into(),
-            call_depth:     0,
+            profile_id: "default".into(),
+            call_depth: 0,
             cancel,
-            secrets:        Arc::new(SecretsStore::new()),
+            secrets: Arc::new(SecretsStore::new()),
         }
     }
 
@@ -548,12 +651,16 @@ mod tests {
         assert!(!ToolError::Configuration {
             message: "missing api key".into(),
             fix_hint: "set OPENAI_API_KEY".into(),
-        }.is_retryable());
+        }
+        .is_retryable());
     }
 
     #[test]
     fn not_found_error_is_not_retryable() {
-        assert!(!ToolError::NotFound { resource: "file.txt".into() }.is_retryable());
+        assert!(!ToolError::NotFound {
+            resource: "file.txt".into()
+        }
+        .is_retryable());
     }
 
     #[test]
@@ -563,12 +670,18 @@ mod tests {
 
     #[test]
     fn not_in_context_is_not_retryable() {
-        assert!(!ToolError::NotInContext { tool_name: "unknown_tool".into() }.is_retryable());
+        assert!(!ToolError::NotInContext {
+            tool_name: "unknown_tool".into()
+        }
+        .is_retryable());
     }
 
     #[test]
     fn internal_error_is_not_retryable() {
-        assert!(!ToolError::Internal { message: "panic".into() }.is_retryable());
+        assert!(!ToolError::Internal {
+            message: "panic".into()
+        }
+        .is_retryable());
     }
 
     #[test]
@@ -582,12 +695,12 @@ mod tests {
     fn outcome_to_context_message_has_correct_structure() {
         let outcome = ToolCallOutcome {
             tool_call_id: "tc1".into(),
-            tool_name:    "get_datetime".into(),
-            args:         serde_json::json!({}),
-            result_json:  r#"{"now":"2026-04-19"}"#.into(),
-            decision:     "allowed".into(),
-            duration_ms:  12,
-            from_cache:   false,
+            tool_name: "get_datetime".into(),
+            args: serde_json::json!({}),
+            result_json: r#"{"now":"2026-04-19"}"#.into(),
+            decision: "allowed".into(),
+            duration_ms: 12,
+            from_cache: false,
         };
         let msg = outcome.to_context_message();
         assert_eq!(msg["role"], "tool");

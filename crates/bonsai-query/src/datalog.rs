@@ -16,8 +16,8 @@
 //! assert!(results.contains(&vec!["a".into(), "c".into()]));
 //! ```
 
-use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -49,7 +49,11 @@ pub struct Rule {
 #[derive(Debug, Error)]
 pub enum DatalogError {
     #[error("arity mismatch: relation {rel} expects arity {expected}, got {got}")]
-    ArityMismatch { rel: String, expected: usize, got: usize },
+    ArityMismatch {
+        rel: String,
+        expected: usize,
+        got: usize,
+    },
     #[error("unbound variable {0} in rule head")]
     UnboundVariable(String),
     #[error("{0}")]
@@ -92,7 +96,9 @@ impl Db {
     /// Query all facts (EDB + IDB) for a relation after running fixpoint.
     pub fn query(&mut self, relation: &str) -> Vec<Tuple> {
         self.fixpoint();
-        let mut out: Vec<Tuple> = self.derived.get(relation)
+        let mut out: Vec<Tuple> = self
+            .derived
+            .get(relation)
             .or_else(|| self.facts.get(relation))
             .map(|s| s.iter().cloned().collect())
             .unwrap_or_default();
@@ -110,15 +116,30 @@ impl Db {
     pub fn query_transitive(&mut self, base: &str, derived_name: &str) -> Vec<Tuple> {
         // Seed rule 1: derived :- base
         self.add_rule(Rule {
-            head: Atom { relation: derived_name.into(), args: vec![Term::Var("X".into()), Term::Var("Y".into())] },
-            body: vec![Atom { relation: base.into(), args: vec![Term::Var("X".into()), Term::Var("Y".into())] }],
+            head: Atom {
+                relation: derived_name.into(),
+                args: vec![Term::Var("X".into()), Term::Var("Y".into())],
+            },
+            body: vec![Atom {
+                relation: base.into(),
+                args: vec![Term::Var("X".into()), Term::Var("Y".into())],
+            }],
         });
         // Rule 2: derived(X,Z) :- derived(X,Y), base(Y,Z)
         self.add_rule(Rule {
-            head: Atom { relation: derived_name.into(), args: vec![Term::Var("X".into()), Term::Var("Z".into())] },
+            head: Atom {
+                relation: derived_name.into(),
+                args: vec![Term::Var("X".into()), Term::Var("Z".into())],
+            },
             body: vec![
-                Atom { relation: derived_name.into(), args: vec![Term::Var("X".into()), Term::Var("Y".into())] },
-                Atom { relation: base.into(),         args: vec![Term::Var("Y".into()), Term::Var("Z".into())] },
+                Atom {
+                    relation: derived_name.into(),
+                    args: vec![Term::Var("X".into()), Term::Var("Y".into())],
+                },
+                Atom {
+                    relation: base.into(),
+                    args: vec![Term::Var("Y".into()), Term::Var("Z".into())],
+                },
             ],
         });
         self.query(derived_name)
@@ -129,7 +150,10 @@ impl Db {
     fn fixpoint(&mut self) {
         // Seed derived with EDB
         for (rel, tuples) in &self.facts {
-            self.derived.entry(rel.clone()).or_default().extend(tuples.iter().cloned());
+            self.derived
+                .entry(rel.clone())
+                .or_default()
+                .extend(tuples.iter().cloned());
         }
 
         let rules = self.rules.clone();
@@ -138,23 +162,32 @@ impl Db {
             for rule in &rules {
                 let derived_facts = derive_rule(rule, &self.derived);
                 for t in derived_facts {
-                    new_facts.entry(rule.head.relation.clone()).or_default().insert(t);
+                    new_facts
+                        .entry(rule.head.relation.clone())
+                        .or_default()
+                        .insert(t);
                 }
             }
             let mut changed = false;
             for (rel, tuples) in new_facts {
                 let set = self.derived.entry(rel).or_default();
                 for t in tuples {
-                    if set.insert(t) { changed = true; }
+                    if set.insert(t) {
+                        changed = true;
+                    }
                 }
             }
-            if !changed { break; }
+            if !changed {
+                break;
+            }
         }
     }
 }
 
 impl Default for Db {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Rule evaluation ───────────────────────────────────────────────────────────
@@ -169,7 +202,9 @@ fn derive_rule(rule: &Rule, db: &HashMap<String, HashSet<Tuple>>) -> Vec<Tuple> 
         for binding in &bindings {
             if let Some(rows) = rows {
                 for row in rows {
-                    if row.len() != atom.args.len() { continue; }
+                    if row.len() != atom.args.len() {
+                        continue;
+                    }
                     if let Some(ext) = extend_binding(binding, &atom.args, row) {
                         next_bindings.push(ext);
                     }
@@ -198,11 +233,15 @@ fn extend_binding(
     for (arg, val) in args.iter().zip(row.iter()) {
         match arg {
             Term::Const(c) => {
-                if c != val { return None; }
+                if c != val {
+                    return None;
+                }
             }
             Term::Var(v) => {
                 if let Some(existing) = new_binding.get(v) {
-                    if existing != val { return None; }
+                    if existing != val {
+                        return None;
+                    }
                 } else {
                     new_binding.insert(v.clone(), val.clone());
                 }
@@ -213,10 +252,12 @@ fn extend_binding(
 }
 
 fn apply_binding(args: &[Term], binding: &HashMap<String, String>) -> Option<Tuple> {
-    args.iter().map(|a| match a {
-        Term::Const(c) => Some(c.clone()),
-        Term::Var(v)   => binding.get(v).cloned(),
-    }).collect()
+    args.iter()
+        .map(|a| match a {
+            Term::Const(c) => Some(c.clone()),
+            Term::Var(v) => binding.get(v).cloned(),
+        })
+        .collect()
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -252,10 +293,19 @@ mod tests {
         db.add_fact("parent", vec!["bob".into(), "carol".into()]);
         // grandparent(X,Z) :- parent(X,Y), parent(Y,Z).
         db.add_rule(Rule {
-            head: Atom { relation: "grandparent".into(), args: vec![Term::Var("X".into()), Term::Var("Z".into())] },
+            head: Atom {
+                relation: "grandparent".into(),
+                args: vec![Term::Var("X".into()), Term::Var("Z".into())],
+            },
             body: vec![
-                Atom { relation: "parent".into(), args: vec![Term::Var("X".into()), Term::Var("Y".into())] },
-                Atom { relation: "parent".into(), args: vec![Term::Var("Y".into()), Term::Var("Z".into())] },
+                Atom {
+                    relation: "parent".into(),
+                    args: vec![Term::Var("X".into()), Term::Var("Y".into())],
+                },
+                Atom {
+                    relation: "parent".into(),
+                    args: vec![Term::Var("Y".into()), Term::Var("Z".into())],
+                },
             ],
         });
         let r = db.query("grandparent");
@@ -269,10 +319,14 @@ mod tests {
         db.add_fact("color", vec!["grass".into(), "green".into()]);
         // blue_things(X) :- color(X, "blue").
         db.add_rule(Rule {
-            head: Atom { relation: "blue_things".into(), args: vec![Term::Var("X".into())] },
-            body: vec![
-                Atom { relation: "color".into(), args: vec![Term::Var("X".into()), Term::Const("blue".into())] },
-            ],
+            head: Atom {
+                relation: "blue_things".into(),
+                args: vec![Term::Var("X".into())],
+            },
+            body: vec![Atom {
+                relation: "color".into(),
+                args: vec![Term::Var("X".into()), Term::Const("blue".into())],
+            }],
         });
         let r = db.query("blue_things");
         assert_eq!(r, vec![vec!["sky".to_string()]]);

@@ -1,27 +1,27 @@
-use std::sync::Arc;
-use std::path::PathBuf;
-use anyhow::Result;
-use candle_core::Device;
-use bonsai_go::board::{GoBoard, Stone, Point};
-use bonsai_go::mcts::{GoMctsConfig, self_play_game};
 use crate::evaluator::NeuralEvaluator;
 use crate::model::GoNet;
-use serde::{Serialize, Deserialize};
+use anyhow::Result;
 use bonsai_cas::CasStore;
+use bonsai_go::board::{GoBoard, Point, Stone};
+use bonsai_go::mcts::{self_play_game, GoMctsConfig};
+use candle_core::Device;
+use serde::{Deserialize, Serialize};
 use std::f32;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// A single training example (state, policy target, value target).
 #[derive(Serialize, Deserialize)]
 pub struct GoTrainingExample {
-    pub state: Vec<f32>,      // flattened board planes (17*19*19)
+    pub state: Vec<f32>,         // flattened board planes (17*19*19)
     pub policy_target: Vec<f32>, // 361
     pub value_target: f32,
 }
 
 /// Configuration for the training loop.
 pub struct GoTrainingConfig {
-    pub num_simulations: u32,   // MCTS simulations per move
-    pub temperature: f32,       // initial temperature for move selection
+    pub num_simulations: u32, // MCTS simulations per move
+    pub temperature: f32,     // initial temperature for move selection
     pub batch_size: usize,
     pub learning_rate: f64,
     pub self_play_games_per_cycle: usize,
@@ -62,7 +62,13 @@ impl GoTrainingLoop {
         let model = GoNet::new_random(hidden);
         // Create Adam state sized to model parameters
         let opt = AdamState::new_from_model(&model);
-        Ok(Self { config, device, model, optimizer: opt, cas_store })
+        Ok(Self {
+            config,
+            device,
+            model,
+            optimizer: opt,
+            cas_store,
+        })
     }
 
     /// Run one full training cycle: self‑play + training.
@@ -72,15 +78,20 @@ impl GoTrainingLoop {
 
         for _ in 0..self.config.self_play_games_per_cycle {
             // Build an evaluator that wraps the current model
-            let evaluator = match NeuralEvaluator::new_from_model(self.model.clone(), self.device.clone()) {
-                Ok(e) => e,
-                Err(e) => {
-                    tracing::warn!("failed to create evaluator from model: {}", e);
-                    continue;
-                }
-            };
+            let evaluator =
+                match NeuralEvaluator::new_from_model(self.model.clone(), self.device.clone()) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        tracing::warn!("failed to create evaluator from model: {}", e);
+                        continue;
+                    }
+                };
 
-            let cfg = GoMctsConfig { num_simulations: self.config.num_simulations, temperature: self.config.temperature, ..Default::default() };
+            let cfg = GoMctsConfig {
+                num_simulations: self.config.num_simulations,
+                temperature: self.config.temperature,
+                ..Default::default()
+            };
 
             // Run one self-play game and obtain bonsai-go training examples
             let examples = self_play_game(19, &evaluator, &cfg);
@@ -96,9 +107,16 @@ impl GoTrainingLoop {
                 let mut black_count = 0usize;
                 let mut white_count = 0usize;
                 for stone in board.stones.values() {
-                    match stone { Stone::Black => black_count += 1, Stone::White => white_count += 1 }
+                    match stone {
+                        Stone::Black => black_count += 1,
+                        Stone::White => white_count += 1,
+                    }
                 }
-                let to_move = if black_count <= white_count { Stone::Black } else { Stone::White };
+                let to_move = if black_count <= white_count {
+                    Stone::Black
+                } else {
+                    Stone::White
+                };
 
                 // Convert board to NN input
                 let state = board.to_nn_input(to_move);
@@ -114,22 +132,34 @@ impl GoTrainingLoop {
                     }
                 }
                 if sum > 0.0 {
-                    for v in policy.iter_mut() { *v /= sum; }
+                    for v in policy.iter_mut() {
+                        *v /= sum;
+                    }
                 } else {
                     let n = policy.len() as f32;
-                    for v in policy.iter_mut() { *v = 1.0 / n; }
+                    for v in policy.iter_mut() {
+                        *v = 1.0 / n;
+                    }
                 }
 
                 let value = ex.game_result.unwrap_or(0.5);
 
-                all_examples.push(GoTrainingExample { state, policy_target: policy, value_target: value });
+                all_examples.push(GoTrainingExample {
+                    state,
+                    policy_target: policy,
+                    value_target: value,
+                });
             }
         }
 
         // 2. Store examples in CAS (deduplicated)
         if !all_examples.is_empty() {
             let examples_key = self.store_examples_in_cas(&all_examples).await?;
-            tracing::info!("Stored {} examples in CAS key {}", all_examples.len(), examples_key.hex());
+            tracing::info!(
+                "Stored {} examples in CAS key {}",
+                all_examples.len(),
+                examples_key.hex()
+            );
             // 3. Train the network on the collected examples
             self.train_on_examples(&all_examples).await?;
             // 4. Save the updated model
@@ -140,13 +170,19 @@ impl GoTrainingLoop {
     }
 
     /// Helper to store training examples in CAS
-    async fn store_examples_in_cas(&self, examples: &[GoTrainingExample]) -> Result<bonsai_cas::CasKey, anyhow::Error> {
+    async fn store_examples_in_cas(
+        &self,
+        examples: &[GoTrainingExample],
+    ) -> Result<bonsai_cas::CasKey, anyhow::Error> {
         let json = serde_json::to_vec(examples)?;
         let key = self.cas_store.put(&json, "application/jsonl").await?;
         Ok(key)
     }
 
-    async fn train_on_examples(&mut self, examples: &[GoTrainingExample]) -> Result<(), anyhow::Error> {
+    async fn train_on_examples(
+        &mut self,
+        examples: &[GoTrainingExample],
+    ) -> Result<(), anyhow::Error> {
         tracing::info!("train_on_examples: received {} examples", examples.len());
         let bs = self.config.batch_size;
         let lr = self.config.learning_rate as f32;
@@ -184,17 +220,24 @@ impl GoTrainingLoop {
                 let mut sumexp = 0.0f32;
                 for (i, v) in l.iter().enumerate() {
                     let e = (v - maxl).exp();
-                    exps[i] = e; sumexp += e;
+                    exps[i] = e;
+                    sumexp += e;
                 }
-                if sumexp <= 0.0 { sumexp = 1.0; }
+                if sumexp <= 0.0 {
+                    sumexp = 1.0;
+                }
                 let mut probs = vec![0.0f32; l.len()];
-                for i in 0..l.len() { probs[i] = exps[i] / sumexp; }
+                for i in 0..l.len() {
+                    probs[i] = exps[i] / sumexp;
+                }
 
                 let tgt = policy_targets[s];
 
                 // delta for policy: probs - target
                 let mut delta_policy = vec![0.0f32; probs.len()];
-                for k in 0..probs.len() { delta_policy[k] = probs[k] - tgt[k]; }
+                for k in 0..probs.len() {
+                    delta_policy[k] = probs[k] - tgt[k];
+                }
 
                 // value loss grad: 2*(pred-target)/batch_size
                 let pred_val = values[s];
@@ -230,7 +273,11 @@ impl GoTrainingLoop {
 
                 // apply ReLU derivative
                 for i in 0..self.model.hidden {
-                    let dh = if activations[s][i] > 0.0 { dadt[i] } else { 0.0 };
+                    let dh = if activations[s][i] > 0.0 {
+                        dadt[i]
+                    } else {
+                        0.0
+                    };
                     grad_b1[i] += dh;
                     let base = i * self.model.in_features;
                     for j in 0..self.model.in_features {
@@ -241,20 +288,36 @@ impl GoTrainingLoop {
 
             // Average grads over batch
             let inv_bs = 1.0f32 / batch_size as f32;
-            for v in grad_b_policy.iter_mut() { *v *= inv_bs; }
-            for v in grad_w_policy.iter_mut() { *v *= inv_bs; }
+            for v in grad_b_policy.iter_mut() {
+                *v *= inv_bs;
+            }
+            for v in grad_w_policy.iter_mut() {
+                *v *= inv_bs;
+            }
             grad_b_value *= inv_bs;
-            for v in grad_w_value.iter_mut() { *v *= inv_bs; }
-            for v in grad_b1.iter_mut() { *v *= inv_bs; }
-            for v in grad_w1.iter_mut() { *v *= inv_bs; }
+            for v in grad_w_value.iter_mut() {
+                *v *= inv_bs;
+            }
+            for v in grad_b1.iter_mut() {
+                *v *= inv_bs;
+            }
+            for v in grad_w1.iter_mut() {
+                *v *= inv_bs;
+            }
 
             // Apply AdamW update to parameters
-            self.optimizer.step_adamw(&mut self.model.w_policy, &grad_w_policy, lr, wd);
-            self.optimizer.step_adamw(&mut self.model.b_policy, &grad_b_policy, lr, wd);
-            self.optimizer.step_adamw(&mut self.model.w_value, &grad_w_value, lr, wd);
-            self.optimizer.step_adamw_scalar(&mut self.model.b_value, grad_b_value, lr, wd);
-            self.optimizer.step_adamw(&mut self.model.w1, &grad_w1, lr, wd);
-            self.optimizer.step_adamw(&mut self.model.b1, &grad_b1, lr, wd);
+            self.optimizer
+                .step_adamw(&mut self.model.w_policy, &grad_w_policy, lr, wd);
+            self.optimizer
+                .step_adamw(&mut self.model.b_policy, &grad_b_policy, lr, wd);
+            self.optimizer
+                .step_adamw(&mut self.model.w_value, &grad_w_value, lr, wd);
+            self.optimizer
+                .step_adamw_scalar(&mut self.model.b_value, grad_b_value, lr, wd);
+            self.optimizer
+                .step_adamw(&mut self.model.w1, &grad_w1, lr, wd);
+            self.optimizer
+                .step_adamw(&mut self.model.b1, &grad_b1, lr, wd);
         }
 
         Ok(())
@@ -270,10 +333,17 @@ impl GoTrainingLoop {
     }
 
     // Additional helpers (board_to_tensor, prepare_batch, etc.) should be added here.
-
 }
 
-fn adamw_vec(t: u64, param: &mut [f32], grad: &[f32], m: &mut [f32], v: &mut [f32], lr: f32, wd: f32) {
+fn adamw_vec(
+    t: u64,
+    param: &mut [f32],
+    grad: &[f32],
+    m: &mut [f32],
+    v: &mut [f32],
+    lr: f32,
+    wd: f32,
+) {
     const B1: f32 = 0.9;
     const B2: f32 = 0.999;
     const EPS: f32 = 1e-8;
@@ -344,15 +414,55 @@ impl AdamState {
         self.t += 1;
         let t = self.t;
         if param.len() == self.m_w_policy.len() {
-            adamw_vec(t, param, grad, &mut self.m_w_policy, &mut self.v_w_policy, lr, weight_decay);
+            adamw_vec(
+                t,
+                param,
+                grad,
+                &mut self.m_w_policy,
+                &mut self.v_w_policy,
+                lr,
+                weight_decay,
+            );
         } else if param.len() == self.m_w1.len() {
-            adamw_vec(t, param, grad, &mut self.m_w1, &mut self.v_w1, lr, weight_decay);
+            adamw_vec(
+                t,
+                param,
+                grad,
+                &mut self.m_w1,
+                &mut self.v_w1,
+                lr,
+                weight_decay,
+            );
         } else if param.len() == self.m_b_policy.len() {
-            adamw_vec(t, param, grad, &mut self.m_b_policy, &mut self.v_b_policy, lr, weight_decay);
+            adamw_vec(
+                t,
+                param,
+                grad,
+                &mut self.m_b_policy,
+                &mut self.v_b_policy,
+                lr,
+                weight_decay,
+            );
         } else if param.len() == self.m_w_value.len() {
-            adamw_vec(t, param, grad, &mut self.m_w_value, &mut self.v_w_value, lr, weight_decay);
+            adamw_vec(
+                t,
+                param,
+                grad,
+                &mut self.m_w_value,
+                &mut self.v_w_value,
+                lr,
+                weight_decay,
+            );
         } else if param.len() == self.m_b1.len() {
-            adamw_vec(t, param, grad, &mut self.m_b1, &mut self.v_b1, lr, weight_decay);
+            adamw_vec(
+                t,
+                param,
+                grad,
+                &mut self.m_b1,
+                &mut self.v_b1,
+                lr,
+                weight_decay,
+            );
         } else {
             for i in 0..param.len() {
                 param[i] -= lr * (grad[i] + weight_decay * param[i]);
@@ -362,7 +472,15 @@ impl AdamState {
 
     pub fn step_adamw_scalar(&mut self, param: &mut f32, grad: f32, lr: f32, weight_decay: f32) {
         self.t += 1;
-        adamw_scalar(self.t, param, grad, &mut self.m_b_value, &mut self.v_b_value, lr, weight_decay);
+        adamw_scalar(
+            self.t,
+            param,
+            grad,
+            &mut self.m_b_value,
+            &mut self.v_b_value,
+            lr,
+            weight_decay,
+        );
     }
 
     // Additional helpers (board_to_tensor, prepare_batch, etc.) should be added here.

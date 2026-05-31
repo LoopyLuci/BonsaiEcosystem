@@ -1,8 +1,8 @@
 //! MCTS engine for Go — mirrors bonsai-chess MCTS structure.
 
-use std::collections::HashMap;
+use crate::board::{GoBoard, Point, Stone};
 use serde::{Deserialize, Serialize};
-use crate::board::{GoBoard, Stone, Point};
+use std::collections::HashMap;
 
 pub trait GoEvaluator: Send + Sync {
     fn evaluate_policy(&self, board: &GoBoard, color: Stone) -> Vec<(Option<Point>, f32)>;
@@ -54,10 +54,12 @@ impl Default for GoMctsNode {
 
 impl GoMctsNode {
     fn ucb_score(&self, parent_visits: u32, c_puct: f32) -> f32 {
-        let q = if self.visit_count == 0 { 0.5 }
-                else { self.total_value / self.visit_count as f32 };
-        q + c_puct * self.prior * (parent_visits as f32).sqrt()
-            / (1.0 + self.visit_count as f32)
+        let q = if self.visit_count == 0 {
+            0.5
+        } else {
+            self.total_value / self.visit_count as f32
+        };
+        q + c_puct * self.prior * (parent_visits as f32).sqrt() / (1.0 + self.visit_count as f32)
     }
 }
 
@@ -72,13 +74,31 @@ pub struct GoMctsConfig {
 
 impl Default for GoMctsConfig {
     fn default() -> Self {
-        Self { num_simulations: 400, c_puct: 1.25, temperature: 1.0, max_moves: 500, komi: 7.5 }
+        Self {
+            num_simulations: 400,
+            c_puct: 1.25,
+            temperature: 1.0,
+            max_moves: 500,
+            komi: 7.5,
+        }
     }
 }
 
 impl GoMctsConfig {
-    pub fn interactive() -> Self { Self { num_simulations: 200, temperature: 0.0, ..Default::default() } }
-    pub fn training()    -> Self { Self { num_simulations: 100, temperature: 1.0, ..Default::default() } }
+    pub fn interactive() -> Self {
+        Self {
+            num_simulations: 200,
+            temperature: 0.0,
+            ..Default::default()
+        }
+    }
+    pub fn training() -> Self {
+        Self {
+            num_simulations: 100,
+            temperature: 1.0,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,17 +121,43 @@ pub fn go_search(
     if board.is_terminal() {
         let score = board.final_score(config.komi);
         let val = match color {
-            Stone::Black => if score > 0.0 { 1.0 } else { 0.0 },
-            Stone::White => if score < 0.0 { 1.0 } else { 0.0 },
+            Stone::Black => {
+                if score > 0.0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Stone::White => {
+                if score < 0.0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
         };
-        return GoSearchResult { best_move: "pass".into(), best_point: None, value: val, simulations: 0, move_probs: vec![] };
+        return GoSearchResult {
+            best_move: "pass".into(),
+            best_point: None,
+            value: val,
+            simulations: 0,
+            move_probs: vec![],
+        };
     }
 
     let mut root = GoMctsNode::default();
     let policy = evaluator.evaluate_policy(board, color);
     for (pt, prior) in &policy {
-        let key = pt.map(|p| p.to_gtp(board.size)).unwrap_or_else(|| "pass".into());
-        root.children.insert(key, GoMctsNode { prior: *prior, ..Default::default() });
+        let key = pt
+            .map(|p| p.to_gtp(board.size))
+            .unwrap_or_else(|| "pass".into());
+        root.children.insert(
+            key,
+            GoMctsNode {
+                prior: *prior,
+                ..Default::default()
+            },
+        );
     }
 
     for _ in 0..config.num_simulations {
@@ -122,25 +168,50 @@ pub fn go_search(
     let total_visits: u32 = root.children.values().map(|c| c.visit_count).sum();
     let move_probs: Vec<(String, f32)> = if total_visits == 0 {
         // Fall back to evaluator policy if no visits recorded
-        evaluator.evaluate_policy(board, color).into_iter()
-            .map(|(pt, p)| (pt.map(|p| p.to_gtp(board.size)).unwrap_or_else(|| "pass".into()), p))
+        evaluator
+            .evaluate_policy(board, color)
+            .into_iter()
+            .map(|(pt, p)| {
+                (
+                    pt.map(|p| p.to_gtp(board.size))
+                        .unwrap_or_else(|| "pass".into()),
+                    p,
+                )
+            })
             .collect()
     } else {
-        root.children.iter()
+        root.children
+            .iter()
             .map(|(k, c)| (k.clone(), c.visit_count as f32 / total_visits as f32))
             .collect()
     };
 
     // Pick best by visit count
-    let best = root.children.iter()
+    let best = root
+        .children
+        .iter()
         .max_by_key(|(_, n)| n.visit_count)
         .map(|(k, _)| k.clone())
         .unwrap_or_else(|| "pass".into());
 
-    let best_point = if best == "pass" { None } else { Point::from_gtp(&best, board.size) };
-    let value = if root.visit_count > 0 { root.total_value / root.visit_count as f32 } else { 0.5 };
+    let best_point = if best == "pass" {
+        None
+    } else {
+        Point::from_gtp(&best, board.size)
+    };
+    let value = if root.visit_count > 0 {
+        root.total_value / root.visit_count as f32
+    } else {
+        0.5
+    };
 
-    GoSearchResult { best_move: best, best_point, value, simulations: config.num_simulations, move_probs }
+    GoSearchResult {
+        best_move: best,
+        best_point,
+        value,
+        simulations: config.num_simulations,
+        move_probs,
+    }
 }
 
 // ── Training example / self-play helper ──────────────────────────────────────
@@ -158,7 +229,11 @@ pub struct TrainingExample {
 }
 
 /// Play a self-play game using the provided evaluator and config.
-pub fn self_play_game(size: u8, evaluator: &dyn GoEvaluator, config: &GoMctsConfig) -> Vec<TrainingExample> {
+pub fn self_play_game(
+    size: u8,
+    evaluator: &dyn GoEvaluator,
+    config: &GoMctsConfig,
+) -> Vec<TrainingExample> {
     let mut board = GoBoard::new(size);
     let mut examples: Vec<TrainingExample> = Vec::new();
     let mut move_count: u32 = 0;
@@ -166,7 +241,9 @@ pub fn self_play_game(size: u8, evaluator: &dyn GoEvaluator, config: &GoMctsConf
 
     while !board.is_terminal() && move_count < config.max_moves {
         let result = go_search(&board, color, evaluator, config);
-        if result.best_move.is_empty() { break; }
+        if result.best_move.is_empty() {
+            break;
+        }
 
         let board_json = serde_json::to_string(&board).unwrap_or_default();
         let ex = TrainingExample {
@@ -192,11 +269,21 @@ pub fn self_play_game(size: u8, evaluator: &dyn GoEvaluator, config: &GoMctsConf
     let final_score = board.final_score(config.komi);
     let black_wins = final_score > 0.0;
     let draw = final_score.abs() < 1e-6;
-    let final_val = if draw { 0.5 } else if black_wins { 1.0 } else { 0.0 };
+    let final_val = if draw {
+        0.5
+    } else if black_wins {
+        1.0
+    } else {
+        0.0
+    };
 
     for (i, ex) in examples.iter_mut().enumerate() {
         // Even indices correspond to Black to play at that ply (first move Black)
-        let perspective = if i % 2 == 0 { final_val } else { 1.0 - final_val };
+        let perspective = if i % 2 == 0 {
+            final_val
+        } else {
+            1.0 - final_val
+        };
         ex.game_result = Some(perspective);
     }
 
@@ -234,19 +321,29 @@ fn go_simulate(
         if node.children.is_empty() && !board.is_terminal() {
             let policy = evaluator.evaluate_policy(board, color);
             for (pt, prior) in policy {
-                let key = pt.map(|p| p.to_gtp(board.size)).unwrap_or_else(|| "pass".into());
-                node.children.insert(key, GoMctsNode { prior, ..Default::default() });
+                let key = pt
+                    .map(|p| p.to_gtp(board.size))
+                    .unwrap_or_else(|| "pass".into());
+                node.children.insert(
+                    key,
+                    GoMctsNode {
+                        prior,
+                        ..Default::default()
+                    },
+                );
             }
         }
         return 1.0 - value;
     }
 
     let parent_visits = node.visit_count;
-    let best_key = node.children.iter()
+    let best_key = node
+        .children
+        .iter()
         .max_by(|(_, a), (_, b)| {
             a.ucb_score(parent_visits, config.c_puct)
-             .partial_cmp(&b.ucb_score(parent_visits, config.c_puct))
-             .unwrap_or(std::cmp::Ordering::Equal)
+                .partial_cmp(&b.ucb_score(parent_visits, config.c_puct))
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(k, _)| k.clone())
         .unwrap();
@@ -260,8 +357,20 @@ fn go_simulate(
         if child_board.is_terminal() {
             let score = child_board.final_score(config.komi);
             let v = match next_color {
-                Stone::Black => if score > 0.0 { 1.0 } else { 0.0 },
-                Stone::White => if score < 0.0 { 1.0 } else { 0.0 },
+                Stone::Black => {
+                    if score > 0.0 {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
+                Stone::White => {
+                    if score < 0.0 {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
             };
             child.is_terminal = true;
             child.terminal_value = Some(v);
@@ -269,17 +378,33 @@ fn go_simulate(
             child.total_value += v;
             1.0 - v
         } else {
-            go_simulate(child, &child_board, next_color, evaluator, config, depth + 1)
+            go_simulate(
+                child,
+                &child_board,
+                next_color,
+                evaluator,
+                config,
+                depth + 1,
+            )
         }
     } else {
         let pt = Point::from_gtp(&best_key, board.size);
-        let valid = pt.map(|p| child_board.place_stone(p, color).is_ok()).unwrap_or(false);
+        let valid = pt
+            .map(|p| child_board.place_stone(p, color).is_ok())
+            .unwrap_or(false);
         if !valid {
             node.children.remove(&best_key);
             return 0.5;
         }
         let child = node.children.get_mut(&best_key).unwrap();
-        go_simulate(child, &child_board, next_color, evaluator, config, depth + 1)
+        go_simulate(
+            child,
+            &child_board,
+            next_color,
+            evaluator,
+            config,
+            depth + 1,
+        )
     };
 
     node.visit_count += 1;
@@ -295,7 +420,10 @@ mod tests {
     fn search_returns_move() {
         let board = GoBoard::new(9);
         let eval = RandomGoEvaluator;
-        let config = GoMctsConfig { num_simulations: 20, ..Default::default() };
+        let config = GoMctsConfig {
+            num_simulations: 20,
+            ..Default::default()
+        };
         let result = go_search(&board, Stone::Black, &eval, &config);
         assert!(!result.best_move.is_empty());
     }

@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
-use bonsai_hnsw::{HnswIndex, Distance};
 use crate::{KdbError, Result};
+use bonsai_hnsw::{Distance, HnswIndex};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleManifest {
@@ -44,9 +44,7 @@ pub struct ModuleInfo {
 impl LoadedModule {
     pub fn load(dir: &Path) -> Result<Self> {
         let manifest_path = dir.join("manifest.json");
-        let manifest: ModuleManifest = serde_json::from_str(
-            &fs::read_to_string(&manifest_path)?
-        )?;
+        let manifest: ModuleManifest = serde_json::from_str(&fs::read_to_string(&manifest_path)?)?;
 
         let index_path = dir.join("index.hnsw");
         let index = HnswIndex::load(&index_path)?;
@@ -58,8 +56,7 @@ impl LoadedModule {
             let zst_path = dir.join("values.txt.zst");
             if zst_path.exists() {
                 let compressed = fs::read(&zst_path)?;
-                let decoded = zstd::decode_all(compressed.as_slice())
-                    .map_err(KdbError::Io)?;
+                let decoded = zstd::decode_all(compressed.as_slice()).map_err(KdbError::Io)?;
                 String::from_utf8(decoded)
                     .map_err(|e| KdbError::Invalid(format!("values utf8: {e}")))?
             } else {
@@ -72,11 +69,17 @@ impl LoadedModule {
         if values.len() != manifest.entry_count {
             return Err(KdbError::Invalid(format!(
                 "values count {} != manifest entry_count {}",
-                values.len(), manifest.entry_count
+                values.len(),
+                manifest.entry_count
             )));
         }
 
-        Ok(LoadedModule { manifest, index, values, path: dir.to_path_buf() })
+        Ok(LoadedModule {
+            manifest,
+            index,
+            values,
+            path: dir.to_path_buf(),
+        })
     }
 
     pub fn info(&self) -> ModuleInfo {

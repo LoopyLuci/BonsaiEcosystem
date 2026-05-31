@@ -9,7 +9,6 @@
 /// Encryption: optional AES-256-GCM (PBKDF2 key derivation, 100k iterations).
 /// Import modes: Merge | ReplaceProfile(id) | FullReplace
 /// FullReplace auto-snapshots current state first (stored in backup_registry).
-
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -38,33 +37,33 @@ pub enum ImportMode {
 #[derive(Debug, Serialize)]
 pub struct ImportSummary {
     pub profiles: usize,
-    pub avatars:  usize,
+    pub avatars: usize,
     pub sessions: usize,
-    pub errors:   Vec<String>,
+    pub errors: Vec<String>,
     pub rollback_snapshot: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Manifest {
-    version:     u32,
-    created_at:  i64,
+    version: u32,
+    created_at: i64,
     app_version: String,
-    encrypted:   bool,
-    checksums:   HashMap<String, String>,  // entry path → sha256 hex
+    encrypted: bool,
+    checksums: HashMap<String, String>, // entry path → sha256 hex
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SessionExport {
-    session:  AssistantSession,
+    session: AssistantSession,
     messages: Vec<AssistantMessage>,
 }
 
 // ── Encryption helpers ────────────────────────────────────────────────────────
 
 const PBKDF2_ITERATIONS: u32 = 100_000;
-const SALT_LEN:          usize = 16;
-const NONCE_LEN:         usize = 12;
-const KEY_LEN:           usize = 32;
+const SALT_LEN: usize = 16;
+const NONCE_LEN: usize = 12;
+const KEY_LEN: usize = 32;
 
 fn derive_key(passphrase: &str, salt: &[u8]) -> [u8; KEY_LEN] {
     use sha2::Sha256 as HmacSha256;
@@ -76,8 +75,8 @@ fn derive_key(passphrase: &str, salt: &[u8]) -> [u8; KEY_LEN] {
 
 fn pbkdf2_hmac_sha256(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8]) {
     // Single-block PBKDF2 (output ≤ 32 bytes, one PRF block is sufficient)
-    use sha2::digest::Mac;
     use hmac::Hmac;
+    use sha2::digest::Mac;
     type HmacSha256 = Hmac<Sha256>;
 
     let mut u = {
@@ -102,8 +101,8 @@ fn pbkdf2_hmac_sha256(password: &[u8], salt: &[u8], iterations: u32, out: &mut [
 }
 
 fn encrypt_bytes(data: &[u8], passphrase: &str) -> Result<Vec<u8>, String> {
-    use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
     use aes_gcm::aead::Aead;
+    use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
 
     let mut salt = [0u8; SALT_LEN];
     let mut nonce_bytes = [0u8; NONCE_LEN];
@@ -118,10 +117,12 @@ fn encrypt_bytes(data: &[u8], passphrase: &str) -> Result<Vec<u8>, String> {
     nonce_bytes.copy_from_slice(&seed[SALT_LEN..SALT_LEN + NONCE_LEN]);
 
     let key_bytes = derive_key(passphrase, &salt);
-    let key   = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
     let nonce = Nonce::from_slice(&nonce_bytes);
     let cipher = Aes256Gcm::new(key);
-    let ciphertext = cipher.encrypt(nonce, data).map_err(|e| format!("AES-GCM encrypt: {e}"))?;
+    let ciphertext = cipher
+        .encrypt(nonce, data)
+        .map_err(|e| format!("AES-GCM encrypt: {e}"))?;
 
     // Output: salt (16) | nonce (12) | ciphertext
     let mut out = Vec::with_capacity(SALT_LEN + NONCE_LEN + ciphertext.len());
@@ -132,32 +133,34 @@ fn encrypt_bytes(data: &[u8], passphrase: &str) -> Result<Vec<u8>, String> {
 }
 
 fn decrypt_bytes(data: &[u8], passphrase: &str) -> Result<Vec<u8>, String> {
-    use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
     use aes_gcm::aead::Aead;
+    use aes_gcm::{Aes256Gcm, Key, KeyInit, Nonce};
 
     if data.len() < SALT_LEN + NONCE_LEN + 16 {
         return Err("Encrypted data too short".into());
     }
-    let salt        = &data[..SALT_LEN];
+    let salt = &data[..SALT_LEN];
     let nonce_bytes = &data[SALT_LEN..SALT_LEN + NONCE_LEN];
-    let ciphertext  = &data[SALT_LEN + NONCE_LEN..];
+    let ciphertext = &data[SALT_LEN + NONCE_LEN..];
 
     let key_bytes = derive_key(passphrase, salt);
-    let key   = Key::<Aes256Gcm>::from_slice(&key_bytes);
+    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
     let nonce = Nonce::from_slice(nonce_bytes);
     let cipher = Aes256Gcm::new(key);
-    cipher.decrypt(nonce, ciphertext).map_err(|_| "Decryption failed — wrong passphrase?".into())
+    cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|_| "Decryption failed — wrong passphrase?".into())
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
 
 pub async fn export_backup(
-    app:              &AppHandle,
-    store:            &AssistantStore,
+    app: &AppHandle,
+    store: &AssistantStore,
     include_sessions: bool,
-    include_avatars:  bool,
-    encrypt:          bool,
-    passphrase:       Option<&str>,
+    include_avatars: bool,
+    encrypt: bool,
+    passphrase: Option<&str>,
 ) -> Result<String, String> {
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let backups_dir = data_dir.join("backups");
@@ -169,14 +172,21 @@ pub async fn export_backup(
 
     // Collect all data first
     let profiles = store.list_profiles().await?;
-    let avatars  = if include_avatars { store.list_avatars().await? } else { vec![] };
+    let avatars = if include_avatars {
+        store.list_avatars().await?
+    } else {
+        vec![]
+    };
 
     let mut session_exports: Vec<SessionExport> = vec![];
     if include_sessions {
         let sessions = store.list_sessions(None).await?;
         for s in sessions {
             let messages = store.load_messages(&s.id).await?;
-            session_exports.push(SessionExport { session: s, messages });
+            session_exports.push(SessionExport {
+                session: s,
+                messages,
+            });
         }
     }
 
@@ -188,19 +198,25 @@ pub async fn export_backup(
 
     // Register in backup_registry
     let file_size = zip_bytes.len() as i64;
-    let checksum  = hex_sha256(&zip_bytes);
+    let checksum = hex_sha256(&zip_bytes);
     let mut includes = vec!["profiles".to_string()];
-    if include_avatars  { includes.push("avatars".into()); }
-    if include_sessions { includes.push("sessions".into()); }
+    if include_avatars {
+        includes.push("avatars".into());
+    }
+    if include_sessions {
+        includes.push("sessions".into());
+    }
 
-    store.register_backup(
-        &filename,
-        &zip_path.to_string_lossy(),
-        file_size,
-        &serde_json::to_string(&includes).unwrap_or_default(),
-        &checksum,
-        encrypt,
-    ).await?;
+    store
+        .register_backup(
+            &filename,
+            &zip_path.to_string_lossy(),
+            file_size,
+            &serde_json::to_string(&includes).unwrap_or_default(),
+            &checksum,
+            encrypt,
+        )
+        .await?;
 
     // Rotate: keep last 5 auto-backups (oldest first)
     store.rotate_backups(5).await?;
@@ -209,11 +225,11 @@ pub async fn export_backup(
 }
 
 fn build_zip(
-    profiles:        &[AssistantProfile],
-    avatars:         &[AvatarAsset],
+    profiles: &[AssistantProfile],
+    avatars: &[AvatarAsset],
     session_exports: &[SessionExport],
-    encrypt:         bool,
-    passphrase:      Option<&str>,
+    encrypt: bool,
+    passphrase: Option<&str>,
 ) -> Result<Vec<u8>, String> {
     let mut buf = Vec::new();
     let mut zip = ZipWriter::new(std::io::Cursor::new(&mut buf));
@@ -222,11 +238,14 @@ fn build_zip(
 
     // Helper: write entry
     let mut write_entry = |zip: &mut ZipWriter<std::io::Cursor<&mut Vec<u8>>>,
-                            path: &str,
-                            data: &[u8]| -> Result<(), String> {
+                           path: &str,
+                           data: &[u8]|
+     -> Result<(), String> {
         checksums.insert(path.to_string(), hex_sha256(data));
-        zip.start_file(path, opts).map_err(|e| format!("zip start_file {path}: {e}"))?;
-        zip.write_all(data).map_err(|e| format!("zip write {path}: {e}"))?;
+        zip.start_file(path, opts)
+            .map_err(|e| format!("zip start_file {path}: {e}"))?;
+        zip.write_all(data)
+            .map_err(|e| format!("zip write {path}: {e}"))?;
         Ok(())
     };
 
@@ -250,15 +269,17 @@ fn build_zip(
 
     // Manifest (checksums written before manifest itself)
     let manifest = Manifest {
-        version:     1,
-        created_at:  now_ms(),
+        version: 1,
+        created_at: now_ms(),
         app_version: env!("CARGO_PKG_VERSION").to_string(),
-        encrypted:   encrypt,
-        checksums:   checksums.clone(),
+        encrypted: encrypt,
+        checksums: checksums.clone(),
     };
     let manifest_json = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
-    zip.start_file("manifest.json", opts).map_err(|e| format!("zip manifest: {e}"))?;
-    zip.write_all(&manifest_json).map_err(|e| format!("zip write manifest: {e}"))?;
+    zip.start_file("manifest.json", opts)
+        .map_err(|e| format!("zip manifest: {e}"))?;
+    zip.write_all(&manifest_json)
+        .map_err(|e| format!("zip write manifest: {e}"))?;
 
     zip.finish().map_err(|e| format!("zip finish: {e}"))?;
     drop(zip);
@@ -277,12 +298,12 @@ fn build_zip(
 // ── Import ────────────────────────────────────────────────────────────────────
 
 pub async fn import_backup(
-    app:        &AppHandle,
-    store:      &AssistantStore,
-    zip_path:   &str,
-    mode:       ImportMode,
+    app: &AppHandle,
+    store: &AssistantStore,
+    zip_path: &str,
+    mode: ImportMode,
     passphrase: Option<&str>,
-    dry_run:    bool,
+    dry_run: bool,
 ) -> Result<ImportSummary, String> {
     let raw = std::fs::read(zip_path).map_err(|e| format!("read backup: {e}"))?;
 
@@ -303,25 +324,33 @@ pub async fn import_backup(
 
     // Read manifest first
     let manifest: Manifest = {
-        let mut f = archive.by_name("manifest.json").map_err(|_| "manifest.json not found in backup")?;
+        let mut f = archive
+            .by_name("manifest.json")
+            .map_err(|_| "manifest.json not found in backup")?;
         let mut s = String::new();
-        f.read_to_string(&mut s).map_err(|e| format!("read manifest: {e}"))?;
+        f.read_to_string(&mut s)
+            .map_err(|e| format!("read manifest: {e}"))?;
         serde_json::from_str(&s).map_err(|e| format!("parse manifest: {e}"))?
     };
 
     // Validate checksums (dry-run or real)
     let mut errors: Vec<String> = vec![];
     let mut profiles: Vec<AssistantProfile> = vec![];
-    let mut avatars:  Vec<AvatarAsset>       = vec![];
-    let mut sessions: Vec<SessionExport>     = vec![];
+    let mut avatars: Vec<AvatarAsset> = vec![];
+    let mut sessions: Vec<SessionExport> = vec![];
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| format!("zip entry {i}: {e}"))?;
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| format!("zip entry {i}: {e}"))?;
         let name = file.name().to_string();
-        if name == "manifest.json" { continue; }
+        if name == "manifest.json" {
+            continue;
+        }
 
         let mut data = Vec::new();
-        file.read_to_end(&mut data).map_err(|e| format!("read {name}: {e}"))?;
+        file.read_to_end(&mut data)
+            .map_err(|e| format!("read {name}: {e}"))?;
 
         // Checksum validation
         let actual = hex_sha256(&data);
@@ -335,17 +364,17 @@ pub async fn import_backup(
         // Parse
         if name.starts_with("profiles/") {
             match serde_json::from_slice::<AssistantProfile>(&data) {
-                Ok(p)  => profiles.push(p),
+                Ok(p) => profiles.push(p),
                 Err(e) => errors.push(format!("parse {name}: {e}")),
             }
         } else if name.starts_with("avatars/") {
             match serde_json::from_slice::<AvatarAsset>(&data) {
-                Ok(a)  => avatars.push(a),
+                Ok(a) => avatars.push(a),
                 Err(e) => errors.push(format!("parse {name}: {e}")),
             }
         } else if name.starts_with("sessions/") {
             match serde_json::from_slice::<SessionExport>(&data) {
-                Ok(s)  => sessions.push(s),
+                Ok(s) => sessions.push(s),
                 Err(e) => errors.push(format!("parse {name}: {e}")),
             }
         }
@@ -353,7 +382,9 @@ pub async fn import_backup(
 
     if !errors.is_empty() {
         return Ok(ImportSummary {
-            profiles: 0, avatars: 0, sessions: 0,
+            profiles: 0,
+            avatars: 0,
+            sessions: 0,
             errors,
             rollback_snapshot: None,
         });
@@ -362,9 +393,9 @@ pub async fn import_backup(
     if dry_run {
         return Ok(ImportSummary {
             profiles: profiles.len(),
-            avatars:  avatars.len(),
+            avatars: avatars.len(),
             sessions: sessions.len(),
-            errors:   vec![],
+            errors: vec![],
             rollback_snapshot: None,
         });
     }
@@ -373,7 +404,10 @@ pub async fn import_backup(
     let rollback_snapshot = if mode == ImportMode::FullReplace {
         match export_backup(app, store, true, true, false, None).await {
             Ok(path) => Some(path),
-            Err(e)   => { errors.push(format!("auto-snapshot failed: {e}")); None }
+            Err(e) => {
+                errors.push(format!("auto-snapshot failed: {e}"));
+                None
+            }
         }
     } else {
         None
@@ -384,7 +418,7 @@ pub async fn import_backup(
 
     Ok(ImportSummary {
         profiles: profiles.len(),
-        avatars:  avatars.len(),
+        avatars: avatars.len(),
         sessions: sessions.len(),
         errors,
         rollback_snapshot,
@@ -392,12 +426,12 @@ pub async fn import_backup(
 }
 
 async fn apply_import(
-    store:    &AssistantStore,
+    store: &AssistantStore,
     profiles: &[AssistantProfile],
-    avatars:  &[AvatarAsset],
+    avatars: &[AvatarAsset],
     sessions: &[SessionExport],
-    mode:     &ImportMode,
-    errors:   &mut Vec<String>,
+    mode: &ImportMode,
+    errors: &mut Vec<String>,
 ) {
     if *mode == ImportMode::FullReplace {
         // Wipe existing data before import
@@ -415,13 +449,15 @@ async fn apply_import(
     for profile in profiles {
         let mut p = profile.clone();
         if let ImportMode::ReplaceProfile { id } = mode {
-            if &p.id != id { continue; }
+            if &p.id != id {
+                continue;
+            }
         }
         if let ImportMode::Merge = mode {
             // On conflict: rename
             if store.profile_exists(&p.id).await.unwrap_or(false) {
                 p.name = format!("{} (imported)", p.name);
-                p.id   = format!("{}_imp", p.id);
+                p.id = format!("{}_imp", p.id);
                 p.is_active = false;
             }
         }
@@ -440,7 +476,7 @@ async fn apply_import(
         let mut session = sx.session.clone();
         if let ImportMode::Merge = mode {
             if store.session_exists(&session.id).await.unwrap_or(false) {
-                session.id    = format!("{}_imp", session.id);
+                session.id = format!("{}_imp", session.id);
                 session.title = format!("{} (imported)", session.title);
             }
         }
@@ -462,15 +498,15 @@ async fn apply_import(
 
 #[derive(Debug, Serialize)]
 pub struct BackupEntry {
-    pub id:         String,
-    pub filename:   String,
-    pub file_path:  String,
+    pub id: String,
+    pub filename: String,
+    pub file_path: String,
     pub size_bytes: i64,
-    pub includes:   Vec<String>,
-    pub checksum:   Option<String>,
-    pub encrypted:  bool,
+    pub includes: Vec<String>,
+    pub checksum: Option<String>,
+    pub encrypted: bool,
     pub created_at: i64,
-    pub valid:      Option<bool>,
+    pub valid: Option<bool>,
 }
 
 pub async fn list_backups(store: &AssistantStore) -> Result<Vec<BackupEntry>, String> {
@@ -489,20 +525,28 @@ pub async fn verify_backup(zip_path: &str, passphrase: Option<&str>) -> Result<b
     let cursor = std::io::Cursor::new(&zip_bytes);
     let mut archive = ZipArchive::new(cursor).map_err(|e| format!("zip: {e}"))?;
     let manifest: Manifest = {
-        let mut f = archive.by_name("manifest.json").map_err(|_| "no manifest")?;
+        let mut f = archive
+            .by_name("manifest.json")
+            .map_err(|_| "no manifest")?;
         let mut s = String::new();
-        f.read_to_string(&mut s).map_err(|e| format!("read manifest: {e}"))?;
+        f.read_to_string(&mut s)
+            .map_err(|e| format!("read manifest: {e}"))?;
         serde_json::from_str(&s).map_err(|e| format!("parse manifest: {e}"))?
     };
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).map_err(|e| format!("entry {i}: {e}"))?;
         let name = file.name().to_string();
-        if name == "manifest.json" { continue; }
+        if name == "manifest.json" {
+            continue;
+        }
         let mut data = Vec::new();
-        file.read_to_end(&mut data).map_err(|e| format!("read {name}: {e}"))?;
+        file.read_to_end(&mut data)
+            .map_err(|e| format!("read {name}: {e}"))?;
         if let Some(expected) = manifest.checksums.get(&name) {
-            if &hex_sha256(&data) != expected { return Ok(false); }
+            if &hex_sha256(&data) != expected {
+                return Ok(false);
+            }
         }
     }
     Ok(true)
@@ -517,7 +561,10 @@ fn hex_sha256(data: &[u8]) -> String {
 }
 
 fn now_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }
 
 fn is_encrypted(data: &[u8]) -> bool {

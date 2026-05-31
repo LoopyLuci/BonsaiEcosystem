@@ -15,7 +15,9 @@ pub struct FineTuningActor {
 }
 
 impl FineTuningActor {
-    pub fn new(cas: Arc<CasStore>) -> Self { Self { cas } }
+    pub fn new(cas: Arc<CasStore>) -> Self {
+        Self { cas }
+    }
 
     /// Start a LoRA/DPO fine-tuning job.
     ///
@@ -39,12 +41,23 @@ impl FineTuningActor {
 
         // Verify all dataset keys exist before we start.
         for key in &preference_cas_keys {
-            if !self.cas.exists(key).await.map_err(|e| anyhow::anyhow!("{e}"))? {
-                return Err(anyhow::anyhow!("preference dataset key not found: {}", key.hex()));
+            if !self
+                .cas
+                .exists(key)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+            {
+                return Err(anyhow::anyhow!(
+                    "preference dataset key not found: {}",
+                    key.hex()
+                ));
             }
         }
 
-        info!("LoRA job: model={base_model} epochs={epochs} datasets={}", preference_cas_keys.len());
+        info!(
+            "LoRA job: model={base_model} epochs={epochs} datasets={}",
+            preference_cas_keys.len()
+        );
 
         // 1-hour hard cap on any single training run.
         let adapter_key = timeout(
@@ -64,7 +77,8 @@ impl FineTuningActor {
         dataset_key: CasKey,
         epochs: u32,
     ) -> anyhow::Result<CasKey> {
-        self.start_lora_job(base_model, vec![dataset_key], epochs).await
+        self.start_lora_job(base_model, vec![dataset_key], epochs)
+            .await
     }
 
     async fn run_training(
@@ -81,7 +95,10 @@ impl FineTuningActor {
 
         for epoch in 1..=epochs {
             tokio::time::sleep(Duration::from_millis(200)).await;
-            info!("  epoch {epoch}/{epochs} — base={base_model} datasets={}", keys.len());
+            info!(
+                "  epoch {epoch}/{epochs} — base={base_model} datasets={}",
+                keys.len()
+            );
         }
 
         // Placeholder adapter bytes tagged with training metadata
@@ -89,7 +106,10 @@ impl FineTuningActor {
             "LoRA adapter | base={base_model} epochs={epochs} datasets={}",
             keys.iter().map(|k| k.hex()).collect::<Vec<_>>().join(",")
         );
-        let adapter_key = self.cas.put(adapter_data.as_bytes(), "application/octet-stream").await
+        let adapter_key = self
+            .cas
+            .put(adapter_data.as_bytes(), "application/octet-stream")
+            .await
             .map_err(|e| anyhow::anyhow!("CAS put adapter: {e}"))?;
 
         info!("LoRA training complete → adapter key={}", adapter_key.hex());

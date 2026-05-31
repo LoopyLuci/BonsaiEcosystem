@@ -58,25 +58,53 @@ pub enum Token {
     Receive,
     Ask,
     Match,
-    Sql,     // @sql
+    Sql, // @sql
 
     // Operators
-    Plus, Minus, Star, Slash, Percent,
-    Eq, Ne, Lt, Le, Gt, Ge,
-    And, Or, Not,
-    BitAnd, BitOr, BitXor, Shl, Shr,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    Not,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
     Assign, // =
 
     // Punctuation
-    LParen, RParen,
-    LBrace, RBrace,
-    LBracket, RBracket,
-    LAngle, RAngle,
-    Comma, Colon, Semicolon, Arrow, Dot, At,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LBracket,
+    RBracket,
+    LAngle,
+    RAngle,
+    Comma,
+    Colon,
+    Semicolon,
+    Arrow,
+    Dot,
+    At,
     DotDot,
 
     // Devices
-    DeviceCpu, DeviceGpu, DeviceFpga, DeviceTpu, DeviceAuto,
+    DeviceCpu,
+    DeviceGpu,
+    DeviceFpga,
+    DeviceTpu,
+    DeviceAuto,
 
     Eof,
 }
@@ -92,7 +120,9 @@ impl std::fmt::Display for ParseError {
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-fn err(msg: impl Into<String>) -> ParseError { ParseError(msg.into()) }
+fn err(msg: impl Into<String>) -> ParseError {
+    ParseError(msg.into())
+}
 
 // ── Tokenizer ────────────────────────────────────────────────────────────────
 
@@ -104,9 +134,13 @@ pub fn tokenize(src: &str) -> ParseResult<Vec<Token>> {
     while i < chars.len() {
         let c = chars[i];
         match c {
-            ' ' | '\t' | '\r' | '\n' => { i += 1; }
-            '/' if chars.get(i+1) == Some(&'/') => {
-                while i < chars.len() && chars[i] != '\n' { i += 1; }
+            ' ' | '\t' | '\r' | '\n' => {
+                i += 1;
+            }
+            '/' if chars.get(i + 1) == Some(&'/') => {
+                while i < chars.len() && chars[i] != '\n' {
+                    i += 1;
+                }
             }
             '"' => {
                 i += 1;
@@ -126,7 +160,9 @@ pub fn tokenize(src: &str) -> ParseResult<Vec<Token>> {
                     }
                     i += 1;
                 }
-                if i >= chars.len() { return Err(err("unterminated string")); }
+                if i >= chars.len() {
+                    return Err(err("unterminated string"));
+                }
                 i += 1;
                 tokens.push(Token::Str(s));
             }
@@ -134,87 +170,198 @@ pub fn tokenize(src: &str) -> ParseResult<Vec<Token>> {
                 i += 1;
                 let mut kw = String::new();
                 while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
-                    kw.push(chars[i]); i += 1;
+                    kw.push(chars[i]);
+                    i += 1;
                 }
                 match kw.as_str() {
-                    "cpu"  => tokens.push(Token::DeviceCpu),
-                    "gpu"  => tokens.push(Token::DeviceGpu),
+                    "cpu" => tokens.push(Token::DeviceCpu),
+                    "gpu" => tokens.push(Token::DeviceGpu),
                     "fpga" => tokens.push(Token::DeviceFpga),
-                    "tpu"  => tokens.push(Token::DeviceTpu),
+                    "tpu" => tokens.push(Token::DeviceTpu),
                     "auto" => tokens.push(Token::DeviceAuto),
-                    "sql"  => tokens.push(Token::Sql),
-                    _      => tokens.push(Token::At),
+                    "sql" => tokens.push(Token::Sql),
+                    _ => tokens.push(Token::At),
                 }
             }
-            '-' if chars.get(i+1) == Some(&'>') => { tokens.push(Token::Arrow); i += 2; }
-            '.' if chars.get(i+1) == Some(&'.') => { tokens.push(Token::DotDot); i += 2; }
-            '=' if chars.get(i+1) == Some(&'=') => { tokens.push(Token::Eq); i += 2; }
-            '!' if chars.get(i+1) == Some(&'=') => { tokens.push(Token::Ne); i += 2; }
-            '<' if chars.get(i+1) == Some(&'=') => { tokens.push(Token::Le); i += 2; }
-            '>' if chars.get(i+1) == Some(&'=') => { tokens.push(Token::Ge); i += 2; }
-            '<' if chars.get(i+1) == Some(&'<') => { tokens.push(Token::Shl); i += 2; }
-            '>' if chars.get(i+1) == Some(&'>') => { tokens.push(Token::Shr); i += 2; }
-            '&' if chars.get(i+1) == Some(&'&') => { tokens.push(Token::And); i += 2; }
-            '|' if chars.get(i+1) == Some(&'|') => { tokens.push(Token::Or); i += 2; }
-            '+' => { tokens.push(Token::Plus);     i += 1; }
-            '-' => { tokens.push(Token::Minus);    i += 1; }
-            '*' => { tokens.push(Token::Star);     i += 1; }
-            '/' => { tokens.push(Token::Slash);    i += 1; }
-            '%' => { tokens.push(Token::Percent);  i += 1; }
-            '<' => { tokens.push(Token::Lt);       i += 1; }
-            '>' => { tokens.push(Token::Gt);       i += 1; }
-            '&' => { tokens.push(Token::BitAnd);   i += 1; }
-            '|' => { tokens.push(Token::BitOr);    i += 1; }
-            '^' => { tokens.push(Token::BitXor);   i += 1; }
-            '!' => { tokens.push(Token::Not);      i += 1; }
-            '=' => { tokens.push(Token::Assign);   i += 1; }
-            '(' => { tokens.push(Token::LParen);   i += 1; }
-            ')' => { tokens.push(Token::RParen);   i += 1; }
-            '{' => { tokens.push(Token::LBrace);   i += 1; }
-            '}' => { tokens.push(Token::RBrace);   i += 1; }
-            '[' => { tokens.push(Token::LBracket); i += 1; }
-            ']' => { tokens.push(Token::RBracket); i += 1; }
-            ',' => { tokens.push(Token::Comma);    i += 1; }
-            ':' => { tokens.push(Token::Colon);    i += 1; }
-            ';' => { tokens.push(Token::Semicolon); i += 1; }
-            '.' => { tokens.push(Token::Dot);      i += 1; }
-            _ if c.is_ascii_digit() || (c == '-' && chars.get(i+1).is_some_and(|x| x.is_ascii_digit())) => {
+            '-' if chars.get(i + 1) == Some(&'>') => {
+                tokens.push(Token::Arrow);
+                i += 2;
+            }
+            '.' if chars.get(i + 1) == Some(&'.') => {
+                tokens.push(Token::DotDot);
+                i += 2;
+            }
+            '=' if chars.get(i + 1) == Some(&'=') => {
+                tokens.push(Token::Eq);
+                i += 2;
+            }
+            '!' if chars.get(i + 1) == Some(&'=') => {
+                tokens.push(Token::Ne);
+                i += 2;
+            }
+            '<' if chars.get(i + 1) == Some(&'=') => {
+                tokens.push(Token::Le);
+                i += 2;
+            }
+            '>' if chars.get(i + 1) == Some(&'=') => {
+                tokens.push(Token::Ge);
+                i += 2;
+            }
+            '<' if chars.get(i + 1) == Some(&'<') => {
+                tokens.push(Token::Shl);
+                i += 2;
+            }
+            '>' if chars.get(i + 1) == Some(&'>') => {
+                tokens.push(Token::Shr);
+                i += 2;
+            }
+            '&' if chars.get(i + 1) == Some(&'&') => {
+                tokens.push(Token::And);
+                i += 2;
+            }
+            '|' if chars.get(i + 1) == Some(&'|') => {
+                tokens.push(Token::Or);
+                i += 2;
+            }
+            '+' => {
+                tokens.push(Token::Plus);
+                i += 1;
+            }
+            '-' => {
+                tokens.push(Token::Minus);
+                i += 1;
+            }
+            '*' => {
+                tokens.push(Token::Star);
+                i += 1;
+            }
+            '/' => {
+                tokens.push(Token::Slash);
+                i += 1;
+            }
+            '%' => {
+                tokens.push(Token::Percent);
+                i += 1;
+            }
+            '<' => {
+                tokens.push(Token::Lt);
+                i += 1;
+            }
+            '>' => {
+                tokens.push(Token::Gt);
+                i += 1;
+            }
+            '&' => {
+                tokens.push(Token::BitAnd);
+                i += 1;
+            }
+            '|' => {
+                tokens.push(Token::BitOr);
+                i += 1;
+            }
+            '^' => {
+                tokens.push(Token::BitXor);
+                i += 1;
+            }
+            '!' => {
+                tokens.push(Token::Not);
+                i += 1;
+            }
+            '=' => {
+                tokens.push(Token::Assign);
+                i += 1;
+            }
+            '(' => {
+                tokens.push(Token::LParen);
+                i += 1;
+            }
+            ')' => {
+                tokens.push(Token::RParen);
+                i += 1;
+            }
+            '{' => {
+                tokens.push(Token::LBrace);
+                i += 1;
+            }
+            '}' => {
+                tokens.push(Token::RBrace);
+                i += 1;
+            }
+            '[' => {
+                tokens.push(Token::LBracket);
+                i += 1;
+            }
+            ']' => {
+                tokens.push(Token::RBracket);
+                i += 1;
+            }
+            ',' => {
+                tokens.push(Token::Comma);
+                i += 1;
+            }
+            ':' => {
+                tokens.push(Token::Colon);
+                i += 1;
+            }
+            ';' => {
+                tokens.push(Token::Semicolon);
+                i += 1;
+            }
+            '.' => {
+                tokens.push(Token::Dot);
+                i += 1;
+            }
+            _ if c.is_ascii_digit()
+                || (c == '-' && chars.get(i + 1).is_some_and(|x| x.is_ascii_digit())) =>
+            {
                 let start = i;
-                if c == '-' { i += 1; }
-                while i < chars.len() && (chars[i].is_ascii_digit()) { i += 1; }
+                if c == '-' {
+                    i += 1;
+                }
+                while i < chars.len() && (chars[i].is_ascii_digit()) {
+                    i += 1;
+                }
                 let is_float = i < chars.len() && chars[i] == '.';
                 if is_float {
                     i += 1;
-                    while i < chars.len() && chars[i].is_ascii_digit() { i += 1; }
+                    while i < chars.len() && chars[i].is_ascii_digit() {
+                        i += 1;
+                    }
                     let s: String = chars[start..i].iter().collect();
-                    tokens.push(Token::Float(s.parse().map_err(|_| err(format!("bad float: {s}")))?));
+                    tokens.push(Token::Float(
+                        s.parse().map_err(|_| err(format!("bad float: {s}")))?,
+                    ));
                 } else {
                     let s: String = chars[start..i].iter().collect();
-                    tokens.push(Token::Int(s.parse().map_err(|_| err(format!("bad int: {s}")))?));
+                    tokens.push(Token::Int(
+                        s.parse().map_err(|_| err(format!("bad int: {s}")))?,
+                    ));
                 }
             }
             _ if c.is_alphabetic() || c == '_' => {
                 let start = i;
-                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') { i += 1; }
+                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                    i += 1;
+                }
                 let word: String = chars[start..i].iter().collect();
                 tokens.push(match word.as_str() {
-                    "fn"       => Token::Fn,
-                    "let"      => Token::Let,
-                    "if"       => Token::If,
-                    "else"     => Token::Else,
-                    "return"   => Token::Return,
-                    "loop"     => Token::Loop,
-                    "break"    => Token::Break,
+                    "fn" => Token::Fn,
+                    "let" => Token::Let,
+                    "if" => Token::If,
+                    "else" => Token::Else,
+                    "return" => Token::Return,
+                    "loop" => Token::Loop,
+                    "break" => Token::Break,
                     "continue" => Token::Continue,
-                    "spawn"    => Token::Spawn,
-                    "send"     => Token::Send,
-                    "receive"  => Token::Receive,
-                    "ask"      => Token::Ask,
-                    "match"    => Token::Match,
-                    "true"     => Token::Bool(true),
-                    "false"    => Token::Bool(false),
-                    "unit"     => Token::Unit,
-                    _          => Token::Ident(word),
+                    "spawn" => Token::Spawn,
+                    "send" => Token::Send,
+                    "receive" => Token::Receive,
+                    "ask" => Token::Ask,
+                    "match" => Token::Match,
+                    "true" => Token::Bool(true),
+                    "false" => Token::Bool(false),
+                    "unit" => Token::Unit,
+                    _ => Token::Ident(word),
                 });
             }
             other => return Err(err(format!("unexpected char: {other:?}"))),
@@ -232,15 +379,23 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self { Self { tokens, pos: 0 } }
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, pos: 0 }
+    }
 
-    fn peek(&self) -> &Token { &self.tokens[self.pos] }
+    fn peek(&self) -> &Token {
+        &self.tokens[self.pos]
+    }
 
-    fn peek2(&self) -> Option<&Token> { self.tokens.get(self.pos + 1) }
+    fn peek2(&self) -> Option<&Token> {
+        self.tokens.get(self.pos + 1)
+    }
 
     fn advance(&mut self) -> &Token {
         let t = &self.tokens[self.pos];
-        if self.pos + 1 < self.tokens.len() { self.pos += 1; }
+        if self.pos + 1 < self.tokens.len() {
+            self.pos += 1;
+        }
         t
     }
 
@@ -255,8 +410,11 @@ impl Parser {
 
     fn expect_ident(&mut self) -> ParseResult<String> {
         match self.peek().clone() {
-            Token::Ident(s) => { self.advance(); Ok(s) }
-            other => Err(err(format!("expected identifier, got {:?}", other)))
+            Token::Ident(s) => {
+                self.advance();
+                Ok(s)
+            }
+            other => Err(err(format!("expected identifier, got {:?}", other))),
         }
     }
 
@@ -268,14 +426,14 @@ impl Parser {
                 let name = name.clone();
                 self.advance();
                 match name.as_str() {
-                    "Unit"      => Ok(IrType::Unit),
-                    "Bool"      => Ok(IrType::Bool),
-                    "Int"       => Ok(IrType::I64),
-                    "Float"     => Ok(IrType::F64),
-                    "Str"       => Ok(IrType::Str),
-                    "Bytes"     => Ok(IrType::Bytes),
+                    "Unit" => Ok(IrType::Unit),
+                    "Bool" => Ok(IrType::Bool),
+                    "Int" => Ok(IrType::I64),
+                    "Float" => Ok(IrType::F64),
+                    "Str" => Ok(IrType::Str),
+                    "Bytes" => Ok(IrType::Bytes),
                     "DataFrame" => Ok(IrType::DataFrame),
-                    "ActorRef"  => {
+                    "ActorRef" => {
                         self.expect(&Token::Lt)?;
                         let inner = self.parse_type()?;
                         self.expect(&Token::Gt)?;
@@ -302,7 +460,9 @@ impl Parser {
                 let mut params = Vec::new();
                 while self.peek() != &Token::RParen {
                     params.push(self.parse_type()?);
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                 }
                 self.expect(&Token::RParen)?;
                 self.expect(&Token::Arrow)?;
@@ -315,7 +475,7 @@ impl Parser {
                 self.expect(&Token::RParen)?;
                 Ok(ty)
             }
-            other => Err(err(format!("expected type, got {:?}", other)))
+            other => Err(err(format!("expected type, got {:?}", other))),
         }
     }
 
@@ -327,8 +487,14 @@ impl Parser {
             // optional device annotation on fn
             // peek2() disambiguates: only consume the device token when the next
             // token is `fn`, avoiding false positives for bare @-identifiers.
-            let device = if matches!(self.peek(), Token::DeviceCpu | Token::DeviceGpu | Token::DeviceFpga | Token::DeviceTpu | Token::DeviceAuto)
-                && self.peek2() == Some(&Token::Fn)
+            let device = if matches!(
+                self.peek(),
+                Token::DeviceCpu
+                    | Token::DeviceGpu
+                    | Token::DeviceFpga
+                    | Token::DeviceTpu
+                    | Token::DeviceAuto
+            ) && self.peek2() == Some(&Token::Fn)
             {
                 Some(self.parse_device())
             } else {
@@ -344,11 +510,11 @@ impl Parser {
 
     fn parse_device(&mut self) -> DeviceTarget {
         match self.advance().clone() {
-            Token::DeviceCpu  => DeviceTarget::Cpu,
-            Token::DeviceGpu  => DeviceTarget::Gpu,
+            Token::DeviceCpu => DeviceTarget::Cpu,
+            Token::DeviceGpu => DeviceTarget::Gpu,
             Token::DeviceFpga => DeviceTarget::Fpga,
-            Token::DeviceTpu  => DeviceTarget::Tpu,
-            _                 => DeviceTarget::Auto,
+            Token::DeviceTpu => DeviceTarget::Tpu,
+            _ => DeviceTarget::Auto,
         }
     }
 
@@ -362,8 +528,14 @@ impl Parser {
             let pname = self.expect_ident()?;
             self.expect(&Token::Colon)?;
             let pty = self.parse_type()?;
-            params.push(IrParam { name: pname, ty: pty, default: None });
-            if self.peek() == &Token::Comma { self.advance(); }
+            params.push(IrParam {
+                name: pname,
+                ty: pty,
+                default: None,
+            });
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
         }
         self.expect(&Token::RParen)?;
 
@@ -379,7 +551,10 @@ impl Parser {
         self.expect(&Token::RBrace)?;
 
         if let Some(dev) = device {
-            body = IrOp::DeviceAnnotation { target: dev, expr: Box::new(body) };
+            body = IrOp::DeviceAnnotation {
+                target: dev,
+                expr: Box::new(body),
+            };
         }
 
         Ok(IrFunction {
@@ -398,8 +573,8 @@ impl Parser {
     fn parse_expr(&mut self) -> ParseResult<IrOp> {
         match self.peek().clone() {
             Token::Let => self.parse_let(),
-            Token::If  => self.parse_if(),
-            Token::Fn  => self.parse_lambda(),
+            Token::If => self.parse_if(),
+            Token::Fn => self.parse_lambda(),
             Token::Return => {
                 self.advance();
                 let val = self.parse_expr()?;
@@ -421,16 +596,26 @@ impl Parser {
                 };
                 Ok(IrOp::Break(Box::new(val)))
             }
-            Token::Continue => { self.advance(); Ok(IrOp::Continue) }
-            Token::Spawn    => self.parse_spawn(),
-            Token::Send     => self.parse_send(),
-            Token::Receive  => self.parse_receive(),
-            Token::Ask      => self.parse_ask(),
-            Token::Sql      => self.parse_sql(),
-            Token::DeviceCpu | Token::DeviceGpu | Token::DeviceFpga | Token::DeviceTpu | Token::DeviceAuto => {
+            Token::Continue => {
+                self.advance();
+                Ok(IrOp::Continue)
+            }
+            Token::Spawn => self.parse_spawn(),
+            Token::Send => self.parse_send(),
+            Token::Receive => self.parse_receive(),
+            Token::Ask => self.parse_ask(),
+            Token::Sql => self.parse_sql(),
+            Token::DeviceCpu
+            | Token::DeviceGpu
+            | Token::DeviceFpga
+            | Token::DeviceTpu
+            | Token::DeviceAuto => {
                 let dev = self.parse_device();
                 let expr = self.parse_expr()?;
-                Ok(IrOp::DeviceAnnotation { target: dev, expr: Box::new(expr) })
+                Ok(IrOp::DeviceAnnotation {
+                    target: dev,
+                    expr: Box::new(expr),
+                })
             }
             Token::Match => self.parse_match(),
             _ => self.parse_bin_expr(0),
@@ -442,7 +627,9 @@ impl Parser {
         while self.peek() != &Token::RBrace && self.peek() != &Token::Eof {
             let expr = self.parse_expr()?;
             stmts.push(expr);
-            if self.peek() == &Token::Semicolon { self.advance(); }
+            if self.peek() == &Token::Semicolon {
+                self.advance();
+            }
         }
         Ok(if stmts.len() == 1 {
             stmts.pop().unwrap()
@@ -464,7 +651,12 @@ impl Parser {
         let value = self.parse_expr()?;
         self.expect(&Token::Semicolon)?;
         let rest = self.parse_expr()?;
-        Ok(IrOp::Let { name, ty, value: Box::new(value), rest: Box::new(rest) })
+        Ok(IrOp::Let {
+            name,
+            ty,
+            value: Box::new(value),
+            rest: Box::new(rest),
+        })
     }
 
     fn parse_if(&mut self) -> ParseResult<IrOp> {
@@ -489,17 +681,25 @@ impl Parser {
             self.expect(&Token::Colon)?;
             let pty = self.parse_type()?;
             params.push((pname, pty));
-            if self.peek() == &Token::Comma { self.advance(); }
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
         }
         self.expect(&Token::RParen)?;
         let ret = if self.peek() == &Token::Arrow {
             self.advance();
             Some(self.parse_type()?)
-        } else { None };
+        } else {
+            None
+        };
         self.expect(&Token::LBrace)?;
         let body = self.parse_block()?;
         self.expect(&Token::RBrace)?;
-        Ok(IrOp::Lambda { params, ret, body: Box::new(body) })
+        Ok(IrOp::Lambda {
+            params,
+            ret,
+            body: Box::new(body),
+        })
     }
 
     fn parse_spawn(&mut self) -> ParseResult<IrOp> {
@@ -510,7 +710,10 @@ impl Parser {
         self.expect(&Token::LParen)?;
         let init = self.parse_expr()?;
         self.expect(&Token::RParen)?;
-        Ok(IrOp::Spawn { actor_ty: ty, init_msg: Box::new(init) })
+        Ok(IrOp::Spawn {
+            actor_ty: ty,
+            init_msg: Box::new(init),
+        })
     }
 
     fn parse_send(&mut self) -> ParseResult<IrOp> {
@@ -520,7 +723,10 @@ impl Parser {
         self.expect(&Token::Comma)?;
         let msg = self.parse_expr()?;
         self.expect(&Token::RParen)?;
-        Ok(IrOp::Send { actor_ref: Box::new(actor), msg: Box::new(msg) })
+        Ok(IrOp::Send {
+            actor_ref: Box::new(actor),
+            msg: Box::new(msg),
+        })
     }
 
     fn parse_receive(&mut self) -> ParseResult<IrOp> {
@@ -540,7 +746,11 @@ impl Parser {
         self.expect(&Token::Comma)?;
         let reply_ty = self.parse_type()?;
         self.expect(&Token::RParen)?;
-        Ok(IrOp::Ask { actor_ref: Box::new(actor), msg: Box::new(msg), reply_ty })
+        Ok(IrOp::Ask {
+            actor_ref: Box::new(actor),
+            msg: Box::new(msg),
+            reply_ty,
+        })
     }
 
     fn parse_sql(&mut self) -> ParseResult<IrOp> {
@@ -569,15 +779,23 @@ impl Parser {
             self.expect(&Token::Arrow)?;
             let body = self.parse_expr()?;
             arms.push((pat, body));
-            if self.peek() == &Token::Comma { self.advance(); }
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
         }
         self.expect(&Token::RBrace)?;
-        Ok(IrOp::Match { scrutinee: Box::new(scrutinee), arms })
+        Ok(IrOp::Match {
+            scrutinee: Box::new(scrutinee),
+            arms,
+        })
     }
 
     fn parse_pattern(&mut self) -> ParseResult<IrPattern> {
         match self.peek().clone() {
-            Token::Ident(s) if s == "_" => { self.advance(); Ok(IrPattern::Wildcard) }
+            Token::Ident(s) if s == "_" => {
+                self.advance();
+                Ok(IrPattern::Wildcard)
+            }
             Token::Ident(s) => {
                 let s = s.clone();
                 self.advance();
@@ -587,7 +805,9 @@ impl Parser {
                     let mut fields = Vec::new();
                     while self.peek() != &Token::RParen {
                         fields.push(self.parse_pattern()?);
-                        if self.peek() == &Token::Comma { self.advance(); }
+                        if self.peek() == &Token::Comma {
+                            self.advance();
+                        }
                     }
                     self.expect(&Token::RParen)?;
                     Ok(IrPattern::Variant { name: s, fields })
@@ -595,20 +815,32 @@ impl Parser {
                     Ok(IrPattern::Bind(s))
                 }
             }
-            Token::Int(n)  => { self.advance(); Ok(IrPattern::Lit(IrLit::I64(n))) }
-            Token::Bool(b) => { self.advance(); Ok(IrPattern::Lit(IrLit::Bool(b))) }
-            Token::Str(s)  => { let s = s.clone(); self.advance(); Ok(IrPattern::Lit(IrLit::Str(s))) }
-            Token::LParen  => {
+            Token::Int(n) => {
+                self.advance();
+                Ok(IrPattern::Lit(IrLit::I64(n)))
+            }
+            Token::Bool(b) => {
+                self.advance();
+                Ok(IrPattern::Lit(IrLit::Bool(b)))
+            }
+            Token::Str(s) => {
+                let s = s.clone();
+                self.advance();
+                Ok(IrPattern::Lit(IrLit::Str(s)))
+            }
+            Token::LParen => {
                 self.advance();
                 let mut pats = Vec::new();
                 while self.peek() != &Token::RParen {
                     pats.push(self.parse_pattern()?);
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                 }
                 self.expect(&Token::RParen)?;
                 Ok(IrPattern::Tuple(pats))
             }
-            other => Err(err(format!("expected pattern, got {:?}", other)))
+            other => Err(err(format!("expected pattern, got {:?}", other))),
         }
     }
 
@@ -617,23 +849,23 @@ impl Parser {
     fn prec(tok: &Token) -> Option<(u8, BinOpKind)> {
         use BinOpKind::*;
         Some(match tok {
-            Token::Or      => (1, Or),
-            Token::And     => (2, And),
-            Token::BitOr   => (3, BitOr),
-            Token::BitXor  => (4, BitXor),
-            Token::BitAnd  => (5, BitAnd),
-            Token::Eq      => (6, Eq),
-            Token::Ne      => (6, Ne),
-            Token::Lt      => (7, Lt),
-            Token::Le      => (7, Le),
-            Token::Gt      => (7, Gt),
-            Token::Ge      => (7, Ge),
-            Token::Shl     => (8, Shl),
-            Token::Shr     => (8, Shr),
-            Token::Plus    => (9, Add),
-            Token::Minus   => (9, Sub),
-            Token::Star    => (10, Mul),
-            Token::Slash   => (10, Div),
+            Token::Or => (1, Or),
+            Token::And => (2, And),
+            Token::BitOr => (3, BitOr),
+            Token::BitXor => (4, BitXor),
+            Token::BitAnd => (5, BitAnd),
+            Token::Eq => (6, Eq),
+            Token::Ne => (6, Ne),
+            Token::Lt => (7, Lt),
+            Token::Le => (7, Le),
+            Token::Gt => (7, Gt),
+            Token::Ge => (7, Ge),
+            Token::Shl => (8, Shl),
+            Token::Shr => (8, Shr),
+            Token::Plus => (9, Add),
+            Token::Minus => (9, Sub),
+            Token::Star => (10, Mul),
+            Token::Slash => (10, Div),
             Token::Percent => (10, Rem),
             _ => return None,
         })
@@ -648,16 +880,41 @@ impl Parser {
             };
             self.advance();
             let rhs = self.parse_bin_expr(prec + 1)?;
-            lhs = IrOp::BinOp { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+            lhs = IrOp::BinOp {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            };
         }
         Ok(lhs)
     }
 
     fn parse_unary(&mut self) -> ParseResult<IrOp> {
         match self.peek().clone() {
-            Token::Not   => { self.advance(); let e = self.parse_call()?; Ok(IrOp::UnOp { op: UnOpKind::Not,   expr: Box::new(e) }) }
-            Token::Minus => { self.advance(); let e = self.parse_call()?; Ok(IrOp::UnOp { op: UnOpKind::Neg,   expr: Box::new(e) }) }
-            Token::Star  => { self.advance(); let e = self.parse_call()?; Ok(IrOp::UnOp { op: UnOpKind::Deref, expr: Box::new(e) }) }
+            Token::Not => {
+                self.advance();
+                let e = self.parse_call()?;
+                Ok(IrOp::UnOp {
+                    op: UnOpKind::Not,
+                    expr: Box::new(e),
+                })
+            }
+            Token::Minus => {
+                self.advance();
+                let e = self.parse_call()?;
+                Ok(IrOp::UnOp {
+                    op: UnOpKind::Neg,
+                    expr: Box::new(e),
+                })
+            }
+            Token::Star => {
+                self.advance();
+                let e = self.parse_call()?;
+                Ok(IrOp::UnOp {
+                    op: UnOpKind::Deref,
+                    expr: Box::new(e),
+                })
+            }
             _ => self.parse_call(),
         }
     }
@@ -670,7 +927,10 @@ impl Parser {
                     self.advance();
                     let args = self.parse_arg_list()?;
                     self.expect(&Token::RParen)?;
-                    base = IrOp::Apply { func: Box::new(base), args };
+                    base = IrOp::Apply {
+                        func: Box::new(base),
+                        args,
+                    };
                 }
                 Token::Dot => {
                     self.advance();
@@ -682,18 +942,27 @@ impl Parser {
                         self.expect(&Token::RParen)?;
                         // lower to ToolCall if it looks like a bonsai.X() call
                         base = IrOp::Apply {
-                            func: Box::new(IrOp::FieldAccess { expr: Box::new(base), field }),
+                            func: Box::new(IrOp::FieldAccess {
+                                expr: Box::new(base),
+                                field,
+                            }),
                             args,
                         };
                     } else {
-                        base = IrOp::FieldAccess { expr: Box::new(base), field };
+                        base = IrOp::FieldAccess {
+                            expr: Box::new(base),
+                            field,
+                        };
                     }
                 }
                 Token::LBracket => {
                     self.advance();
                     let idx = self.parse_expr()?;
                     self.expect(&Token::RBracket)?;
-                    base = IrOp::IndexAccess { expr: Box::new(base), index: Box::new(idx) };
+                    base = IrOp::IndexAccess {
+                        expr: Box::new(base),
+                        index: Box::new(idx),
+                    };
                 }
                 _ => break,
             }
@@ -705,18 +974,36 @@ impl Parser {
         let mut args = Vec::new();
         while self.peek() != &Token::RParen && self.peek() != &Token::Eof {
             args.push(self.parse_expr()?);
-            if self.peek() == &Token::Comma { self.advance(); }
+            if self.peek() == &Token::Comma {
+                self.advance();
+            }
         }
         Ok(args)
     }
 
     fn parse_atom(&mut self) -> ParseResult<IrOp> {
         match self.peek().clone() {
-            Token::Int(n)  => { self.advance(); Ok(IrOp::lit_i64(n)) }
-            Token::Float(f)=> { self.advance(); Ok(IrOp::Lit(IrLit::F64(f))) }
-            Token::Bool(b) => { self.advance(); Ok(IrOp::lit_bool(b)) }
-            Token::Str(s)  => { let s = s.clone(); self.advance(); Ok(IrOp::lit_str(s)) }
-            Token::Unit    => { self.advance(); Ok(IrOp::unit()) }
+            Token::Int(n) => {
+                self.advance();
+                Ok(IrOp::lit_i64(n))
+            }
+            Token::Float(f) => {
+                self.advance();
+                Ok(IrOp::Lit(IrLit::F64(f)))
+            }
+            Token::Bool(b) => {
+                self.advance();
+                Ok(IrOp::lit_bool(b))
+            }
+            Token::Str(s) => {
+                let s = s.clone();
+                self.advance();
+                Ok(IrOp::lit_str(s))
+            }
+            Token::Unit => {
+                self.advance();
+                Ok(IrOp::unit())
+            }
             Token::Ident(name) => {
                 let name = name.clone();
                 self.advance();
@@ -734,7 +1021,9 @@ impl Parser {
                     let mut elems = vec![first];
                     while self.peek() == &Token::Comma {
                         self.advance();
-                        if self.peek() == &Token::RParen { break; }
+                        if self.peek() == &Token::RParen {
+                            break;
+                        }
                         elems.push(self.parse_expr()?);
                     }
                     self.expect(&Token::RParen)?;
@@ -749,7 +1038,9 @@ impl Parser {
                 let mut elems = Vec::new();
                 while self.peek() != &Token::RBracket && self.peek() != &Token::Eof {
                     elems.push(self.parse_expr()?);
-                    if self.peek() == &Token::Comma { self.advance(); }
+                    if self.peek() == &Token::Comma {
+                        self.advance();
+                    }
                 }
                 self.expect(&Token::RBracket)?;
                 Ok(IrOp::Array(elems))
@@ -760,7 +1051,7 @@ impl Parser {
                 self.expect(&Token::RBrace)?;
                 Ok(block)
             }
-            other => Err(err(format!("unexpected token in expression: {:?}", other)))
+            other => Err(err(format!("unexpected token in expression: {:?}", other))),
         }
     }
 }
@@ -813,7 +1104,13 @@ mod tests {
     fn parse_device_annotation() {
         let src = r#"@gpu fn matmul(a: NDArray<Float>, b: NDArray<Float>) -> NDArray<Float> { a }"#;
         let m = parse(src, "test").unwrap();
-        assert!(matches!(m.functions[0].body, IrOp::DeviceAnnotation { target: DeviceTarget::Gpu, .. }));
+        assert!(matches!(
+            m.functions[0].body,
+            IrOp::DeviceAnnotation {
+                target: DeviceTarget::Gpu,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -845,9 +1142,19 @@ mod tests {
         let op = parse_expr("1 + 2 * 3").unwrap();
         // Should be 1 + (2 * 3) due to precedence
         match op {
-            IrOp::BinOp { op: BinOpKind::Add, lhs, rhs } => {
+            IrOp::BinOp {
+                op: BinOpKind::Add,
+                lhs,
+                rhs,
+            } => {
                 assert!(matches!(*lhs, IrOp::Lit(IrLit::I64(1))));
-                assert!(matches!(*rhs, IrOp::BinOp { op: BinOpKind::Mul, .. }));
+                assert!(matches!(
+                    *rhs,
+                    IrOp::BinOp {
+                        op: BinOpKind::Mul,
+                        ..
+                    }
+                ));
             }
             _ => panic!("expected BinOp::Add at top level"),
         }

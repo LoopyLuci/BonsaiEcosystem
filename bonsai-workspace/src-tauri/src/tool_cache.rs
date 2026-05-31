@@ -1,3 +1,4 @@
+use serde_json::Value;
 /// Tenancy-aware LRU cache for tool results.
 ///
 /// Cache key includes: tool name, canonical args hash, profile_id, workspace_path.
@@ -7,7 +8,6 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use serde_json::Value;
 
 const DEFAULT_CAPACITY: usize = 256;
 
@@ -15,18 +15,18 @@ const DEFAULT_CAPACITY: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct CacheKey {
-    tool:           String,
-    args_hash:      u64,
-    profile_id:     String,
+    tool: String,
+    args_hash: u64,
+    profile_id: String,
     workspace_path: String, // "" when no workspace
 }
 
 impl CacheKey {
     fn new(tool: &str, args: &Value, profile_id: &str, workspace: Option<&str>) -> Self {
         Self {
-            tool:           tool.to_string(),
-            args_hash:      hash_value(args),
-            profile_id:     profile_id.to_string(),
+            tool: tool.to_string(),
+            args_hash: hash_value(args),
+            profile_id: profile_id.to_string(),
             workspace_path: workspace.unwrap_or("").to_string(),
         }
     }
@@ -49,13 +49,23 @@ fn canonical_json(v: &Value) -> String {
         Value::Object(map) => {
             let mut keys: Vec<&String> = map.keys().collect();
             keys.sort();
-            let inner: Vec<String> = keys.iter()
-                .map(|k| format!("{}:{}", serde_json::to_string(k).unwrap_or_default(), canonical_json(&map[*k])))
+            let inner: Vec<String> = keys
+                .iter()
+                .map(|k| {
+                    format!(
+                        "{}:{}",
+                        serde_json::to_string(k).unwrap_or_default(),
+                        canonical_json(&map[*k])
+                    )
+                })
                 .collect();
             format!("{{{}}}", inner.join(","))
         }
         Value::Array(arr) => {
-            format!("[{}]", arr.iter().map(canonical_json).collect::<Vec<_>>().join(","))
+            format!(
+                "[{}]",
+                arr.iter().map(canonical_json).collect::<Vec<_>>().join(",")
+            )
         }
         other => serde_json::to_string(other).unwrap_or_default(),
     }
@@ -64,29 +74,29 @@ fn canonical_json(v: &Value) -> String {
 // ── Cache entry ───────────────────────────────────────────────────────────────
 
 struct Entry {
-    value:      Value,
+    value: Value,
     expires_at: Instant,
-    hits:       u32,
+    hits: u32,
 }
 
 // ── ToolCache ─────────────────────────────────────────────────────────────────
 
 pub struct ToolCache {
-    inner:    Mutex<Inner>,
+    inner: Mutex<Inner>,
     capacity: usize,
 }
 
 struct Inner {
-    map:     HashMap<CacheKey, Entry>,
+    map: HashMap<CacheKey, Entry>,
     /// Insertion-order list for LRU eviction. Stores keys in eviction order.
-    order:   std::collections::VecDeque<CacheKey>,
+    order: std::collections::VecDeque<CacheKey>,
 }
 
 impl ToolCache {
     pub fn new(capacity: usize) -> Self {
         Self {
             inner: Mutex::new(Inner {
-                map:   HashMap::with_capacity(capacity),
+                map: HashMap::with_capacity(capacity),
                 order: std::collections::VecDeque::with_capacity(capacity),
             }),
             capacity,
@@ -105,12 +115,14 @@ impl ToolCache {
 
     pub fn get(
         &self,
-        tool:       &str,
-        args:       &Value,
+        tool: &str,
+        args: &Value,
         profile_id: &str,
-        workspace:  Option<&str>,
+        workspace: Option<&str>,
     ) -> Option<Value> {
-        if self.capacity == 0 { return None; }
+        if self.capacity == 0 {
+            return None;
+        }
         let key = CacheKey::new(tool, args, profile_id, workspace);
         let mut inner = self.inner.lock().unwrap();
         // Purge expired in the same lock to avoid double-lookup
@@ -128,14 +140,16 @@ impl ToolCache {
 
     pub fn put(
         &self,
-        tool:       &str,
-        args:       &Value,
+        tool: &str,
+        args: &Value,
         profile_id: &str,
-        workspace:  Option<&str>,
-        value:      Value,
-        ttl_secs:   u64,
+        workspace: Option<&str>,
+        value: Value,
+        ttl_secs: u64,
     ) {
-        if self.capacity == 0 || ttl_secs == 0 { return; }
+        if self.capacity == 0 || ttl_secs == 0 {
+            return;
+        }
         let key = CacheKey::new(tool, args, profile_id, workspace);
         let mut inner = self.inner.lock().unwrap();
 
@@ -149,11 +163,14 @@ impl ToolCache {
         }
 
         inner.order.push_back(key.clone());
-        inner.map.insert(key, Entry {
-            value,
-            expires_at: Instant::now() + Duration::from_secs(ttl_secs),
-            hits: 0,
-        });
+        inner.map.insert(
+            key,
+            Entry {
+                value,
+                expires_at: Instant::now() + Duration::from_secs(ttl_secs),
+                hits: 0,
+            },
+        );
     }
 
     /// Invalidate all entries for a given tool name (e.g. after a Write to the same path).
@@ -175,7 +192,11 @@ impl ToolCache {
         let now = Instant::now();
         let live = inner.map.values().filter(|e| e.expires_at > now).count();
         let total_hits: u32 = inner.map.values().map(|e| e.hits).sum();
-        CacheStats { entries: inner.map.len(), live, total_hits }
+        CacheStats {
+            entries: inner.map.len(),
+            live,
+            total_hits,
+        }
     }
 
     pub fn clear(&self) {
@@ -187,8 +208,8 @@ impl ToolCache {
 
 #[derive(Debug, serde::Serialize)]
 pub struct CacheStats {
-    pub entries:    usize,
-    pub live:       usize,
+    pub entries: usize,
+    pub live: usize,
     pub total_hits: u32,
 }
 
@@ -202,10 +223,23 @@ mod tests {
         let cache = ToolCache::new(8);
         let args = json!({"path": "README.md"});
 
-        cache.put("read_file", &args, "profile-a", Some("/workspace"), json!({"ok": "a"}), 60);
+        cache.put(
+            "read_file",
+            &args,
+            "profile-a",
+            Some("/workspace"),
+            json!({"ok": "a"}),
+            60,
+        );
 
-        assert_eq!(cache.get("read_file", &args, "profile-a", Some("/workspace")), Some(json!({"ok": "a"})));
-        assert_eq!(cache.get("read_file", &args, "profile-b", Some("/workspace")), None);
+        assert_eq!(
+            cache.get("read_file", &args, "profile-a", Some("/workspace")),
+            Some(json!({"ok": "a"}))
+        );
+        assert_eq!(
+            cache.get("read_file", &args, "profile-b", Some("/workspace")),
+            None
+        );
     }
 
     #[test]
@@ -213,10 +247,23 @@ mod tests {
         let cache = ToolCache::new(8);
         let args = json!({"q": "status"});
 
-        cache.put("get_system_stats", &args, "profile-a", Some("/workspace-a"), json!({"cpu": 1}), 60);
+        cache.put(
+            "get_system_stats",
+            &args,
+            "profile-a",
+            Some("/workspace-a"),
+            json!({"cpu": 1}),
+            60,
+        );
 
-        assert_eq!(cache.get("get_system_stats", &args, "profile-a", Some("/workspace-a")), Some(json!({"cpu": 1})));
-        assert_eq!(cache.get("get_system_stats", &args, "profile-a", Some("/workspace-b")), None);
+        assert_eq!(
+            cache.get("get_system_stats", &args, "profile-a", Some("/workspace-a")),
+            Some(json!({"cpu": 1}))
+        );
+        assert_eq!(
+            cache.get("get_system_stats", &args, "profile-a", Some("/workspace-b")),
+            None
+        );
     }
 
     #[test]
@@ -226,7 +273,10 @@ mod tests {
         let args_b = json!({"b": 2, "a": 1});
 
         cache.put("demo", &args_a, "p", Some("/w"), json!({"hit": true}), 60);
-        assert_eq!(cache.get("demo", &args_b, "p", Some("/w")), Some(json!({"hit": true})));
+        assert_eq!(
+            cache.get("demo", &args_b, "p", Some("/w")),
+            Some(json!({"hit": true}))
+        );
     }
 
     #[test]

@@ -51,15 +51,27 @@ impl CoreMemory {
         } else {
             Vec::new()
         };
-        Self { entries: RwLock::new(entries), persist_path }
+        Self {
+            entries: RwLock::new(entries),
+            persist_path,
+        }
     }
 
-    pub async fn search(&self, _query: &str, limit: usize) -> Result<Vec<MemoryEntry>, BonsaiError> {
+    pub async fn search(
+        &self,
+        _query: &str,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>, BonsaiError> {
         let entries = self.entries.read().await;
         Ok(entries.iter().rev().take(limit).cloned().collect())
     }
 
-    pub async fn record(&self, request: &str, plan: &BonsaiPlan, _result: &BonsaiResponse) -> Result<(), BonsaiError> {
+    pub async fn record(
+        &self,
+        request: &str,
+        plan: &BonsaiPlan,
+        _result: &BonsaiResponse,
+    ) -> Result<(), BonsaiError> {
         let mut entries = self.entries.write().await;
         entries.push(MemoryEntry {
             request: request.to_string(),
@@ -93,7 +105,12 @@ impl CoreMemory {
 
 fn load_jsonl(path: &PathBuf) -> Option<Vec<MemoryEntry>> {
     let content = std::fs::read_to_string(path).ok()?;
-    Some(content.lines().filter_map(|l| serde_json::from_str(l).ok()).collect())
+    Some(
+        content
+            .lines()
+            .filter_map(|l| serde_json::from_str(l).ok())
+            .collect(),
+    )
 }
 
 fn save_jsonl(path: &PathBuf, entries: &[MemoryEntry]) -> std::io::Result<()> {
@@ -137,7 +154,10 @@ impl KeywordRouter {
                         final_response: Some("Hello! How can I help?".into()),
                         confidence: 0.99,
                     };
-                    return Some(BonsaiResponse { plan, tool_results: vec![] });
+                    return Some(BonsaiResponse {
+                        plan,
+                        tool_results: vec![],
+                    });
                 }
             }
         }
@@ -180,7 +200,11 @@ impl BonsaiCore {
             prompt_template,
             fallback_router: KeywordRouter::new(),
             allowed_commands: vec![
-                "python".into(), "py".into(), "ls".into(), "cat".into(), "echo".into(),
+                "python".into(),
+                "py".into(),
+                "ls".into(),
+                "cat".into(),
+                "echo".into(),
             ],
             workspace_root,
             shadow_mode: RwLock::new(shadow_mode),
@@ -263,7 +287,10 @@ impl BonsaiCore {
             .await
             .map_err(|e| BonsaiError::Network(e.to_string()))?;
 
-        let text = resp.text().await.map_err(|e| BonsaiError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| BonsaiError::Network(e.to_string()))?;
         let parsed: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| BonsaiError::Serde(e.to_string()))?;
         let content = parsed["choices"][0]["message"]["content"]
@@ -276,7 +303,12 @@ impl BonsaiCore {
         Ok(plan)
     }
 
-    fn build_prompt(&self, request: &str, _history: &[ChatMessage], memory: &[MemoryEntry]) -> String {
+    fn build_prompt(
+        &self,
+        request: &str,
+        _history: &[ChatMessage],
+        memory: &[MemoryEntry],
+    ) -> String {
         let memory_str = if memory.is_empty() {
             "None".to_string()
         } else {
@@ -296,7 +328,11 @@ impl BonsaiCore {
             match step.tool.as_str() {
                 "run_command" => {
                     let cmd = step.args["command"].as_str().unwrap_or("");
-                    if !self.allowed_commands.iter().any(|c| cmd.starts_with(c.as_str())) {
+                    if !self
+                        .allowed_commands
+                        .iter()
+                        .any(|c| cmd.starts_with(c.as_str()))
+                    {
                         return Err(BonsaiError::Tool(format!("Command not allowed: {cmd}")));
                     }
                 }
@@ -325,7 +361,10 @@ impl BonsaiCore {
             .unwrap_or_else(|e| format!("tool error: {e}"));
             results.push(result);
         }
-        Ok(BonsaiResponse { plan: plan.clone(), tool_results: results })
+        Ok(BonsaiResponse {
+            plan: plan.clone(),
+            tool_results: results,
+        })
     }
 
     pub async fn adapter_loaded(&self) -> bool {
@@ -369,7 +408,11 @@ impl BonsaiCore {
 }
 
 fn extract_json(s: &str) -> Result<String, BonsaiError> {
-    let s = s.trim().trim_start_matches("```json").trim_end_matches("```").trim();
+    let s = s
+        .trim()
+        .trim_start_matches("```json")
+        .trim_end_matches("```")
+        .trim();
     let start = s
         .find('{')
         .ok_or_else(|| BonsaiError::Internal("No JSON object found in model output".into()))?;

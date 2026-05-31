@@ -12,9 +12,9 @@
 //! 4. For critical chunks (is_critical=true), sends redundantly on a
 //!    second lane (QoS mirroring); the first arrival wins.
 
+use crate::lane::{LaneHealth, LaneKind, TransportLane};
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::lane::{TransportLane, LaneHealth, LaneKind};
 
 /// Maximum GSN gap before the reorder guard blocks a lane.
 const MAX_REORDER_GAP: u32 = 256;
@@ -77,16 +77,22 @@ impl EcfRgScheduler {
         chunk_size: usize,
         is_critical: bool,
     ) -> Option<ChunkAssignment> {
-        let available: Vec<(&String, &Arc<dyn TransportLane>, LaneHealth)> = self.lanes.iter()
+        let available: Vec<(&String, &Arc<dyn TransportLane>, LaneHealth)> = self
+            .lanes
+            .iter()
             .filter(|(name, lane)| {
                 let h = lane.health();
-                if !h.available { return false; }
+                if !h.available {
+                    return false;
+                }
                 // Reorder guard: reject lanes where accepting this chunk would
                 // push the gap beyond MAX_REORDER_GAP.
                 let state = self.state.get(*name).unwrap();
                 if state.in_flight > 0 {
                     let gap = gsn.saturating_sub(state.highest_gsn_in_flight);
-                    if gap > MAX_REORDER_GAP as u64 { return false; }
+                    if gap > MAX_REORDER_GAP as u64 {
+                        return false;
+                    }
                 }
                 true
             })
@@ -96,10 +102,13 @@ impl EcfRgScheduler {
             })
             .collect();
 
-        if available.is_empty() { return None; }
+        if available.is_empty() {
+            return None;
+        }
 
         // Sort by estimated completion time
-        let mut ranked: Vec<(&str, f64)> = available.iter()
+        let mut ranked: Vec<(&str, f64)> = available
+            .iter()
             .map(|(name, _, health)| {
                 let eta = health.estimated_completion_secs(chunk_size as u64);
                 (name.as_str(), eta)
@@ -114,7 +123,9 @@ impl EcfRgScheduler {
             st.in_flight += 1;
             st.highest_gsn_in_flight = st.highest_gsn_in_flight.max(gsn);
         }
-        if gsn > self.global_max_gsn { self.global_max_gsn = gsn; }
+        if gsn > self.global_max_gsn {
+            self.global_max_gsn = gsn;
+        }
 
         // QoS mirroring for critical chunks: pick the second-best lane
         let mirror = if is_critical && ranked.len() > 1 {
@@ -148,14 +159,17 @@ impl EcfRgScheduler {
 
     /// List all registered lane names and their current health.
     pub fn lane_summary(&self) -> Vec<(String, LaneKind, LaneHealth)> {
-        self.lanes.iter().map(|(name, lane)| {
-            (name.clone(), lane.kind(), lane.health())
-        }).collect()
+        self.lanes
+            .iter()
+            .map(|(name, lane)| (name.clone(), lane.kind(), lane.health()))
+            .collect()
     }
 }
 
 impl Default for EcfRgScheduler {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -185,7 +199,10 @@ mod tests {
         sched.add_lane(Arc::new(lane2));
 
         let assignment = sched.assign(0, 512, true).unwrap();
-        assert!(assignment.mirror.is_some(), "critical chunks must be mirrored");
+        assert!(
+            assignment.mirror.is_some(),
+            "critical chunks must be mirrored"
+        );
     }
 
     #[test]

@@ -1,10 +1,10 @@
 //! Belief Revision System — Bayesian updating, contradiction resolution,
 //! temporal evidence decay, and source diversity scoring.
 
-use std::collections::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
 use bonsai_knowledge::{Belief, BeliefId, Evidence, ProvenanceSource};
-use bonsai_verify::{AxiomKernel, definitionally_equal};
+use bonsai_verify::{definitionally_equal, AxiomKernel};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 // ── BeliefRevision audit entry ────────────────────────────────────────────────
 
@@ -27,7 +27,10 @@ pub struct BeliefReviser {
 
 impl BeliefReviser {
     pub fn new() -> Self {
-        Self { priors: HashMap::new(), likelihoods: HashMap::new() }
+        Self {
+            priors: HashMap::new(),
+            likelihoods: HashMap::new(),
+        }
     }
 
     // ── Bayesian update ───────────────────────────────────────────────────────
@@ -53,7 +56,10 @@ impl BeliefReviser {
         belief.last_updated = chrono::Utc::now().timestamp_millis();
 
         self.priors.insert(belief.id.clone(), prior);
-        self.likelihoods.entry(belief.id.clone()).or_default().push(likelihood);
+        self.likelihoods
+            .entry(belief.id.clone())
+            .or_default()
+            .push(likelihood);
 
         posterior
     }
@@ -77,9 +83,13 @@ impl BeliefReviser {
         for i in 0..n {
             for j in (i + 1)..n {
                 if self.are_contradictory(&beliefs[i], &beliefs[j]) {
-                    let weaker_idx = if beliefs[i].confidence <= beliefs[j].confidence { i } else { j };
+                    let weaker_idx = if beliefs[i].confidence <= beliefs[j].confidence {
+                        i
+                    } else {
+                        j
+                    };
                     let stronger_idx = 1 - weaker_idx + (i + j - weaker_idx); // the other one
-                    // recalculate cleanly:
+                                                                              // recalculate cleanly:
                     let (stronger_conf, stronger_id) = if i == weaker_idx {
                         (beliefs[j].confidence, beliefs[j].id.clone())
                     } else {
@@ -92,8 +102,10 @@ impl BeliefReviser {
                         belief_id: beliefs[weaker_idx].id.clone(),
                         old_confidence: old,
                         new_confidence: new_c,
-                        reason: format!("Contradicted by belief {} (confidence {:.2})",
-                            stronger_id, stronger_conf),
+                        reason: format!(
+                            "Contradicted by belief {} (confidence {:.2})",
+                            stronger_id, stronger_conf
+                        ),
                     });
                     beliefs[weaker_idx].confidence = new_c;
                     beliefs[weaker_idx].times_challenged += 1;
@@ -127,7 +139,9 @@ impl BeliefReviser {
         let decay_k = (2.0f64).ln() / (half_life_hours * 3_600_000.0);
 
         for belief in beliefs.iter_mut() {
-            if belief.evidence.is_empty() { continue; }
+            if belief.evidence.is_empty() {
+                continue;
+            }
 
             let mut total_weight = 0.0f64;
             let mut weighted_sum = 0.0f64;
@@ -152,7 +166,9 @@ impl BeliefReviser {
 
     /// Multi-source confirmation adds up to 10% confidence bonus.
     pub fn compute_source_diversity_bonus(&self, belief: &Belief) -> f32 {
-        let unique_source_types: HashSet<u8> = belief.evidence.iter()
+        let unique_source_types: HashSet<u8> = belief
+            .evidence
+            .iter()
             .map(|e| source_discriminant(&e.source))
             .collect();
         let diversity = unique_source_types.len() as f32 / 5.0;
@@ -170,7 +186,8 @@ impl BeliefReviser {
     /// Check whether a new statement is consistent with existing high-confidence beliefs.
     pub fn check_consistency(&self, beliefs: &[Belief], statement: &str) -> ConsistencyResult {
         let candidate = Belief::new(statement, 0.5);
-        let contradictions: Vec<&Belief> = beliefs.iter()
+        let contradictions: Vec<&Belief> = beliefs
+            .iter()
             .filter(|b| b.confidence > 0.7 && self.are_contradictory(&candidate, b))
             .collect();
 
@@ -179,7 +196,8 @@ impl BeliefReviser {
         } else {
             ConsistencyResult::Contradicts {
                 conflicting: contradictions.iter().map(|b| b.id.clone()).collect(),
-                max_conflict_confidence: contradictions.iter()
+                max_conflict_confidence: contradictions
+                    .iter()
                     .map(|b| b.confidence)
                     .fold(0.0f32, f32::max),
             }
@@ -188,7 +206,9 @@ impl BeliefReviser {
 }
 
 impl Default for BeliefReviser {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── ConsistencyResult ─────────────────────────────────────────────────────────
@@ -196,7 +216,10 @@ impl Default for BeliefReviser {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConsistencyResult {
     Consistent,
-    Contradicts { conflicting: Vec<BeliefId>, max_conflict_confidence: f32 },
+    Contradicts {
+        conflicting: Vec<BeliefId>,
+        max_conflict_confidence: f32,
+    },
     Uncertain,
 }
 
@@ -234,7 +257,9 @@ mod tests {
 
     fn make_evidence(strength: f32) -> Evidence {
         Evidence {
-            source: ProvenanceSource::UserStatement { session_id: "test".into() },
+            source: ProvenanceSource::UserStatement {
+                session_id: "test".into(),
+            },
             strength,
             timestamp: chrono::Utc::now().timestamp_millis(),
             description: "test evidence".into(),
@@ -275,13 +300,32 @@ mod tests {
         let br = BeliefReviser::new();
         let mut b = Belief::new("test", 0.8);
         for d in [
-            ProvenanceSource::UserStatement { session_id: "s".into() },
-            ProvenanceSource::ModelInference { model_id: "m".into(), adapter_id: None },
-            ProvenanceSource::ToolExecution { tool_name: "t".into(), result_hash: "h".into() },
-            ProvenanceSource::DeductiveProof { proof_id: "p".into(), kernel_version: "1".into() },
-            ProvenanceSource::ExternalDocument { document_hash: "d".into(), source_url: None },
+            ProvenanceSource::UserStatement {
+                session_id: "s".into(),
+            },
+            ProvenanceSource::ModelInference {
+                model_id: "m".into(),
+                adapter_id: None,
+            },
+            ProvenanceSource::ToolExecution {
+                tool_name: "t".into(),
+                result_hash: "h".into(),
+            },
+            ProvenanceSource::DeductiveProof {
+                proof_id: "p".into(),
+                kernel_version: "1".into(),
+            },
+            ProvenanceSource::ExternalDocument {
+                document_hash: "d".into(),
+                source_url: None,
+            },
         ] {
-            b.evidence.push(Evidence { source: d, strength: 0.8, timestamp: 0, description: "".into() });
+            b.evidence.push(Evidence {
+                source: d,
+                strength: 0.8,
+                timestamp: 0,
+                description: "".into(),
+            });
         }
         let bonus = br.compute_source_diversity_bonus(&b);
         assert!(bonus <= 0.101); // ≤10%

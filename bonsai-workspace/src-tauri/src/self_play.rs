@@ -160,7 +160,7 @@ impl SelfPlayTrainer {
                 break;
             }
 
-            info!(round=i, "[self_play] starting round");
+            info!(round = i, "[self_play] starting round");
             let result = match self.run_round(i, &seeds).await {
                 Ok(r) => r,
                 Err(e) => {
@@ -182,7 +182,10 @@ impl SelfPlayTrainer {
             }
 
             if total_examples >= self.config.finetune_threshold {
-                info!(examples=total_examples, "[self_play] threshold reached, triggering fine-tune");
+                info!(
+                    examples = total_examples,
+                    "[self_play] threshold reached, triggering fine-tune"
+                );
                 let data = self.config.output_jsonl.to_string_lossy().into_owned();
                 let out = self.config.adapter_output.to_string_lossy().into_owned();
                 let model = self.config.base_model_path.as_deref();
@@ -203,7 +206,9 @@ impl SelfPlayTrainer {
         let mut gaps = Vec::new();
 
         for seed in seeds {
-            if *self.stop_flag.lock().await { break; }
+            if *self.stop_flag.lock().await {
+                break;
+            }
 
             // Step 1: generate an exploratory response
             let resp = self.infer(seed, self.config.temperature_high).await?;
@@ -212,7 +217,9 @@ impl SelfPlayTrainer {
             let crit_prompt = format!(
                 "You are a strict evaluator. Critique the following answer for accuracy, completeness, and usefulness. If it is good, say 'No issues'.\n\nQuestion: {seed}\nAnswer: {resp}\n\nCritique:"
             );
-            let critique = self.infer(&crit_prompt, self.config.temperature_low).await?;
+            let critique = self
+                .infer(&crit_prompt, self.config.temperature_low)
+                .await?;
 
             // Skip if critique says it's fine
             if critique.to_lowercase().contains("no issues") || critique.len() < 20 {
@@ -223,7 +230,9 @@ impl SelfPlayTrainer {
             let corr_prompt = format!(
                 "Improve the following answer based on the critique.\n\nQuestion: {seed}\nOriginal answer: {resp}\nCritique: {critique}\n\nImproved answer:"
             );
-            let corrected = self.infer(&corr_prompt, self.config.temperature_low).await?;
+            let corrected = self
+                .infer(&corr_prompt, self.config.temperature_low)
+                .await?;
 
             // Step 4: novelty check (Jaccard word overlap against the original response)
             let overlap = word_overlap(&corrected, &resp);
@@ -289,14 +298,18 @@ impl SelfPlayTrainer {
                 "source": "self_play",
                 "confidence": 1.0 - gap.overlap,
             });
-            writeln!(file, "{}", serde_json::to_string(&example).unwrap_or_default())?;
+            writeln!(
+                file,
+                "{}",
+                serde_json::to_string(&example).unwrap_or_default()
+            )?;
 
             // DPO triple: corrected = chosen, original = rejected
             let triple = crate::adapter_manager::DpoTriple {
-                prompt:   gap.seed_prompt.clone(),
-                chosen:   gap.corrected_response.clone(),
+                prompt: gap.seed_prompt.clone(),
+                chosen: gap.corrected_response.clone(),
                 rejected: gap.model_response.clone(),
-                source:   "self_play",
+                source: "self_play",
             };
             let _ = crate::adapter_manager::write_dpo_triples(&dpo_path, &[triple]);
         }
@@ -339,7 +352,11 @@ fn word_overlap(a: &str, b: &str) -> f32 {
     let b: HashSet<&str> = b.split_whitespace().collect();
     let inter = a.intersection(&b).count();
     let union = a.union(&b).count();
-    if union == 0 { 1.0 } else { inter as f32 / union as f32 }
+    if union == 0 {
+        1.0
+    } else {
+        inter as f32 / union as f32
+    }
 }
 
 fn default_seeds() -> Vec<String> {
@@ -360,16 +377,12 @@ fn default_seeds() -> Vec<String> {
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn start_self_play(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<(), String> {
+pub async fn start_self_play(state: tauri::State<'_, crate::AppState>) -> Result<(), String> {
     state.self_play.start().await
 }
 
 #[tauri::command]
-pub async fn stop_self_play(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<(), String> {
+pub async fn stop_self_play(state: tauri::State<'_, crate::AppState>) -> Result<(), String> {
     state.self_play.stop().await;
     Ok(())
 }

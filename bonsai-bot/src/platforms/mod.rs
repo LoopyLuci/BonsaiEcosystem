@@ -1,11 +1,11 @@
 #[cfg(feature = "discord")]
 pub mod discord;
-#[cfg(feature = "telegram")]
-pub mod telegram;
 #[cfg(feature = "email")]
 pub mod email;
 #[cfg(feature = "matrix")]
 pub mod matrix;
+#[cfg(feature = "telegram")]
+pub mod telegram;
 
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -14,14 +14,14 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct InboundMessage {
-    pub platform:    String,
-    pub platform_id: String,  // guild_id/chat_id/room_id
-    pub user_id:     String,
+    pub platform: String,
+    pub platform_id: String, // guild_id/chat_id/room_id
+    pub user_id: String,
     pub display_name: String,
-    pub event_id:    String,
-    pub text:        String,
+    pub event_id: String,
+    pub text: String,
     /// For email only
-    pub reply_to:    Option<String>,
+    pub reply_to: Option<String>,
 }
 
 // ── Platform trait ────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ pub trait MessagingPlatform: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct ShedNotice {
     pub platform: String,
-    pub chat_id:  String,
-    pub user_id:  String,
+    pub chat_id: String,
+    pub user_id: String,
     pub reply_to: Option<String>,
 }

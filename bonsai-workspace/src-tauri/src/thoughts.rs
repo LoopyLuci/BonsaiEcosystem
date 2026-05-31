@@ -30,11 +30,20 @@ pub struct ThoughtContent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ThoughtSource {
-    PrimaryModel { model_id: Option<String>, adapter: Option<String> },
-    Adapter { adapter: String },
-    Tool { tool_name: String },
+    PrimaryModel {
+        model_id: Option<String>,
+        adapter: Option<String>,
+    },
+    Adapter {
+        adapter: String,
+    },
+    Tool {
+        tool_name: String,
+    },
     System,
-    Other { label: String },
+    Other {
+        label: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,8 +85,11 @@ impl ThoughtsStore {
         .await
         .map_err(|e| format!("migrate: {e}"))?;
 
-        self.apply_migration(2, "create_thinking_history_table", &[
-            "CREATE TABLE IF NOT EXISTS thinking_history (
+        self.apply_migration(
+            2,
+            "create_thinking_history_table",
+            &[
+                "CREATE TABLE IF NOT EXISTS thinking_history (
                 id          TEXT PRIMARY KEY,
                 session_id  TEXT NOT NULL,
                 turn_id     TEXT NOT NULL,
@@ -86,13 +98,18 @@ impl ThoughtsStore {
                 token_count INTEGER NOT NULL DEFAULT 0,
                 created_at  INTEGER NOT NULL
             )",
-            "CREATE INDEX IF NOT EXISTS idx_th_session  ON thinking_history(session_id)",
-            "CREATE INDEX IF NOT EXISTS idx_th_turn     ON thinking_history(turn_id)",
-            "CREATE INDEX IF NOT EXISTS idx_th_created  ON thinking_history(created_at)",
-        ]).await?;
+                "CREATE INDEX IF NOT EXISTS idx_th_session  ON thinking_history(session_id)",
+                "CREATE INDEX IF NOT EXISTS idx_th_turn     ON thinking_history(turn_id)",
+                "CREATE INDEX IF NOT EXISTS idx_th_created  ON thinking_history(created_at)",
+            ],
+        )
+        .await?;
 
-        self.apply_migration(1, "create_thoughts_table", &[
-            "CREATE TABLE IF NOT EXISTS thoughts (
+        self.apply_migration(
+            1,
+            "create_thoughts_table",
+            &[
+                "CREATE TABLE IF NOT EXISTS thoughts (
                 id TEXT PRIMARY KEY,
                 parent_segment TEXT,
                 turn_id TEXT NOT NULL,
@@ -108,23 +125,31 @@ impl ThoughtsStore {
                 confidence REAL,
                 metadata_json TEXT
             )",
-            "CREATE INDEX IF NOT EXISTS idx_thoughts_turn ON thoughts(turn_id)",
-            "CREATE INDEX IF NOT EXISTS idx_thoughts_session ON thoughts(session_id)",
-        ]).await?;
+                "CREATE INDEX IF NOT EXISTS idx_thoughts_turn ON thoughts(turn_id)",
+                "CREATE INDEX IF NOT EXISTS idx_thoughts_session ON thoughts(session_id)",
+            ],
+        )
+        .await?;
 
         Ok(())
     }
 
-    async fn apply_migration(&self, version: i64, description: &str, stmts: &[&str]) -> Result<(), String> {
-        let exists: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM thoughts_schema_migrations WHERE version = ?",
-        )
-        .bind(version)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(0);
+    async fn apply_migration(
+        &self,
+        version: i64,
+        description: &str,
+        stmts: &[&str],
+    ) -> Result<(), String> {
+        let exists: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM thoughts_schema_migrations WHERE version = ?")
+                .bind(version)
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(0);
 
-        if exists > 0 { return Ok(()); }
+        if exists > 0 {
+            return Ok(());
+        }
 
         for stmt in stmts {
             sqlx::query(stmt)
@@ -158,18 +183,12 @@ impl ThoughtsStore {
                 adapter.clone(),
                 None,
             ),
-            ThoughtSource::Adapter { adapter } => (
-                "Adapter".to_string(),
-                None,
-                Some(adapter.clone()),
-                None,
-            ),
-            ThoughtSource::Tool { tool_name } => (
-                "Tool".to_string(),
-                None,
-                None,
-                Some(tool_name.clone()),
-            ),
+            ThoughtSource::Adapter { adapter } => {
+                ("Adapter".to_string(), None, Some(adapter.clone()), None)
+            }
+            ThoughtSource::Tool { tool_name } => {
+                ("Tool".to_string(), None, None, Some(tool_name.clone()))
+            }
             ThoughtSource::System => ("System".to_string(), None, None, None),
             ThoughtSource::Other { label } => (format!("Other:{}", label), None, None, None),
         };
@@ -182,7 +201,11 @@ impl ThoughtsStore {
         };
 
         let content_text = t.content.text.clone();
-        let content_json = t.content.json.as_ref().and_then(|v| serde_json::to_string(v).ok());
+        let content_json = t
+            .content
+            .json
+            .as_ref()
+            .and_then(|v| serde_json::to_string(v).ok());
         let confidence = t.confidence.map(|f| f as f64);
         let metadata_json = serde_json::to_string(&t.metadata).ok();
 
@@ -208,7 +231,10 @@ impl ThoughtsStore {
         Ok(())
     }
 
-    pub async fn get_thoughts_for_turn(&self, turn_id: &str) -> Result<Vec<ThoughtSegment>, String> {
+    pub async fn get_thoughts_for_turn(
+        &self,
+        turn_id: &str,
+    ) -> Result<Vec<ThoughtSegment>, String> {
         let rows = sqlx::query(
             "SELECT id,parent_segment,turn_id,session_id,timestamp_ms,source,source_model,source_adapter,source_tool,content_type,content_text,content_json,confidence,metadata_json FROM thoughts WHERE turn_id = ? ORDER BY timestamp_ms ASC",
         )
@@ -224,21 +250,36 @@ impl ThoughtsStore {
             let parent_str: Option<String> = r.get::<Option<String>, _>("parent_segment");
             let parent = parent_str.and_then(|s| Uuid::parse_str(&s).ok());
 
-            let turn_id_uuid = Uuid::parse_str(&r.get::<String, _>("turn_id")).unwrap_or_else(|_| Uuid::nil());
-            let session_id_uuid = Uuid::parse_str(&r.get::<String, _>("session_id")).unwrap_or_else(|_| Uuid::nil());
+            let turn_id_uuid =
+                Uuid::parse_str(&r.get::<String, _>("turn_id")).unwrap_or_else(|_| Uuid::nil());
+            let session_id_uuid =
+                Uuid::parse_str(&r.get::<String, _>("session_id")).unwrap_or_else(|_| Uuid::nil());
             let ts = r.get::<i64, _>("timestamp_ms");
 
             let source_str: String = r.get::<String, _>("source");
             let source = if source_str == "PrimaryModel" {
-                ThoughtSource::PrimaryModel { model_id: r.get::<Option<String>, _>("source_model"), adapter: r.get::<Option<String>, _>("source_adapter") }
+                ThoughtSource::PrimaryModel {
+                    model_id: r.get::<Option<String>, _>("source_model"),
+                    adapter: r.get::<Option<String>, _>("source_adapter"),
+                }
             } else if source_str == "Adapter" {
-                ThoughtSource::Adapter { adapter: r.get::<Option<String>, _>("source_adapter").unwrap_or_default() }
+                ThoughtSource::Adapter {
+                    adapter: r
+                        .get::<Option<String>, _>("source_adapter")
+                        .unwrap_or_default(),
+                }
             } else if source_str == "Tool" {
-                ThoughtSource::Tool { tool_name: r.get::<Option<String>, _>("source_tool").unwrap_or_default() }
+                ThoughtSource::Tool {
+                    tool_name: r
+                        .get::<Option<String>, _>("source_tool")
+                        .unwrap_or_default(),
+                }
             } else if source_str == "System" {
                 ThoughtSource::System
             } else if source_str.starts_with("Other:") {
-                ThoughtSource::Other { label: source_str.trim_start_matches("Other:").to_string() }
+                ThoughtSource::Other {
+                    label: source_str.trim_start_matches("Other:").to_string(),
+                }
             } else {
                 ThoughtSource::Other { label: source_str }
             };
@@ -248,16 +289,26 @@ impl ThoughtsStore {
                 "Text" => ThoughtContentType::Text,
                 "Json" => ThoughtContentType::Json,
                 "Code" => ThoughtContentType::Code,
-                s if s.starts_with("Other:") => ThoughtContentType::Other(s.trim_start_matches("Other:").to_string()),
+                s if s.starts_with("Other:") => {
+                    ThoughtContentType::Other(s.trim_start_matches("Other:").to_string())
+                }
                 _ => ThoughtContentType::Text,
             };
 
             let content_text = r.get::<Option<String>, _>("content_text");
-            let content_json = r.get::<Option<String>, _>("content_json").and_then(|s| serde_json::from_str(&s).ok());
-            let content = ThoughtContent { text: content_text, json: content_json };
+            let content_json = r
+                .get::<Option<String>, _>("content_json")
+                .and_then(|s| serde_json::from_str(&s).ok());
+            let content = ThoughtContent {
+                text: content_text,
+                json: content_json,
+            };
 
             let confidence = r.get::<Option<f64>, _>("confidence").map(|f| f as f32);
-            let metadata = r.get::<Option<String>, _>("metadata_json").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+            let metadata = r
+                .get::<Option<String>, _>("metadata_json")
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
 
             out.push(ThoughtSegment {
                 id,
@@ -341,25 +392,28 @@ impl ThoughtsStore {
         .await
         .map_err(|e| format!("search_thinking_history: {e}"))?;
 
-        Ok(rows.iter().map(|r| ThinkingHistoryEntry {
-            id:          r.get::<String, _>("id"),
-            session_id:  r.get::<String, _>("session_id"),
-            turn_id:     r.get::<String, _>("turn_id"),
-            model_role:  r.get::<String, _>("model_role"),
-            content:     r.get::<String, _>("content"),
-            token_count: r.get::<i64, _>("token_count"),
-            created_at:  r.get::<i64, _>("created_at"),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| ThinkingHistoryEntry {
+                id: r.get::<String, _>("id"),
+                session_id: r.get::<String, _>("session_id"),
+                turn_id: r.get::<String, _>("turn_id"),
+                model_role: r.get::<String, _>("model_role"),
+                content: r.get::<String, _>("content"),
+                token_count: r.get::<i64, _>("token_count"),
+                created_at: r.get::<i64, _>("created_at"),
+            })
+            .collect())
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThinkingHistoryEntry {
-    pub id:          String,
-    pub session_id:  String,
-    pub turn_id:     String,
-    pub model_role:  String,
-    pub content:     String,
+    pub id: String,
+    pub session_id: String,
+    pub turn_id: String,
+    pub model_role: String,
+    pub content: String,
     pub token_count: i64,
-    pub created_at:  i64,
+    pub created_at: i64,
 }

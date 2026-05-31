@@ -1,39 +1,48 @@
-use std::sync::Arc;
-use std::time::Duration;
+use futures::StreamExt;
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-use futures::StreamExt;
 
 use crate::health::CircuitBreaker;
 use crate::metrics::SharedMetrics;
 
 pub struct BuddyClient {
-    http:              Client,
-    base:              String,
+    http: Client,
+    base: String,
     workspace_api_url: String,
-    preferred_tags:    Vec<String>,
-    breaker:           Arc<CircuitBreaker>,
-    metrics:           SharedMetrics,
+    preferred_tags: Vec<String>,
+    breaker: Arc<CircuitBreaker>,
+    metrics: SharedMetrics,
 }
 
 impl BuddyClient {
     pub fn new(
-        base_url:          String,
+        base_url: String,
         workspace_api_url: String,
-        preferred_tags:    Vec<String>,
-        breaker:           Arc<CircuitBreaker>,
-        metrics:           SharedMetrics,
+        preferred_tags: Vec<String>,
+        breaker: Arc<CircuitBreaker>,
+        metrics: SharedMetrics,
     ) -> Self {
         let http = Client::builder()
             .timeout(Duration::from_secs(120))
             .build()
             .expect("reqwest client");
-        Self { http, base: base_url, workspace_api_url, preferred_tags, breaker, metrics }
+        Self {
+            http,
+            base: base_url,
+            workspace_api_url,
+            preferred_tags,
+            breaker,
+            metrics,
+        }
     }
 
-    pub fn workspace_api_url(&self) -> &str { &self.workspace_api_url }
+    pub fn workspace_api_url(&self) -> &str {
+        &self.workspace_api_url
+    }
 
     /// Send a chat/completions request to Buddy. Returns the raw JSON response.
     pub async fn chat(&self, body: Value) -> Result<Value, String> {
@@ -49,12 +58,16 @@ impl BuddyClient {
                 sleep(Duration::from_secs(2u64.pow(attempt - 1))).await;
             }
 
-            self.metrics.buddy_requests.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .buddy_requests
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
             match self.http.post(&url).json(&body).send().await {
                 Err(e) => {
                     last_err = e.to_string();
-                    self.metrics.buddy_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.metrics
+                        .buddy_errors
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     self.breaker.record_failure();
                     continue;
                 }
@@ -74,7 +87,9 @@ impl BuddyClient {
                         }
                     } else {
                         last_err = format!("HTTP {status}");
-                        self.metrics.buddy_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        self.metrics
+                            .buddy_errors
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         self.breaker.record_failure();
                         continue;
                     }
@@ -99,10 +114,20 @@ impl BuddyClient {
         streaming_body["stream"] = json!(true);
 
         let url = format!("{}/v1/chat/completions", self.base);
-        self.metrics.buddy_requests.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .buddy_requests
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        let resp = self.http.post(&url).json(&streaming_body).send().await
-            .map_err(|e| { self.breaker.record_failure(); e.to_string() })?;
+        let resp = self
+            .http
+            .post(&url)
+            .json(&streaming_body)
+            .send()
+            .await
+            .map_err(|e| {
+                self.breaker.record_failure();
+                e.to_string()
+            })?;
 
         if !resp.status().is_success() {
             self.breaker.record_failure();
@@ -168,7 +193,10 @@ impl BuddyClient {
     #[allow(dead_code)]
     pub async fn is_healthy(&self) -> bool {
         let url = format!("{}/health", self.base);
-        self.http.get(&url).send().await
+        self.http
+            .get(&url)
+            .send()
+            .await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
     }
@@ -177,12 +205,10 @@ impl BuddyClient {
     /// Returns the base_url of the first ready slot, or an error.
     pub async fn local_slot_url(&self) -> Result<String, String> {
         let status_url = format!("{}/v1/orchestrator/status", self.workspace_api_url);
-        let resp = tokio::time::timeout(
-            Duration::from_secs(3),
-            self.http.get(&status_url).send(),
-        ).await
-        .map_err(|_| "workspace API timeout".to_string())?
-        .map_err(|e| e.to_string())?;
+        let resp = tokio::time::timeout(Duration::from_secs(3), self.http.get(&status_url).send())
+            .await
+            .map_err(|_| "workspace API timeout".to_string())?
+            .map_err(|e| e.to_string())?;
 
         let body: Value = resp.json().await.map_err(|e| e.to_string())?;
         let slots = body["slots"].as_array().ok_or("no slots in status")?;
@@ -205,7 +231,8 @@ impl BuddyClient {
         let resp = tokio::time::timeout(
             Duration::from_secs(120),
             self.http.post(&url).json(&body).send(),
-        ).await
+        )
+        .await
         .map_err(|_| "local slot timeout".to_string())?
         .map_err(|e| e.to_string())?;
 
@@ -223,10 +250,10 @@ impl BuddyClient {
             return None;
         }
         let url = format!("{}/v1/orchestrator/status", self.workspace_api_url);
-        let resp = tokio::time::timeout(
-            Duration::from_secs(2),
-            self.http.get(&url).send(),
-        ).await.ok()?.ok()?;
+        let resp = tokio::time::timeout(Duration::from_secs(2), self.http.get(&url).send())
+            .await
+            .ok()?
+            .ok()?;
 
         let body: Value = resp.json().await.ok()?;
         let slots = body["slots"].as_array()?;
@@ -236,7 +263,9 @@ impl BuddyClient {
             if slot["state"]["state"].as_str() == Some("ready") {
                 if let Some(model_id) = slot["state"]["model_id"].as_str() {
                     let mid_lower = model_id.to_lowercase();
-                    let matches = self.preferred_tags.iter()
+                    let matches = self
+                        .preferred_tags
+                        .iter()
                         .any(|tag| mid_lower.contains(&tag.to_lowercase()));
                     if matches {
                         return Some(model_id.to_string());

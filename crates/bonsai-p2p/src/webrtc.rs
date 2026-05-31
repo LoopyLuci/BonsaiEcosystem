@@ -18,8 +18,8 @@
 //! # Ok(()) }
 //! ```
 
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -29,13 +29,11 @@ use tracing::warn;
 
 use webrtc::{
     api::APIBuilder,
-    data_channel::{RTCDataChannel, data_channel_message::DataChannelMessage},
+    data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel},
     ice_transport::ice_server::RTCIceServer,
     peer_connection::{
-        configuration::RTCConfiguration,
-        peer_connection_state::RTCPeerConnectionState,
-        sdp::session_description::RTCSessionDescription,
-        RTCPeerConnection,
+        configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,
+        sdp::session_description::RTCSessionDescription, RTCPeerConnection,
     },
 };
 
@@ -93,7 +91,9 @@ impl WebRtcLane {
         let mut gather_rx = pc.gathering_complete_promise().await;
         gather_rx.recv().await;
 
-        let local_sdp = pc.local_description().await
+        let local_sdp = pc
+            .local_description()
+            .await
             .ok_or_else(|| anyhow::anyhow!("no local SDP after ICE gathering"))?
             .sdp;
 
@@ -119,7 +119,9 @@ impl WebRtcLane {
         let mut gather_rx = pc.gathering_complete_promise().await;
         gather_rx.recv().await;
 
-        let local_sdp = pc.local_description().await
+        let local_sdp = pc
+            .local_description()
+            .await
             .ok_or_else(|| anyhow::anyhow!("no local SDP after ICE gathering"))?
             .sdp;
 
@@ -127,13 +129,18 @@ impl WebRtcLane {
         let (dc_tx, dc_rx) = oneshot::channel::<Arc<RTCDataChannel>>();
         let dc_tx = Mutex::new(Some(dc_tx));
         pc.on_data_channel(Box::new(move |dc: Arc<RTCDataChannel>| {
-            if let Some(tx) = dc_tx.lock().unwrap().take() { let _ = tx.send(dc); }
+            if let Some(tx) = dc_tx.lock().unwrap().take() {
+                let _ = tx.send(dc);
+            }
             Box::pin(async {})
         }));
 
         let dc = tokio::time::timeout(Duration::from_secs(30), async move {
-            dc_rx.await.map_err(|_| anyhow::anyhow!("data channel never arrived"))
-        }).await??;
+            dc_rx
+                .await
+                .map_err(|_| anyhow::anyhow!("data channel never arrived"))
+        })
+        .await??;
 
         let lane = Self::attach(name, pc, dc).await;
         Ok((lane, local_sdp))
@@ -155,15 +162,15 @@ impl WebRtcLane {
     ) -> Arc<Self> {
         let (tx, rx) = mpsc::unbounded_channel::<ChunkCiphertext>();
         let health = Arc::new(Mutex::new(LaneHealth {
-            rtt_ms:        150.0,
+            rtt_ms: 150.0,
             bandwidth_bps: 10_000_000, // 10 Mbps initial estimate
-            in_flight:     0,
-            available:     false, // becomes true on_open
-            loss_rate:     0.0,
+            in_flight: 0,
+            available: false, // becomes true on_open
+            loss_rate: 0.0,
         }));
-        let closed       = Arc::new(AtomicBool::new(false));
-        let open_notify  = Arc::new(tokio::sync::Notify::new());
-        let ping_rtt     = Arc::new(Mutex::new(None::<Duration>));
+        let closed = Arc::new(AtomicBool::new(false));
+        let open_notify = Arc::new(tokio::sync::Notify::new());
+        let ping_rtt = Arc::new(Mutex::new(None::<Duration>));
 
         // on_open — mark lane available
         {
@@ -185,8 +192,10 @@ impl WebRtcLane {
                 let n2 = name2.clone();
                 Box::pin(async move {
                     match bincode::deserialize::<ChunkCiphertext>(&msg.data) {
-                        Ok(chunk) => { let _ = tx3.send(chunk); }
-                        Err(e)    => warn!("{n2}: deserialize error: {e}"),
+                        Ok(chunk) => {
+                            let _ = tx3.send(chunk);
+                        }
+                        Err(e) => warn!("{n2}: deserialize error: {e}"),
                     }
                 })
             }));
@@ -197,9 +206,12 @@ impl WebRtcLane {
             let h = health.clone();
             let c = closed.clone();
             pc.on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
-                if matches!(s, RTCPeerConnectionState::Failed | RTCPeerConnectionState::Closed
-                              | RTCPeerConnectionState::Disconnected)
-                {
+                if matches!(
+                    s,
+                    RTCPeerConnectionState::Failed
+                        | RTCPeerConnectionState::Closed
+                        | RTCPeerConnectionState::Disconnected
+                ) {
                     h.lock().unwrap().available = false;
                     c.store(true, Ordering::Relaxed);
                 }
@@ -221,7 +233,9 @@ impl WebRtcLane {
 
     /// Wait until the data channel is open (up to `timeout`).
     pub async fn wait_open(&self, timeout: Duration) -> bool {
-        tokio::time::timeout(timeout, self.open_notify.notified()).await.is_ok()
+        tokio::time::timeout(timeout, self.open_notify.notified())
+            .await
+            .is_ok()
     }
 
     /// Non-blocking receive of the next inbound chunk.
@@ -239,33 +253,48 @@ impl WebRtcLane {
 
 #[async_trait]
 impl TransportLane for WebRtcLane {
-    fn name(&self) -> &str { &self.name }
-    fn kind(&self) -> LaneKind { LaneKind::WebRtc }
-    fn health(&self) -> LaneHealth { self.health.lock().unwrap().clone() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn kind(&self) -> LaneKind {
+        LaneKind::WebRtc
+    }
+    fn health(&self) -> LaneHealth {
+        self.health.lock().unwrap().clone()
+    }
 
     async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
         if self.closed.load(Ordering::Relaxed) {
-            return Err(TransferError::Other(format!("{}: data channel closed", self.name)));
+            return Err(TransferError::Other(format!(
+                "{}: data channel closed",
+                self.name
+            )));
         }
-        let data = bincode::serialize(chunk)
-            .map_err(|e| TransferError::Other(format!("bincode: {e}")))?;
-        self.dc.send(&Bytes::from(data)).await
+        let data =
+            bincode::serialize(chunk).map_err(|e| TransferError::Other(format!("bincode: {e}")))?;
+        self.dc
+            .send(&Bytes::from(data))
+            .await
             .map_err(|e| TransferError::Other(format!("{}: send: {e}", self.name)))?;
         Ok(())
     }
 
     async fn send_ack(&self, gsn: u64) -> TransferResult<()> {
-        let payload = bincode::serialize(&("ack", gsn))
-            .map_err(|e| TransferError::Other(e.to_string()))?;
-        self.dc.send(&Bytes::from(payload)).await
+        let payload =
+            bincode::serialize(&("ack", gsn)).map_err(|e| TransferError::Other(e.to_string()))?;
+        self.dc
+            .send(&Bytes::from(payload))
+            .await
             .map_err(|e| TransferError::Other(e.to_string()))?;
         Ok(())
     }
 
     async fn send_nack(&self, gsn: u64) -> TransferResult<()> {
-        let payload = bincode::serialize(&("nack", gsn))
-            .map_err(|e| TransferError::Other(e.to_string()))?;
-        self.dc.send(&Bytes::from(payload)).await
+        let payload =
+            bincode::serialize(&("nack", gsn)).map_err(|e| TransferError::Other(e.to_string()))?;
+        self.dc
+            .send(&Bytes::from(payload))
+            .await
             .map_err(|e| TransferError::Other(e.to_string()))?;
         Ok(())
     }

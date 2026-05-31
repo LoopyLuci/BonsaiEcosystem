@@ -1,3 +1,6 @@
+use futures::StreamExt;
+use serde_json::{json, Value};
+use std::sync::OnceLock;
 /// ReAct (Reason + Act) inference loop — next-gen edition.
 ///
 /// Changes from v1:
@@ -13,24 +16,23 @@
 ///   the context window.
 /// - Top-K tool selection via ToolSelector; unknown-tool fallback expands
 ///   the candidate set and retries once.
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
-use std::sync::OnceLock;
-use serde_json::{json, Value};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
-use futures::StreamExt;
 
+use crate::assistant_audit_log::AuditLog;
 use crate::assistant_policy::{ConfirmationGate, PolicyDecision, PolicyEngine};
 use crate::assistant_store::{AssistantMessage, AssistantProfile, AssistantStore};
-use crate::assistant_audit_log::AuditLog;
 use crate::model_orchestrator::ModelOrchestrator;
 use crate::secrets_store::SecretsStore;
+use crate::tool_cache::ToolCache;
 use crate::tool_core::{
-    SideEffectProfile, ToolCallOutcome, ToolContext, ToolError, ToolOutput,
-    ToolRegistry,
+    SideEffectProfile, ToolCallOutcome, ToolContext, ToolError, ToolOutput, ToolRegistry,
 };
 use crate::tool_selector::ToolSelector;
-use crate::tool_cache::ToolCache;
 
 const MAX_REACT_ITERATIONS: usize = 10;
 const MAX_TOKENS: u32 = 2048;
@@ -46,39 +48,134 @@ const QUESTION_PREFIXES: &[&str] = &[
 ];
 
 const TOOL_ACTION_HINTS: &[&str] = &[
-    "read", "open", "find", "search", "list", "write", "edit", "update", "create", "delete", "remove",
-    "run", "execute", "command", "file", "folder", "directory", "url", "http", "email", "send",
-    "weather", "time", "date", "system stats", "cpu", "memory",
+    "read",
+    "open",
+    "find",
+    "search",
+    "list",
+    "write",
+    "edit",
+    "update",
+    "create",
+    "delete",
+    "remove",
+    "run",
+    "execute",
+    "command",
+    "file",
+    "folder",
+    "directory",
+    "url",
+    "http",
+    "email",
+    "send",
+    "weather",
+    "time",
+    "date",
+    "system stats",
+    "cpu",
+    "memory",
 ];
 
 const TARGET_HINTS: &[&str] = &[
-    "http://", "https://", "/", "\\", ".rs", ".ts", ".js", ".json", ".md", "file", "folder", "path",
-    "command", "email", "weather", "time", "date", "system",
+    "http://", "https://", "/", "\\", ".rs", ".ts", ".js", ".json", ".md", "file", "folder",
+    "path", "command", "email", "weather", "time", "date", "system",
 ];
 
 const LIVE_DATA_HINTS: &[&str] = &[
-    "current time", "time now", "date today", "weather", "forecast",
-    "system cpu", "cpu usage", "memory usage", "ram usage", "disk usage", "system stats",
+    "current time",
+    "time now",
+    "date today",
+    "weather",
+    "forecast",
+    "system cpu",
+    "cpu usage",
+    "memory usage",
+    "ram usage",
+    "disk usage",
+    "system stats",
     // system specs / hardware queries
-    "system spec", "system info", "system information", "hardware info", "hardware spec",
-    "my computer", "my machine", "computer spec", "machine spec", "os version",
-    "operating system", "processor info", "my specs", "disk space", "free space",
-    "how much ram", "how much memory", "how much disk", "what os", "what cpu",
-    "what are my", "tell me my", "show my system", "check my",
+    "system spec",
+    "system info",
+    "system information",
+    "hardware info",
+    "hardware spec",
+    "my computer",
+    "my machine",
+    "computer spec",
+    "machine spec",
+    "os version",
+    "operating system",
+    "processor info",
+    "my specs",
+    "disk space",
+    "free space",
+    "how much ram",
+    "how much memory",
+    "how much disk",
+    "what os",
+    "what cpu",
+    "what are my",
+    "tell me my",
+    "show my system",
+    "check my",
 ];
 
 const SYSTEM_STATS_HINTS: &[&str] = &[
-    "cpu", "memory", "ram", "system stats", "disk usage", "system usage",
-    "system spec", "system info", "system information", "hardware",
-    "my computer", "my machine", "operating system", "os version", "processor",
-    "my specs", "disk space", "free space", "how much ram", "how much memory",
-    "storage", "drives", "what os", "what cpu", "computer info", "machine info",
-    "what are my", "tell me my", "show my system",
+    "cpu",
+    "memory",
+    "ram",
+    "system stats",
+    "disk usage",
+    "system usage",
+    "system spec",
+    "system info",
+    "system information",
+    "hardware",
+    "my computer",
+    "my machine",
+    "operating system",
+    "os version",
+    "processor",
+    "my specs",
+    "disk space",
+    "free space",
+    "how much ram",
+    "how much memory",
+    "storage",
+    "drives",
+    "what os",
+    "what cpu",
+    "computer info",
+    "machine info",
+    "what are my",
+    "tell me my",
+    "show my system",
 ];
 const DATETIME_HINTS: &[&str] = &["time", "date", "clock", "what time", "today", "now"];
-const WEATHER_HINTS: &[&str] = &["weather", "forecast", "temperature", "rain", "wind", "humidity"];
-const FILE_READ_HINTS: &[&str] = &["read file", "open file", "show file", "file contents", "cat file"];
-const FILE_LIST_HINTS: &[&str] = &["find file", "find files", "list files", "search files", "locate file", "directory listing"];
+const WEATHER_HINTS: &[&str] = &[
+    "weather",
+    "forecast",
+    "temperature",
+    "rain",
+    "wind",
+    "humidity",
+];
+const FILE_READ_HINTS: &[&str] = &[
+    "read file",
+    "open file",
+    "show file",
+    "file contents",
+    "cat file",
+];
+const FILE_LIST_HINTS: &[&str] = &[
+    "find file",
+    "find files",
+    "list files",
+    "search files",
+    "locate file",
+    "directory listing",
+];
 const URL_FETCH_HINTS: &[&str] = &["fetch", "url", "web page", "website", "http://", "https://"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,13 +196,22 @@ struct IntentDecision {
 
 // Prompt-injection heuristics — abort tool dispatch if found in model's reasoning.
 const INJECTION_PATTERNS: &[&str] = &[
-    "ignore previous instructions", "ignore all previous", "disregard previous",
-    "system:", "SYSTEM:", "<|system|>", "you are now", "new instruction:", "override:",
+    "ignore previous instructions",
+    "ignore all previous",
+    "disregard previous",
+    "system:",
+    "SYSTEM:",
+    "<|system|>",
+    "you are now",
+    "new instruction:",
+    "override:",
 ];
 
 fn contains_injection(text: &str) -> bool {
     let lower = text.to_lowercase();
-    INJECTION_PATTERNS.iter().any(|p| lower.contains(&p.to_lowercase()))
+    INJECTION_PATTERNS
+        .iter()
+        .any(|p| lower.contains(&p.to_lowercase()))
 }
 
 fn should_expand_for_non_injected(tool_name: &str, injected_names: &[String]) -> bool {
@@ -135,7 +241,9 @@ fn contains_any(text: &str, needles: &[&str]) -> bool {
 }
 
 fn starts_with_question_prefix(text: &str) -> bool {
-    QUESTION_PREFIXES.iter().any(|p| text.starts_with(&format!("{p} ")))
+    QUESTION_PREFIXES
+        .iter()
+        .any(|p| text.starts_with(&format!("{p} ")))
 }
 
 fn has_path_like_target(text: &str) -> bool {
@@ -153,7 +261,9 @@ fn build_clarifying_question(user_text: &str) -> String {
 
     let lower = normalize_text(user_text);
     if lower.contains("delete") || lower.contains("remove") {
-        asks.push("If this is destructive, confirm whether I should proceed once target is identified.");
+        asks.push(
+            "If this is destructive, confirm whether I should proceed once target is identified.",
+        );
     }
 
     format!(
@@ -161,21 +271,29 @@ fn build_clarifying_question(user_text: &str) -> String {
         asks[0],
         asks[1],
         asks[2],
-        if asks.len() > 3 { format!("\n4. {}", asks[3]) } else { String::new() }
+        if asks.len() > 3 {
+            format!("\n4. {}", asks[3])
+        } else {
+            String::new()
+        }
     )
 }
 
 fn analyze_intent(last_user_text: &str, history: &[Value]) -> IntentDecision {
     let text = normalize_text(last_user_text);
     let has_question_mark = text.contains('?');
-    let question_like = has_question_mark || starts_with_question_prefix(&text)
-        || text.starts_with("can you explain") || text.starts_with("help me understand")
-        || text.starts_with("what is") || text.starts_with("how to");
+    let question_like = has_question_mark
+        || starts_with_question_prefix(&text)
+        || text.starts_with("can you explain")
+        || text.starts_with("help me understand")
+        || text.starts_with("what is")
+        || text.starts_with("how to");
 
     let action_like = contains_any(&text, TOOL_ACTION_HINTS);
     let live_data_like = contains_any(&text, LIVE_DATA_HINTS);
     let explicit_target = has_path_like_target(&text);
-    let ambiguous_reference = text.contains(" this ") || text.contains(" that ") || text.contains(" it ");
+    let ambiguous_reference =
+        text.contains(" this ") || text.contains(" that ") || text.contains(" it ");
     let has_prior_context = history.len() > 2;
 
     if action_like && !explicit_target && (!has_prior_context || ambiguous_reference) {
@@ -191,7 +309,9 @@ fn analyze_intent(last_user_text: &str, history: &[Value]) -> IntentDecision {
         return IntentDecision {
             mode: IntentMode::ToolPreferred,
             tool_top_k: TOOL_SELECTOR_TOP_K,
-            rationale: "live-data query detected: prefer trusted tool retrieval over model-only answer".to_string(),
+            rationale:
+                "live-data query detected: prefer trusted tool retrieval over model-only answer"
+                    .to_string(),
             clarifying_question: None,
         };
     }
@@ -272,23 +392,28 @@ fn emit_intent_router_trace(
     user_text: &str,
 ) {
     let preview = user_text.chars().take(180).collect::<String>();
-    let _ = app.emit("intent-router-trace", json!({
-        "session_id": session_id,
-        "turn_id": turn_id,
-        "phase": phase,
-        "mode": intent_mode_label(intent.mode),
-        "confidence": intent_confidence(intent),
-        "tool_top_k": intent.tool_top_k,
-        "rationale": intent.rationale,
-        "has_clarifying_question": intent.clarifying_question.is_some(),
-        "user_text_preview": preview,
-    }));
+    let _ = app.emit(
+        "intent-router-trace",
+        json!({
+            "session_id": session_id,
+            "turn_id": turn_id,
+            "phase": phase,
+            "mode": intent_mode_label(intent.mode),
+            "confidence": intent_confidence(intent),
+            "tool_top_k": intent.tool_top_k,
+            "rationale": intent.rationale,
+            "has_clarifying_question": intent.clarifying_question.is_some(),
+            "user_text_preview": preview,
+        }),
+    );
 }
 
 fn extract_weather_location(text: &str) -> Option<String> {
     let lower = normalize_text(text);
     if let Some(idx) = lower.find(" in ") {
-        let loc = text[idx + 4..].trim().trim_matches(&['?', '.', '!', ','][..]);
+        let loc = text[idx + 4..]
+            .trim()
+            .trim_matches(&['?', '.', '!', ','][..]);
         if !loc.is_empty() {
             return Some(loc.to_string());
         }
@@ -299,7 +424,12 @@ fn extract_weather_location(text: &str) -> Option<String> {
 fn extract_url(text: &str) -> Option<String> {
     text.split_whitespace()
         .find(|t| t.starts_with("http://") || t.starts_with("https://"))
-        .map(|t| t.trim_matches(|c: char| c == ')' || c == ']' || c == '"' || c == '\'' || c == ',' || c == '.').to_string())
+        .map(|t| {
+            t.trim_matches(|c: char| {
+                c == ')' || c == ']' || c == '"' || c == '\'' || c == ',' || c == '.'
+            })
+            .to_string()
+        })
 }
 
 fn extract_quoted_segment(text: &str) -> Option<String> {
@@ -322,11 +452,24 @@ fn extract_path_like_token(text: &str) -> Option<String> {
     }
     text.split_whitespace()
         .find(|t| {
-            t.contains('\\') || t.contains('/') || t.ends_with(".rs") || t.ends_with(".ts")
-                || t.ends_with(".js") || t.ends_with(".json") || t.ends_with(".md")
-                || t.ends_with(".txt") || t.ends_with(".toml") || t.ends_with(".yaml") || t.ends_with(".yml")
+            t.contains('\\')
+                || t.contains('/')
+                || t.ends_with(".rs")
+                || t.ends_with(".ts")
+                || t.ends_with(".js")
+                || t.ends_with(".json")
+                || t.ends_with(".md")
+                || t.ends_with(".txt")
+                || t.ends_with(".toml")
+                || t.ends_with(".yaml")
+                || t.ends_with(".yml")
         })
-        .map(|t| t.trim_matches(|c: char| c == ')' || c == ']' || c == '"' || c == '\'' || c == ',' || c == '.').to_string())
+        .map(|t| {
+            t.trim_matches(|c: char| {
+                c == ')' || c == ']' || c == '"' || c == '\'' || c == ',' || c == '.'
+            })
+            .to_string()
+        })
 }
 
 fn extract_glob_pattern(text: &str) -> Option<String> {
@@ -337,7 +480,12 @@ fn extract_glob_pattern(text: &str) -> Option<String> {
     }
     text.split_whitespace()
         .find(|t| t.contains('*') || t.starts_with("*.") || t.starts_with("**/"))
-        .map(|t| t.trim_matches(|c: char| c == ')' || c == ']' || c == '"' || c == '\'' || c == ',' || c == '.').to_string())
+        .map(|t| {
+            t.trim_matches(|c: char| {
+                c == ')' || c == ']' || c == '"' || c == '\'' || c == ',' || c == '.'
+            })
+            .to_string()
+        })
 }
 
 fn infer_pattern_from_text(text: &str) -> String {
@@ -351,7 +499,9 @@ fn infer_pattern_from_text(text: &str) -> String {
     if lower.contains("text files") || lower.contains("txt files") {
         return "*.txt".to_string();
     }
-    for ext in ["rs", "ts", "js", "json", "md", "txt", "toml", "yaml", "yml", "py", "java"] {
+    for ext in [
+        "rs", "ts", "js", "json", "md", "txt", "toml", "yaml", "yml", "py", "java",
+    ] {
         if lower.contains(&format!(".{ext}")) || lower.contains(&format!(" {ext} files")) {
             return format!("*.{ext}");
         }
@@ -378,7 +528,8 @@ async fn try_model_independent_live_data_reply(
     } else if contains_any(&lower, DATETIME_HINTS) && !contains_any(&lower, WEATHER_HINTS) {
         ("get_datetime", json!({}))
     } else if contains_any(&lower, WEATHER_HINTS) {
-        let location = extract_weather_location(last_user_text).unwrap_or_else(|| "auto".to_string());
+        let location =
+            extract_weather_location(last_user_text).unwrap_or_else(|| "auto".to_string());
         ("get_weather", json!({ "location": location }))
     } else {
         return None;
@@ -396,63 +547,102 @@ async fn try_model_independent_live_data_reply(
         cache,
         audit,
         app,
-    ).await;
+    )
+    .await;
 
     let reply = if outcome.decision == "allowed" {
         match serde_json::from_str::<Value>(&outcome.result_json) {
-            Ok(v) => {
-                match tool_name {
-                    "get_system_stats" => {
-                        let os      = v.get("os_name").and_then(|x| x.as_str()).unwrap_or("Unknown OS");
-                        let os_ver  = v.get("os_version").and_then(|x| x.as_str()).unwrap_or("");
-                        let arch    = v.get("architecture").and_then(|x| x.as_str()).unwrap_or("");
-                        let host    = v.get("hostname").and_then(|x| x.as_str()).unwrap_or("");
-                        let cpu_mod = v.get("cpu_model").and_then(|x| x.as_str()).unwrap_or("Unknown CPU");
-                        let cpu_ph  = v.get("cpu_cores_physical").and_then(|x| x.as_u64()).unwrap_or(0);
-                        let cpu_lg  = v.get("cpu_cores_logical").and_then(|x| x.as_u64()).unwrap_or(0);
-                        let cpu_pct = v.get("cpu_usage_pct").and_then(|x| x.as_f64()).unwrap_or(0.0);
-                        let mem_tot = v.get("memory_total_mb").and_then(|x| x.as_u64()).unwrap_or(0);
-                        let mem_use = v.get("memory_used_mb").and_then(|x| x.as_u64()).unwrap_or(0);
-                        let mem_pct = v.get("memory_used_pct").and_then(|x| x.as_f64()).unwrap_or(0.0);
-                        let sw_tot  = v.get("swap_total_mb").and_then(|x| x.as_u64()).unwrap_or(0);
-                        let sw_use  = v.get("swap_used_mb").and_then(|x| x.as_u64()).unwrap_or(0);
+            Ok(v) => match tool_name {
+                "get_system_stats" => {
+                    let os = v
+                        .get("os_name")
+                        .and_then(|x| x.as_str())
+                        .unwrap_or("Unknown OS");
+                    let os_ver = v.get("os_version").and_then(|x| x.as_str()).unwrap_or("");
+                    let arch = v.get("architecture").and_then(|x| x.as_str()).unwrap_or("");
+                    let host = v.get("hostname").and_then(|x| x.as_str()).unwrap_or("");
+                    let cpu_mod = v
+                        .get("cpu_model")
+                        .and_then(|x| x.as_str())
+                        .unwrap_or("Unknown CPU");
+                    let cpu_ph = v
+                        .get("cpu_cores_physical")
+                        .and_then(|x| x.as_u64())
+                        .unwrap_or(0);
+                    let cpu_lg = v
+                        .get("cpu_cores_logical")
+                        .and_then(|x| x.as_u64())
+                        .unwrap_or(0);
+                    let cpu_pct = v
+                        .get("cpu_usage_pct")
+                        .and_then(|x| x.as_f64())
+                        .unwrap_or(0.0);
+                    let mem_tot = v
+                        .get("memory_total_mb")
+                        .and_then(|x| x.as_u64())
+                        .unwrap_or(0);
+                    let mem_use = v
+                        .get("memory_used_mb")
+                        .and_then(|x| x.as_u64())
+                        .unwrap_or(0);
+                    let mem_pct = v
+                        .get("memory_used_pct")
+                        .and_then(|x| x.as_f64())
+                        .unwrap_or(0.0);
+                    let sw_tot = v.get("swap_total_mb").and_then(|x| x.as_u64()).unwrap_or(0);
+                    let sw_use = v.get("swap_used_mb").and_then(|x| x.as_u64()).unwrap_or(0);
 
-                        let mut s = format!(
-                            "**System specs for {}:**\n\n\
+                    let mut s = format!(
+                        "**System specs for {}:**\n\n\
                              **OS:** {} {} ({})\n\
                              **CPU:** {} — {} physical / {} logical cores — {}% usage\n\
                              **RAM:** {} MB / {} MB used ({}%)\n\
                              **Swap:** {} MB / {} MB used",
-                            host, os, os_ver, arch,
-                            cpu_mod, cpu_ph, cpu_lg, cpu_pct,
-                            mem_use, mem_tot, mem_pct,
-                            sw_use, sw_tot,
-                        );
+                        host,
+                        os,
+                        os_ver,
+                        arch,
+                        cpu_mod,
+                        cpu_ph,
+                        cpu_lg,
+                        cpu_pct,
+                        mem_use,
+                        mem_tot,
+                        mem_pct,
+                        sw_use,
+                        sw_tot,
+                    );
 
-                        if let Some(disks) = v.get("disks").and_then(|x| x.as_array()) {
-                            if !disks.is_empty() {
-                                s.push_str("\n**Storage:**");
-                                for d in disks {
-                                    let name  = d.get("name").and_then(|x| x.as_str()).unwrap_or("?");
-                                    let mount = d.get("mount").and_then(|x| x.as_str()).unwrap_or("?");
-                                    let tot   = d.get("total_gb").and_then(|x| x.as_f64()).unwrap_or(0.0);
-                                    let avail = d.get("available_gb").and_then(|x| x.as_f64()).unwrap_or(0.0);
-                                    let pct   = d.get("used_pct").and_then(|x| x.as_f64()).unwrap_or(0.0);
-                                    s.push_str(&format!(
-                                        "\n  - {} ({}): {:.1} GB total, {:.1} GB free ({:.0}% used)",
-                                        name, mount, tot, avail, pct
-                                    ));
-                                }
+                    if let Some(disks) = v.get("disks").and_then(|x| x.as_array()) {
+                        if !disks.is_empty() {
+                            s.push_str("\n**Storage:**");
+                            for d in disks {
+                                let name = d.get("name").and_then(|x| x.as_str()).unwrap_or("?");
+                                let mount = d.get("mount").and_then(|x| x.as_str()).unwrap_or("?");
+                                let tot = d.get("total_gb").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                                let avail = d
+                                    .get("available_gb")
+                                    .and_then(|x| x.as_f64())
+                                    .unwrap_or(0.0);
+                                let pct = d.get("used_pct").and_then(|x| x.as_f64()).unwrap_or(0.0);
+                                s.push_str(&format!(
+                                    "\n  - {} ({}): {:.1} GB total, {:.1} GB free ({:.0}% used)",
+                                    name, mount, tot, avail, pct
+                                ));
                             }
                         }
-                        s
                     }
-                    "get_datetime" => {
-                        let dt = v.get("datetime").and_then(|x| x.as_str()).unwrap_or("unknown");
-                        format!("Current date/time: {dt}")
-                    }
-                    "get_weather" => {
-                        format!(
+                    s
+                }
+                "get_datetime" => {
+                    let dt = v
+                        .get("datetime")
+                        .and_then(|x| x.as_str())
+                        .unwrap_or("unknown");
+                    format!("Current date/time: {dt}")
+                }
+                "get_weather" => {
+                    format!(
                             "Current weather for {}:\n- Temperature: {} C\n- Condition: {}\n- Wind: {} km/h\n- Humidity: {}%",
                             v.get("location").and_then(|x| x.as_str()).unwrap_or("unknown"),
                             v.get("temperature_c").and_then(|x| x.as_f64()).unwrap_or(0.0),
@@ -460,14 +650,16 @@ async fn try_model_independent_live_data_reply(
                             v.get("wind_kmh").and_then(|x| x.as_f64()).unwrap_or(0.0),
                             v.get("humidity_pct").and_then(|x| x.as_f64()).unwrap_or(0.0),
                         )
-                    }
-                    _ => outcome.result_json.clone(),
                 }
-            }
+                _ => outcome.result_json.clone(),
+            },
             Err(_) => outcome.result_json.clone(),
         }
     } else {
-        format!("I attempted to retrieve live data but hit an issue: {}", outcome.result_json)
+        format!(
+            "I attempted to retrieve live data but hit an issue: {}",
+            outcome.result_json
+        )
     };
 
     Some(AssistantTurn {
@@ -506,16 +698,24 @@ async fn try_model_independent_read_ops_reply(
             cache,
             audit,
             app,
-        ).await;
+        )
+        .await;
 
         let reply = match serde_json::from_str::<Value>(&outcome.result_json) {
             Ok(v) => {
                 let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("");
-                format!("Fetched URL successfully. Content preview:\n{}", &text[..text.len().min(1200)])
+                format!(
+                    "Fetched URL successfully. Content preview:\n{}",
+                    &text[..text.len().min(1200)]
+                )
             }
             Err(_) => format!("Fetched URL. Raw result: {}", outcome.result_json),
         };
-        return Some(AssistantTurn { reply, outcomes: vec![outcome], confirm_token: None });
+        return Some(AssistantTurn {
+            reply,
+            outcomes: vec![outcome],
+            confirm_token: None,
+        });
     }
 
     // Read file
@@ -539,28 +739,47 @@ async fn try_model_independent_read_ops_reply(
             cache,
             audit,
             app,
-        ).await;
+        )
+        .await;
 
         let reply = match serde_json::from_str::<Value>(&outcome.result_json) {
             Ok(v) => {
-                let p = v.get("path").and_then(|x| x.as_str()).unwrap_or("(unknown)");
+                let p = v
+                    .get("path")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("(unknown)");
                 let c = v.get("content").and_then(|x| x.as_str()).unwrap_or("");
-                let truncated = v.get("truncated").and_then(|x| x.as_bool()).unwrap_or(false);
+                let truncated = v
+                    .get("truncated")
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or(false);
                 format!(
                     "Read file: {p}\n{}{}",
                     &c[..c.len().min(1600)],
-                    if truncated { "\n\n[Output truncated. Ask for a specific section if needed.]" } else { "" }
+                    if truncated {
+                        "\n\n[Output truncated. Ask for a specific section if needed.]"
+                    } else {
+                        ""
+                    }
                 )
             }
             Err(_) => format!("Read file result: {}", outcome.result_json),
         };
-        return Some(AssistantTurn { reply, outcomes: vec![outcome], confirm_token: None });
+        return Some(AssistantTurn {
+            reply,
+            outcomes: vec![outcome],
+            confirm_token: None,
+        });
     }
 
     // Find/list files
-    if contains_any(&lower, FILE_LIST_HINTS) || (lower.contains("list") && lower.contains("files")) || (lower.contains("find") && lower.contains("files")) {
+    if contains_any(&lower, FILE_LIST_HINTS)
+        || (lower.contains("list") && lower.contains("files"))
+        || (lower.contains("find") && lower.contains("files"))
+    {
         let path = extract_path_like_token(last_user_text).unwrap_or_else(|| ".".to_string());
-        let pattern = extract_glob_pattern(last_user_text).unwrap_or_else(|| infer_pattern_from_text(last_user_text));
+        let pattern = extract_glob_pattern(last_user_text)
+            .unwrap_or_else(|| infer_pattern_from_text(last_user_text));
 
         let args = json!({ "path": path, "pattern": pattern, "max_results": 50 });
         let outcome = execute_single_with_retry(
@@ -573,13 +792,20 @@ async fn try_model_independent_read_ops_reply(
             cache,
             audit,
             app,
-        ).await;
+        )
+        .await;
 
         let reply = match serde_json::from_str::<Value>(&outcome.result_json) {
             Ok(v) => {
                 let count = v.get("count").and_then(|x| x.as_u64()).unwrap_or(0);
-                let files = v.get("files").and_then(|x| x.as_array()).cloned().unwrap_or_default();
-                let preview = files.iter().take(20)
+                let files = v
+                    .get("files")
+                    .and_then(|x| x.as_array())
+                    .cloned()
+                    .unwrap_or_default();
+                let preview = files
+                    .iter()
+                    .take(20)
                     .filter_map(|f| f.as_str())
                     .collect::<Vec<_>>()
                     .join("\n- ");
@@ -591,7 +817,11 @@ async fn try_model_independent_read_ops_reply(
             }
             Err(_) => format!("File search result: {}", outcome.result_json),
         };
-        return Some(AssistantTurn { reply, outcomes: vec![outcome], confirm_token: None });
+        return Some(AssistantTurn {
+            reply,
+            outcomes: vec![outcome],
+            confirm_token: None,
+        });
     }
 
     if contains_any(&lower, URL_FETCH_HINTS) && extract_url(last_user_text).is_none() {
@@ -608,8 +838,8 @@ async fn try_model_independent_read_ops_reply(
 // ── Public API ─────────────────────────────────────────────────────────────────
 
 pub struct AssistantTurn {
-    pub reply:         String,
-    pub outcomes:      Vec<ToolCallOutcome>,
+    pub reply: String,
+    pub outcomes: Vec<ToolCallOutcome>,
     /// Set when a tool call required user confirmation. Contains the single-use token,
     /// tool name, args, human-readable prompt, and expiry — so callers can surface
     /// a structured confirm request (e.g. bonsai-bot bonsai_ext envelope).
@@ -617,10 +847,10 @@ pub struct AssistantTurn {
 }
 
 pub struct ConfirmRequest {
-    pub token:      String,
-    pub tool:       String,
-    pub args:       serde_json::Value,
-    pub prompt:     String,
+    pub token: String,
+    pub tool: String,
+    pub args: serde_json::Value,
+    pub prompt: String,
     pub expires_at: u64,
 }
 
@@ -629,9 +859,8 @@ static ASSISTANT_SELECTOR: OnceLock<ToolSelector> = OnceLock::new();
 static ASSISTANT_CACHE: OnceLock<ToolCache> = OnceLock::new();
 
 pub fn assistant_registry() -> &'static tokio::sync::RwLock<ToolRegistry> {
-    ASSISTANT_REGISTRY.get_or_init(|| {
-        tokio::sync::RwLock::new(crate::assistant_tools::build_registry())
-    })
+    ASSISTANT_REGISTRY
+        .get_or_init(|| tokio::sync::RwLock::new(crate::assistant_tools::build_registry()))
 }
 
 fn assistant_selector() -> &'static ToolSelector {
@@ -647,23 +876,25 @@ fn assistant_cache() -> &'static ToolCache {
 }
 
 /// Hot-reload user-defined skills into the running registry.
-pub async fn reload_user_skills(store: &crate::user_skills::UserSkillStore) -> Result<usize, String> {
+pub async fn reload_user_skills(
+    store: &crate::user_skills::UserSkillStore,
+) -> Result<usize, String> {
     let mut reg = assistant_registry().write().await;
     store.load_into_registry(&mut *reg).await
 }
 
 pub async fn run_assistant_turn(
-    history:    Vec<Value>,
-    profile:    &AssistantProfile,
-    store:      &AssistantStore,
-    policy:     &PolicyEngine,
-    gate:       &ConfirmationGate,
-    orch:       &ModelOrchestrator,
-    secrets:    &Arc<SecretsStore>,
-    audit:      &AuditLog,
-    app:        &AppHandle,
-    cancel:     Arc<AtomicBool>,
-    stream_tx:  Option<mpsc::UnboundedSender<String>>,
+    history: Vec<Value>,
+    profile: &AssistantProfile,
+    store: &AssistantStore,
+    policy: &PolicyEngine,
+    gate: &ConfirmationGate,
+    orch: &ModelOrchestrator,
+    secrets: &Arc<SecretsStore>,
+    audit: &AuditLog,
+    app: &AppHandle,
+    cancel: Arc<AtomicBool>,
+    stream_tx: Option<mpsc::UnboundedSender<String>>,
     session_id: &str,
 ) -> Result<AssistantTurn, String> {
     let registry_lock = assistant_registry();
@@ -676,7 +907,11 @@ pub async fn run_assistant_turn(
     let turn_id = {
         use rand::distributions::Alphanumeric;
         use rand::Rng;
-        rand::thread_rng().sample_iter(&Alphanumeric).take(16).map(char::from).collect::<String>()
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(16)
+            .map(char::from)
+            .collect::<String>()
     };
     let ctx = ToolContext {
         workspace_path: None, // TODO: pass from AppState when workspace is known
@@ -688,11 +923,13 @@ pub async fn run_assistant_turn(
         secrets: secrets.clone(),
     };
 
-    let profile_perms: Value = serde_json::from_str(&profile.tool_permissions)
-        .unwrap_or_else(|_| json!({}));
+    let profile_perms: Value =
+        serde_json::from_str(&profile.tool_permissions).unwrap_or_else(|_| json!({}));
 
     // Extract the last user message text for the selector.
-    let last_user_text = history.iter().rev()
+    let last_user_text = history
+        .iter()
+        .rev()
         .find(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
         .and_then(|m| m.get("content").and_then(|c| c.as_str()))
         .unwrap_or("")
@@ -742,7 +979,9 @@ pub async fn run_assistant_turn(
         cache,
         audit,
         app,
-    ).await {
+    )
+    .await
+    {
         emit_intent_router_trace(
             app,
             session_id,
@@ -762,7 +1001,9 @@ pub async fn run_assistant_turn(
         cache,
         audit,
         app,
-    ).await {
+    )
+    .await
+    {
         emit_intent_router_trace(
             app,
             session_id,
@@ -796,10 +1037,9 @@ pub async fn run_assistant_turn(
         if let Some(url) = url {
             url
         } else {
-            let hint = orch
-                .readiness_hint()
-                .await
-                .unwrap_or_else(|| "No model is currently loading. Load a model from Model Selector.".to_string());
+            let hint = orch.readiness_hint().await.unwrap_or_else(|| {
+                "No model is currently loading. Load a model from Model Selector.".to_string()
+            });
             return Err(format!("No model slot is ready. {hint}"));
         }
     };
@@ -812,7 +1052,11 @@ pub async fn run_assistant_turn(
     let mut messages = history.clone();
     let protocol = protocol_message_for_intent(&intent);
     let protocol_msg = json!({ "role": "system", "content": protocol });
-    if messages.first().and_then(|m| m.get("role").and_then(|r| r.as_str())) == Some("system") {
+    if messages
+        .first()
+        .and_then(|m| m.get("role").and_then(|r| r.as_str()))
+        == Some("system")
+    {
         messages.insert(1, protocol_msg);
     } else {
         messages.insert(0, protocol_msg);
@@ -831,8 +1075,12 @@ pub async fn run_assistant_turn(
         // ── Tool selection ───────────────────────────────────────────────────
         let mut selected = match intent.mode {
             IntentMode::AnswerOnly => Vec::new(),
-            IntentMode::ToolPreferred => selector.select(&last_user_text, intent.tool_top_k, &injected_names),
-            IntentMode::Hybrid => selector.select(&last_user_text, intent.tool_top_k, &injected_names),
+            IntentMode::ToolPreferred => {
+                selector.select(&last_user_text, intent.tool_top_k, &injected_names)
+            }
+            IntentMode::Hybrid => {
+                selector.select(&last_user_text, intent.tool_top_k, &injected_names)
+            }
             IntentMode::ClarifyFirst => Vec::new(),
         };
 
@@ -840,12 +1088,16 @@ pub async fn run_assistant_turn(
         // benefits from get_datetime/get_system_stats if the LLM decides to use them.
         if !matches!(intent.mode, IntentMode::ClarifyFirst) {
             for name in ALWAYS_INJECT {
-                if !selected.contains(&name.to_string()) { selected.push(name.to_string()); }
+                if !selected.contains(&name.to_string()) {
+                    selected.push(name.to_string());
+                }
             }
         }
         // Add fallback-expansion tools from previous iteration
         for name in &expand_names {
-            if !selected.contains(name) { selected.push(name.clone()); }
+            if !selected.contains(name) {
+                selected.push(name.clone());
+            }
         }
         expand_names.clear();
         injected_names = selected.clone();
@@ -874,31 +1126,40 @@ pub async fn run_assistant_turn(
             let code = resp.status().as_u16();
             if code == 400 || code == 422 || code >= 500 {
                 // Server doesn't support tools — fall back to plain turn
-                return run_plain_turn(history, profile, orch, audit, app, cancel, stream_tx, session_id).await;
+                return run_plain_turn(
+                    history, profile, orch, audit, app, cancel, stream_tx, session_id,
+                )
+                .await;
             }
             return Err(format!("llama-server HTTP {code}"));
         }
 
         // ── Stream accumulation ──────────────────────────────────────────────
-        let (full_message, tool_calls_raw) = accumulate_stream(
-            resp, app, &stream_tx, cancel.clone()
-        ).await?;
+        let (full_message, tool_calls_raw) =
+            accumulate_stream(resp, app, &stream_tx, cancel.clone()).await?;
 
         // Append assistant message to context
         messages.push(full_message.clone());
 
         // ── Tool calls? ──────────────────────────────────────────────────────
         if let Some(calls) = tool_calls_raw {
-            let reasoning = full_message.get("content").and_then(|c| c.as_str()).unwrap_or("");
+            let reasoning = full_message
+                .get("content")
+                .and_then(|c| c.as_str())
+                .unwrap_or("");
 
             // Separate into parallelizable vs. serial groups
             let mut parallel_group: Vec<(&Value, Arc<dyn crate::tool_core::Tool>)> = Vec::new();
             let mut parallel_effects: Vec<SideEffectProfile> = Vec::new();
-            let mut serial_queue:   Vec<(&Value, Option<Arc<dyn crate::tool_core::Tool>>, PolicyDecision)> = Vec::new();
+            let mut serial_queue: Vec<(
+                &Value,
+                Option<Arc<dyn crate::tool_core::Tool>>,
+                PolicyDecision,
+            )> = Vec::new();
 
             for tc in &calls {
                 let tool_name = tc["function"]["name"].as_str().unwrap_or("").to_string();
-                let args_str  = tc["function"]["arguments"].as_str().unwrap_or("{}");
+                let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
                 let args: Value = serde_json::from_str(args_str).unwrap_or_else(|_| json!({}));
 
                 // If the model references a valid tool that was not injected,
@@ -909,7 +1170,10 @@ pub async fn run_assistant_turn(
                         tool_call_id: tc["id"].as_str().unwrap_or("").to_string(),
                         tool_name: tool_name.clone(),
                         args,
-                        result_json: ToolError::NotInContext { tool_name: tool_name.clone() }.to_llm_message(),
+                        result_json: ToolError::NotInContext {
+                            tool_name: tool_name.clone(),
+                        }
+                        .to_llm_message(),
                         decision: "not_in_context".into(),
                         duration_ms: 0,
                         from_cache: false,
@@ -954,7 +1218,10 @@ pub async fn run_assistant_turn(
                             tool_call_id: tc["id"].as_str().unwrap_or("").to_string(),
                             tool_name: tool_name.clone(),
                             args,
-                            result_json: ToolError::NotInContext { tool_name: tool_name.clone() }.to_llm_message(),
+                            result_json: ToolError::NotInContext {
+                                tool_name: tool_name.clone(),
+                            }
+                            .to_llm_message(),
                             decision: "not_in_context".into(),
                             duration_ms: 0,
                             from_cache: false,
@@ -966,12 +1233,14 @@ pub async fn run_assistant_turn(
                 };
 
                 let advisory_risk = Some(tool_arc.policy_hint().max_risk);
-                let decision = policy.evaluate_with_risk(&tool_name, &args, &profile_perms, advisory_risk);
+                let decision =
+                    policy.evaluate_with_risk(&tool_name, &args, &profile_perms, advisory_risk);
 
                 match decision {
                     PolicyDecision::Allow => {
                         let side_effects = tool_arc.side_effects();
-                        let compatible_with_group = parallel_effects.iter()
+                        let compatible_with_group = parallel_effects
+                            .iter()
                             .all(|existing| side_effects.can_parallelize_with(existing));
 
                         if compatible_with_group {
@@ -989,9 +1258,7 @@ pub async fn run_assistant_turn(
 
             // ── Execute parallel group ───────────────────────────────────────
             if !parallel_group.is_empty() {
-                let par_outcomes = execute_parallel(
-                    parallel_group, &ctx, cache, audit, app
-                ).await;
+                let par_outcomes = execute_parallel(parallel_group, &ctx, cache, audit, app).await;
                 for o in &par_outcomes {
                     messages.push(o.to_context_message());
                 }
@@ -1000,11 +1267,13 @@ pub async fn run_assistant_turn(
 
             // ── Execute serial queue ─────────────────────────────────────────
             for (tc, tool_opt, decision) in serial_queue {
-                if cancel.load(Ordering::SeqCst) { break; }
+                if cancel.load(Ordering::SeqCst) {
+                    break;
+                }
                 let tool_name = tc["function"]["name"].as_str().unwrap_or("").to_string();
-                let args_str  = tc["function"]["arguments"].as_str().unwrap_or("{}");
+                let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
                 let args: Value = serde_json::from_str(args_str).unwrap_or_else(|_| json!({}));
-                let call_id   = tc["id"].as_str().unwrap_or("call_0").to_string();
+                let call_id = tc["id"].as_str().unwrap_or("call_0").to_string();
 
                 let outcome = match decision {
                     PolicyDecision::Deny(reason) => {
@@ -1033,7 +1302,9 @@ pub async fn run_assistant_turn(
                         let token = gate.register(&tool_name, args.clone());
                         let expires_at = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default().as_secs() + 120; // 2-minute TTL for bot confirmations
+                            .unwrap_or_default()
+                            .as_secs()
+                            + 120; // 2-minute TTL for bot confirmations
                         let _ = app.emit(
                             "assistant-confirm-required",
                             json!({
@@ -1057,15 +1328,17 @@ pub async fn run_assistant_turn(
                             Some(&call_id),
                         );
                         // Return early; frontend or bot resubmits after approval
-                        let reply = full_message["content"].as_str()
-                            .unwrap_or("I need your confirmation to proceed.").to_string();
+                        let reply = full_message["content"]
+                            .as_str()
+                            .unwrap_or("I need your confirmation to proceed.")
+                            .to_string();
                         return Ok(AssistantTurn {
                             reply,
                             outcomes: all_outcomes,
                             confirm_token: Some(ConfirmRequest {
                                 token,
-                                tool:       tool_name.clone(),
-                                args:       args.clone(),
+                                tool: tool_name.clone(),
+                                args: args.clone(),
                                 prompt,
                                 expires_at,
                             }),
@@ -1075,25 +1348,35 @@ pub async fn run_assistant_turn(
                     PolicyDecision::Allow => {
                         let tool = tool_opt.unwrap();
                         execute_single_with_retry(
-                            call_id, tool_name.clone(), args, args_str,
-                            tool, &ctx, cache, audit, app
-                        ).await
+                            call_id,
+                            tool_name.clone(),
+                            args,
+                            args_str,
+                            tool,
+                            &ctx,
+                            cache,
+                            audit,
+                            app,
+                        )
+                        .await
                     }
                 };
 
                 // Persist tool messages in session
-                let _ = store.append_message(AssistantMessage {
-                    id: String::new(),
-                    session_id: session_id.to_string(),
-                    role: "tool".into(),
-                    content: outcome.result_json.clone(),
-                    tool_name: Some(outcome.tool_name.clone()),
-                    tool_result: None,
-                    tts_synthesized: false,
-                    created_at: 0,
-                    tool_call_id: Some(outcome.tool_call_id.clone()),
-                    game_state: None,
-                }).await;
+                let _ = store
+                    .append_message(AssistantMessage {
+                        id: String::new(),
+                        session_id: session_id.to_string(),
+                        role: "tool".into(),
+                        content: outcome.result_json.clone(),
+                        tool_name: Some(outcome.tool_name.clone()),
+                        tool_result: None,
+                        tts_synthesized: false,
+                        created_at: 0,
+                        tool_call_id: Some(outcome.tool_call_id.clone()),
+                        game_state: None,
+                    })
+                    .await;
 
                 messages.push(outcome.to_context_message());
                 all_outcomes.push(outcome);
@@ -1108,7 +1391,11 @@ pub async fn run_assistant_turn(
 
         // ── Plain text reply ─────────────────────────────────────────────────
         let reply = full_message["content"].as_str().unwrap_or("").to_string();
-        return Ok(AssistantTurn { reply, outcomes: all_outcomes, confirm_token: None });
+        return Ok(AssistantTurn {
+            reply,
+            outcomes: all_outcomes,
+            confirm_token: None,
+        });
     }
 
     Err("Max ReAct iterations reached without a final answer.".into())
@@ -1117,39 +1404,53 @@ pub async fn run_assistant_turn(
 // ── Parallel executor ─────────────────────────────────────────────────────────
 
 async fn execute_parallel(
-    group:  Vec<(&Value, Arc<dyn crate::tool_core::Tool>)>,
-    ctx:    &ToolContext,
-    cache:  &ToolCache,
-    audit:  &AuditLog,
-    app:    &AppHandle,
+    group: Vec<(&Value, Arc<dyn crate::tool_core::Tool>)>,
+    ctx: &ToolContext,
+    cache: &ToolCache,
+    audit: &AuditLog,
+    app: &AppHandle,
 ) -> Vec<ToolCallOutcome> {
-    let futures: Vec<_> = group.into_iter().map(|(tc, tool)| async move {
-        let call_id   = tc["id"].as_str().unwrap_or("").to_string();
-        let tool_name = tc["function"]["name"].as_str().unwrap_or("").to_string();
-        let args_str  = tc["function"]["arguments"].as_str().unwrap_or("{}").to_string();
-        let args: Value = serde_json::from_str(&args_str).unwrap_or_else(|_| json!({}));
-        execute_single_with_retry(call_id, tool_name, args, &args_str, tool, ctx, cache, audit, app).await
-    }).collect();
+    let futures: Vec<_> = group
+        .into_iter()
+        .map(|(tc, tool)| async move {
+            let call_id = tc["id"].as_str().unwrap_or("").to_string();
+            let tool_name = tc["function"]["name"].as_str().unwrap_or("").to_string();
+            let args_str = tc["function"]["arguments"]
+                .as_str()
+                .unwrap_or("{}")
+                .to_string();
+            let args: Value = serde_json::from_str(&args_str).unwrap_or_else(|_| json!({}));
+            execute_single_with_retry(
+                call_id, tool_name, args, &args_str, tool, ctx, cache, audit, app,
+            )
+            .await
+        })
+        .collect();
 
     futures::future::join_all(futures).await
 }
 
 async fn execute_single_with_retry(
-    call_id:   String,
+    call_id: String,
     tool_name: String,
-    args:      Value,
-    args_str:  &str,
-    tool:      Arc<dyn crate::tool_core::Tool>,
-    ctx:       &ToolContext,
-    cache:     &ToolCache,
-    audit:     &AuditLog,
-    app:       &AppHandle,
+    args: Value,
+    args_str: &str,
+    tool: Arc<dyn crate::tool_core::Tool>,
+    ctx: &ToolContext,
+    cache: &ToolCache,
+    audit: &AuditLog,
+    app: &AppHandle,
 ) -> ToolCallOutcome {
     let cache_ttl = cache_enabled_for_tool(&tool);
 
     // Cache check only for explicitly cacheable tools.
     if cache_ttl.is_some() {
-        if let Some(cached) = cache.get(&tool_name, &args, &ctx.profile_id, ctx.workspace_path.as_deref()) {
+        if let Some(cached) = cache.get(
+            &tool_name,
+            &args,
+            &ctx.profile_id,
+            ctx.workspace_path.as_deref(),
+        ) {
             audit.log_decision_with_context(
                 &tool_name,
                 "cache_hit",
@@ -1176,7 +1477,9 @@ async fn execute_single_with_retry(
     let mut last_outcome = None;
 
     for attempt in 0..retry.max_attempts {
-        if ctx.is_cancelled() { break; }
+        if ctx.is_cancelled() {
+            break;
+        }
         if attempt > 0 {
             let delay = retry.backoff_ms(attempt - 1);
             tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
@@ -1222,7 +1525,14 @@ async fn execute_single_with_retry(
                 );
                 // Cache the result
                 if let Some(ttl) = cache_ttl {
-                    cache.put(&tool_name, &args, &ctx.profile_id, ctx.workspace_path.as_deref(), val, ttl);
+                    cache.put(
+                        &tool_name,
+                        &args,
+                        &ctx.profile_id,
+                        ctx.workspace_path.as_deref(),
+                        val,
+                        ttl,
+                    );
                 }
                 last_outcome = Some(ToolCallOutcome {
                     tool_call_id: call_id.clone(),
@@ -1241,7 +1551,9 @@ async fn execute_single_with_retry(
                 let mut text = String::new();
                 while let Some(chunk) = rx.recv().await {
                     text.push_str(&chunk.delta);
-                    if chunk.done { break; }
+                    if chunk.done {
+                        break;
+                    }
                 }
                 let val = json!({ "output": text });
                 let result_str = maybe_summarize(&val, &tool_name);
@@ -1341,12 +1653,12 @@ async fn execute_single_with_retry(
 // window, and returns the fully assembled message object.
 
 async fn accumulate_stream(
-    resp:      reqwest::Response,
-    app:       &AppHandle,
+    resp: reqwest::Response,
+    app: &AppHandle,
     stream_tx: &Option<mpsc::UnboundedSender<String>>,
-    cancel:    Arc<AtomicBool>,
+    cancel: Arc<AtomicBool>,
 ) -> Result<(Value, Option<Vec<Value>>), String> {
-    let mut text_content  = String::new();
+    let mut text_content = String::new();
     let mut tool_calls_map: std::collections::HashMap<usize, Value> = Default::default();
     let mut finish_reason = "stop".to_string();
 
@@ -1365,12 +1677,17 @@ async fn accumulate_stream(
             let line = buffer[..nl].trim().to_string();
             buffer = buffer[nl + 1..].to_string();
 
-            if line.is_empty() || line == "data: [DONE]" { continue; }
+            if line.is_empty() || line == "data: [DONE]" {
+                continue;
+            }
             let json_str = line.strip_prefix("data: ").unwrap_or(&line);
-            let Ok(delta_obj): Result<Value, _> = serde_json::from_str(json_str) else { continue };
+            let Ok(delta_obj): Result<Value, _> = serde_json::from_str(json_str) else {
+                continue;
+            };
 
             let choice = &delta_obj["choices"][0];
-            finish_reason = choice["finish_reason"].as_str()
+            finish_reason = choice["finish_reason"]
+                .as_str()
                 .filter(|s| *s != "null")
                 .unwrap_or(&finish_reason)
                 .to_string();
@@ -1381,11 +1698,10 @@ async fn accumulate_stream(
             if let Some(tok) = delta.get("content").and_then(|c| c.as_str()) {
                 if !tok.is_empty() {
                     text_content.push_str(tok);
-                    let _ = app.emit(
-                        "token-stream-assistant",
-                        tok,
-                    );
-                    if let Some(ref tx) = stream_tx { let _ = tx.send(tok.to_string()); }
+                    let _ = app.emit("token-stream-assistant", tok);
+                    if let Some(ref tx) = stream_tx {
+                        let _ = tx.send(tok.to_string());
+                    }
                 }
             }
 
@@ -1393,19 +1709,28 @@ async fn accumulate_stream(
             if let Some(tcs) = delta.get("tool_calls").and_then(|v| v.as_array()) {
                 for tc_delta in tcs {
                     let idx = tc_delta.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                    let entry = tool_calls_map.entry(idx).or_insert_with(|| json!({
-                        "id": "", "type": "function",
-                        "function": { "name": "", "arguments": "" }
-                    }));
+                    let entry = tool_calls_map.entry(idx).or_insert_with(|| {
+                        json!({
+                            "id": "", "type": "function",
+                            "function": { "name": "", "arguments": "" }
+                        })
+                    });
                     if let Some(id) = tc_delta.get("id").and_then(|v| v.as_str()) {
                         entry["id"] = json!(id);
                     }
-                    if let Some(name) = tc_delta.pointer("/function/name").and_then(|v| v.as_str()) {
+                    if let Some(name) = tc_delta.pointer("/function/name").and_then(|v| v.as_str())
+                    {
                         let cur = entry["function"]["name"].as_str().unwrap_or("").to_string();
                         entry["function"]["name"] = json!(cur + name);
                     }
-                    if let Some(args) = tc_delta.pointer("/function/arguments").and_then(|v| v.as_str()) {
-                        let cur = entry["function"]["arguments"].as_str().unwrap_or("").to_string();
+                    if let Some(args) = tc_delta
+                        .pointer("/function/arguments")
+                        .and_then(|v| v.as_str())
+                    {
+                        let cur = entry["function"]["arguments"]
+                            .as_str()
+                            .unwrap_or("")
+                            .to_string();
                         entry["function"]["arguments"] = json!(cur + args);
                     }
                 }
@@ -1449,34 +1774,39 @@ fn maybe_summarize(val: &Value, tool_name: &str) -> String {
             "count": files.len(),
             "files": &files[..files.len().min(10)],
             "_note": format!("Result truncated. Full {} files available on request.", files.len()),
-        })).unwrap_or(s);
+        }))
+        .unwrap_or(s);
     }
     if let Some(content) = val.get("content").and_then(|v| v.as_str()) {
         return serde_json::to_string(&json!({
             "content": &content[..content.len().min(1500)],
             "_note": "Content truncated to 1500 chars. Ask for more if needed.",
-        })).unwrap_or(s);
+        }))
+        .unwrap_or(s);
     }
     // Generic: keep first 2KB
-    format!("{}... [result truncated — full {} bytes available, tool: {tool_name}]",
-        &s[..s.len().min(2048)], s.len())
+    format!(
+        "{}... [result truncated — full {} bytes available, tool: {tool_name}]",
+        &s[..s.len().min(2048)],
+        s.len()
+    )
 }
 
 // ── Plain-text fallback ───────────────────────────────────────────────────────
 // Used when llama-server returns 400/422 for tool schemas (model doesn't support them).
 
 async fn run_plain_turn(
-    history:    Vec<Value>,
-    profile:    &AssistantProfile,
-    orch:       &ModelOrchestrator,
-    audit:      &AuditLog,
-    app:        &AppHandle,
-    cancel:     Arc<AtomicBool>,
-    stream_tx:  Option<mpsc::UnboundedSender<String>>,
+    history: Vec<Value>,
+    profile: &AssistantProfile,
+    orch: &ModelOrchestrator,
+    audit: &AuditLog,
+    app: &AppHandle,
+    cancel: Arc<AtomicBool>,
+    stream_tx: Option<mpsc::UnboundedSender<String>>,
     session_id: &str,
 ) -> Result<AssistantTurn, String> {
-    use tokio::sync::oneshot;
     use crate::model_orchestrator::InferRequest;
+    use tokio::sync::oneshot;
 
     let (resp_tx, resp_rx) = oneshot::channel();
     let (tok_tx, mut tok_rx) = mpsc::unbounded_channel::<String>();
@@ -1485,29 +1815,36 @@ async fn run_plain_turn(
     tokio::spawn(async move {
         while let Some(tok) = tok_rx.recv().await {
             let _ = app2.emit("token-stream-assistant", &tok);
-            if let Some(ref tx) = outer_tx { let _ = tx.send(tok); }
+            if let Some(ref tx) = outer_tx {
+                let _ = tx.send(tok);
+            }
         }
     });
 
     let req = InferRequest {
-        model_id:    profile.model_id.clone(),
-        messages:    history,
-        max_tokens:  MAX_TOKENS,
-        overrides:   None,
-        stream_tx:   Some(tok_tx),
+        model_id: profile.model_id.clone(),
+        messages: history,
+        max_tokens: MAX_TOKENS,
+        overrides: None,
+        stream_tx: Some(tok_tx),
         cancel_flag: Some(cancel),
         resp_tx,
-        source:      "assistant",
+        source: "assistant",
     };
     orch.infer(req)?;
 
-    let (reply, _stats) = resp_rx.await
+    let (reply, _stats) = resp_rx
+        .await
         .map_err(|_| "inference channel closed".to_string())??;
 
     let plain_turn_id = {
         use rand::distributions::Alphanumeric;
         use rand::Rng;
-        rand::thread_rng().sample_iter(&Alphanumeric).take(16).map(char::from).collect::<String>()
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(16)
+            .map(char::from)
+            .collect::<String>()
     };
     audit.log_decision_with_context(
         "plain_turn",
@@ -1519,7 +1856,11 @@ async fn run_plain_turn(
         Some(&plain_turn_id),
         None,
     );
-    Ok(AssistantTurn { reply, outcomes: vec![], confirm_token: None })
+    Ok(AssistantTurn {
+        reply,
+        outcomes: vec![],
+        confirm_token: None,
+    })
 }
 
 #[cfg(test)]
@@ -1543,29 +1884,58 @@ mod tests {
         let mut expand = vec!["get_weather".to_string()];
         queue_expansion_tool(&mut expand, "get_weather");
         queue_expansion_tool(&mut expand, "get_datetime");
-        assert_eq!(expand, vec!["get_weather".to_string(), "get_datetime".to_string()]);
+        assert_eq!(
+            expand,
+            vec!["get_weather".to_string(), "get_datetime".to_string()]
+        );
     }
 
     #[test]
     fn expansion_retry_blocked_on_last_iteration() {
         let expand = vec!["get_weather".to_string()];
-        assert!(should_retry_with_expansion(&expand, MAX_REACT_ITERATIONS - 2));
-        assert!(!should_retry_with_expansion(&expand, MAX_REACT_ITERATIONS - 1));
+        assert!(should_retry_with_expansion(
+            &expand,
+            MAX_REACT_ITERATIONS - 2
+        ));
+        assert!(!should_retry_with_expansion(
+            &expand,
+            MAX_REACT_ITERATIONS - 1
+        ));
     }
 
     struct CacheableTestTool;
 
     #[async_trait::async_trait]
     impl crate::tool_core::Tool for CacheableTestTool {
-        fn name(&self) -> &'static str { "cacheable_test" }
-        fn description(&self) -> &'static str { "cacheable test tool" }
-        fn schema(&self) -> serde_json::Value { serde_json::json!({"type": "object"}) }
-        fn policy_hint(&self) -> crate::tool_core::ToolPolicyHint { crate::tool_core::ToolPolicyHint::safe() }
-        fn side_effects(&self) -> crate::tool_core::SideEffectProfile { crate::tool_core::SideEffectProfile::Read }
-        fn tags(&self) -> &'static [&'static str] { &["test"] }
-        fn cache_ttl_secs(&self) -> Option<u64> { Some(120) }
-        async fn execute(&self, _args: &serde_json::Value, _ctx: &crate::tool_core::ToolContext) -> crate::tool_core::ToolResult {
-            Ok(crate::tool_core::ToolOutput::Complete(serde_json::json!({"ok": true})))
+        fn name(&self) -> &'static str {
+            "cacheable_test"
+        }
+        fn description(&self) -> &'static str {
+            "cacheable test tool"
+        }
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object"})
+        }
+        fn policy_hint(&self) -> crate::tool_core::ToolPolicyHint {
+            crate::tool_core::ToolPolicyHint::safe()
+        }
+        fn side_effects(&self) -> crate::tool_core::SideEffectProfile {
+            crate::tool_core::SideEffectProfile::Read
+        }
+        fn tags(&self) -> &'static [&'static str] {
+            &["test"]
+        }
+        fn cache_ttl_secs(&self) -> Option<u64> {
+            Some(120)
+        }
+        async fn execute(
+            &self,
+            _args: &serde_json::Value,
+            _ctx: &crate::tool_core::ToolContext,
+        ) -> crate::tool_core::ToolResult {
+            Ok(crate::tool_core::ToolOutput::Complete(
+                serde_json::json!({"ok": true}),
+            ))
         }
     }
 
@@ -1573,15 +1943,35 @@ mod tests {
 
     #[async_trait::async_trait]
     impl crate::tool_core::Tool for NonCacheableTestTool {
-        fn name(&self) -> &'static str { "non_cacheable_test" }
-        fn description(&self) -> &'static str { "non-cacheable test tool" }
-        fn schema(&self) -> serde_json::Value { serde_json::json!({"type": "object"}) }
-        fn policy_hint(&self) -> crate::tool_core::ToolPolicyHint { crate::tool_core::ToolPolicyHint::external() }
-        fn side_effects(&self) -> crate::tool_core::SideEffectProfile { crate::tool_core::SideEffectProfile::External }
-        fn tags(&self) -> &'static [&'static str] { &["test"] }
-        fn cache_ttl_secs(&self) -> Option<u64> { None }
-        async fn execute(&self, _args: &serde_json::Value, _ctx: &crate::tool_core::ToolContext) -> crate::tool_core::ToolResult {
-            Ok(crate::tool_core::ToolOutput::Complete(serde_json::json!({"ok": true})))
+        fn name(&self) -> &'static str {
+            "non_cacheable_test"
+        }
+        fn description(&self) -> &'static str {
+            "non-cacheable test tool"
+        }
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({"type": "object"})
+        }
+        fn policy_hint(&self) -> crate::tool_core::ToolPolicyHint {
+            crate::tool_core::ToolPolicyHint::external()
+        }
+        fn side_effects(&self) -> crate::tool_core::SideEffectProfile {
+            crate::tool_core::SideEffectProfile::External
+        }
+        fn tags(&self) -> &'static [&'static str] {
+            &["test"]
+        }
+        fn cache_ttl_secs(&self) -> Option<u64> {
+            None
+        }
+        async fn execute(
+            &self,
+            _args: &serde_json::Value,
+            _ctx: &crate::tool_core::ToolContext,
+        ) -> crate::tool_core::ToolResult {
+            Ok(crate::tool_core::ToolOutput::Complete(
+                serde_json::json!({"ok": true}),
+            ))
         }
     }
 

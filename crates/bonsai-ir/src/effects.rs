@@ -13,32 +13,32 @@ use std::collections::HashMap;
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BonsaiEffect {
     // ── I/O effects ──────────────────────────────────────────────────────────
-    ReadFile       { path: String },
-    WriteFile      { path: String, bytes: u64 },
-    DeleteFile     { path: String },
-    ListDir        { path: String },
-    NetworkFetch   { url: String, method: String },
-    NetworkPost    { url: String },
-    RunProcess     { cmd: String, args: Vec<String> },
-    ReadEnv        { key: String },
-    WriteEnv       { key: String },
+    ReadFile { path: String },
+    WriteFile { path: String, bytes: u64 },
+    DeleteFile { path: String },
+    ListDir { path: String },
+    NetworkFetch { url: String, method: String },
+    NetworkPost { url: String },
+    RunProcess { cmd: String, args: Vec<String> },
+    ReadEnv { key: String },
+    WriteEnv { key: String },
 
     // ── Model effects ────────────────────────────────────────────────────────
     ModelInference { model_id: String, tokens: u32 },
-    AdapterSwitch  { from: Option<String>, to: String },
+    AdapterSwitch { from: Option<String>, to: String },
     TrainingIngest { domain: String, example_count: u32 },
 
     // ── UI effects ───────────────────────────────────────────────────────────
-    EmitEvent      { event: String },
+    EmitEvent { event: String },
     ShowNotification { title: String },
-    OpenWindow     { label: String },
+    OpenWindow { label: String },
 
     // ── Memory effects ───────────────────────────────────────────────────────
-    MemoryWrite    { namespace: String, key: String },
-    MemoryDelete   { namespace: String, key: String },
+    MemoryWrite { namespace: String, key: String },
+    MemoryDelete { namespace: String, key: String },
 
     // ── Audit / meta ────────────────────────────────────────────────────────
-    LogAudit       { message: String },
+    LogAudit { message: String },
     PolicyViolation { policy: String, details: String },
 }
 
@@ -49,20 +49,20 @@ pub enum BonsaiEffect {
 pub enum TrustLevel {
     Untrusted = 0,
     Sandboxed = 1,
-    Trusted   = 2,
-    System    = 3,
+    Trusted = 2,
+    System = 3,
 }
 
 // ── Effect row (audit log entry) ─────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EffectRow {
-    pub id:           String,
-    pub capability:   String,
-    pub trust_level:  TrustLevel,
-    pub effect:       BonsaiEffect,
-    pub allowed:      bool,
-    pub reason:       Option<String>,
+    pub id: String,
+    pub capability: String,
+    pub trust_level: TrustLevel,
+    pub effect: BonsaiEffect,
+    pub allowed: bool,
+    pub reason: Option<String>,
     pub timestamp_ms: i64,
 }
 
@@ -80,7 +80,11 @@ pub struct EffectPolicy {
 
 impl EffectPolicy {
     pub fn permissive(max_trust: TrustLevel) -> Self {
-        Self { allowed_kinds: vec![], max_trust, deny_by_default: false }
+        Self {
+            allowed_kinds: vec![],
+            max_trust,
+            deny_by_default: false,
+        }
     }
 
     pub fn restrictive(allowed_kinds: Vec<&str>, max_trust: TrustLevel) -> Self {
@@ -93,31 +97,37 @@ impl EffectPolicy {
 
     fn effect_kind(e: &BonsaiEffect) -> &'static str {
         match e {
-            BonsaiEffect::ReadFile { .. }        => "read_file",
-            BonsaiEffect::WriteFile { .. }       => "write_file",
-            BonsaiEffect::DeleteFile { .. }      => "delete_file",
-            BonsaiEffect::ListDir { .. }         => "list_dir",
-            BonsaiEffect::NetworkFetch { .. }    => "network_fetch",
-            BonsaiEffect::NetworkPost { .. }     => "network_post",
-            BonsaiEffect::RunProcess { .. }      => "run_process",
-            BonsaiEffect::ReadEnv { .. }         => "read_env",
-            BonsaiEffect::WriteEnv { .. }        => "write_env",
-            BonsaiEffect::ModelInference { .. }  => "model_inference",
-            BonsaiEffect::AdapterSwitch { .. }   => "adapter_switch",
-            BonsaiEffect::TrainingIngest { .. }  => "training_ingest",
-            BonsaiEffect::EmitEvent { .. }       => "emit_event",
+            BonsaiEffect::ReadFile { .. } => "read_file",
+            BonsaiEffect::WriteFile { .. } => "write_file",
+            BonsaiEffect::DeleteFile { .. } => "delete_file",
+            BonsaiEffect::ListDir { .. } => "list_dir",
+            BonsaiEffect::NetworkFetch { .. } => "network_fetch",
+            BonsaiEffect::NetworkPost { .. } => "network_post",
+            BonsaiEffect::RunProcess { .. } => "run_process",
+            BonsaiEffect::ReadEnv { .. } => "read_env",
+            BonsaiEffect::WriteEnv { .. } => "write_env",
+            BonsaiEffect::ModelInference { .. } => "model_inference",
+            BonsaiEffect::AdapterSwitch { .. } => "adapter_switch",
+            BonsaiEffect::TrainingIngest { .. } => "training_ingest",
+            BonsaiEffect::EmitEvent { .. } => "emit_event",
             BonsaiEffect::ShowNotification { .. } => "show_notification",
-            BonsaiEffect::OpenWindow { .. }      => "open_window",
-            BonsaiEffect::MemoryWrite { .. }     => "memory_write",
-            BonsaiEffect::MemoryDelete { .. }    => "memory_delete",
-            BonsaiEffect::LogAudit { .. }        => "log_audit",
+            BonsaiEffect::OpenWindow { .. } => "open_window",
+            BonsaiEffect::MemoryWrite { .. } => "memory_write",
+            BonsaiEffect::MemoryDelete { .. } => "memory_delete",
+            BonsaiEffect::LogAudit { .. } => "log_audit",
             BonsaiEffect::PolicyViolation { .. } => "policy_violation",
         }
     }
 
     pub fn check(&self, effect: &BonsaiEffect, trust: TrustLevel) -> (bool, Option<String>) {
         if trust > self.max_trust {
-            return (false, Some(format!("trust level {:?} exceeds max {:?}", trust, self.max_trust)));
+            return (
+                false,
+                Some(format!(
+                    "trust level {:?} exceeds max {:?}",
+                    trust, self.max_trust
+                )),
+            );
         }
         let kind = Self::effect_kind(effect);
         if self.deny_by_default {
@@ -136,14 +146,14 @@ impl EffectPolicy {
 
 pub struct TrustGuard {
     policies: HashMap<String, EffectPolicy>,
-    log:      std::sync::Mutex<Vec<EffectRow>>,
+    log: std::sync::Mutex<Vec<EffectRow>>,
 }
 
 impl TrustGuard {
     pub fn new() -> Self {
         Self {
             policies: HashMap::new(),
-            log:      std::sync::Mutex::new(Vec::new()),
+            log: std::sync::Mutex::new(Vec::new()),
         }
     }
 
@@ -162,32 +172,39 @@ impl TrustGuard {
         let policy = self.policies.get(capability);
         let (allowed, reason) = match policy {
             Some(p) => p.check(&effect, trust),
-            None    => (true, None), // no policy = permissive
+            None => (true, None), // no policy = permissive
         };
 
         let row = EffectRow {
-            id:           uuid_v4(),
-            capability:   capability.to_string(),
-            trust_level:  trust,
+            id: uuid_v4(),
+            capability: capability.to_string(),
+            trust_level: trust,
             effect,
             allowed,
-            reason:       reason.clone(),
+            reason: reason.clone(),
             timestamp_ms: now_ms(),
         };
 
         if let Ok(mut log) = self.log.lock() {
             log.push(row);
             // Rolling window: keep latest 10 000 entries
-            if log.len() > 10_000 { log.drain(..1_000); }
+            if log.len() > 10_000 {
+                log.drain(..1_000);
+            }
         }
 
-        if allowed { Ok(()) } else { Err(reason.unwrap_or_else(|| "denied".into())) }
+        if allowed {
+            Ok(())
+        } else {
+            Err(reason.unwrap_or_else(|| "denied".into()))
+        }
     }
 
     /// Return the last `n` audit rows for `capability` (or all if `None`).
     pub fn audit_tail(&self, capability: Option<&str>, n: usize) -> Vec<EffectRow> {
         let log = self.log.lock().unwrap_or_else(|e| e.into_inner());
-        let filtered: Vec<_> = log.iter()
+        let filtered: Vec<_> = log
+            .iter()
             .filter(|r| capability.is_none_or(|c| r.capability == c))
             .cloned()
             .collect();
@@ -197,16 +214,31 @@ impl TrustGuard {
 }
 
 impl Default for TrustGuard {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn uuid_v4() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos();
-    format!("{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}", t, t >> 16, t & 0xfff, 0x8000 | (t & 0x3fff), t as u64 * 0x1000193)
+    let t = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    format!(
+        "{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
+        t,
+        t >> 16,
+        t & 0xfff,
+        0x8000 | (t & 0x3fff),
+        t as u64 * 0x1000193
+    )
 }
 
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }

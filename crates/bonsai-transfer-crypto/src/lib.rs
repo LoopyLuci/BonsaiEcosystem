@@ -7,14 +7,14 @@
 //! - Key derivation: Argon2id from BIP-39 12-word recovery phrase
 //! - Forward secrecy: ephemeral session keys per transfer
 
-pub mod identity;
-pub mod session;
 pub mod cipher;
-pub mod kdf;
 pub mod error;
+pub mod identity;
+pub mod kdf;
+pub mod session;
 
-pub use identity::{BonsaiIdentity, IdentityPublicKey};
-pub use session::{SessionKey, HybridHandshake, InitiatorHello, ResponderHello};
-pub use cipher::{encrypt_chunk, decrypt_chunk, ChunkCiphertext};
-pub use kdf::{derive_identity_from_phrase, generate_phrase};
+pub use cipher::{decrypt_chunk, encrypt_chunk, ChunkCiphertext};
 pub use error::{CryptoError, CryptoResult};
+pub use identity::{BonsaiIdentity, IdentityPublicKey};
+pub use kdf::{derive_identity_from_phrase, generate_phrase};
+pub use session::{HybridHandshake, InitiatorHello, ResponderHello, SessionKey};

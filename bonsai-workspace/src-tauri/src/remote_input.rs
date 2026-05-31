@@ -8,6 +8,6 @@ pub struct RemoteInputEvent {
     pub y: Option<i32>,
     pub button: Option<String>,
     pub key: Option<String>,
-    pub modifiers: Option<Vec<String>>, 
+    pub modifiers: Option<Vec<String>>,
     pub text: Option<String>,
 }

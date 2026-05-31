@@ -4,11 +4,11 @@
 //! The ECF-RG scheduler calls `send_chunk` and monitors `health()` to
 //! select the optimal lane per chunk.
 
-use std::time::Duration;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
 use crate::error::TransferResult;
+use async_trait::async_trait;
+use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 // ── Lane kind ─────────────────────────────────────────────────────────────────
 
@@ -40,16 +40,16 @@ pub enum LaneKind {
 impl std::fmt::Display for LaneKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Dmi       => write!(f, "DMI"),
-            Self::Tcp       => write!(f, "TCP"),
-            Self::Relay     => write!(f, "Relay"),
-            Self::WifiDirect=> write!(f, "Wi-Fi"),
-            Self::Ble       => write!(f, "BLE"),
-            Self::Swarm     => write!(f, "Swarm"),
-            Self::Mqtt      => write!(f, "MQTT"),
+            Self::Dmi => write!(f, "DMI"),
+            Self::Tcp => write!(f, "TCP"),
+            Self::Relay => write!(f, "Relay"),
+            Self::WifiDirect => write!(f, "Wi-Fi"),
+            Self::Ble => write!(f, "BLE"),
+            Self::Swarm => write!(f, "Swarm"),
+            Self::Mqtt => write!(f, "MQTT"),
             Self::InProcess => write!(f, "InProcess"),
-            Self::WebRtc    => write!(f, "WebRTC"),
-            Self::Onion     => write!(f, "Onion"),
+            Self::WebRtc => write!(f, "WebRTC"),
+            Self::Onion => write!(f, "Onion"),
         }
     }
 }
@@ -74,7 +74,9 @@ pub struct LaneHealth {
 impl LaneHealth {
     /// Estimated time to complete sending `bytes` more bytes on this lane.
     pub fn estimated_completion_secs(&self, bytes: u64) -> f64 {
-        if self.bandwidth_bps == 0 { return f64::MAX; }
+        if self.bandwidth_bps == 0 {
+            return f64::MAX;
+        }
         let rtt = self.rtt_ms / 1000.0;
         let transfer_time = bytes as f64 / self.bandwidth_bps as f64;
         rtt + transfer_time
@@ -127,7 +129,9 @@ pub trait TransportLane: Send + Sync + 'static {
     async fn send_nack(&self, gsn: u64) -> TransferResult<()>;
 
     /// Attempt to measure current RTT (optional, return None if not supported).
-    async fn ping(&self) -> Option<Duration> { None }
+    async fn ping(&self) -> Option<Duration> {
+        None
+    }
 
     /// Shut down the lane gracefully.
     async fn close(&self) {}
@@ -135,8 +139,8 @@ pub trait TransportLane: Send + Sync + 'static {
 
 // ── In-process lane (for testing and intra-process use) ──────────────────────
 
-use tokio::sync::mpsc;
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc;
 
 /// A loopback lane that delivers chunks via an in-memory channel.
 /// Used for testing and for intra-process Bonsai agent communication.
@@ -160,15 +164,26 @@ impl InProcessLane {
 
 #[async_trait]
 impl TransportLane for InProcessLane {
-    fn name(&self) -> &str { &self.name }
-    fn kind(&self) -> LaneKind { LaneKind::InProcess }
-    fn health(&self) -> LaneHealth { self.health.lock().unwrap().clone() }
-
-    async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
-        self.tx.send(chunk.clone())
-            .map_err(|_| crate::error::TransferError::LaneFailed(self.name.clone(), "channel closed".into()))
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn kind(&self) -> LaneKind {
+        LaneKind::InProcess
+    }
+    fn health(&self) -> LaneHealth {
+        self.health.lock().unwrap().clone()
     }
 
-    async fn send_ack(&self, _gsn: u64) -> TransferResult<()> { Ok(()) }
-    async fn send_nack(&self, _gsn: u64) -> TransferResult<()> { Ok(()) }
+    async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
+        self.tx.send(chunk.clone()).map_err(|_| {
+            crate::error::TransferError::LaneFailed(self.name.clone(), "channel closed".into())
+        })
+    }
+
+    async fn send_ack(&self, _gsn: u64) -> TransferResult<()> {
+        Ok(())
+    }
+    async fn send_nack(&self, _gsn: u64) -> TransferResult<()> {
+        Ok(())
+    }
 }

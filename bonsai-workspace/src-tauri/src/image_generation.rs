@@ -72,13 +72,20 @@ pub async fn generate_image(request: ImageGenRequest) -> Result<ImageGenResult, 
 
     let mut args = vec![
         script.to_string_lossy().into_owned(),
-        "--model".into(), model,
-        "--prompt".into(), request.prompt.clone(),
-        "--output".into(), output_path.clone(),
-        "--width".into(), width.to_string(),
-        "--height".into(), height.to_string(),
-        "--steps".into(), steps.to_string(),
-        "--guidance".into(), guidance.to_string(),
+        "--model".into(),
+        model,
+        "--prompt".into(),
+        request.prompt.clone(),
+        "--output".into(),
+        output_path.clone(),
+        "--width".into(),
+        width.to_string(),
+        "--height".into(),
+        height.to_string(),
+        "--steps".into(),
+        steps.to_string(),
+        "--guidance".into(),
+        guidance.to_string(),
     ];
     if let Some(neg) = &request.negative_prompt {
         args.push("--negative_prompt".into());
@@ -91,9 +98,7 @@ pub async fn generate_image(request: ImageGenRequest) -> Result<ImageGenResult, 
 
     let out = tokio::time::timeout(
         Duration::from_secs(300),
-        tokio::process::Command::new(&python)
-            .args(&args)
-            .output(),
+        tokio::process::Command::new(&python).args(&args).output(),
     )
     .await
     .map_err(|_| "Image generation timed out (300s)".to_string())?
@@ -140,7 +145,11 @@ fn find_sd_python() -> String {
         .join("com.bonsai.workspace")
         .join("sd_venv")
         .join(if cfg!(windows) { "Scripts" } else { "bin" })
-        .join(if cfg!(windows) { "python.exe" } else { "python" });
+        .join(if cfg!(windows) {
+            "python.exe"
+        } else {
+            "python"
+        });
     if venv_py.exists() {
         return venv_py.to_string_lossy().into_owned();
     }
@@ -173,10 +182,20 @@ fn find_default_sd_model() -> Option<String> {
                     let p = entry.path();
                     // Skip non-SD files: GGUF language models tend to be large (>4 GB) and have llm names
                     if p.extension().map(|e| e == *ext).unwrap_or(false) {
-                        let name = p.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+                        let name = p
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_lowercase();
                         // Basic heuristic: skip obvious LLM files
-                        if name.contains("bonsai") || name.contains("qwen") || name.contains("gemma")
-                            || name.contains("svara") || name.contains("vibevoice") { continue; }
+                        if name.contains("bonsai")
+                            || name.contains("qwen")
+                            || name.contains("gemma")
+                            || name.contains("svara")
+                            || name.contains("vibevoice")
+                        {
+                            continue;
+                        }
                         return Some(p.to_string_lossy().into_owned());
                     }
                 }

@@ -38,8 +38,11 @@ impl PluginManifest {
 
     /// True if the plugin requests only safe, read-only capabilities.
     pub fn is_read_only(&self) -> bool {
-        self.capabilities
-            .iter()
-            .all(|c| matches!(c, Capability::Log | Capability::ReadWorkspace | Capability::CallModel))
+        self.capabilities.iter().all(|c| {
+            matches!(
+                c,
+                Capability::Log | Capability::ReadWorkspace | Capability::CallModel
+            )
+        })
     }
 }

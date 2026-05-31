@@ -1,14 +1,14 @@
-use std::process::Command;
-use std::time::Duration;
-use std::path::PathBuf;
+use fs2::FileExt;
+use serde_json::json;
+use sha2::Digest;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use fs2::FileExt;
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::Duration;
 use tempfile::NamedTempFile;
 use tokio::net::TcpListener;
 use tokio::time::sleep;
-use serde_json::json;
-use sha2::Digest;
 
 pub async fn is_api_healthy(host: &str, port: u16) -> bool {
     let url = format!("http://{host}:{port}/health");
@@ -29,16 +29,21 @@ pub async fn is_api_healthy(host: &str, port: u16) -> bool {
 /// Tries preferred_port .. preferred_port+max_delta. On Windows it will
 /// attempt a best-effort reclaim of stale listeners that appear to belong
 /// to a known bonsai-bot process image.
-pub async fn allocate_listener(preferred_port: u16, max_delta: u16) -> Result<(u16, TcpListener), String> {
+pub async fn allocate_listener(
+    preferred_port: u16,
+    max_delta: u16,
+) -> Result<(u16, TcpListener), String> {
     let mut bound = None;
     for delta in 0u16..=max_delta {
         let p = preferred_port.saturating_add(delta);
-            match TcpListener::bind(format!("127.0.0.1:{p}")).await {
+        match TcpListener::bind(format!("127.0.0.1:{p}")).await {
             Ok(l) => {
                 // If we asked for port 0 (ephemeral) the OS assigns a port; read it back.
                 let actual_port = if p == 0 {
                     l.local_addr().map(|addr| addr.port()).unwrap_or(p)
-                } else { p };
+                } else {
+                    p
+                };
                 bound = Some((actual_port, l));
                 break;
             }
@@ -66,7 +71,8 @@ pub async fn allocate_listener(preferred_port: u16, max_delta: u16) -> Result<(u
         }
     }
 
-    let (port, listener) = bound.ok_or_else(|| format!("no admin port available near {}", preferred_port))?;
+    let (port, listener) =
+        bound.ok_or_else(|| format!("no admin port available near {}", preferred_port))?;
     Ok((port, listener))
 }
 
@@ -104,13 +110,17 @@ pub fn persist_port(port: u16, admin_token: &str) -> Result<(), String> {
         .write(true)
         .open(&lock_path)
         .map_err(|e| format!("failed to open lock file: {e}"))?;
-    lock_file.lock_exclusive().map_err(|e| format!("failed to lock: {e}"))?;
+    lock_file
+        .lock_exclusive()
+        .map_err(|e| format!("failed to lock: {e}"))?;
 
     // Write to a temp file in same dir and then persist atomically
     let mut tmp = NamedTempFile::new_in(&target_dir).map_err(|e| format!("tmpfile failed: {e}"))?;
-    std::io::Write::write_all(&mut tmp, s.as_bytes()).map_err(|e| format!("write tmp failed: {e}"))?;
+    std::io::Write::write_all(&mut tmp, s.as_bytes())
+        .map_err(|e| format!("write tmp failed: {e}"))?;
     tmp.flush().map_err(|e| format!("flush tmp failed: {e}"))?;
-    tmp.persist(&target_path).map_err(|e| format!("persist failed: {e}"))?;
+    tmp.persist(&target_path)
+        .map_err(|e| format!("persist failed: {e}"))?;
 
     // Drop lock by closing file (will unlock on drop)
     drop(lock_file);
@@ -118,7 +128,9 @@ pub fn persist_port(port: u16, admin_token: &str) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn try_reclaim_stale_listener(_port: u16) -> bool { false }
+fn try_reclaim_stale_listener(_port: u16) -> bool {
+    false
+}
 
 #[cfg(target_os = "windows")]
 fn try_reclaim_stale_listener(port: u16) -> bool {

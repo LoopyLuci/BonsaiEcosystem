@@ -50,7 +50,9 @@ pub struct AutomationRule {
 impl AutomationRule {
     pub fn confidence(&self) -> f32 {
         let total = self.times_correct + self.times_rejected;
-        if total == 0 { return 0.5; }
+        if total == 0 {
+            return 0.5;
+        }
         self.times_correct as f32 / total as f32
     }
 
@@ -75,22 +77,29 @@ impl TriggerCondition {
         match self {
             Self::TimeOfDay { hour, day_of_week } => {
                 let now = Utc::now();
-                now.hour() == *hour && day_of_week.map_or(true, |d| now.weekday().num_days_from_monday() == d)
+                now.hour() == *hour
+                    && day_of_week.map_or(true, |d| now.weekday().num_days_from_monday() == d)
             }
             Self::AppLaunch { app_id } => matches!(&ev.event_type,
                 OmnEventType::AppLaunch { app_id: id, .. } if id == app_id),
             Self::FileOpen { extension } => matches!(&ev.event_type,
                 OmnEventType::FileOpen { path, .. } if path.ends_with(extension.as_str())),
-            Self::CommandSequence { commands } => {
-                commands.iter().all(|c| recent.contains(c))
-            }
+            Self::CommandSequence { commands } => commands.iter().all(|c| recent.contains(c)),
             Self::ContextMatch { pattern } => {
-                ev.context.active_window_title.to_lowercase().contains(pattern.to_lowercase().as_str())
-                || ev.context.active_app.to_lowercase().contains(pattern.to_lowercase().as_str())
+                ev.context
+                    .active_window_title
+                    .to_lowercase()
+                    .contains(pattern.to_lowercase().as_str())
+                    || ev
+                        .context
+                        .active_app
+                        .to_lowercase()
+                        .contains(pattern.to_lowercase().as_str())
             }
             Self::EventAfterEvent { first, second } => {
                 let label = event_label(&ev.event_type);
-                label.contains(second.as_str()) && recent.last().map_or(false, |r| r.contains(first.as_str()))
+                label.contains(second.as_str())
+                    && recent.last().map_or(false, |r| r.contains(first.as_str()))
             }
         }
     }
@@ -99,13 +108,28 @@ impl TriggerCondition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
 pub enum AutomatedAction {
-    LaunchApp { app_id: String },
-    OpenFile { path: String },
-    RunCommand { command: String },
-    ExecuteWorkflow { workflow_id: String },
-    SendNotification { message: String },
-    AdjustSetting { setting: String, value: serde_json::Value },
-    SuggestCompletion { text: String },
+    LaunchApp {
+        app_id: String,
+    },
+    OpenFile {
+        path: String,
+    },
+    RunCommand {
+        command: String,
+    },
+    ExecuteWorkflow {
+        workflow_id: String,
+    },
+    SendNotification {
+        message: String,
+    },
+    AdjustSetting {
+        setting: String,
+        value: serde_json::Value,
+    },
+    SuggestCompletion {
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,47 +153,73 @@ struct MarkovModel {
 
 impl MarkovModel {
     fn new() -> Self {
-        Self { transitions: HashMap::new(), window: VecDeque::with_capacity(64) }
+        Self {
+            transitions: HashMap::new(),
+            window: VecDeque::with_capacity(64),
+        }
     }
 
     fn update(&mut self, label: &str) {
         if let Some(prev) = self.window.back() {
-            *self.transitions
+            *self
+                .transitions
                 .entry(prev.clone())
                 .or_default()
                 .entry(label.to_string())
                 .or_default() += 1;
         }
         self.window.push_back(label.to_string());
-        if self.window.len() > 64 { self.window.pop_front(); }
+        if self.window.len() > 64 {
+            self.window.pop_front();
+        }
     }
 
     fn predict(&self, current: &str, top_n: usize) -> Vec<PredictedAction> {
-        let Some(nexts) = self.transitions.get(current) else { return vec![]; };
+        let Some(nexts) = self.transitions.get(current) else {
+            return vec![];
+        };
         let total: u32 = nexts.values().sum();
-        let mut ranked: Vec<(&String, f32)> = nexts.iter()
+        let mut ranked: Vec<(&String, f32)> = nexts
+            .iter()
             .map(|(k, &v)| (k, v as f32 / total as f32))
             .collect();
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         ranked.truncate(top_n);
-        ranked.into_iter().map(|(label, conf)| PredictedAction {
-            action_label: label.clone(),
-            confidence: conf,
-            source: "markov".into(),
-            automation_rule_id: None,
-        }).collect()
+        ranked
+            .into_iter()
+            .map(|(label, conf)| PredictedAction {
+                action_label: label.clone(),
+                confidence: conf,
+                source: "markov".into(),
+                automation_rule_id: None,
+            })
+            .collect()
     }
 
     fn recent_sequence(&self, n: usize) -> Vec<String> {
-        self.window.iter().rev().take(n).cloned().collect::<Vec<_>>().into_iter().rev().collect()
+        self.window
+            .iter()
+            .rev()
+            .take(n)
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect()
     }
 
     /// Extract n-grams that appear with high frequency
     fn extract_sequences(&self, min_freq: u32, top_n: usize) -> Vec<(String, String, u32)> {
-        let mut seqs: Vec<(String, String, u32)> = self.transitions.iter()
+        let mut seqs: Vec<(String, String, u32)> = self
+            .transitions
+            .iter()
             .flat_map(|(prev, nexts)| {
                 nexts.iter().filter_map(|(next, &cnt)| {
-                    if cnt >= min_freq { Some((prev.clone(), next.clone(), cnt)) } else { None }
+                    if cnt >= min_freq {
+                        Some((prev.clone(), next.clone(), cnt))
+                    } else {
+                        None
+                    }
                 })
             })
             .collect();
@@ -189,28 +239,43 @@ struct TemporalModel {
 }
 
 impl TemporalModel {
-    fn new() -> Self { Self { hourly: HashMap::new() } }
+    fn new() -> Self {
+        Self {
+            hourly: HashMap::new(),
+        }
+    }
 
     fn update(&mut self, label: &str) {
         let hour = Utc::now().hour();
-        *self.hourly.entry(hour).or_default().entry(label.to_string()).or_default() += 1;
+        *self
+            .hourly
+            .entry(hour)
+            .or_default()
+            .entry(label.to_string())
+            .or_default() += 1;
     }
 
     fn predict_now(&self, top_n: usize) -> Vec<PredictedAction> {
         let hour = Utc::now().hour();
-        let Some(labels) = self.hourly.get(&hour) else { return vec![]; };
+        let Some(labels) = self.hourly.get(&hour) else {
+            return vec![];
+        };
         let total: u32 = labels.values().sum();
-        let mut ranked: Vec<(&String, f32)> = labels.iter()
+        let mut ranked: Vec<(&String, f32)> = labels
+            .iter()
             .map(|(k, &v)| (k, v as f32 / total as f32))
             .collect();
         ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         ranked.truncate(top_n);
-        ranked.into_iter().map(|(label, conf)| PredictedAction {
-            action_label: label.clone(),
-            confidence: conf * 0.6, // temporal predictions are lower confidence
-            source: "temporal".into(),
-            automation_rule_id: None,
-        }).collect()
+        ranked
+            .into_iter()
+            .map(|(label, conf)| PredictedAction {
+                action_label: label.clone(),
+                confidence: conf * 0.6, // temporal predictions are lower confidence
+                source: "temporal".into(),
+                automation_rule_id: None,
+            })
+            .collect()
     }
 }
 
@@ -276,7 +341,8 @@ impl PredictiveEngine {
         let temporal = self.temporal.read().await.predict_now(top_n);
 
         // Merge: give Markov priority, add temporal predictions for uncovered labels
-        let existing: std::collections::HashSet<String> = preds.iter().map(|p| p.action_label.clone()).collect();
+        let existing: std::collections::HashSet<String> =
+            preds.iter().map(|p| p.action_label.clone()).collect();
         for p in temporal {
             if !existing.contains(&p.action_label) {
                 preds.push(p);
@@ -295,15 +361,19 @@ impl PredictiveEngine {
             let exists = rules.iter().any(|r| {
                 matches!(&r.trigger, TriggerCondition::CommandSequence { commands }
                     if commands == &[prev.clone()])
-                && matches!(&r.action, AutomatedAction::SuggestCompletion { text }
+                    && matches!(&r.action, AutomatedAction::SuggestCompletion { text }
                     if text == &next)
             });
-            if exists { continue; }
+            if exists {
+                continue;
+            }
             if count >= 5 {
                 info!("[predictive] mined rule: {prev} → {next} (×{count})");
                 rules.push(AutomationRule {
                     id: Uuid::new_v4().to_string(),
-                    trigger: TriggerCondition::CommandSequence { commands: vec![prev] },
+                    trigger: TriggerCondition::CommandSequence {
+                        commands: vec![prev],
+                    },
                     action: AutomatedAction::SuggestCompletion { text: next },
                     confidence_threshold: 0.8,
                     requires_confirmation: true,
@@ -325,7 +395,9 @@ impl PredictiveEngine {
             AutomatedAction::OpenFile { path } => format!("Open {path}?"),
             AutomatedAction::SendNotification { message } => format!("Notify: {message}"),
             AutomatedAction::AdjustSetting { setting, .. } => format!("Adjust setting: {setting}"),
-            AutomatedAction::ExecuteWorkflow { workflow_id } => format!("Run workflow: {workflow_id}"),
+            AutomatedAction::ExecuteWorkflow { workflow_id } => {
+                format!("Run workflow: {workflow_id}")
+            }
         };
         self.suggestions.write().await.push(PendingSuggestion {
             id: Uuid::new_v4().to_string(),
@@ -340,7 +412,12 @@ impl PredictiveEngine {
         let rule_id = {
             let mut sugg = self.suggestions.write().await;
             let pos = sugg.iter().position(|s| s.id == suggestion_id);
-            if let Some(i) = pos { let s = sugg.remove(i); Some(s.rule_id) } else { None }
+            if let Some(i) = pos {
+                let s = sugg.remove(i);
+                Some(s.rule_id)
+            } else {
+                None
+            }
         };
         if let Some(rid) = rule_id {
             let mut rules = self.rules.write().await;
@@ -355,7 +432,12 @@ impl PredictiveEngine {
         let rule_id = {
             let mut sugg = self.suggestions.write().await;
             let pos = sugg.iter().position(|s| s.id == suggestion_id);
-            if let Some(i) = pos { let s = sugg.remove(i); Some(s.rule_id) } else { None }
+            if let Some(i) = pos {
+                let s = sugg.remove(i);
+                Some(s.rule_id)
+            } else {
+                None
+            }
         };
         if let Some(rid) = rule_id {
             let mut rules = self.rules.write().await;
@@ -379,8 +461,12 @@ fn event_label(ev: &OmnEventType) -> String {
         OmnEventType::FileOpen { app_id, .. } => format!("open:{app_id}"),
         OmnEventType::FileSave { .. } => "filesave".into(),
         OmnEventType::FileDelete { .. } => "filedelete".into(),
-        OmnEventType::CommandTyped { command, .. } => format!("cmd:{}", command.split_whitespace().next().unwrap_or("")),
-        OmnEventType::CommandCompleted { command, .. } => format!("done:{}", command.split_whitespace().next().unwrap_or("")),
+        OmnEventType::CommandTyped { command, .. } => {
+            format!("cmd:{}", command.split_whitespace().next().unwrap_or(""))
+        }
+        OmnEventType::CommandCompleted { command, .. } => {
+            format!("done:{}", command.split_whitespace().next().unwrap_or(""))
+        }
         OmnEventType::ToolInvocation { tool_name, .. } => format!("tool:{tool_name}"),
         OmnEventType::ModelInference { model_id, .. } => format!("infer:{model_id}"),
         OmnEventType::WindowFocus { app_id, .. } => format!("focus:{app_id}"),
@@ -399,7 +485,10 @@ pub async fn get_predictions(
     top_n: usize,
 ) -> Result<Vec<PredictedAction>, String> {
     let ctx = crate::omnipresent_capture::OmnContext::default();
-    Ok(state.predictive_engine.predict_next(&ctx, top_n.min(10)).await)
+    Ok(state
+        .predictive_engine
+        .predict_next(&ctx, top_n.min(10))
+        .await)
 }
 
 #[tauri::command]
@@ -421,7 +510,10 @@ pub async fn approve_automation(
     state: tauri::State<'_, crate::AppState>,
     suggestion_id: String,
 ) -> Result<(), String> {
-    state.predictive_engine.approve_suggestion(&suggestion_id).await;
+    state
+        .predictive_engine
+        .approve_suggestion(&suggestion_id)
+        .await;
     Ok(())
 }
 
@@ -430,7 +522,10 @@ pub async fn reject_automation(
     state: tauri::State<'_, crate::AppState>,
     suggestion_id: String,
 ) -> Result<(), String> {
-    state.predictive_engine.reject_suggestion(&suggestion_id).await;
+    state
+        .predictive_engine
+        .reject_suggestion(&suggestion_id)
+        .await;
     Ok(())
 }
 
@@ -475,7 +570,10 @@ mod tests {
     #[tokio::test]
     async fn markov_learns_and_predicts() {
         let mut m = MarkovModel::new();
-        for _ in 0..5 { m.update("open:vim"); m.update("cmd:git"); }
+        for _ in 0..5 {
+            m.update("open:vim");
+            m.update("cmd:git");
+        }
         let preds = m.predict("open:vim", 3);
         assert!(!preds.is_empty());
         assert_eq!(preds[0].action_label, "cmd:git");
@@ -485,11 +583,20 @@ mod tests {
     #[tokio::test]
     async fn rule_confidence_updates() {
         let mut r = AutomationRule {
-            id: "r1".into(), trigger: TriggerCondition::AppLaunch { app_id: "vim".into() },
-            action: AutomatedAction::SendNotification { message: "hi".into() },
-            confidence_threshold: 0.8, requires_confirmation: true,
-            times_correct: 4, times_rejected: 1,
-            created_at: 0, last_fired_at: None, enabled: true,
+            id: "r1".into(),
+            trigger: TriggerCondition::AppLaunch {
+                app_id: "vim".into(),
+            },
+            action: AutomatedAction::SendNotification {
+                message: "hi".into(),
+            },
+            confidence_threshold: 0.8,
+            requires_confirmation: true,
+            times_correct: 4,
+            times_rejected: 1,
+            created_at: 0,
+            last_fired_at: None,
+            enabled: true,
         };
         assert!((r.confidence() - 0.8).abs() < 0.01);
         r.times_rejected += 3;

@@ -10,7 +10,9 @@ pub struct SwapBuffer<T> {
 
 impl<T> SwapBuffer<T> {
     pub fn new(value: T) -> Self {
-        Self { inner: ArcSwap::new(Arc::new(value)) }
+        Self {
+            inner: ArcSwap::new(Arc::new(value)),
+        }
     }
 
     /// Atomically replace the stored value. Returns the old value.

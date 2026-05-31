@@ -30,10 +30,7 @@ pub enum InteractionEvent {
         result: String,
     },
     /// A chat turn completed (user ↔ assistant).
-    ChatMessage {
-        user: String,
-        assistant: String,
-    },
+    ChatMessage { user: String, assistant: String },
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -118,18 +115,32 @@ impl CrossTrainingPipeline {
 
     fn event_to_text(event: &InteractionEvent) -> String {
         match event {
-            InteractionEvent::PluginOutput { plugin_id, output, context } =>
-                format!("### Plugin {plugin_id}\nContext: {context}\nOutput: {output}"),
-            InteractionEvent::ToolUsage { tool_name, args, result } =>
-                format!("### Tool {tool_name}\nArgs: {args}\nResult: {result}"),
-            InteractionEvent::ChatMessage { user, assistant } =>
-                format!("### Instruction:\n{user}\n\n### Response:\n{assistant}"),
+            InteractionEvent::PluginOutput {
+                plugin_id,
+                output,
+                context,
+            } => format!("### Plugin {plugin_id}\nContext: {context}\nOutput: {output}"),
+            InteractionEvent::ToolUsage {
+                tool_name,
+                args,
+                result,
+            } => format!("### Tool {tool_name}\nArgs: {args}\nResult: {result}"),
+            InteractionEvent::ChatMessage { user, assistant } => {
+                format!("### Instruction:\n{user}\n\n### Response:\n{assistant}")
+            }
         }
     }
 
     fn flush_to_disk(path: &PathBuf, buf: &[String]) -> usize {
-        match std::fs::OpenOptions::new().create(true).append(true).open(path) {
-            Err(e) => { warn!(error=%e, "[cross_training] cannot open JSONL"); 0 }
+        match std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            Err(e) => {
+                warn!(error=%e, "[cross_training] cannot open JSONL");
+                0
+            }
             Ok(mut f) => {
                 let mut written = 0;
                 for text in buf {
@@ -138,7 +149,9 @@ impl CrossTrainingPipeline {
                         "source": "cross_training",
                         "confidence": 0.8,
                     });
-                    if writeln!(f, "{}", serde_json::to_string(&example).unwrap_or_default()).is_ok() {
+                    if writeln!(f, "{}", serde_json::to_string(&example).unwrap_or_default())
+                        .is_ok()
+                    {
                         written += 1;
                     }
                 }

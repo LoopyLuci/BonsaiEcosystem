@@ -7,11 +7,11 @@
 //!   - `broadcast(msg)` → fan-out a message to every connected client.
 //!   - `send_to(id, msg)` → unicast to one client (VSCode extension, Android, etc.)
 
+use axum::extract::ws::Message;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use axum::extract::ws::Message;
 use tokio::sync::mpsc;
 
 pub type ClientId = u64;
@@ -70,7 +70,10 @@ impl WsRouter {
     /// Send `msg` to a specific client.  Returns `false` if the client is gone.
     pub fn send_to(&self, id: ClientId, msg: Message) -> bool {
         let g = self.inner.lock().unwrap();
-        g.clients.get(&id).map(|tx| tx.send(msg).is_ok()).unwrap_or(false)
+        g.clients
+            .get(&id)
+            .map(|tx| tx.send(msg).is_ok())
+            .unwrap_or(false)
     }
 
     pub fn client_count(&self) -> usize {
@@ -146,7 +149,10 @@ mod tests {
         assert_eq!(m1, Message::Text("targeted".into()));
 
         // rx2 must NOT receive anything.
-        assert!(rx2.try_recv().is_err(), "rx2 should not receive the targeted message");
+        assert!(
+            rx2.try_recv().is_err(),
+            "rx2 should not receive the targeted message"
+        );
     }
 
     #[test]

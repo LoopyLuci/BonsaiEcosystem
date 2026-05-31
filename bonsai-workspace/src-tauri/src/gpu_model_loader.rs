@@ -59,11 +59,7 @@ impl GpuModelLoader {
 
         info!(
             free_mb,
-            per_layer_mb,
-            layers,
-            total_layers,
-            safe_max,
-            "[gpu_loader] GPU layer calculation"
+            per_layer_mb, layers, total_layers, safe_max, "[gpu_loader] GPU layer calculation"
         );
         layers
     }

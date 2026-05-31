@@ -6,7 +6,8 @@ use std::panic;
 pub fn install_panic_hook() {
     let default_hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
-        let location = info.location()
+        let location = info
+            .location()
             .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
             .unwrap_or_else(|| "unknown location".into());
         let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {

@@ -1,11 +1,13 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::num::NonZeroU32;
-use dashmap::DashMap;
-use governor::{Quota, RateLimiter, state::direct::NotKeyed, state::InMemoryState, clock::DefaultClock};
-use serde_json::{json, Value};
 use crate::session::Db;
+use dashmap::DashMap;
+use governor::{
+    clock::DefaultClock, state::direct::NotKeyed, state::InMemoryState, Quota, RateLimiter,
+};
+use serde_json::{json, Value};
+use std::num::NonZeroU32;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::buddy_client::BuddyClient;
 use crate::config::BotConfig;
@@ -17,7 +19,10 @@ use crate::sanitizer::sanitize;
 use crate::session;
 
 fn now_secs() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
 }
 
 type UserLimiter = Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>;
@@ -26,12 +31,12 @@ type LimiterEntry = (UserLimiter, Arc<AtomicU64>);
 
 #[allow(dead_code)]
 pub struct Router {
-    pub buddy:   Arc<BuddyClient>,
-    pub mgmt:    Arc<MgmtClient>,
-    pub dedup:   Arc<DedupCache>,
-    pub db:      Db,
+    pub buddy: Arc<BuddyClient>,
+    pub mgmt: Arc<MgmtClient>,
+    pub dedup: Arc<DedupCache>,
+    pub db: Db,
     pub metrics: SharedMetrics,
-    pub config:  BotConfig,
+    pub config: BotConfig,
     // Stage 3: per-user token-bucket rate limiters (10 msgs / 60 s per user)
     rate_limiters: DashMap<String, LimiterEntry>,
 }
@@ -45,14 +50,23 @@ impl Router {
         metrics: SharedMetrics,
         config: BotConfig,
     ) -> Self {
-        Self { buddy, mgmt, dedup, db, metrics, config, rate_limiters: DashMap::new() }
+        Self {
+            buddy,
+            mgmt,
+            dedup,
+            db,
+            metrics,
+            config,
+            rate_limiters: DashMap::new(),
+        }
     }
 
     /// Remove rate limiter entries not accessed in the last `stale_secs` seconds.
     pub fn evict_stale_limiters(&self, stale_secs: u64) {
         let cutoff = now_secs() as u64 - stale_secs;
         let before = self.rate_limiters.len();
-        self.rate_limiters.retain(|_, (_, last)| last.load(AtomicOrdering::Relaxed) >= cutoff);
+        self.rate_limiters
+            .retain(|_, (_, last)| last.load(AtomicOrdering::Relaxed) >= cutoff);
         let evicted = before - self.rate_limiters.len();
         if evicted > 0 {
             tracing::info!(evicted, "rate limiter stale entries evicted");
@@ -60,12 +74,13 @@ impl Router {
     }
 
     fn rate_limiter_for(&self, key: &str) -> UserLimiter {
-        let entry = self.rate_limiters
+        let entry = self
+            .rate_limiters
             .entry(key.to_string())
             .or_insert_with(|| {
-                let limiter = Arc::new(RateLimiter::direct(
-                    Quota::per_minute(NonZeroU32::new(10).unwrap()),
-                ));
+                let limiter = Arc::new(RateLimiter::direct(Quota::per_minute(
+                    NonZeroU32::new(10).unwrap(),
+                )));
                 let last_access = Arc::new(AtomicU64::new(now_secs() as u64));
                 (limiter, last_access)
             });
@@ -74,16 +89,14 @@ impl Router {
         entry.0.clone()
     }
 
-    pub async fn handle(
-        &self,
-        msg: InboundMessage,
-        platform: &Arc<dyn MessagingPlatform>,
-    ) {
+    pub async fn handle(&self, msg: InboundMessage, platform: &Arc<dyn MessagingPlatform>) {
         let req_id = uuid::Uuid::new_v4();
 
         // Stage 1: Dedup
         if self.dedup.is_duplicate(&msg.platform, &msg.event_id) {
-            self.metrics.dedup_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .dedup_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             tracing::debug!(req_id=%req_id, platform=%msg.platform, event_id=%msg.event_id, "dedup hit");
             return;
         }
@@ -93,13 +106,18 @@ impl Router {
         // Stage 3: Rate limit (token bucket — 10 msgs/min per platform:user)
         let rate_key = format!("{}:{}", msg.platform, msg.user_id);
         if self.rate_limiter_for(&rate_key).check().is_err() {
-            self.metrics.rate_limit_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .rate_limit_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             tracing::warn!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, "rate limited");
-            let _ = platform.send_reply(
-                &msg.platform_id, &msg.user_id,
-                "⏳ Rate limit exceeded. Please wait before sending more messages.",
-                msg.reply_to.as_deref(),
-            ).await;
+            let _ = platform
+                .send_reply(
+                    &msg.platform_id,
+                    &msg.user_id,
+                    "⏳ Rate limit exceeded. Please wait before sending more messages.",
+                    msg.reply_to.as_deref(),
+                )
+                .await;
             return;
         }
 
@@ -108,8 +126,14 @@ impl Router {
             Ok(t) => t,
             Err(e) => {
                 tracing::warn!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, reason=%e, "sanitize rejected");
-                let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
-                    "⚠️ Your message could not be processed safely.", msg.reply_to.as_deref()).await;
+                let _ = platform
+                    .send_reply(
+                        &msg.platform_id,
+                        &msg.user_id,
+                        "⚠️ Your message could not be processed safely.",
+                        msg.reply_to.as_deref(),
+                    )
+                    .await;
                 return;
             }
         };
@@ -117,24 +141,41 @@ impl Router {
         // Stage 4b: Slash command dispatch
         if clean_text.starts_with('/') {
             let reply = self.handle_slash(&clean_text, &msg).await;
-            let _ = platform.send_reply(&msg.platform_id, &msg.user_id, &reply, msg.reply_to.as_deref()).await;
-            self.metrics.messages_processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let _ = platform
+                .send_reply(
+                    &msg.platform_id,
+                    &msg.user_id,
+                    &reply,
+                    msg.reply_to.as_deref(),
+                )
+                .await;
+            self.metrics
+                .messages_processed
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return;
         }
 
         // Stage 5: Session resolution
         let buddy_session = match session::find_active_session(
             &self.db,
-            msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone(),
-        ).await {
+            msg.platform.clone(),
+            msg.user_id.clone(),
+            msg.platform_id.clone(),
+        )
+        .await
+        {
             Some(id) => id,
             None => {
                 let new_id = uuid::Uuid::new_v4().to_string();
                 let _ = session::upsert_session(
                     &self.db,
-                    msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone(),
-                    msg.display_name.clone(), new_id.clone(),
-                ).await;
+                    msg.platform.clone(),
+                    msg.user_id.clone(),
+                    msg.platform_id.clone(),
+                    msg.display_name.clone(),
+                    new_id.clone(),
+                )
+                .await;
                 new_id
             }
         };
@@ -143,14 +184,28 @@ impl Router {
         // Check if the user is responding to a pending confirmation with "yes" or "no".
         let trimmed = clean_text.trim().to_lowercase();
         if trimmed == "yes" || trimmed == "no" || trimmed == "y" || trimmed == "n" {
-            if let Some(reply) = self.try_resolve_confirm_by_text(
-                &msg, &trimmed, platform,
-            ).await {
-                let _ = platform.send_reply(
-                    &msg.platform_id, &msg.user_id, &reply, msg.reply_to.as_deref(),
-                ).await;
-                session::touch_session(&self.db, msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone()).await;
-                self.metrics.messages_processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if let Some(reply) = self
+                .try_resolve_confirm_by_text(&msg, &trimmed, platform)
+                .await
+            {
+                let _ = platform
+                    .send_reply(
+                        &msg.platform_id,
+                        &msg.user_id,
+                        &reply,
+                        msg.reply_to.as_deref(),
+                    )
+                    .await;
+                session::touch_session(
+                    &self.db,
+                    msg.platform.clone(),
+                    msg.user_id.clone(),
+                    msg.platform_id.clone(),
+                )
+                .await;
+                self.metrics
+                    .messages_processed
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 return;
             }
             // No pending confirm found — fall through to normal Buddy call
@@ -173,23 +228,36 @@ impl Router {
                     Ok(v) => v,
                     Err(le) => {
                         tracing::warn!(req_id=%req_id, error=%le, "local fallback also failed");
-                        let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
-                            "⚠️ Bonsai is currently unavailable. Try again shortly.",
-                            msg.reply_to.as_deref()).await;
+                        let _ = platform
+                            .send_reply(
+                                &msg.platform_id,
+                                &msg.user_id,
+                                "⚠️ Bonsai is currently unavailable. Try again shortly.",
+                                msg.reply_to.as_deref(),
+                            )
+                            .await;
                         return;
                     }
                 }
             }
             Err(e) => {
                 tracing::warn!(req_id=%req_id, error=%e, "buddy call failed");
-                let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
-                    "⚠️ Bonsai error. Please retry.", msg.reply_to.as_deref()).await;
+                let _ = platform
+                    .send_reply(
+                        &msg.platform_id,
+                        &msg.user_id,
+                        "⚠️ Bonsai error. Please retry.",
+                        msg.reply_to.as_deref(),
+                    )
+                    .await;
                 return;
             }
         };
 
         // Stage 7: Confirmation gate
-        let finish_reason = response["choices"][0]["finish_reason"].as_str().unwrap_or("stop");
+        let finish_reason = response["choices"][0]["finish_reason"]
+            .as_str()
+            .unwrap_or("stop");
         if finish_reason == "tool_calls_pending_approval" {
             if let Some(ext) = response.get("bonsai_ext") {
                 if ext.get("type").and_then(|v| v.as_str()) == Some("confirm_required") {
@@ -206,10 +274,25 @@ impl Router {
             .unwrap_or("(no response)");
 
         tracing::info!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, "reply sent");
-        let _ = platform.send_reply(&msg.platform_id, &msg.user_id, reply_text, msg.reply_to.as_deref()).await;
+        let _ = platform
+            .send_reply(
+                &msg.platform_id,
+                &msg.user_id,
+                reply_text,
+                msg.reply_to.as_deref(),
+            )
+            .await;
 
-        session::touch_session(&self.db, msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone()).await;
-        self.metrics.messages_processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        session::touch_session(
+            &self.db,
+            msg.platform.clone(),
+            msg.user_id.clone(),
+            msg.platform_id.clone(),
+        )
+        .await;
+        self.metrics
+            .messages_processed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Like `handle`, but uses the streaming Buddy API path. Accumulates tokens and
@@ -222,36 +305,63 @@ impl Router {
         let req_id = uuid::Uuid::new_v4();
 
         if self.dedup.is_duplicate(&msg.platform, &msg.event_id) {
-            self.metrics.dedup_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .dedup_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return;
         }
 
         let rate_key = format!("{}:{}", msg.platform, msg.user_id);
         if self.rate_limiter_for(&rate_key).check().is_err() {
-            self.metrics.rate_limit_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
-                "⏳ Rate limit exceeded.", msg.reply_to.as_deref()).await;
+            self.metrics
+                .rate_limit_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let _ = platform
+                .send_reply(
+                    &msg.platform_id,
+                    &msg.user_id,
+                    "⏳ Rate limit exceeded.",
+                    msg.reply_to.as_deref(),
+                )
+                .await;
             return;
         }
 
         let clean_text = match crate::sanitizer::sanitize(&msg.text, &self.metrics) {
             Ok(t) => t,
             Err(_) => {
-                let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
-                    "⚠️ Your message could not be processed safely.", msg.reply_to.as_deref()).await;
+                let _ = platform
+                    .send_reply(
+                        &msg.platform_id,
+                        &msg.user_id,
+                        "⚠️ Your message could not be processed safely.",
+                        msg.reply_to.as_deref(),
+                    )
+                    .await;
                 return;
             }
         };
 
         let buddy_session = match session::find_active_session(
-            &self.db, msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone(),
-        ).await {
+            &self.db,
+            msg.platform.clone(),
+            msg.user_id.clone(),
+            msg.platform_id.clone(),
+        )
+        .await
+        {
             Some(id) => id,
             None => {
                 let new_id = uuid::Uuid::new_v4().to_string();
-                let _ = session::upsert_session(&self.db,
-                    msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone(),
-                    msg.display_name.clone(), new_id.clone()).await;
+                let _ = session::upsert_session(
+                    &self.db,
+                    msg.platform.clone(),
+                    msg.user_id.clone(),
+                    msg.platform_id.clone(),
+                    msg.display_name.clone(),
+                    new_id.clone(),
+                )
+                .await;
                 new_id
             }
         };
@@ -262,12 +372,22 @@ impl Router {
             "_bonsai_session": buddy_session,
         })];
 
-        let mut rx = match self.buddy.chat_stream(BuddyClient::build_request(messages, None)).await {
+        let mut rx = match self
+            .buddy
+            .chat_stream(BuddyClient::build_request(messages, None))
+            .await
+        {
             Ok(r) => r,
             Err(e) => {
                 tracing::warn!(req_id=%req_id, error=%e, "buddy stream failed");
-                let _ = platform.send_reply(&msg.platform_id, &msg.user_id,
-                    "⚠️ Bonsai error. Please retry.", msg.reply_to.as_deref()).await;
+                let _ = platform
+                    .send_reply(
+                        &msg.platform_id,
+                        &msg.user_id,
+                        "⚠️ Bonsai error. Please retry.",
+                        msg.reply_to.as_deref(),
+                    )
+                    .await;
                 return;
             }
         };
@@ -278,12 +398,29 @@ impl Router {
             full.push_str(&token);
         }
 
-        if full.is_empty() { full = "(no response)".to_string(); }
+        if full.is_empty() {
+            full = "(no response)".to_string();
+        }
 
         tracing::info!(req_id=%req_id, platform=%msg.platform, user=%msg.user_id, "stream reply sent");
-        let _ = platform.send_reply(&msg.platform_id, &msg.user_id, &full, msg.reply_to.as_deref()).await;
-        session::touch_session(&self.db, msg.platform.clone(), msg.user_id.clone(), msg.platform_id.clone()).await;
-        self.metrics.messages_processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let _ = platform
+            .send_reply(
+                &msg.platform_id,
+                &msg.user_id,
+                &full,
+                msg.reply_to.as_deref(),
+            )
+            .await;
+        session::touch_session(
+            &self.db,
+            msg.platform.clone(),
+            msg.user_id.clone(),
+            msg.platform_id.clone(),
+        )
+        .await;
+        self.metrics
+            .messages_processed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Send a structured confirm_response to Buddy, return Buddy's reply text.
@@ -302,10 +439,17 @@ impl Router {
                 "approved": approved,
             }
         })];
-        let resp = self.buddy.chat(BuddyClient::build_request(messages, None)).await?;
+        let resp = self
+            .buddy
+            .chat(BuddyClient::build_request(messages, None))
+            .await?;
         Ok(resp["choices"][0]["message"]["content"]
             .as_str()
-            .unwrap_or(if approved { "✅ Action confirmed and processing." } else { "❌ Action denied." })
+            .unwrap_or(if approved {
+                "✅ Action confirmed and processing."
+            } else {
+                "❌ Action denied."
+            })
             .to_string())
     }
 
@@ -318,9 +462,9 @@ impl Router {
         _platform: &Arc<dyn MessagingPlatform>,
     ) -> Option<String> {
         let pending = session::load_unresolved_confirms(&self.db).await;
-        let my_pending = pending.into_iter().find(|p| {
-            p.platform == msg.platform && p.user_id == msg.user_id
-        })?;
+        let my_pending = pending
+            .into_iter()
+            .find(|p| p.platform == msg.platform && p.user_id == msg.user_id)?;
 
         let approved = matches!(text, "yes" | "y");
         let token = my_pending.token.clone();
@@ -329,7 +473,9 @@ impl Router {
         let _ = session::resolve_confirm(&self.db, token.clone()).await;
 
         if approved {
-            self.metrics.confirms_resolved.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .confirms_resolved
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
         // Send confirm_response to Buddy
@@ -347,7 +493,7 @@ impl Router {
 
     async fn handle_slash(&self, text: &str, msg: &InboundMessage) -> String {
         let parts: Vec<&str> = text.splitn(3, ' ').collect();
-        let cmd  = parts[0].to_lowercase();
+        let cmd = parts[0].to_lowercase();
         let arg1 = parts.get(1).copied().unwrap_or("").trim();
         let rest = parts.get(2).copied().unwrap_or("").trim();
 
@@ -361,7 +507,10 @@ impl Router {
                     format!("{arg1} {rest}")
                 };
                 match self.mgmt.swarm_submit(&prompt).await {
-                    Ok(v) => v["final_content"].as_str().unwrap_or("(no response)").to_string(),
+                    Ok(v) => v["final_content"]
+                        .as_str()
+                        .unwrap_or("(no response)")
+                        .to_string(),
                     Err(e) => format!("⚠️ Swarm error: {e}"),
                 }
             }
@@ -373,15 +522,18 @@ impl Router {
                     if agents.is_empty() {
                         return "No agents registered.".to_string();
                     }
-                    let lines: Vec<String> = agents.iter().map(|a| {
-                        let id   = a["id"].as_str().unwrap_or("?");
-                        let name = a["name"].as_str().unwrap_or(id);
-                        let desc = a["description"].as_str().unwrap_or("");
-                        format!("• {name} ({id}) — {desc}")
-                    }).collect();
+                    let lines: Vec<String> = agents
+                        .iter()
+                        .map(|a| {
+                            let id = a["id"].as_str().unwrap_or("?");
+                            let name = a["name"].as_str().unwrap_or(id);
+                            let desc = a["description"].as_str().unwrap_or("");
+                            format!("• {name} ({id}) — {desc}")
+                        })
+                        .collect();
                     format!("Registered agents:\n{}", lines.join("\n"))
                 }
-            }
+            },
 
             "/agent" => {
                 if arg1.is_empty() || rest.is_empty() {
@@ -400,14 +552,17 @@ impl Router {
                     if obj.is_empty() {
                         return "No feature flags found.".to_string();
                     }
-                    let mut flags: Vec<String> = obj.iter().map(|(k, v)| {
-                        let on = v.as_bool().unwrap_or(false);
-                        format!("{} {}", if on { "✅" } else { "❌" }, k.replace('_', " "))
-                    }).collect();
+                    let mut flags: Vec<String> = obj
+                        .iter()
+                        .map(|(k, v)| {
+                            let on = v.as_bool().unwrap_or(false);
+                            format!("{} {}", if on { "✅" } else { "❌" }, k.replace('_', " "))
+                        })
+                        .collect();
                     flags.sort();
                     format!("Feature flags:\n{}", flags.join("\n"))
                 }
-            }
+            },
 
             "/model" | "/models" => match self.mgmt.list_models().await {
                 Err(e) => format!("⚠️ Could not reach workspace: {e}"),
@@ -416,28 +571,29 @@ impl Router {
                     if models.is_empty() {
                         return "No models found.".to_string();
                     }
-                    let lines: Vec<String> = models.iter()
+                    let lines: Vec<String> = models
+                        .iter()
                         .filter(|m| m["valid"].as_bool().unwrap_or(false))
                         .map(|m| {
                             let name = m["name"].as_str().unwrap_or("?");
-                            let ram  = m["ram_required_mb"].as_u64().unwrap_or(0);
+                            let ram = m["ram_required_mb"].as_u64().unwrap_or(0);
                             format!("• {name} (~{ram} MB)")
                         })
                         .collect();
                     format!("Available models ({}):\n{}", lines.len(), lines.join("\n"))
                 }
-            }
+            },
 
             "/queue" => match self.mgmt.queue_status().await {
                 Err(e) => format!("⚠️ Could not reach workspace: {e}"),
                 Ok(v) => {
-                    let active  = v["active_total"].as_u64().unwrap_or(0);
+                    let active = v["active_total"].as_u64().unwrap_or(0);
                     let pending = v["pending_total"].as_u64().unwrap_or(0);
-                    let cpu     = v["cpu_pct"].as_f64().unwrap_or(0.0);
-                    let ram_mb  = v["free_ram_mb"].as_u64().unwrap_or(0);
+                    let cpu = v["cpu_pct"].as_f64().unwrap_or(0.0);
+                    let ram_mb = v["free_ram_mb"].as_u64().unwrap_or(0);
                     format!("Queue: {active} active, {pending} pending | CPU {cpu:.0}% | Free RAM {ram_mb} MB")
                 }
-            }
+            },
 
             // ── Chess commands ─────────────────────────────────────────────────
             "/chess" => {
@@ -575,47 +731,45 @@ impl Router {
             }
 
             // ── Puzzle commands ────────────────────────────────────────────────
-            "/puzzle" => {
-                match arg1 {
-                    "" | "daily" => {
-                        match self.mgmt.puzzle_daily().await {
-                            Ok(v) => {
-                                let id    = v["id"].as_str().unwrap_or("?");
-                                let desc  = v["description"].as_str().unwrap_or("Find the best move.");
-                                let fen   = v["fen"].as_str().unwrap_or("");
-                                let hint  = v["hint"].as_str().unwrap_or("");
-                                format!("🧩 Daily Puzzle (ID: {id})\n{desc}\n`{fen}`\nHint: _{hint}_\nGuess with: /puzzle guess {id} <uci-move>")
-                            }
-                            Err(e) => format!("⚠️ Puzzle error: {e}"),
-                        }
+            "/puzzle" => match arg1 {
+                "" | "daily" => match self.mgmt.puzzle_daily().await {
+                    Ok(v) => {
+                        let id = v["id"].as_str().unwrap_or("?");
+                        let desc = v["description"].as_str().unwrap_or("Find the best move.");
+                        let fen = v["fen"].as_str().unwrap_or("");
+                        let hint = v["hint"].as_str().unwrap_or("");
+                        format!("🧩 Daily Puzzle (ID: {id})\n{desc}\n`{fen}`\nHint: _{hint}_\nGuess with: /puzzle guess {id} <uci-move>")
                     }
-                    "guess" => {
-                        let parts2: Vec<&str> = rest.splitn(2, ' ').collect();
-                        let puzzle_id = parts2.first().copied().unwrap_or("");
-                        let uci_move  = parts2.get(1).copied().unwrap_or("").trim();
-                        if puzzle_id.is_empty() || uci_move.is_empty() {
-                            return "/puzzle guess <puzzle-id> <uci-move>".to_string();
-                        }
-                        match self.mgmt.puzzle_check(puzzle_id, uci_move).await {
-                            Ok(v) => {
-                                let status = v["status"].as_str().unwrap_or("?");
-                                let msg_txt = v["message"].as_str().unwrap_or("");
-                                match status {
-                                    "solved"  => format!("🎉 Solved! {msg_txt}"),
-                                    "correct" => format!("✅ Correct! {msg_txt}"),
-                                    "wrong"   => {
-                                        let hint = v["hint"].as_str().unwrap_or("Keep trying!");
-                                        format!("❌ Not quite. Hint: _{hint}_")
-                                    }
-                                    _ => "⚠️ Error checking move.".to_string(),
+                    Err(e) => format!("⚠️ Puzzle error: {e}"),
+                },
+                "guess" => {
+                    let parts2: Vec<&str> = rest.splitn(2, ' ').collect();
+                    let puzzle_id = parts2.first().copied().unwrap_or("");
+                    let uci_move = parts2.get(1).copied().unwrap_or("").trim();
+                    if puzzle_id.is_empty() || uci_move.is_empty() {
+                        return "/puzzle guess <puzzle-id> <uci-move>".to_string();
+                    }
+                    match self.mgmt.puzzle_check(puzzle_id, uci_move).await {
+                        Ok(v) => {
+                            let status = v["status"].as_str().unwrap_or("?");
+                            let msg_txt = v["message"].as_str().unwrap_or("");
+                            match status {
+                                "solved" => format!("🎉 Solved! {msg_txt}"),
+                                "correct" => format!("✅ Correct! {msg_txt}"),
+                                "wrong" => {
+                                    let hint = v["hint"].as_str().unwrap_or("Keep trying!");
+                                    format!("❌ Not quite. Hint: _{hint}_")
                                 }
+                                _ => "⚠️ Error checking move.".to_string(),
                             }
-                            Err(e) => format!("⚠️ Puzzle error: {e}"),
                         }
+                        Err(e) => format!("⚠️ Puzzle error: {e}"),
                     }
-                    _ => "Puzzle commands:\n  /puzzle daily\n  /puzzle guess <id> <uci-move>".to_string(),
                 }
-            }
+                _ => {
+                    "Puzzle commands:\n  /puzzle daily\n  /puzzle guess <id> <uci-move>".to_string()
+                }
+            },
 
             // ── Tournament commands ────────────────────────────────────────────
             "/tournament" | "/tourney" => {
@@ -677,7 +831,8 @@ impl Router {
                 "  /tournament list      — list tournaments\n",
                 "  /tournament new …     — create a tournament\n",
                 "  /help                 — this message",
-            ).to_string(),
+            )
+            .to_string(),
 
             _ => format!("Unknown command '{cmd}'. Try /help."),
         }
@@ -689,34 +844,46 @@ impl Router {
         msg: &InboundMessage,
         platform: &Arc<dyn MessagingPlatform>,
     ) {
-        let token      = ext["token"].as_str().unwrap_or_default();
-        let tool       = ext["tool"].as_str().unwrap_or_default();
-        let prompt     = ext["prompt"].as_str().unwrap_or_default();
+        let token = ext["token"].as_str().unwrap_or_default();
+        let tool = ext["tool"].as_str().unwrap_or_default();
+        let prompt = ext["prompt"].as_str().unwrap_or_default();
         let expires_at = ext["expires_at"].as_i64().unwrap_or(0);
-        let args_json  = ext["args"].to_string();
+        let args_json = ext["args"].to_string();
 
         if token.is_empty() || expires_at < now_secs() {
-            let _ = platform.send_reply(
-                &msg.platform_id, &msg.user_id,
-                "⏰ Confirmation expired or invalid. Please resend your request.",
-                msg.reply_to.as_deref(),
-            ).await;
+            let _ = platform
+                .send_reply(
+                    &msg.platform_id,
+                    &msg.user_id,
+                    "⏰ Confirmation expired or invalid. Please resend your request.",
+                    msg.reply_to.as_deref(),
+                )
+                .await;
             return;
         }
 
         let _ = session::insert_confirm(
             &self.db,
-            token.to_string(), msg.platform.clone(), msg.platform_id.clone(), msg.user_id.clone(),
-            tool.to_string(), args_json, prompt.to_string(), expires_at,
-        ).await;
+            token.to_string(),
+            msg.platform.clone(),
+            msg.platform_id.clone(),
+            msg.user_id.clone(),
+            tool.to_string(),
+            args_json,
+            prompt.to_string(),
+            expires_at,
+        )
+        .await;
 
-        self.metrics.confirms_created.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .confirms_created
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         match session::mark_prompted(&self.db, token.to_string()).await {
             Ok(nonce) => {
-                let _ = platform.send_confirm_prompt(
-                    &msg.platform_id, &msg.user_id, token, prompt, nonce,
-                ).await;
+                let _ = platform
+                    .send_confirm_prompt(&msg.platform_id, &msg.user_id, token, prompt, nonce)
+                    .await;
             }
             Err(e) => tracing::error!("[router] mark_prompted failed: {e}"),
         }
@@ -736,9 +903,16 @@ mod tests {
 
         // First 10 should succeed
         for i in 0..10 {
-            assert!(limiter.check().is_ok(), "message {} should be allowed", i + 1);
+            assert!(
+                limiter.check().is_ok(),
+                "message {} should be allowed",
+                i + 1
+            );
         }
         // 11th must fail
-        assert!(limiter.check().is_err(), "11th message should be rate-limited");
+        assert!(
+            limiter.check().is_err(),
+            "11th message should be rate-limited"
+        );
     }
 }

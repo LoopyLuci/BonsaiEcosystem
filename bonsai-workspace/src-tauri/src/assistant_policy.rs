@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde_json::Value;
 use crate::tool_core::RiskLevel;
+use serde_json::Value;
+use std::collections::HashMap;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -13,22 +13,22 @@ pub enum PolicyDecision {
 
 #[derive(Debug, Clone)]
 pub struct ArgRule {
-    pub field:          String,
-    pub required:       bool,
-    pub max_len:        Option<usize>,
-    pub max_value:      Option<f64>,
+    pub field: String,
+    pub required: bool,
+    pub max_len: Option<usize>,
+    pub max_value: Option<f64>,
     pub allowed_values: Option<Vec<String>>,
-    pub is_path:        bool,  // if true, check against path_sandbox
-    pub is_url:         bool,  // if true, check against domain_allowlist
+    pub is_path: bool, // if true, check against path_sandbox
+    pub is_url: bool,  // if true, check against domain_allowlist
 }
 
 #[derive(Debug, Clone)]
 pub struct ToolPolicy {
-    pub requires_confirm:           bool,
-    pub high_risk_prompt:           String,
-    pub path_sandbox_applies:       bool,
-    pub domain_allowlist_applies:   bool,
-    pub arg_rules:                  Vec<ArgRule>,
+    pub requires_confirm: bool,
+    pub high_risk_prompt: String,
+    pub path_sandbox_applies: bool,
+    pub domain_allowlist_applies: bool,
+    pub arg_rules: Vec<ArgRule>,
 }
 
 // ── PolicyEngine ──────────────────────────────────────────────────────────────
@@ -42,133 +42,302 @@ impl PolicyEngine {
         let mut policies = HashMap::new();
 
         // fetch_url — low-risk read, but domain allowlist applies
-        policies.insert("fetch_url".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: true,
-            arg_rules: vec![
-                ArgRule { field: "url".into(), required: true, max_len: Some(2048), max_value: None, allowed_values: None, is_path: false, is_url: true },
-                ArgRule { field: "strip_html".into(), required: false, max_len: None, max_value: None, allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "fetch_url".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: true,
+                arg_rules: vec![
+                    ArgRule {
+                        field: "url".into(),
+                        required: true,
+                        max_len: Some(2048),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: true,
+                    },
+                    ArgRule {
+                        field: "strip_html".into(),
+                        required: false,
+                        max_len: None,
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                ],
+            },
+        );
 
         // get_weather — read-only, network, no confirmation
-        policies.insert("get_weather".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "location".into(), required: false, max_len: Some(256), max_value: None, allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "get_weather".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: false,
+                arg_rules: vec![ArgRule {
+                    field: "location".into(),
+                    required: false,
+                    max_len: Some(256),
+                    max_value: None,
+                    allowed_values: None,
+                    is_path: false,
+                    is_url: false,
+                }],
+            },
+        );
 
         // get_datetime — trivial
-        policies.insert("get_datetime".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "format".into(), required: false, max_len: Some(64), max_value: None, allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "get_datetime".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: false,
+                arg_rules: vec![ArgRule {
+                    field: "format".into(),
+                    required: false,
+                    max_len: Some(64),
+                    max_value: None,
+                    allowed_values: None,
+                    is_path: false,
+                    is_url: false,
+                }],
+            },
+        );
 
         // get_system_stats — read-only
-        policies.insert("get_system_stats".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: false,
-            arg_rules: vec![],
-        });
+        policies.insert(
+            "get_system_stats".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: false,
+                arg_rules: vec![],
+            },
+        );
 
         // render_chart — no I/O
-        policies.insert("render_chart".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "chart_type".into(), required: true, max_len: Some(16), max_value: None, allowed_values: Some(vec!["bar".into(), "line".into(), "pie".into()]), is_path: false, is_url: false },
-                ArgRule { field: "data_json".into(), required: true, max_len: Some(32768), max_value: None, allowed_values: None, is_path: false, is_url: false },
-                ArgRule { field: "title".into(), required: false, max_len: Some(256), max_value: None, allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "render_chart".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: false,
+                arg_rules: vec![
+                    ArgRule {
+                        field: "chart_type".into(),
+                        required: true,
+                        max_len: Some(16),
+                        max_value: None,
+                        allowed_values: Some(vec!["bar".into(), "line".into(), "pie".into()]),
+                        is_path: false,
+                        is_url: false,
+                    },
+                    ArgRule {
+                        field: "data_json".into(),
+                        required: true,
+                        max_len: Some(32768),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                    ArgRule {
+                        field: "title".into(),
+                        required: false,
+                        max_len: Some(256),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                ],
+            },
+        );
 
         // find_files — path sandbox applies
-        policies.insert("find_files".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: true,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "path".into(), required: true, max_len: Some(1024), max_value: None, allowed_values: None, is_path: true, is_url: false },
-                ArgRule { field: "pattern".into(), required: true, max_len: Some(256), max_value: None, allowed_values: None, is_path: false, is_url: false },
-                ArgRule { field: "max_results".into(), required: false, max_len: None, max_value: Some(500.0), allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "find_files".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: true,
+                domain_allowlist_applies: false,
+                arg_rules: vec![
+                    ArgRule {
+                        field: "path".into(),
+                        required: true,
+                        max_len: Some(1024),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: true,
+                        is_url: false,
+                    },
+                    ArgRule {
+                        field: "pattern".into(),
+                        required: true,
+                        max_len: Some(256),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                    ArgRule {
+                        field: "max_results".into(),
+                        required: false,
+                        max_len: None,
+                        max_value: Some(500.0),
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                ],
+            },
+        );
 
         // read_file_assistant — high privilege, path sandbox, confirmation
-        policies.insert("read_file_assistant".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: true,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "path".into(), required: true, max_len: Some(1024), max_value: None, allowed_values: None, is_path: true, is_url: false },
-            ],
-        });
+        policies.insert(
+            "read_file_assistant".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: true,
+                domain_allowlist_applies: false,
+                arg_rules: vec![ArgRule {
+                    field: "path".into(),
+                    required: true,
+                    max_len: Some(1024),
+                    max_value: None,
+                    allowed_values: None,
+                    is_path: true,
+                    is_url: false,
+                }],
+            },
+        );
 
         // write_file_assistant — requires confirmation, path sandbox
-        policies.insert("write_file_assistant".into(), ToolPolicy {
-            requires_confirm: true,
-            high_risk_prompt: "Write to file on disk?".into(),
-            path_sandbox_applies: true,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "path".into(), required: true, max_len: Some(1024), max_value: None, allowed_values: None, is_path: true, is_url: false },
-                ArgRule { field: "content".into(), required: true, max_len: Some(1_048_576), max_value: None, allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "write_file_assistant".into(),
+            ToolPolicy {
+                requires_confirm: true,
+                high_risk_prompt: "Write to file on disk?".into(),
+                path_sandbox_applies: true,
+                domain_allowlist_applies: false,
+                arg_rules: vec![
+                    ArgRule {
+                        field: "path".into(),
+                        required: true,
+                        max_len: Some(1024),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: true,
+                        is_url: false,
+                    },
+                    ArgRule {
+                        field: "content".into(),
+                        required: true,
+                        max_len: Some(1_048_576),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                ],
+            },
+        );
 
         // open_url — opens system browser, confirmation optional
-        policies.insert("open_url".into(), ToolPolicy {
-            requires_confirm: false,
-            high_risk_prompt: String::new(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: true,
-            arg_rules: vec![
-                ArgRule { field: "url".into(), required: true, max_len: Some(2048), max_value: None, allowed_values: None, is_path: false, is_url: true },
-            ],
-        });
+        policies.insert(
+            "open_url".into(),
+            ToolPolicy {
+                requires_confirm: false,
+                high_risk_prompt: String::new(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: true,
+                arg_rules: vec![ArgRule {
+                    field: "url".into(),
+                    required: true,
+                    max_len: Some(2048),
+                    max_value: None,
+                    allowed_values: None,
+                    is_path: false,
+                    is_url: true,
+                }],
+            },
+        );
 
         // send_email — high-risk: requires explicit confirmation
-        policies.insert("send_email".into(), ToolPolicy {
-            requires_confirm: true,
-            high_risk_prompt: "Send an email on your behalf?".into(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "to".into(), required: true, max_len: Some(512), max_value: None, allowed_values: None, is_path: false, is_url: false },
-                ArgRule { field: "subject".into(), required: true, max_len: Some(512), max_value: None, allowed_values: None, is_path: false, is_url: false },
-                ArgRule { field: "body".into(), required: true, max_len: Some(65536), max_value: None, allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "send_email".into(),
+            ToolPolicy {
+                requires_confirm: true,
+                high_risk_prompt: "Send an email on your behalf?".into(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: false,
+                arg_rules: vec![
+                    ArgRule {
+                        field: "to".into(),
+                        required: true,
+                        max_len: Some(512),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                    ArgRule {
+                        field: "subject".into(),
+                        required: true,
+                        max_len: Some(512),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                    ArgRule {
+                        field: "body".into(),
+                        required: true,
+                        max_len: Some(65536),
+                        max_value: None,
+                        allowed_values: None,
+                        is_path: false,
+                        is_url: false,
+                    },
+                ],
+            },
+        );
 
         // run_shell_command — highest risk, always requires confirmation
-        policies.insert("run_command".into(), ToolPolicy {
-            requires_confirm: true,
-            high_risk_prompt: "Run a shell command on your system?".into(),
-            path_sandbox_applies: false,
-            domain_allowlist_applies: false,
-            arg_rules: vec![
-                ArgRule { field: "command".into(), required: true, max_len: Some(4096), max_value: None, allowed_values: None, is_path: false, is_url: false },
-            ],
-        });
+        policies.insert(
+            "run_command".into(),
+            ToolPolicy {
+                requires_confirm: true,
+                high_risk_prompt: "Run a shell command on your system?".into(),
+                path_sandbox_applies: false,
+                domain_allowlist_applies: false,
+                arg_rules: vec![ArgRule {
+                    field: "command".into(),
+                    required: true,
+                    max_len: Some(4096),
+                    max_value: None,
+                    allowed_values: None,
+                    is_path: false,
+                    is_url: false,
+                }],
+            },
+        );
 
-        PolicyEngine { default_policies: policies }
+        PolicyEngine {
+            default_policies: policies,
+        }
     }
 
     /// Evaluate whether a tool call should be allowed, denied, or requires user confirmation.
@@ -207,7 +376,9 @@ impl PolicyEngine {
         if let Some(perms) = profile_permissions.as_object() {
             if let Some(enabled) = perms.get(tool) {
                 if enabled == &Value::Bool(false) {
-                    return PolicyDecision::Deny(format!("Tool '{tool}' is disabled in your assistant profile."));
+                    return PolicyDecision::Deny(format!(
+                        "Tool '{tool}' is disabled in your assistant profile."
+                    ));
                 }
             }
         }
@@ -225,7 +396,9 @@ impl PolicyEngine {
                     ));
                 }
                 // All other unknown tools are denied by default.
-                return PolicyDecision::Deny(format!("Tool '{tool}' is not registered in the policy engine."));
+                return PolicyDecision::Deny(format!(
+                    "Tool '{tool}' is not registered in the policy engine."
+                ));
             }
         };
 
@@ -241,7 +414,11 @@ impl PolicyEngine {
             } else {
                 policy.high_risk_prompt.clone()
             };
-            return self.apply_advisory_ceiling(tool, PolicyDecision::RequireConfirmation(prompt), advisory_max_risk);
+            return self.apply_advisory_ceiling(
+                tool,
+                PolicyDecision::RequireConfirmation(prompt),
+                advisory_max_risk,
+            );
         }
 
         self.apply_advisory_ceiling(tool, PolicyDecision::Allow, advisory_max_risk)
@@ -260,20 +437,18 @@ impl PolicyEngine {
         // Never deescalate policy outcomes.
         match decision {
             PolicyDecision::Deny(_) | PolicyDecision::RequireConfirmation(_) => decision,
-            PolicyDecision::Allow => {
-                match risk {
-                    RiskLevel::Safe => PolicyDecision::Allow,
-                    RiskLevel::LowRisk => PolicyDecision::RequireConfirmation(
-                        format!("Allow '{tool}' to execute? (advisory risk: low)"),
-                    ),
-                    RiskLevel::Destructive => PolicyDecision::RequireConfirmation(
-                        format!("Allow '{tool}' to execute? (advisory risk: destructive)"),
-                    ),
-                    RiskLevel::AlwaysConfirm => PolicyDecision::RequireConfirmation(
-                        format!("Allow '{tool}' to execute? (advisory risk: always confirm)"),
-                    ),
-                }
-            }
+            PolicyDecision::Allow => match risk {
+                RiskLevel::Safe => PolicyDecision::Allow,
+                RiskLevel::LowRisk => PolicyDecision::RequireConfirmation(format!(
+                    "Allow '{tool}' to execute? (advisory risk: low)"
+                )),
+                RiskLevel::Destructive => PolicyDecision::RequireConfirmation(format!(
+                    "Allow '{tool}' to execute? (advisory risk: destructive)"
+                )),
+                RiskLevel::AlwaysConfirm => PolicyDecision::RequireConfirmation(format!(
+                    "Allow '{tool}' to execute? (advisory risk: always confirm)"
+                )),
+            },
         }
     }
 
@@ -321,10 +496,14 @@ impl PolicyEngine {
                 // Path traversal guard using component analysis (robust against encoded variants)
                 if rule.is_path {
                     if let Some(s) = v.as_str() {
-                        if std::path::Path::new(s).components().any(|c| {
-                            c == std::path::Component::ParentDir
-                        }) {
-                            return Err(format!("Field '{}' contains path traversal sequences", rule.field));
+                        if std::path::Path::new(s)
+                            .components()
+                            .any(|c| c == std::path::Component::ParentDir)
+                        {
+                            return Err(format!(
+                                "Field '{}' contains path traversal sequences",
+                                rule.field
+                            ));
                         }
                     }
                 }
@@ -333,11 +512,15 @@ impl PolicyEngine {
                 if rule.is_url {
                     if let Some(s) = v.as_str() {
                         if !s.starts_with("https://") && !s.starts_with("http://") {
-                            return Err(format!("Field '{}' must start with http:// or https://", rule.field));
+                            return Err(format!(
+                                "Field '{}' must start with http:// or https://",
+                                rule.field
+                            ));
                         }
                         if is_ssrf_target(s) {
                             return Err(format!(
-                                "Field '{}' targets a private or loopback address (SSRF blocked)", rule.field
+                                "Field '{}' targets a private or loopback address (SSRF blocked)",
+                                rule.field
                             ));
                         }
                     }
@@ -349,11 +532,17 @@ impl PolicyEngine {
 
     pub fn is_path_sandbox_tool(&self, tool: &str) -> bool {
         // (see is_ssrf_target free function below)
-        self.default_policies.get(tool).map(|p| p.path_sandbox_applies).unwrap_or(false)
+        self.default_policies
+            .get(tool)
+            .map(|p| p.path_sandbox_applies)
+            .unwrap_or(false)
     }
 
     pub fn is_domain_restricted_tool(&self, tool: &str) -> bool {
-        self.default_policies.get(tool).map(|p| p.domain_allowlist_applies).unwrap_or(false)
+        self.default_policies
+            .get(tool)
+            .map(|p| p.domain_allowlist_applies)
+            .unwrap_or(false)
     }
 }
 
@@ -426,14 +615,16 @@ pub struct ConfirmationGate {
 }
 
 struct PendingConfirm {
-    tool:       String,
-    args:       Value,
+    tool: String,
+    args: Value,
     expires_at: u64,
 }
 
 impl ConfirmationGate {
     pub fn new() -> Self {
-        ConfirmationGate { pending: Mutex::new(HashMap::new()) }
+        ConfirmationGate {
+            pending: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Register a pending confirmation. Returns the single-use token.
@@ -446,11 +637,14 @@ impl ConfirmationGate {
             .map(char::from)
             .collect();
         let expires_at = now_secs() + 60; // 60s TTL
-        self.pending.lock().unwrap().insert(token.clone(), PendingConfirm {
-            tool: tool.to_string(),
-            args,
-            expires_at,
-        });
+        self.pending.lock().unwrap().insert(
+            token.clone(),
+            PendingConfirm {
+                tool: tool.to_string(),
+                args,
+                expires_at,
+            },
+        );
         token
     }
 
@@ -464,7 +658,7 @@ impl ConfirmationGate {
         match map.remove(token) {
             Some(c) if c.expires_at > now => Ok((c.tool, c.args)),
             Some(_) => Err("Confirmation token has expired.".into()),
-            None    => Err("Unknown or already-used confirmation token.".into()),
+            None => Err("Unknown or already-used confirmation token.".into()),
         }
     }
 
@@ -475,7 +669,10 @@ impl ConfirmationGate {
 }
 
 fn now_secs() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 #[cfg(test)]
@@ -489,12 +686,8 @@ mod tests {
         let args = json!({ "location": "Zurich" });
         let perms = json!({});
 
-        let decision = engine.evaluate_with_risk(
-            "get_weather",
-            &args,
-            &perms,
-            Some(RiskLevel::AlwaysConfirm),
-        );
+        let decision =
+            engine.evaluate_with_risk("get_weather", &args, &perms, Some(RiskLevel::AlwaysConfirm));
 
         assert!(matches!(decision, PolicyDecision::RequireConfirmation(_)));
     }
@@ -505,12 +698,8 @@ mod tests {
         let args = json!({ "location": "Zurich" });
         let perms = json!({ "get_weather": false });
 
-        let decision = engine.evaluate_with_risk(
-            "get_weather",
-            &args,
-            &perms,
-            Some(RiskLevel::Safe),
-        );
+        let decision =
+            engine.evaluate_with_risk("get_weather", &args, &perms, Some(RiskLevel::Safe));
 
         assert!(matches!(decision, PolicyDecision::Deny(_)));
     }
@@ -524,12 +713,8 @@ mod tests {
         });
         let perms = json!({});
 
-        let decision = engine.evaluate_with_risk(
-            "write_file_assistant",
-            &args,
-            &perms,
-            Some(RiskLevel::Safe),
-        );
+        let decision =
+            engine.evaluate_with_risk("write_file_assistant", &args, &perms, Some(RiskLevel::Safe));
 
         assert!(matches!(decision, PolicyDecision::RequireConfirmation(_)));
     }
@@ -661,7 +846,11 @@ mod tests {
     #[test]
     fn missing_required_argument_is_denied() {
         let engine = PolicyEngine::new();
-        let decision = engine.evaluate("write_file_assistant", &json!({ "path": "notes.txt" }), &json!({}));
+        let decision = engine.evaluate(
+            "write_file_assistant",
+            &json!({ "path": "notes.txt" }),
+            &json!({}),
+        );
         assert!(matches!(decision, PolicyDecision::Deny(_)));
     }
 
@@ -757,11 +946,7 @@ mod tests {
     fn destructive_tool_always_requires_confirmation() {
         let engine = PolicyEngine::new();
         // run_command must require confirmation even with no advisory
-        let decision = engine.evaluate(
-            "run_command",
-            &json!({ "command": "ls" }),
-            &json!({}),
-        );
+        let decision = engine.evaluate("run_command", &json!({ "command": "ls" }), &json!({}));
         assert!(matches!(decision, PolicyDecision::RequireConfirmation(_)));
     }
 }

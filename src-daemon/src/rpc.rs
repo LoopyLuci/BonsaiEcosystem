@@ -1,35 +1,35 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::process::Command;
 use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
 
 use serde_json::Value;
 
 use crate::state::DaemonState;
 
-use bonsai_transfer_crypto::{
-    identity::BonsaiIdentity,
-    kdf::{kdf_phrase_to_seed, ARGON2_PARAMS_TEST},
-    session::SessionKey,
-};
+use bonsai_array::AplEval;
+use bonsai_capability_registry::{DeploymentGate, TrustScore};
+use bonsai_ci::{OrchestratorActor, PipelineDef};
+use bonsai_sylva::SylvaVm;
 use bonsai_transfer_core::{
     lane::{InProcessLane, TransportLane},
     scheduler::EcfRgScheduler,
     transfer::{Transfer, TransferStatus},
 };
-use bonsai_array::AplEval;
-use bonsai_verify_lean::{LeanSidecar, LeanRequest};
-use bonsai_verify_coq::{CoqSidecar, CoqRequest};
-use bonsai_verify_agda::{AgdaSidecar, AgdaRequest};
-use bonsai_verify_isabelle::{IsabelleSidecar, IsabelleRequest};
-use bonsai_verify_fstar::{FStarSidecar, FStarRequest};
-use bonsai_verify_tla::{TlaSidecar, TlaRequest};
-use bonsai_capability_registry::{TrustScore, DeploymentGate};
-use bonsai_sylva::SylvaVm;
-use uuid::Uuid;
+use bonsai_transfer_crypto::{
+    identity::BonsaiIdentity,
+    kdf::{kdf_phrase_to_seed, ARGON2_PARAMS_TEST},
+    session::SessionKey,
+};
+use bonsai_verify_agda::{AgdaRequest, AgdaSidecar};
+use bonsai_verify_coq::{CoqRequest, CoqSidecar};
+use bonsai_verify_fstar::{FStarRequest, FStarSidecar};
+use bonsai_verify_isabelle::{IsabelleRequest, IsabelleSidecar};
+use bonsai_verify_lean::{LeanRequest, LeanSidecar};
+use bonsai_verify_tla::{TlaRequest, TlaSidecar};
 use tokio::sync::mpsc;
-use bonsai_ci::{PipelineDef, OrchestratorActor};
+use uuid::Uuid;
 
 /// Dispatch a JSON-RPC method to a concrete implementation.
 /// Returns a JSON value on success or an error string on failure.
@@ -70,7 +70,9 @@ pub async fn dispatch(
             let payload: serde_json::Value = state.store.load().map_err(|e| e.to_string())?;
             let seed_hex = payload["seed"].as_str().ok_or("missing seed in store")?;
             let seed_bytes = hex::decode(seed_hex).map_err(|e| e.to_string())?;
-            if seed_bytes.len() != 32 { return Err("invalid seed length".into()); }
+            if seed_bytes.len() != 32 {
+                return Err("invalid seed length".into());
+            }
             let mut seed = [0u8; 32];
             seed.copy_from_slice(&seed_bytes);
             let identity = BonsaiIdentity::from_seed(&seed).map_err(|e| e.to_string())?;
@@ -99,7 +101,10 @@ pub async fn dispatch(
                 Ok(v) => v,
                 Err(_) => serde_json::json!({}),
             };
-            let contacts = payload.get("contacts").cloned().unwrap_or_else(|| serde_json::json!([]));
+            let contacts = payload
+                .get("contacts")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!([]));
             Ok(contacts)
         }
 
@@ -111,7 +116,8 @@ pub async fn dispatch(
                 Ok(v) => v,
                 Err(_) => serde_json::json!({}),
             };
-            let arr = payload.as_object_mut()
+            let arr = payload
+                .as_object_mut()
                 .and_then(|o| o.get_mut("contacts"))
                 .and_then(|v| v.as_array_mut());
             if let Some(a) = arr {
@@ -125,23 +131,50 @@ pub async fn dispatch(
 
         "mailbox.send" => {
             use bonsai_mailbox::MailEnvelope;
-            let to    = params.get("to").and_then(|v| v.as_str()).ok_or("missing to")?.to_string();
-            let from  = params.get("from").and_then(|v| v.as_str()).unwrap_or("daemon").to_string();
-            let topic = params.get("topic").and_then(|v| v.as_str()).unwrap_or("message").to_string();
-            let body  = params.get("body").cloned().unwrap_or(serde_json::Value::Null);
+            let to = params
+                .get("to")
+                .and_then(|v| v.as_str())
+                .ok_or("missing to")?
+                .to_string();
+            let from = params
+                .get("from")
+                .and_then(|v| v.as_str())
+                .unwrap_or("daemon")
+                .to_string();
+            let topic = params
+                .get("topic")
+                .and_then(|v| v.as_str())
+                .unwrap_or("message")
+                .to_string();
+            let body = params
+                .get("body")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
             let payload = serde_json::to_vec(&body).unwrap_or_default();
             // No signature for daemon-originated messages (unsigned, trusted locally).
             let env = MailEnvelope::new(from, to, &topic, payload, vec![]);
-            state.mailbox.deliver(env).await.map_err(|e| e.to_string())?;
+            state
+                .mailbox
+                .deliver(env)
+                .await
+                .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"ok": true}))
         }
 
         "transfer.send_file" => {
-            let file_path = params.get("file_path").and_then(|v| v.as_str()).ok_or("missing file_path")?;
-            let chunk_size = params.get("chunk_size").and_then(|v| v.as_u64()).map(|v| v as usize);
+            let file_path = params
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .ok_or("missing file_path")?;
+            let chunk_size = params
+                .get("chunk_size")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
 
             let path = PathBuf::from(file_path);
-            let data = tokio::fs::read(&path).await.map_err(|e| format!("read {file_path}: {e}"))?;
+            let data = tokio::fs::read(&path)
+                .await
+                .map_err(|e| format!("read {file_path}: {e}"))?;
 
             // Get identity
             let guard = state.identity.lock().await;
@@ -167,7 +200,8 @@ pub async fn dispatch(
             }
             let scheduler = Arc::new(tokio::sync::Mutex::new(sched));
 
-            let cs = chunk_size.unwrap_or(bonsai_transfer_core::transfer::DEFAULT_CHUNK_SIZE)
+            let cs = chunk_size
+                .unwrap_or(bonsai_transfer_core::transfer::DEFAULT_CHUNK_SIZE)
                 .min(bonsai_transfer_core::transfer::MAX_CHUNK_SIZE)
                 .max(1);
 
@@ -176,7 +210,9 @@ pub async fn dispatch(
             // Create a progress channel so we can update DaemonState.transfers
             let (tx, mut rx) = mpsc::unbounded_channel();
 
-            let handle = transfer.send_data(data.clone(), session_key, scheduler, lanes, cs, Some(tx)).await
+            let handle = transfer
+                .send_data(data.clone(), session_key, scheduler, lanes, cs, Some(tx))
+                .await
                 .map_err(|e| e.to_string())?;
 
             let id_str = handle.id.to_string();
@@ -194,8 +230,16 @@ pub async fn dispatch(
                 bytes_per_sec: 0.0,
             };
 
-            state.transfers.lock().await.insert(id_str.clone(), initial_status.clone());
-            state.transfer_handles.lock().await.insert(id_str.clone(), handle.clone());
+            state
+                .transfers
+                .lock()
+                .await
+                .insert(id_str.clone(), initial_status.clone());
+            state
+                .transfer_handles
+                .lock()
+                .await
+                .insert(id_str.clone(), handle.clone());
 
             // Spawn a background task to watch progress updates and persist them in state
             let state_clone = state.clone();
@@ -234,7 +278,10 @@ pub async fn dispatch(
         }
 
         "transfer.cancel" | "transfer.cancel_transfer" => {
-            let id = params.get("id").and_then(|v| v.as_str()).ok_or("missing id")?;
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or("missing id")?;
             let handles = state.transfer_handles.lock().await;
             if let Some(handle) = handles.get(id) {
                 handle.cancel();
@@ -249,21 +296,36 @@ pub async fn dispatch(
         }
 
         "data.execute_sql" => {
-            let query = params.get("query").and_then(|v| v.as_str()).ok_or("missing query")?;
-            let rows = state.sql.lock().await.query_json(query).map_err(|e| e.to_string())?;
+            let query = params
+                .get("query")
+                .and_then(|v| v.as_str())
+                .ok_or("missing query")?;
+            let rows = state
+                .sql
+                .lock()
+                .await
+                .query_json(query)
+                .map_err(|e| e.to_string())?;
             let out = serde_json::to_value(&rows).map_err(|e| e.to_string())?;
             Ok(out)
         }
 
         "data.eval_apl" | "data.eval" | "apl.eval" => {
-            let src = params.get("src").or_else(|| params.get("code")).and_then(|v| v.as_str()).ok_or("missing src/code")?;
+            let src = params
+                .get("src")
+                .or_else(|| params.get("code"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing src/code")?;
             let arr = AplEval::eval(src).map_err(|e| e.to_string())?;
             let out = serde_json::to_value(&arr).map_err(|e| e.to_string())?;
             Ok(out)
         }
 
         "deno.run_script" | "deno.eval" => {
-            let code = params.get("code").and_then(|v| v.as_str()).ok_or("missing code")?;
+            let code = params
+                .get("code")
+                .and_then(|v| v.as_str())
+                .ok_or("missing code")?;
 
             // Worker path relative to workspace
             let worker_path = PathBuf::from("runtimes/deno/worker.ts");
@@ -287,15 +349,18 @@ pub async fn dispatch(
 
             // read startup line (timeout)
             let mut line = String::new();
-            let _ = tokio::time::timeout(Duration::from_secs(3), reader.read_line(&mut line)).await
-                .map_err(|_| "deno worker startup timed out" )?
+            let _ = tokio::time::timeout(Duration::from_secs(3), reader.read_line(&mut line))
+                .await
+                .map_err(|_| "deno worker startup timed out")?
                 .map_err(|e: std::io::Error| e.to_string())?;
 
             // Send eval request
             let req_id = Uuid::new_v4().to_string();
             let req = serde_json::json!({"id": req_id, "op": "eval", "code": code});
             let req_line = serde_json::to_string(&req).map_err(|e| e.to_string())? + "\n";
-            tokio::io::AsyncWriteExt::write_all(&mut stdin, req_line.as_bytes()).await.map_err(|e| e.to_string())?;
+            tokio::io::AsyncWriteExt::write_all(&mut stdin, req_line.as_bytes())
+                .await
+                .map_err(|e| e.to_string())?;
 
             // Read response lines until matching id or timeout
             let mut buf = String::new();
@@ -304,10 +369,13 @@ pub async fn dispatch(
             let start = tokio::time::Instant::now();
             while start.elapsed() < timeout {
                 buf.clear();
-                let n = tokio::time::timeout(timeout - start.elapsed(), reader.read_line(&mut buf)).await
-                    .map_err(|_| "deno worker read timed out" )?
+                let n = tokio::time::timeout(timeout - start.elapsed(), reader.read_line(&mut buf))
+                    .await
+                    .map_err(|_| "deno worker read timed out")?
                     .map_err(|e: std::io::Error| e.to_string())?;
-                if n == 0 { break; }
+                if n == 0 {
+                    break;
+                }
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(buf.trim()) {
                     if v.get("id").and_then(|x| x.as_str()) == Some(req_id.as_str()) {
                         result_value = Some(v);
@@ -317,33 +385,49 @@ pub async fn dispatch(
             }
 
             // Try to shutdown the worker gracefully
-            let _ = tokio::io::AsyncWriteExt::write_all(&mut stdin, serde_json::to_string(&serde_json::json!({"id": Uuid::new_v4().to_string(), "op": "shutdown"})).unwrap().as_bytes()).await;
+            let _ = tokio::io::AsyncWriteExt::write_all(
+                &mut stdin,
+                serde_json::to_string(
+                    &serde_json::json!({"id": Uuid::new_v4().to_string(), "op": "shutdown"}),
+                )
+                .unwrap()
+                .as_bytes(),
+            )
+            .await;
             let _ = child.kill().await;
 
             let v = result_value.ok_or("no response from deno worker")?;
             if v.get("ok").and_then(|b| b.as_bool()) == Some(true) {
                 Ok(v.get("result").cloned().unwrap_or(serde_json::Value::Null))
             } else {
-                Err(v.get("error").and_then(|e| e.as_str()).unwrap_or("deno eval error").to_string())
+                Err(v
+                    .get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("deno eval error")
+                    .to_string())
             }
         }
 
         "sylva.eval" => {
-            let src = params.get("src").or_else(|| params.get("code")).and_then(|v| v.as_str()).ok_or("missing src/code")?;
+            let src = params
+                .get("src")
+                .or_else(|| params.get("code"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing src/code")?;
             // Wire tool_fn so Sylva scripts can call daemon RPC methods via
             // tool("method_name", args_json_value).
             let state_clone = state.clone();
-            let tool_fn: bonsai_sylva::vm::ToolFn = Arc::new(move |method: String, args: serde_json::Value| {
-                // Dispatch synchronously using a blocking runtime handle.
-                let state2 = state_clone.clone();
-                let method2 = method.clone();
-                let result = tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async move {
-                        dispatch(&method2, &args, &state2).await
-                    })
+            let tool_fn: bonsai_sylva::vm::ToolFn =
+                Arc::new(move |method: String, args: serde_json::Value| {
+                    // Dispatch synchronously using a blocking runtime handle.
+                    let state2 = state_clone.clone();
+                    let method2 = method.clone();
+                    let result = tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current()
+                            .block_on(async move { dispatch(&method2, &args, &state2).await })
+                    });
+                    result.map_err(|e| bonsai_sylva::VmError::ToolCallFailed(e))
                 });
-                result.map_err(|e| bonsai_sylva::VmError::ToolCallFailed(e))
-            });
             let mut vm = SylvaVm::with_tool_fn(tool_fn);
             bonsai_sylva::stdlib::register_stdlib(&mut vm);
             let result = vm.eval_str(src).map_err(|e| e.to_string())?;
@@ -351,10 +435,20 @@ pub async fn dispatch(
         }
 
         "verify.check_lean" | "verify.verify_lean" => {
-            let src = params.get("source").or_else(|| params.get("src")).and_then(|v| v.as_str()).ok_or("missing source")?;
-            let timeout_secs = params.get("timeout_secs").and_then(|v| v.as_u64()).map(|v| v as u64);
+            let src = params
+                .get("source")
+                .or_else(|| params.get("src"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing source")?;
+            let timeout_secs = params
+                .get("timeout_secs")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as u64);
             let sidecar = LeanSidecar::new();
-            let req = LeanRequest { source: src.to_string(), timeout_secs };
+            let req = LeanRequest {
+                source: src.to_string(),
+                timeout_secs,
+            };
             match sidecar.verify(&req) {
                 Ok(resp) => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
                 Err(e) => Err(e.to_string()),
@@ -362,74 +456,143 @@ pub async fn dispatch(
         }
 
         "verify.check_coq" | "verify.verify_coq" => {
-            let src = params.get("source").or_else(|| params.get("src")).and_then(|v| v.as_str()).ok_or("missing source")?;
+            let src = params
+                .get("source")
+                .or_else(|| params.get("src"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing source")?;
             let timeout_secs = params.get("timeout_secs").and_then(|v| v.as_u64());
-            let req = CoqRequest { source: src.to_string(), logical_name: None, timeout_secs };
+            let req = CoqRequest {
+                source: src.to_string(),
+                logical_name: None,
+                timeout_secs,
+            };
             let sidecar = CoqSidecar::new();
             match sidecar.verify(&req) {
-                Ok(resp)  => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
-                Err(e)    => Err(e.to_string()),
+                Ok(resp) => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
+                Err(e) => Err(e.to_string()),
             }
         }
 
         "verify.check_agda" | "verify.verify_agda" => {
-            let src = params.get("source").or_else(|| params.get("src")).and_then(|v| v.as_str()).ok_or("missing source")?;
-            let module = params.get("module_name").and_then(|v| v.as_str()).unwrap_or("BonsaiProof").to_string();
+            let src = params
+                .get("source")
+                .or_else(|| params.get("src"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing source")?;
+            let module = params
+                .get("module_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("BonsaiProof")
+                .to_string();
             let timeout_secs = params.get("timeout_secs").and_then(|v| v.as_u64());
-            let req = AgdaRequest { source: src.to_string(), module_name: module, timeout_secs };
+            let req = AgdaRequest {
+                source: src.to_string(),
+                module_name: module,
+                timeout_secs,
+            };
             let sidecar = AgdaSidecar::new();
             match sidecar.verify(&req) {
-                Ok(resp)  => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
-                Err(e)    => Err(e.to_string()),
+                Ok(resp) => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
+                Err(e) => Err(e.to_string()),
             }
         }
 
         "verify.check_isabelle" | "verify.verify_isabelle" => {
-            let src = params.get("source").or_else(|| params.get("src")).and_then(|v| v.as_str()).ok_or("missing source")?;
-            let theory = params.get("theory_name").and_then(|v| v.as_str()).unwrap_or("BonsaiProof").to_string();
-            let imports = params.get("imports").and_then(|v| v.as_array())
-                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+            let src = params
+                .get("source")
+                .or_else(|| params.get("src"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing source")?;
+            let theory = params
+                .get("theory_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("BonsaiProof")
+                .to_string();
+            let imports = params
+                .get("imports")
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect()
+                })
                 .unwrap_or_default();
             let timeout_secs = params.get("timeout_secs").and_then(|v| v.as_u64());
-            let req = IsabelleRequest { source: src.to_string(), theory_name: theory, imports, timeout_secs };
+            let req = IsabelleRequest {
+                source: src.to_string(),
+                theory_name: theory,
+                imports,
+                timeout_secs,
+            };
             let sidecar = IsabelleSidecar::new();
             match sidecar.verify(&req) {
-                Ok(resp)  => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
-                Err(e)    => Err(e.to_string()),
+                Ok(resp) => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
+                Err(e) => Err(e.to_string()),
             }
         }
 
         "verify.check_fstar" | "verify.verify_fstar" => {
-            let src = params.get("code").or_else(|| params.get("source")).and_then(|v| v.as_str()).ok_or("missing code")?;
-            let extra_flags = params.get("options").and_then(|v| v.as_array())
-                .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+            let src = params
+                .get("code")
+                .or_else(|| params.get("source"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing code")?;
+            let extra_flags = params
+                .get("options")
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect()
+                })
                 .unwrap_or_default();
             let timeout_secs = params.get("timeout_secs").and_then(|v| v.as_u64());
-            let req = FStarRequest { source: src.to_string(), extra_flags, timeout_secs };
+            let req = FStarRequest {
+                source: src.to_string(),
+                extra_flags,
+                timeout_secs,
+            };
             let sidecar = FStarSidecar::new();
             match sidecar.verify(&req) {
                 Ok(resp) => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
-                Err(e)   => Err(e.to_string()),
+                Err(e) => Err(e.to_string()),
             }
         }
 
         "verify.check_tla" | "verify.verify_tla" => {
-            let spec = params.get("spec").and_then(|v| v.as_str()).ok_or("missing spec")?;
-            let config = params.get("config").and_then(|v| v.as_str()).map(str::to_string);
-            let spec_name = params.get("spec_name").and_then(|v| v.as_str()).map(str::to_string);
+            let spec = params
+                .get("spec")
+                .and_then(|v| v.as_str())
+                .ok_or("missing spec")?;
+            let config = params
+                .get("config")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let spec_name = params
+                .get("spec_name")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
             let timeout_secs = params.get("timeout_secs").and_then(|v| v.as_u64());
-            let req = TlaRequest { spec: spec.to_string(), config, spec_name, timeout_secs, extra_flags: vec![] };
+            let req = TlaRequest {
+                spec: spec.to_string(),
+                config,
+                spec_name,
+                timeout_secs,
+                extra_flags: vec![],
+            };
             let sidecar = TlaSidecar::new();
             match sidecar.verify(&req) {
                 Ok(resp) => Ok(serde_json::to_value(&resp).map_err(|e| e.to_string())?),
-                Err(e)   => Err(e.to_string()),
+                Err(e) => Err(e.to_string()),
             }
         }
 
         "ci.submit_pipeline" => {
             // Expect a `pipeline` object in params
             let pipeline_val = params.get("pipeline").ok_or("missing pipeline")?.clone();
-            let pipeline: PipelineDef = serde_json::from_value(pipeline_val).map_err(|e| e.to_string())?;
+            let pipeline: PipelineDef =
+                serde_json::from_value(pipeline_val).map_err(|e| e.to_string())?;
 
             // Ensure orchestrator exists
             let mut orch_lock = state.orchestrator.lock().await;
@@ -454,9 +617,18 @@ pub async fn dispatch(
         }
 
         "tools.call" => {
-            let name = params.get("name").and_then(|v| v.as_str()).ok_or("missing name")?;
-            let args = params.get("args").cloned().unwrap_or(serde_json::Value::Null);
-            let skill = state.tools.get(name).ok_or_else(|| format!("tool not found: {name}"))?;
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or("missing name")?;
+            let args = params
+                .get("args")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
+            let skill = state
+                .tools
+                .get(name)
+                .ok_or_else(|| format!("tool not found: {name}"))?;
 
             // ── Trust gate ──────────────────────────────────────────────────
             // Build a TrustScore from the skill's required permissions and
@@ -466,13 +638,21 @@ pub async fn dispatch(
             // Convert permission strings to BonsaiEffect for penalty calculation.
             // Unknown strings incur no penalty.
             let effects: Vec<bonsai_capability_registry::BonsaiEffect> = skill
-                .requires_permissions.iter()
+                .requires_permissions
+                .iter()
                 .filter_map(|p| serde_json::from_value(serde_json::json!(p)).ok())
                 .collect();
             score.add_capability_penalty(effect_penalty(&effects));
             let gate = DeploymentGate::Staging;
-            if let bonsai_capability_registry::GateResult::Fail { required, actual, reason } = gate.check(&score) {
-                return Err(format!("trust gate failed: score {actual} < required {required}: {reason}"));
+            if let bonsai_capability_registry::GateResult::Fail {
+                required,
+                actual,
+                reason,
+            } = gate.check(&score)
+            {
+                return Err(format!(
+                    "trust gate failed: score {actual} < required {required}: {reason}"
+                ));
             }
             // ── End trust gate ──────────────────────────────────────────────
 
@@ -480,7 +660,10 @@ pub async fn dispatch(
             let wasm_bytes = skill.wasm_bytes.clone();
             let result = tokio::task::spawn_blocking(move || {
                 bonsai_skills::execute_skill(&wasm_bytes, &args)
-            }).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+            })
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
 
             Ok(serde_json::to_value(&result).map_err(|e| e.to_string())?)
         }
@@ -491,7 +674,10 @@ pub async fn dispatch(
         }
 
         "tools.get" => {
-            let name = params.get("name").and_then(|v| v.as_str()).ok_or("missing name")?;
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or("missing name")?;
             match state.tools.get(name) {
                 Some(skill) => Ok(serde_json::json!({
                     "name": skill.name,
@@ -506,40 +692,68 @@ pub async fn dispatch(
         }
 
         // ── P2P lanes ─────────────────────────────────────────────────────────
-
         "p2p.start_webrtc" => {
-            let name  = params.get("name").and_then(|v| v.as_str()).unwrap_or("webrtc:default");
-            let stuns: Vec<String> = params.get("stun_urls")
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("webrtc:default");
+            let stuns: Vec<String> = params
+                .get("stun_urls")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|s| s.as_str().map(String::from)).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|s| s.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_else(|| vec!["stun:stun.l.google.com:19302".into()]);
 
-            let (lane, offer_sdp) = bonsai_p2p::WebRtcLane::new_offer(name, stuns).await
+            let (lane, offer_sdp) = bonsai_p2p::WebRtcLane::new_offer(name, stuns)
+                .await
                 .map_err(|e| e.to_string())?;
 
             let lane_name = lane.name().to_string();
-            state.webrtc_lanes.lock().await.insert(lane_name.clone(), lane.clone());
+            state
+                .webrtc_lanes
+                .lock()
+                .await
+                .insert(lane_name.clone(), lane.clone());
             state.p2p_lanes.lock().await.insert(lane_name.clone(), lane);
             Ok(serde_json::json!({ "lane": lane_name, "offer_sdp": offer_sdp }))
         }
 
         "p2p.accept_webrtc_answer" => {
-            let name       = params.get("name").and_then(|v| v.as_str()).ok_or("missing name")?;
-            let answer_sdp = params.get("answer_sdp").and_then(|v| v.as_str()).ok_or("missing answer_sdp")?;
-            let lane = state.webrtc_lanes.lock().await
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or("missing name")?;
+            let answer_sdp = params
+                .get("answer_sdp")
+                .and_then(|v| v.as_str())
+                .ok_or("missing answer_sdp")?;
+            let lane = state
+                .webrtc_lanes
+                .lock()
+                .await
                 .get(name)
                 .cloned()
                 .ok_or_else(|| format!("no WebRTC lane: {name}"))?;
-            bonsai_p2p::WebRtcLane::accept_answer(&lane, answer_sdp).await
+            bonsai_p2p::WebRtcLane::accept_answer(&lane, answer_sdp)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({ "ok": true }))
         }
 
         "p2p.start_swarm" => {
-            let name      = params.get("name").and_then(|v| v.as_str()).unwrap_or("swarm:default");
-            let peer_addr = params.get("peer_addr").and_then(|v| v.as_str())
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("swarm:default");
+            let peer_addr = params
+                .get("peer_addr")
+                .and_then(|v| v.as_str())
                 .ok_or("missing peer_addr")?;
-            let lane = bonsai_p2p::SwarmLane::connect(name, peer_addr).await
+            let lane = bonsai_p2p::SwarmLane::connect(name, peer_addr)
+                .await
                 .map_err(|e| e.to_string())?;
             let lane_name = lane.name().to_string();
             state.p2p_lanes.lock().await.insert(lane_name.clone(), lane);
@@ -547,12 +761,24 @@ pub async fn dispatch(
         }
 
         "p2p.start_onion" => {
-            let name       = params.get("name").and_then(|v| v.as_str()).unwrap_or("onion:default");
-            let target     = params.get("target").and_then(|v| v.as_str()).ok_or("missing target")?;
-            let port       = params.get("port").and_then(|v| v.as_u64()).ok_or("missing port")? as u16;
-            let proxy_addr = params.get("proxy_addr").and_then(|v| v.as_str())
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("onion:default");
+            let target = params
+                .get("target")
+                .and_then(|v| v.as_str())
+                .ok_or("missing target")?;
+            let port = params
+                .get("port")
+                .and_then(|v| v.as_u64())
+                .ok_or("missing port")? as u16;
+            let proxy_addr = params
+                .get("proxy_addr")
+                .and_then(|v| v.as_str())
                 .unwrap_or("127.0.0.1:9050");
-            let lane = bonsai_p2p::OnionLane::connect(name, proxy_addr, target, port).await
+            let lane = bonsai_p2p::OnionLane::connect(name, proxy_addr, target, port)
+                .await
                 .map_err(|e| e.to_string())?;
             let lane_name = lane.name().to_string();
             state.p2p_lanes.lock().await.insert(lane_name.clone(), lane);
@@ -561,39 +787,52 @@ pub async fn dispatch(
 
         "p2p.list_lanes" => {
             let lanes = state.p2p_lanes.lock().await;
-            let list: Vec<serde_json::Value> = lanes.values().map(|l| {
-                let h = l.health();
-                serde_json::json!({
-                    "name":      l.name(),
-                    "kind":      format!("{:?}", l.kind()),
-                    "available": h.available,
-                    "rtt_ms":    h.rtt_ms,
-                    "bw_bps":    h.bandwidth_bps,
+            let list: Vec<serde_json::Value> = lanes
+                .values()
+                .map(|l| {
+                    let h = l.health();
+                    serde_json::json!({
+                        "name":      l.name(),
+                        "kind":      format!("{:?}", l.kind()),
+                        "available": h.available,
+                        "rtt_ms":    h.rtt_ms,
+                        "bw_bps":    h.bandwidth_bps,
+                    })
                 })
-            }).collect();
+                .collect();
             Ok(serde_json::json!({ "lanes": list }))
         }
 
         "p2p.close_lane" => {
-            let name = params.get("name").and_then(|v| v.as_str()).ok_or("missing name")?;
-            let lane = state.p2p_lanes.lock().await.remove(name)
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or("missing name")?;
+            let lane = state
+                .p2p_lanes
+                .lock()
+                .await
+                .remove(name)
                 .ok_or_else(|| format!("no lane: {name}"))?;
             lane.close().await;
             Ok(serde_json::json!({ "ok": true }))
         }
 
         // ── Creator (generative AI) ───────────────────────────────────────────
-
         "creator.generate" => {
             let gen_params: bonsai_creator::GenerateParams =
                 serde_json::from_value(params.clone()).map_err(|e| format!("bad params: {e}"))?;
 
             // Guardian prompt check.
             let guardian = bonsai_creator::guardian::Guardian::default();
-            guardian.check_prompt(&gen_params.prompt)
+            guardian
+                .check_prompt(&gen_params.prompt)
                 .map_err(|e| format!("content policy: {e}"))?;
 
-            let tool = state.creator.get(&gen_params.modality).await
+            let tool = state
+                .creator
+                .get(&gen_params.modality)
+                .await
                 .ok_or_else(|| format!("unknown modality: {}", gen_params.modality))?;
 
             let result = tool.generate(gen_params).await.map_err(|e| e.to_string())?;
@@ -609,40 +848,68 @@ pub async fn dispatch(
         }
 
         "creator.fine_tune" => {
-            let base_model = params.get("base_model").and_then(|v| v.as_str())
-                .ok_or("missing base_model")?.to_string();
+            let base_model = params
+                .get("base_model")
+                .and_then(|v| v.as_str())
+                .ok_or("missing base_model")?
+                .to_string();
             let epochs = params.get("epochs").and_then(|v| v.as_u64()).unwrap_or(5) as u32;
-            let dataset_hex = params.get("dataset_cas_key").and_then(|v| v.as_str())
+            let dataset_hex = params
+                .get("dataset_cas_key")
+                .and_then(|v| v.as_str())
                 .ok_or("missing dataset_cas_key")?;
             let dataset_key = bonsai_cas::CasKey::from_hex(dataset_hex)
                 .map_err(|e| format!("invalid CAS key: {e}"))?;
 
-            let actor = bonsai_creator::fine_tuning::FineTuningActor::new(state.creator.cas.clone());
-            let adapter_key = actor.start_lora_job(base_model, vec![dataset_key], epochs).await
+            let actor =
+                bonsai_creator::fine_tuning::FineTuningActor::new(state.creator.cas.clone());
+            let adapter_key = actor
+                .start_lora_job(base_model, vec![dataset_key], epochs)
+                .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({ "adapter_cas_key": adapter_key.hex() }))
         }
 
         "creator.fetch_model" => {
-            let name  = params.get("name").and_then(|v| v.as_str()).ok_or("missing name")?;
-            let url   = params.get("url").and_then(|v| v.as_str()).ok_or("missing url")?;
-            let confirmed = params.get("user_confirmed").and_then(|v| v.as_bool()).unwrap_or(false);
-            let cache_dir = dirs::data_dir().unwrap_or_default().join("bonsai").join("models");
-            bonsai_creator::model_fetch::fetch_model(name, url, &cache_dir, confirmed).await
+            let name = params
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or("missing name")?;
+            let url = params
+                .get("url")
+                .and_then(|v| v.as_str())
+                .ok_or("missing url")?;
+            let confirmed = params
+                .get("user_confirmed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let cache_dir = dirs::data_dir()
+                .unwrap_or_default()
+                .join("bonsai")
+                .join("models");
+            bonsai_creator::model_fetch::fetch_model(name, url, &cache_dir, confirmed)
+                .await
                 .map(|p| serde_json::json!({ "path": p.display().to_string() }))
                 .map_err(|e| e.to_string())
         }
 
         "creator.list_cached_models" => {
-            let cache_dir = dirs::data_dir().unwrap_or_default().join("bonsai").join("models");
-            let models = bonsai_creator::model_fetch::list_cached(&cache_dir).await
+            let cache_dir = dirs::data_dir()
+                .unwrap_or_default()
+                .join("bonsai")
+                .join("models");
+            let models = bonsai_creator::model_fetch::list_cached(&cache_dir)
+                .await
                 .unwrap_or_default();
             Ok(serde_json::json!({ "models": models }))
         }
 
         "creator.compose" => {
-            let script = params.get("script").and_then(|v| v.as_str())
-                .ok_or("missing script")?.to_string();
+            let script = params
+                .get("script")
+                .and_then(|v| v.as_str())
+                .ok_or("missing script")?
+                .to_string();
             let composer = bonsai_creator::composer::SylvaComposer::new(
                 state.creator.clone(),
                 state.tools.clone(),
@@ -655,9 +922,14 @@ pub async fn dispatch(
         }
 
         "daemon.update_binary" => {
-            let new_path = params.get("path").and_then(|v| v.as_str()).ok_or("missing path")?;
+            let new_path = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("missing path")?;
             let p = std::path::PathBuf::from(new_path);
-            if !p.exists() { return Err(format!("binary not found: {new_path}")); }
+            if !p.exists() {
+                return Err(format!("binary not found: {new_path}"));
+            }
             crate::binary_swap::replace_running_binary(&p).map_err(|e| e.to_string())?;
             Ok(serde_json::json!({ "ok": true, "message": "binary replaced; re-exec to activate" }))
         }

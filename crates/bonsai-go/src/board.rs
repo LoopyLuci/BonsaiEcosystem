@@ -1,8 +1,8 @@
 //! 19×19 Go board with capture logic, Ko detection, territory scoring, SGF I/O.
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use serde::{Deserialize, Serialize};
 use crate::error::GoError;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub type BoardSize = u8;
 pub const DEFAULT_SIZE: BoardSize = 19;
@@ -14,14 +14,24 @@ pub struct Point {
 }
 
 impl Point {
-    pub fn new(x: u8, y: u8) -> Self { Self { x, y } }
+    pub fn new(x: u8, y: u8) -> Self {
+        Self { x, y }
+    }
 
     pub fn neighbors(self, size: BoardSize) -> Vec<Point> {
         let mut n = Vec::with_capacity(4);
-        if self.x > 0          { n.push(Point::new(self.x - 1, self.y)); }
-        if self.x + 1 < size   { n.push(Point::new(self.x + 1, self.y)); }
-        if self.y > 0          { n.push(Point::new(self.x, self.y - 1)); }
-        if self.y + 1 < size   { n.push(Point::new(self.x, self.y + 1)); }
+        if self.x > 0 {
+            n.push(Point::new(self.x - 1, self.y));
+        }
+        if self.x + 1 < size {
+            n.push(Point::new(self.x + 1, self.y));
+        }
+        if self.y > 0 {
+            n.push(Point::new(self.x, self.y - 1));
+        }
+        if self.y + 1 < size {
+            n.push(Point::new(self.x, self.y + 1));
+        }
         n
     }
 
@@ -34,7 +44,9 @@ impl Point {
 
     pub fn from_gtp(s: &str, size: BoardSize) -> Option<Self> {
         let s = s.trim().to_uppercase();
-        if s == "PASS" { return None; }
+        if s == "PASS" {
+            return None;
+        }
         let mut chars = s.chars();
         let col_c = chars.next()?;
         let row_s: String = chars.collect();
@@ -47,11 +59,17 @@ impl Point {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Stone { Black, White }
+pub enum Stone {
+    Black,
+    White,
+}
 
 impl Stone {
     pub fn opponent(self) -> Self {
-        match self { Stone::Black => Stone::White, Stone::White => Stone::Black }
+        match self {
+            Stone::Black => Stone::White,
+            Stone::White => Stone::Black,
+        }
     }
 }
 
@@ -79,11 +97,17 @@ impl GoBoard {
         }
     }
 
-    pub fn standard() -> Self { Self::new(DEFAULT_SIZE) }
+    pub fn standard() -> Self {
+        Self::new(DEFAULT_SIZE)
+    }
 
-    pub fn get(&self, p: Point) -> Option<Stone> { self.stones.get(&p).copied() }
+    pub fn get(&self, p: Point) -> Option<Stone> {
+        self.stones.get(&p).copied()
+    }
 
-    fn in_bounds(&self, p: Point) -> bool { p.x < self.size && p.y < self.size }
+    fn in_bounds(&self, p: Point) -> bool {
+        p.x < self.size && p.y < self.size
+    }
 
     /// Flood-fill to find the group containing `p` and its liberties.
     pub fn group_and_liberties(&self, p: Point) -> (HashSet<Point>, HashSet<Point>) {
@@ -100,7 +124,9 @@ impl GoBoard {
         while let Some(cur) = queue.pop_front() {
             for nb in cur.neighbors(self.size) {
                 match self.get(nb) {
-                    None => { liberties.insert(nb); }
+                    None => {
+                        liberties.insert(nb);
+                    }
                     Some(c) if c == color && !group.contains(&nb) => {
                         group.insert(nb);
                         queue.push_back(nb);
@@ -134,7 +160,9 @@ impl GoBoard {
             if self.get(nb) == Some(color.opponent()) {
                 let (grp, libs) = self.group_and_liberties(nb);
                 if libs.is_empty() {
-                    for cap in &grp { self.stones.remove(cap); }
+                    for cap in &grp {
+                        self.stones.remove(cap);
+                    }
                     captured.extend(grp);
                 }
             }
@@ -168,7 +196,9 @@ impl GoBoard {
     }
 
     /// Game ends after two consecutive passes.
-    pub fn is_terminal(&self) -> bool { self.consecutive_passes >= 2 }
+    pub fn is_terminal(&self) -> bool {
+        self.consecutive_passes >= 2
+    }
 
     /// All empty intersections.
     pub fn empty_points(&self) -> Vec<Point> {
@@ -176,7 +206,9 @@ impl GoBoard {
         for x in 0..self.size {
             for y in 0..self.size {
                 let p = Point::new(x, y);
-                if self.get(p).is_none() { pts.push(p); }
+                if self.get(p).is_none() {
+                    pts.push(p);
+                }
             }
         }
         pts
@@ -193,7 +225,9 @@ impl GoBoard {
         for x in 0..self.size {
             for y in 0..self.size {
                 let p = Point::new(x, y);
-                if self.get(p).is_some() || visited.contains(&p) { continue; }
+                if self.get(p).is_some() || visited.contains(&p) {
+                    continue;
+                }
 
                 // BFS from empty point
                 let mut region = HashSet::new();
@@ -209,7 +243,9 @@ impl GoBoard {
                                 region.insert(nb);
                                 queue.push_back(nb);
                             }
-                            Some(c) => { borders.insert(c); }
+                            Some(c) => {
+                                borders.insert(c);
+                            }
                             _ => {}
                         }
                     }
@@ -218,10 +254,13 @@ impl GoBoard {
                 visited.extend(region.iter().copied());
                 let count = region.len() as u32;
 
-                match (borders.contains(&Stone::Black), borders.contains(&Stone::White)) {
-                    (true, false)  => black_t += count,
-                    (false, true)  => white_t += count,
-                    _              => dame += count,
+                match (
+                    borders.contains(&Stone::Black),
+                    borders.contains(&Stone::White),
+                ) {
+                    (true, false) => black_t += count,
+                    (false, true) => white_t += count,
+                    _ => dame += count,
                 }
             }
         }
@@ -254,7 +293,9 @@ impl GoBoard {
 
         // Plane 16: color to move
         if current_color == Stone::Black {
-            for i in 0..sq { planes[16 * sq + i] = 1.0; }
+            for i in 0..sq {
+                planes[16 * sq + i] = 1.0;
+            }
         }
 
         planes
@@ -266,7 +307,10 @@ impl GoBoard {
     pub fn to_sgf(moves: &[(Stone, Option<Point>)], size: BoardSize, komi: f32) -> String {
         let mut sgf = format!("(;FF[4]GM[1]SZ[{}]KM[{}]", size, komi);
         for (color, pt) in moves {
-            let c = match color { Stone::Black => 'B', Stone::White => 'W' };
+            let c = match color {
+                Stone::Black => 'B',
+                Stone::White => 'W',
+            };
             let coord = match pt {
                 None => String::new(),
                 Some(p) => {

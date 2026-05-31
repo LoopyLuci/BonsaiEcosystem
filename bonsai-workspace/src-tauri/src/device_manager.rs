@@ -155,9 +155,19 @@ pub struct DeviceInventory {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HotplugEvent {
-    Connected { device_id: String, device_class: String, name: String },
-    Disconnected { device_id: String, device_class: String },
-    BatteryLow { device_id: String, level: u8 },
+    Connected {
+        device_id: String,
+        device_class: String,
+        name: String,
+    },
+    Disconnected {
+        device_id: String,
+        device_class: String,
+    },
+    BatteryLow {
+        device_id: String,
+        level: u8,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,7 +218,12 @@ impl DeviceManager {
             resolution: (1920, 1080),
             refresh_rate: 60,
             hdr_capable: false,
-            color_profile: ColorProfile { name: "sRGB".into(), gamma: 2.2, brightness: 80, contrast: 75 },
+            color_profile: ColorProfile {
+                name: "sRGB".into(),
+                gamma: 2.2,
+                brightness: 80,
+                contrast: 75,
+            },
             is_primary: true,
             scaling: 1.0,
             connected: true,
@@ -295,18 +310,20 @@ impl DeviceManager {
 
     pub async fn enumerate(&self) -> DeviceInventory {
         DeviceInventory {
-            displays:  self.displays.read().await.clone(),
-            inputs:    self.input_devices.read().await.clone(),
-            audio:     self.audio_devices.read().await.clone(),
-            network:   self.network_adapters.read().await.clone(),
-            storage:   self.storage_devices.read().await.clone(),
-            gpus:      self.gpu_devices.read().await.clone(),
+            displays: self.displays.read().await.clone(),
+            inputs: self.input_devices.read().await.clone(),
+            audio: self.audio_devices.read().await.clone(),
+            network: self.network_adapters.read().await.clone(),
+            storage: self.storage_devices.read().await.clone(),
+            gpus: self.gpu_devices.read().await.clone(),
         }
     }
 
     pub async fn configure_display(&self, id: &str, config: &DisplayConfig) -> Result<(), String> {
         let mut displays = self.displays.write().await;
-        let display = displays.iter_mut().find(|d| d.id == id)
+        let display = displays
+            .iter_mut()
+            .find(|d| d.id == id)
             .ok_or_else(|| format!("Display '{}' not found", id))?;
         display.resolution = config.resolution;
         display.refresh_rate = config.refresh_rate;
@@ -315,7 +332,10 @@ impl DeviceManager {
         if let Some(profile) = &config.color_profile {
             display.color_profile = profile.clone();
         }
-        info!("[device-mgr] display {} configured: {:?}", id, config.resolution);
+        info!(
+            "[device-mgr] display {} configured: {:?}",
+            id, config.resolution
+        );
         Ok(())
     }
 
@@ -339,7 +359,12 @@ impl DeviceManager {
     }
 
     pub async fn input_device_info(&self, id: &str) -> Option<InputDevice> {
-        self.input_devices.read().await.iter().find(|d| d.id == id).cloned()
+        self.input_devices
+            .read()
+            .await
+            .iter()
+            .find(|d| d.id == id)
+            .cloned()
     }
 
     /// AI-powered peripheral optimization heuristic.
@@ -389,7 +414,11 @@ impl DeviceManager {
     pub async fn on_hotplug(&self, event: HotplugEvent) {
         info!("[device-mgr] hotplug: {:?}", event);
         match &event {
-            HotplugEvent::Connected { device_id, device_class, name } => {
+            HotplugEvent::Connected {
+                device_id,
+                device_class,
+                name,
+            } => {
                 if device_class == "display" {
                     self.displays.write().await.push(Display {
                         id: device_id.clone(),
@@ -404,7 +433,10 @@ impl DeviceManager {
                     });
                 }
             }
-            HotplugEvent::Disconnected { device_id, device_class } => {
+            HotplugEvent::Disconnected {
+                device_id,
+                device_class,
+            } => {
                 if device_class == "display" {
                     let mut displays = self.displays.write().await;
                     if let Some(d) = displays.iter_mut().find(|d| &d.id == device_id) {
@@ -413,7 +445,10 @@ impl DeviceManager {
                 }
             }
             HotplugEvent::BatteryLow { device_id, level } => {
-                warn!("[device-mgr] battery low: device={} level={}%", device_id, level);
+                warn!(
+                    "[device-mgr] battery low: device={} level={}%",
+                    device_id, level
+                );
             }
         }
         self.hotplug_log.write().await.push(event);
@@ -428,9 +463,7 @@ use crate::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub async fn omni_devices_list(
-    state: State<'_, AppState>,
-) -> Result<serde_json::Value, String> {
+pub async fn omni_devices_list(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let inv = state.device_manager.enumerate().await;
     Ok(serde_json::to_value(inv).map_err(|e| e.to_string())?)
 }
@@ -451,7 +484,10 @@ pub async fn omni_display_config(
         hdr_enabled: false,
         color_profile: None,
     };
-    state.device_manager.configure_display(&display_id, &cfg).await?;
+    state
+        .device_manager
+        .configure_display(&display_id, &cfg)
+        .await?;
     Ok(serde_json::json!({ "ok": true }))
 }
 
@@ -460,7 +496,10 @@ pub async fn omni_audio_device_set(
     device_id: String,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    state.device_manager.set_default_audio_output(&device_id).await?;
+    state
+        .device_manager
+        .set_default_audio_output(&device_id)
+        .await?;
     Ok(serde_json::json!({ "ok": true }))
 }
 
@@ -480,7 +519,10 @@ pub async fn omni_device_optimize(
     complaint: String,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let actions = state.device_manager.ai_optimize_peripheral(&complaint).await;
+    let actions = state
+        .device_manager
+        .ai_optimize_peripheral(&complaint)
+        .await;
     Ok(serde_json::to_value(actions).map_err(|e| e.to_string())?)
 }
 

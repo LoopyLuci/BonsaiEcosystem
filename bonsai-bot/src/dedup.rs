@@ -3,17 +3,17 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 pub struct DedupCache {
-    inner:    Mutex<HashMap<String, Instant>>,
+    inner: Mutex<HashMap<String, Instant>>,
     capacity: usize,
-    ttl:      Duration,
+    ttl: Duration,
 }
 
 impl DedupCache {
     pub fn new(capacity: usize, ttl_secs: u64) -> Self {
         Self {
-            inner:    Mutex::new(HashMap::with_capacity(capacity.min(1024))),
+            inner: Mutex::new(HashMap::with_capacity(capacity.min(1024))),
             capacity,
-            ttl:      Duration::from_secs(ttl_secs),
+            ttl: Duration::from_secs(ttl_secs),
         }
     }
 

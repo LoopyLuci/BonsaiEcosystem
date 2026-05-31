@@ -26,7 +26,13 @@ pub struct MailEnvelope {
 }
 
 impl MailEnvelope {
-    pub fn new(from: AgentId, to: AgentId, topic: &str, payload: Vec<u8>, signature: Vec<u8>) -> Self {
+    pub fn new(
+        from: AgentId,
+        to: AgentId,
+        topic: &str,
+        payload: Vec<u8>,
+        signature: Vec<u8>,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             from,

@@ -5,17 +5,15 @@ pub struct Trainer;
 impl Trainer {
     /// Run finetune.py with a local GGUF model path (100% offline).
     /// Falls back to the Python 3.12 absolute path on Windows if `py` fails.
-    pub fn run(
-        gguf_path: Option<&str>,
-        data: &str,
-        output: &str,
-    ) -> Result<PathBuf, String> {
+    pub fn run(gguf_path: Option<&str>, data: &str, output: &str) -> Result<PathBuf, String> {
         let out = PathBuf::from(output);
 
         let mut base_args: Vec<&str> = vec![
             "runtimes/bonsai-trainer/finetune.py",
-            "--data", data,
-            "--output", output,
+            "--data",
+            data,
+            "--output",
+            output,
             "--local-only",
         ];
 
@@ -45,19 +43,17 @@ impl Trainer {
         for launcher in launchers {
             let result = std::process::Command::new(launcher)
                 .args(&base_args)
-                .env("TRANSFORMERS_OFFLINE",        "1")
-                .env("HF_HUB_OFFLINE",              "1")
-                .env("HF_DATASETS_OFFLINE",         "1")
-                .env("HF_HUB_DISABLE_TELEMETRY",    "1")
-                .env("PYTHONUTF8",                  "1")
-                .env("PYTHONUNBUFFERED",             "1")
+                .env("TRANSFORMERS_OFFLINE", "1")
+                .env("HF_HUB_OFFLINE", "1")
+                .env("HF_DATASETS_OFFLINE", "1")
+                .env("HF_HUB_DISABLE_TELEMETRY", "1")
+                .env("PYTHONUTF8", "1")
+                .env("PYTHONUNBUFFERED", "1")
                 .status();
 
             match result {
                 Ok(status) if status.success() => return Ok(out),
-                Ok(status) => {
-                    return Err(format!("Training failed (exit {:?})", status.code()))
-                }
+                Ok(status) => return Err(format!("Training failed (exit {:?})", status.code())),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                     last_err = format!("{launcher}: not found");
                     continue;
@@ -65,6 +61,8 @@ impl Trainer {
                 Err(e) => return Err(e.to_string()),
             }
         }
-        Err(format!("No Python interpreter found. Tried: py, python3, python. Last: {last_err}"))
+        Err(format!(
+            "No Python interpreter found. Tried: py, python3, python. Last: {last_err}"
+        ))
     }
 }

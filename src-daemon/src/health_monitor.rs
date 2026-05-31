@@ -3,9 +3,9 @@ use std::time::Duration;
 use sysinfo::System;
 use tracing::{debug, info, warn};
 
-use bonsai_cas::{CasEvent, CasStore};
-use crate::state::DaemonState;
 use crate::checkpoint_impl;
+use crate::state::DaemonState;
+use bonsai_cas::{CasEvent, CasStore};
 
 /// Memory ceiling above which a warning is emitted (bytes).
 const MEMORY_WARN_BYTES: u64 = 512 * 1024 * 1024; // 512 MiB
@@ -34,13 +34,17 @@ pub async fn run_health_monitor(state: Arc<DaemonState>, cas: Arc<CasStore>) {
             let key_str = key_str.trim();
             if !key_str.is_empty() {
                 match bonsai_cas::CasKey::from_hex(key_str) {
-                    Ok(key) => {
-                        match checkpoint_impl::restore(&state, &cas, &key).await {
-                            Ok(()) => info!(cas_key = %key_str, "health-monitor: restored state from checkpoint"),
-                            Err(e) => warn!(error = %e, "health-monitor: checkpoint restore failed (ignored)"),
+                    Ok(key) => match checkpoint_impl::restore(&state, &cas, &key).await {
+                        Ok(()) => {
+                            info!(cas_key = %key_str, "health-monitor: restored state from checkpoint")
                         }
-                    }
-                    Err(e) => warn!("health-monitor: invalid checkpoint key in {checkpoint_key_path:?}: {e}"),
+                        Err(e) => {
+                            warn!(error = %e, "health-monitor: checkpoint restore failed (ignored)")
+                        }
+                    },
+                    Err(e) => warn!(
+                        "health-monitor: invalid checkpoint key in {checkpoint_key_path:?}: {e}"
+                    ),
                 }
             }
         }

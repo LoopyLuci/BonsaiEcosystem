@@ -24,24 +24,24 @@ use serde::{Deserialize, Serialize};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MAGIC:           u64   = 0xB0_A5_A1_30_C0_DE_00_01;
-const ARENA_VERSION:   u32   = 1;
-const HEADER_SIZE:     usize = 256;
-const BLOCK_HDR_SIZE:  usize = 64;
-const GROW_STEP_BYTES: u64   = 64 * 1024 * 1024;   // 64 MiB growth steps
-const DEFAULT_CAP:     u64   = 256 * 1024 * 1024;  // 256 MiB initial capacity
-const MAX_ARENA_BYTES: u64   = 8 * 1024 * 1024 * 1024; // 8 GiB hard cap
+const MAGIC: u64 = 0xB0_A5_A1_30_C0_DE_00_01;
+const ARENA_VERSION: u32 = 1;
+const HEADER_SIZE: usize = 256;
+const BLOCK_HDR_SIZE: usize = 64;
+const GROW_STEP_BYTES: u64 = 64 * 1024 * 1024; // 64 MiB growth steps
+const DEFAULT_CAP: u64 = 256 * 1024 * 1024; // 256 MiB initial capacity
+const MAX_ARENA_BYTES: u64 = 8 * 1024 * 1024 * 1024; // 8 GiB hard cap
 
 // ── Block types ───────────────────────────────────────────────────────────────
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockKind {
-    Free       = 0,
-    Embedding  = 1,  // float32 embedding vector
-    Summary    = 2,  // UTF-8 context summary
-    KvDigest   = 3,  // SHA-256 of a KV-cache page for deduplication
-    Metadata   = 4,  // arbitrary JSON metadata blob
+    Free = 0,
+    Embedding = 1, // float32 embedding vector
+    Summary = 2,   // UTF-8 context summary
+    KvDigest = 3,  // SHA-256 of a KV-cache page for deduplication
+    Metadata = 4,  // arbitrary JSON metadata blob
 }
 
 impl BlockKind {
@@ -60,25 +60,25 @@ impl BlockKind {
 
 #[repr(C)]
 struct ArenaHeader {
-    magic:        u64,
-    version:      u32,
-    capacity:     u64,
-    write_cursor: u64,   // next free byte (>= HEADER_SIZE)
-    block_count:  u64,
-    _pad:         [u8; 222],
+    magic: u64,
+    version: u32,
+    capacity: u64,
+    write_cursor: u64, // next free byte (>= HEADER_SIZE)
+    block_count: u64,
+    _pad: [u8; 222],
 }
 
 #[repr(C)]
 struct RawBlockHeader {
-    kind:       u8,
-    _pad1:      [u8; 3],
+    kind: u8,
+    _pad1: [u8; 3],
     payload_sz: u32,
-    key_hash:   u64,    // xxhash of the lookup key
-    model_hash: u64,    // hash of model_id that wrote this block
-    timestamp:  u64,    // unix seconds
-    generation: u64,    // monotonic write counter
-    ref_count:  u32,    // 0 = can GC
-    _pad2:      [u8; 16],
+    key_hash: u64,   // xxhash of the lookup key
+    model_hash: u64, // hash of model_id that wrote this block
+    timestamp: u64,  // unix seconds
+    generation: u64, // monotonic write counter
+    ref_count: u32,  // 0 = can GC
+    _pad2: [u8; 16],
 }
 
 // ── Public handle types ───────────────────────────────────────────────────────
@@ -86,22 +86,22 @@ struct RawBlockHeader {
 /// A reference to a block inside the arena. Cheap to clone.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryHandle {
-    pub offset:     u64,
-    pub size:       u64,
-    pub kind:       u8,
+    pub offset: u64,
+    pub size: u64,
+    pub kind: u8,
     pub generation: u64,
 }
 
 /// Stats snapshot returned by `SharedMemoryArena::stats()`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArenaStats {
-    pub capacity_bytes:    u64,
-    pub used_bytes:        u64,
-    pub free_bytes:        u64,
-    pub block_count:       u64,
-    pub live_block_count:  u64,
-    pub embedding_count:   u64,
-    pub summary_count:     u64,
+    pub capacity_bytes: u64,
+    pub used_bytes: u64,
+    pub free_bytes: u64,
+    pub block_count: u64,
+    pub live_block_count: u64,
+    pub embedding_count: u64,
+    pub summary_count: u64,
 }
 
 // ── Arena ─────────────────────────────────────────────────────────────────────
@@ -109,16 +109,16 @@ pub struct ArenaStats {
 /// In-process arena state — wraps the mmap'd file.
 /// Use `Arc<SharedMemoryArena>` for shared ownership.
 pub struct SharedMemoryArena {
-    path:    PathBuf,
-    inner:   RwLock<ArenaInner>,
+    path: PathBuf,
+    inner: RwLock<ArenaInner>,
 }
 
 struct ArenaInner {
-    file:    File,
-    data:    Vec<u8>,          // in-memory shadow (Windows: full file content)
-    cursor:  u64,
-    gen:     u64,
-    cap:     u64,
+    file: File,
+    data: Vec<u8>, // in-memory shadow (Windows: full file content)
+    cursor: u64,
+    gen: u64,
+    cap: u64,
 }
 
 // ── Key hashing ───────────────────────────────────────────────────────────────
@@ -131,10 +131,15 @@ fn hash_key(key: &str) -> u64 {
     h.finish()
 }
 
-fn hash_model(model_id: &str) -> u64 { hash_key(model_id) }
+fn hash_model(model_id: &str) -> u64 {
+    hash_key(model_id)
+}
 
 fn unix_now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 // ── Implementation ────────────────────────────────────────────────────────────
@@ -145,43 +150,56 @@ impl SharedMemoryArena {
         let path = path.as_ref().to_path_buf();
         let cap = capacity_bytes.unwrap_or(DEFAULT_CAP).min(MAX_ARENA_BYTES);
 
-        if let Some(p) = path.parent() { std::fs::create_dir_all(p)?; }
+        if let Some(p) = path.parent() {
+            std::fs::create_dir_all(p)?;
+        }
 
         let exists = path.exists();
-        let file = OpenOptions::new().read(true).write(true).create(true).open(&path)?;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&path)?;
 
-        let (data, cursor, gen, actual_cap) = if exists && file.metadata()?.len() >= HEADER_SIZE as u64 {
-            // Read existing arena
-            let raw = std::fs::read(&path)?;
-            let hdr = unsafe { &*(raw.as_ptr() as *const ArenaHeader) };
-            if hdr.magic == MAGIC && hdr.version == ARENA_VERSION {
-                let cur = hdr.write_cursor.min(raw.len() as u64);
-                let g   = hdr.block_count;
-                let c   = hdr.capacity;
-                (raw, cur, g, c)
+        let (data, cursor, gen, actual_cap) =
+            if exists && file.metadata()?.len() >= HEADER_SIZE as u64 {
+                // Read existing arena
+                let raw = std::fs::read(&path)?;
+                let hdr = unsafe { &*(raw.as_ptr() as *const ArenaHeader) };
+                if hdr.magic == MAGIC && hdr.version == ARENA_VERSION {
+                    let cur = hdr.write_cursor.min(raw.len() as u64);
+                    let g = hdr.block_count;
+                    let c = hdr.capacity;
+                    (raw, cur, g, c)
+                } else {
+                    let (d, c, a) = Self::init_file(&file, cap)?;
+                    (d, HEADER_SIZE as u64, 0, a)
+                }
             } else {
                 let (d, c, a) = Self::init_file(&file, cap)?;
                 (d, HEADER_SIZE as u64, 0, a)
-            }
-        } else {
-            let (d, c, a) = Self::init_file(&file, cap)?;
-            (d, HEADER_SIZE as u64, 0, a)
-        };
+            };
 
         Ok(Arc::new(Self {
             path,
-            inner: RwLock::new(ArenaInner { file, data, cursor, gen, cap: actual_cap }),
+            inner: RwLock::new(ArenaInner {
+                file,
+                data,
+                cursor,
+                gen,
+                cap: actual_cap,
+            }),
         }))
     }
 
     fn init_file(file: &File, cap: u64) -> anyhow::Result<(Vec<u8>, u64, u64)> {
         let mut data = vec![0u8; cap as usize];
         let hdr = unsafe { &mut *(data.as_mut_ptr() as *mut ArenaHeader) };
-        hdr.magic        = MAGIC;
-        hdr.version      = ARENA_VERSION;
-        hdr.capacity     = cap;
+        hdr.magic = MAGIC;
+        hdr.version = ARENA_VERSION;
+        hdr.capacity = cap;
         hdr.write_cursor = HEADER_SIZE as u64;
-        hdr.block_count  = 0;
+        hdr.block_count = 0;
         file.set_len(cap)?;
         Ok((data, HEADER_SIZE as u64, cap))
     }
@@ -190,8 +208,8 @@ impl SharedMemoryArena {
         use std::io::{Seek, SeekFrom};
         let hdr = unsafe { &mut *(inner.data.as_mut_ptr() as *mut ArenaHeader) };
         hdr.write_cursor = inner.cursor;
-        hdr.block_count  = inner.gen;
-        hdr.capacity     = inner.cap;
+        hdr.block_count = inner.gen;
+        hdr.capacity = inner.cap;
         inner.file.seek(SeekFrom::Start(0))?;
         inner.file.write_all(&inner.data[..HEADER_SIZE])?;
         Ok(())
@@ -229,18 +247,17 @@ impl SharedMemoryArena {
         inner.gen += 1;
 
         // Write block header
-        let bh = unsafe {
-            &mut *(inner.data[offset as usize..].as_mut_ptr() as *mut RawBlockHeader)
-        };
-        bh.kind       = kind as u8;
-        bh._pad1      = [0; 3];
+        let bh =
+            unsafe { &mut *(inner.data[offset as usize..].as_mut_ptr() as *mut RawBlockHeader) };
+        bh.kind = kind as u8;
+        bh._pad1 = [0; 3];
         bh.payload_sz = payload.len() as u32;
-        bh.key_hash   = hash_key(key);
+        bh.key_hash = hash_key(key);
         bh.model_hash = hash_model(model_id);
-        bh.timestamp  = unix_now();
+        bh.timestamp = unix_now();
         bh.generation = inner.gen;
-        bh.ref_count  = 1;
-        bh._pad2      = [0; 16];
+        bh.ref_count = 1;
+        bh._pad2 = [0; 16];
 
         // Write payload
         let body_start = offset as usize + BLOCK_HDR_SIZE;
@@ -254,8 +271,8 @@ impl SharedMemoryArena {
 
         Ok(MemoryHandle {
             offset,
-            size:       total as u64,
-            kind:       kind as u8,
+            size: total as u64,
+            kind: kind as u8,
             generation: inner.gen,
         })
     }
@@ -269,9 +286,7 @@ impl SharedMemoryArena {
         model_id: &str,
         embedding: &[f32],
     ) -> anyhow::Result<MemoryHandle> {
-        let payload: Vec<u8> = embedding.iter()
-            .flat_map(|f| f.to_le_bytes())
-            .collect();
+        let payload: Vec<u8> = embedding.iter().flat_map(|f| f.to_le_bytes()).collect();
         let mut inner = self.inner.write().unwrap();
         Self::alloc_block(&mut inner, BlockKind::Embedding, key, model_id, &payload)
     }
@@ -284,7 +299,13 @@ impl SharedMemoryArena {
         summary: &str,
     ) -> anyhow::Result<MemoryHandle> {
         let mut inner = self.inner.write().unwrap();
-        Self::alloc_block(&mut inner, BlockKind::Summary, key, model_id, summary.as_bytes())
+        Self::alloc_block(
+            &mut inner,
+            BlockKind::Summary,
+            key,
+            model_id,
+            summary.as_bytes(),
+        )
     }
 
     /// Store arbitrary JSON metadata.
@@ -310,9 +331,7 @@ impl SharedMemoryArena {
         let mut best: Option<MemoryHandle> = None;
 
         while pos + BLOCK_HDR_SIZE as u64 <= inner.cursor {
-            let bh = unsafe {
-                &*(inner.data[pos as usize..].as_ptr() as *const RawBlockHeader)
-            };
+            let bh = unsafe { &*(inner.data[pos as usize..].as_ptr() as *const RawBlockHeader) };
             let total = BLOCK_HDR_SIZE as u64 + bh.payload_sz as u64;
             if bh.kind != BlockKind::Free as u8
                 && bh.kind == kind as u8
@@ -329,7 +348,9 @@ impl SharedMemoryArena {
                     });
                 }
             }
-            if total == 0 { break; }
+            if total == 0 {
+                break;
+            }
             pos += total;
         }
         best
@@ -339,21 +360,27 @@ impl SharedMemoryArena {
     pub fn read_payload(&self, handle: &MemoryHandle) -> Option<Vec<u8>> {
         let inner = self.inner.read().unwrap();
         let start = handle.offset as usize + BLOCK_HDR_SIZE;
-        let bh = unsafe {
-            &*(inner.data[handle.offset as usize..].as_ptr() as *const RawBlockHeader)
-        };
+        let bh =
+            unsafe { &*(inner.data[handle.offset as usize..].as_ptr() as *const RawBlockHeader) };
         let end = start + bh.payload_sz as usize;
-        if end > inner.data.len() { return None; }
+        if end > inner.data.len() {
+            return None;
+        }
         Some(inner.data[start..end].to_vec())
     }
 
     /// Read a stored embedding back as f32 slice.
     pub fn read_embedding(&self, handle: &MemoryHandle) -> Option<Vec<f32>> {
         let bytes = self.read_payload(handle)?;
-        if bytes.len() % 4 != 0 { return None; }
-        Some(bytes.chunks_exact(4)
-            .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-            .collect())
+        if bytes.len() % 4 != 0 {
+            return None;
+        }
+        Some(
+            bytes
+                .chunks_exact(4)
+                .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                .collect(),
+        )
     }
 
     /// Read a stored summary as a String.
@@ -373,9 +400,8 @@ impl SharedMemoryArena {
         let mut reclaimed = 0u64;
 
         while pos + BLOCK_HDR_SIZE as u64 <= inner.cursor {
-            let bh = unsafe {
-                &mut *(inner.data[pos as usize..].as_mut_ptr() as *mut RawBlockHeader)
-            };
+            let bh =
+                unsafe { &mut *(inner.data[pos as usize..].as_mut_ptr() as *mut RawBlockHeader) };
             let total = BLOCK_HDR_SIZE as u64 + bh.payload_sz as u64;
             if bh.kind != BlockKind::Free as u8 {
                 let age = now.saturating_sub(bh.timestamp);
@@ -384,7 +410,9 @@ impl SharedMemoryArena {
                     reclaimed += total;
                 }
             }
-            if total == 0 { break; }
+            if total == 0 {
+                break;
+            }
             pos += total;
         }
         reclaimed
@@ -401,17 +429,17 @@ impl SharedMemoryArena {
         let mut sum = 0u64;
 
         while pos + BLOCK_HDR_SIZE as u64 <= inner.cursor {
-            let bh = unsafe {
-                &*(inner.data[pos as usize..].as_ptr() as *const RawBlockHeader)
-            };
+            let bh = unsafe { &*(inner.data[pos as usize..].as_ptr() as *const RawBlockHeader) };
             let total = BLOCK_HDR_SIZE as u64 + bh.payload_sz as u64;
-            if total == 0 { break; }
+            if total == 0 {
+                break;
+            }
             total_blocks += 1;
             if bh.kind != BlockKind::Free as u8 && bh.ref_count > 0 {
                 live += 1;
                 match BlockKind::from_u8(bh.kind) {
                     BlockKind::Embedding => emb += 1,
-                    BlockKind::Summary   => sum += 1,
+                    BlockKind::Summary => sum += 1,
                     _ => {}
                 }
             }
@@ -419,13 +447,13 @@ impl SharedMemoryArena {
         }
 
         ArenaStats {
-            capacity_bytes:   inner.cap,
-            used_bytes:       inner.cursor - HEADER_SIZE as u64,
-            free_bytes:       inner.cap.saturating_sub(inner.cursor),
-            block_count:      total_blocks,
+            capacity_bytes: inner.cap,
+            used_bytes: inner.cursor - HEADER_SIZE as u64,
+            free_bytes: inner.cap.saturating_sub(inner.cursor),
+            block_count: total_blocks,
             live_block_count: live,
-            embedding_count:  emb,
-            summary_count:    sum,
+            embedding_count: emb,
+            summary_count: sum,
         }
     }
 }

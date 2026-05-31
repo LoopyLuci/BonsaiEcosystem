@@ -8,26 +8,26 @@ use crate::model_orchestrator::ModelOrchestrator;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Persona {
-    pub id:            String,
-    pub name:          String,
+    pub id: String,
+    pub name: String,
     pub system_prompt: String,
-    pub model_id:      Option<String>,
-    pub color:         String,
-    pub icon_emoji:    String,
-    pub created_at:    i64,
-    pub updated_at:    i64,
+    pub model_id: Option<String>,
+    pub color: String,
+    pub icon_emoji: String,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
-    pub id:         String,
+    pub id: String,
     pub slot_index: i64,
-    pub label:      String,
+    pub label: String,
     pub persona_id: Option<String>,
-    pub model_id:   Option<String>,
-    pub color:      String,
+    pub model_id: Option<String>,
+    pub color: String,
     pub icon_emoji: String,
-    pub enabled:    bool,
+    pub enabled: bool,
     pub max_tokens: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -35,37 +35,37 @@ pub struct AgentConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolvedAgent {
-    pub config:              AgentConfig,
-    pub persona:             Option<Persona>,
-    pub system_prompt:       String,
-    pub effective_model_id:  Option<String>,
-    pub context_length:      u32,
-    pub supports_tools:      bool,
-    pub ram_required_mb:     u64,
+    pub config: AgentConfig,
+    pub persona: Option<Persona>,
+    pub system_prompt: String,
+    pub effective_model_id: Option<String>,
+    pub context_length: u32,
+    pub supports_tools: bool,
+    pub ram_required_mb: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SwarmRun {
-    pub id:           String,
-    pub session_id:   Option<String>,
-    pub user_prompt:  String,
-    pub leader_plan:  Option<String>,
-    pub summary:      Option<String>,
-    pub status:       String,
-    pub started_at:   i64,
+    pub id: String,
+    pub session_id: Option<String>,
+    pub user_prompt: String,
+    pub leader_plan: Option<String>,
+    pub summary: Option<String>,
+    pub status: String,
+    pub started_at: i64,
     pub completed_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SwarmAgentResult {
-    pub id:           String,
+    pub id: String,
     pub swarm_run_id: String,
-    pub agent_id:     String,
-    pub agent_slot:   i64,
-    pub subtask:      String,
-    pub result:       Option<String>,
-    pub stats_json:   Option<String>,
-    pub started_at:   i64,
+    pub agent_id: String,
+    pub agent_slot: i64,
+    pub subtask: String,
+    pub result: Option<String>,
+    pub stats_json: Option<String>,
+    pub started_at: i64,
     pub completed_at: Option<i64>,
 }
 
@@ -78,7 +78,8 @@ pub struct AgentStore {
 impl AgentStore {
     pub async fn new(pool: SqlitePool) -> Result<Self> {
         // Create tables
-        sqlx::query(r#"
+        sqlx::query(
+            r#"
             CREATE TABLE IF NOT EXISTS personas (
                 id            TEXT    PRIMARY KEY,
                 name          TEXT    NOT NULL,
@@ -127,28 +128,24 @@ impl AgentStore {
                 started_at   INTEGER NOT NULL,
                 completed_at INTEGER
             );
-        "#)
+        "#,
+        )
         .execute(&pool)
         .await?;
 
         // Add agent_id column to session_messages if not present
-        let _ = sqlx::query(
-            "ALTER TABLE session_messages ADD COLUMN agent_id TEXT",
-        )
-        .execute(&pool)
-        .await;
+        let _ = sqlx::query("ALTER TABLE session_messages ADD COLUMN agent_id TEXT")
+            .execute(&pool)
+            .await;
 
-        let _ = sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_msgs_agent ON session_messages(agent_id)",
-        )
-        .execute(&pool)
-        .await;
+        let _ =
+            sqlx::query("CREATE INDEX IF NOT EXISTS idx_msgs_agent ON session_messages(agent_id)")
+                .execute(&pool)
+                .await;
 
-        let _ = sqlx::query(
-            "ALTER TABLE swarm_runs ADD COLUMN summary TEXT",
-        )
-        .execute(&pool)
-        .await;
+        let _ = sqlx::query("ALTER TABLE swarm_runs ADD COLUMN summary TEXT")
+            .execute(&pool)
+            .await;
 
         // Seed Leader if table is empty
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM agent_configs")
@@ -183,53 +180,59 @@ impl AgentStore {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| AgentConfig {
-            id:         r.get("id"),
-            slot_index: r.get("slot_index"),
-            label:      r.get("label"),
-            persona_id: r.get("persona_id"),
-            model_id:   r.get("model_id"),
-            color:      r.get("color"),
-            icon_emoji: r.get("icon_emoji"),
-            enabled:    r.get::<i64, _>("enabled") != 0,
-            max_tokens: r.get("max_tokens"),
-            created_at: r.get("created_at"),
-            updated_at: r.get("updated_at"),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| AgentConfig {
+                id: r.get("id"),
+                slot_index: r.get("slot_index"),
+                label: r.get("label"),
+                persona_id: r.get("persona_id"),
+                model_id: r.get("model_id"),
+                color: r.get("color"),
+                icon_emoji: r.get("icon_emoji"),
+                enabled: r.get::<i64, _>("enabled") != 0,
+                max_tokens: r.get("max_tokens"),
+                created_at: r.get("created_at"),
+                updated_at: r.get("updated_at"),
+            })
+            .collect())
     }
 
-    pub async fn resolve_agents(&self, orchestrator: &ModelOrchestrator) -> Result<Vec<ResolvedAgent>> {
-        let agents   = self.list_agents().await?;
+    pub async fn resolve_agents(
+        &self,
+        orchestrator: &ModelOrchestrator,
+    ) -> Result<Vec<ResolvedAgent>> {
+        let agents = self.list_agents().await?;
         let personas = self.list_personas().await?;
-        let models   = orchestrator.list_models().await;
+        let models = orchestrator.list_models().await;
 
         let mut resolved = Vec::new();
         for cfg in agents {
-            let persona = cfg.persona_id.as_deref()
+            let persona = cfg
+                .persona_id
+                .as_deref()
                 .and_then(|pid| personas.iter().find(|p| p.id == pid))
                 .cloned();
 
-            let system_prompt = persona.as_ref()
+            let system_prompt = persona
+                .as_ref()
                 .map(|p| p.system_prompt.clone())
                 .unwrap_or_default();
 
-            let effective_model_id = cfg.model_id.clone()
+            let effective_model_id = cfg
+                .model_id
+                .clone()
                 .or_else(|| persona.as_ref().and_then(|p| p.model_id.clone()));
 
-            let model_info = effective_model_id.as_deref()
+            let model_info = effective_model_id
+                .as_deref()
                 .and_then(|mid| models.iter().find(|m| m.id == mid));
 
-            let ram_required_mb = model_info
-                .map(|m| m.ram_required_mb)
-                .unwrap_or(0);
+            let ram_required_mb = model_info.map(|m| m.ram_required_mb).unwrap_or(0);
 
-            let context_length = model_info
-                .map(|m| m.context_length)
-                .unwrap_or(4096);
+            let context_length = model_info.map(|m| m.context_length).unwrap_or(4096);
 
-            let supports_tools = model_info
-                .map(|m| m.supports_tools)
-                .unwrap_or(false);
+            let supports_tools = model_info.map(|m| m.supports_tools).unwrap_or(false);
 
             resolved.push(ResolvedAgent {
                 config: cfg,
@@ -288,16 +291,19 @@ impl AgentStore {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.iter().map(|r| Persona {
-            id:            r.get("id"),
-            name:          r.get("name"),
-            system_prompt: r.get("system_prompt"),
-            model_id:      r.get("model_id"),
-            color:         r.get("color"),
-            icon_emoji:    r.get("icon_emoji"),
-            created_at:    r.get("created_at"),
-            updated_at:    r.get("updated_at"),
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| Persona {
+                id: r.get("id"),
+                name: r.get("name"),
+                system_prompt: r.get("system_prompt"),
+                model_id: r.get("model_id"),
+                color: r.get("color"),
+                icon_emoji: r.get("icon_emoji"),
+                created_at: r.get("created_at"),
+                updated_at: r.get("updated_at"),
+            })
+            .collect())
     }
 
     pub async fn upsert_persona(&self, p: Persona) -> Result<Persona> {
@@ -366,16 +372,19 @@ impl AgentStore {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| SwarmRun {
-            id: r.get("id"),
-            session_id: r.get("session_id"),
-            user_prompt: r.get("user_prompt"),
-            leader_plan: r.get("leader_plan"),
-            summary: r.get("summary"),
-            status: r.get("status"),
-            started_at: r.get("started_at"),
-            completed_at: r.get("completed_at"),
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| SwarmRun {
+                id: r.get("id"),
+                session_id: r.get("session_id"),
+                user_prompt: r.get("user_prompt"),
+                leader_plan: r.get("leader_plan"),
+                summary: r.get("summary"),
+                status: r.get("status"),
+                started_at: r.get("started_at"),
+                completed_at: r.get("completed_at"),
+            })
+            .collect())
     }
 
     pub async fn save_agent_result(&self, r: &SwarmAgentResult) -> Result<()> {

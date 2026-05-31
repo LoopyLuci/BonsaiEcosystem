@@ -1,10 +1,10 @@
 //! Chess game session — manages players, game state, move history, PGN.
 
-use std::fmt::Write as _;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use crate::error::ChessError;
 use crate::position::ChessPosition;
+use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
+use uuid::Uuid;
 
 // ── Player ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +32,10 @@ pub enum ChessColor {
 
 impl ChessColor {
     pub fn opponent(self) -> Self {
-        match self { Self::White => Self::Black, Self::Black => Self::White }
+        match self {
+            Self::White => Self::Black,
+            Self::Black => Self::White,
+        }
     }
 }
 
@@ -60,10 +63,21 @@ pub enum GameResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum GameEndReason { Checkmate, Resignation, Timeout, Forfeit }
+pub enum GameEndReason {
+    Checkmate,
+    Resignation,
+    Timeout,
+    Forfeit,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum DrawReason { Stalemate, FiftyMoveRule, InsufficientMaterial, Repetition, Agreement }
+pub enum DrawReason {
+    Stalemate,
+    FiftyMoveRule,
+    InsufficientMaterial,
+    Repetition,
+    Agreement,
+}
 
 // ── Game session ──────────────────────────────────────────────────────────────
 
@@ -101,15 +115,27 @@ impl ChessGameSession {
 
     /// The player whose turn it is.
     pub fn current_player(&self) -> &Player {
-        if self.moves.len().is_multiple_of(2) { &self.white } else { &self.black }
+        if self.moves.len().is_multiple_of(2) {
+            &self.white
+        } else {
+            &self.black
+        }
     }
 
     pub fn current_color(&self) -> ChessColor {
-        if self.moves.len().is_multiple_of(2) { ChessColor::White } else { ChessColor::Black }
+        if self.moves.len().is_multiple_of(2) {
+            ChessColor::White
+        } else {
+            ChessColor::Black
+        }
     }
 
     /// Apply a move (UCI or SAN). Returns the move record.
-    pub fn apply_move(&mut self, player_id: &str, notation: &str) -> Result<MoveRecord, ChessError> {
+    pub fn apply_move(
+        &mut self,
+        player_id: &str,
+        notation: &str,
+    ) -> Result<MoveRecord, ChessError> {
         if self.result != GameResult::Ongoing {
             return Err(ChessError::GameOver);
         }
@@ -202,8 +228,8 @@ impl ChessGameSession {
         match &self.result {
             GameResult::WhiteWins(_) => "1-0",
             GameResult::BlackWins(_) => "0-1",
-            GameResult::Draw(_)      => "1/2-1/2",
-            GameResult::Ongoing      => "*",
+            GameResult::Draw(_) => "1/2-1/2",
+            GameResult::Ongoing => "*",
         }
     }
 
@@ -225,8 +251,20 @@ mod tests {
     use super::*;
 
     fn make_session() -> ChessGameSession {
-        let white = Player { id: "user".into(), name: "User".into(), kind: PlayerKind::Human, color: ChessColor::White, elo: None };
-        let black = Player { id: "ai".into(), name: "BonsAI".into(), kind: PlayerKind::BonsAI, color: ChessColor::Black, elo: None };
+        let white = Player {
+            id: "user".into(),
+            name: "User".into(),
+            kind: PlayerKind::Human,
+            color: ChessColor::White,
+            elo: None,
+        };
+        let black = Player {
+            id: "ai".into(),
+            name: "BonsAI".into(),
+            kind: PlayerKind::BonsAI,
+            color: ChessColor::Black,
+            elo: None,
+        };
         ChessGameSession::new(white, black)
     }
 

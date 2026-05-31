@@ -4,8 +4,8 @@
 //! and wraps the result in a `ProofToken` that can be stored in CAS and validated
 //! at deployment gates.
 
-use serde_json;
 use crate::kernel::ProofWitness;
+use serde_json;
 
 /// Serialize a `ProofWitness` to canonical bytes for hashing.
 /// Uses JSON with sorted keys for determinism.
@@ -34,9 +34,13 @@ impl VerifyToken {
     /// Create a token from a `ProofWitness`.
     pub fn from_witness(witness: &ProofWitness) -> Self {
         let bytes = witness_to_bytes(witness);
-        let hash  = blake3::hash(&bytes);
-        let hex   = hash.as_bytes().iter().map(|b| format!("{b:02x}")).collect::<String>();
-        let prop  = format!("{:?}", witness.proposition); // use Debug for now
+        let hash = blake3::hash(&bytes);
+        let hex = hash
+            .as_bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>();
+        let prop = format!("{:?}", witness.proposition); // use Debug for now
         Self {
             proof_hash: hex,
             proposition_display: prop,
@@ -55,7 +59,7 @@ impl VerifyToken {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kernel::{Term, Sort, ProofWitness};
+    use crate::kernel::{ProofWitness, Sort, Term};
 
     #[test]
     fn token_round_trip() {

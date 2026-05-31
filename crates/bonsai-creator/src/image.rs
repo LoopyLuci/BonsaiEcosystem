@@ -14,7 +14,9 @@ pub struct FluxDiTTool {
 }
 
 impl FluxDiTTool {
-    pub fn new(cas: Arc<CasStore>) -> Self { Self { cas } }
+    pub fn new(cas: Arc<CasStore>) -> Self {
+        Self { cas }
+    }
 }
 
 #[async_trait]
@@ -32,11 +34,14 @@ impl GenerativeTool for FluxDiTTool {
         let w = params.width.clamp(64, 2048) as usize;
         let h = params.height.clamp(64, 2048) as usize;
         let mut buf = vec![0u8; w * h * 3];
-        let hash = params.prompt.bytes().fold(seed, |a, b| a.wrapping_add(b as u64));
+        let hash = params
+            .prompt
+            .bytes()
+            .fold(seed, |a, b| a.wrapping_add(b as u64));
         for y in 0..h {
             for x in 0..w {
                 let i = (y * w + x) * 3;
-                buf[i]     = ((x as u64 ^ hash) & 0xFF) as u8;
+                buf[i] = ((x as u64 ^ hash) & 0xFF) as u8;
                 buf[i + 1] = ((y as u64 ^ hash >> 8) & 0xFF) as u8;
                 buf[i + 2] = ((x as u64 + y as u64 ^ hash >> 16) & 0xFF) as u8;
             }
@@ -45,7 +50,10 @@ impl GenerativeTool for FluxDiTTool {
         let img = image::RgbImage::from_raw(w as u32, h as u32, buf)
             .ok_or_else(|| anyhow::anyhow!("invalid image dimensions"))?;
         let mut png_bytes = Vec::new();
-        img.write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png)?;
+        img.write_to(
+            &mut std::io::Cursor::new(&mut png_bytes),
+            image::ImageFormat::Png,
+        )?;
 
         let key = self.cas.put(&png_bytes, "image/png").await?;
         Ok(GenerationResult {

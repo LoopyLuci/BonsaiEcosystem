@@ -2,7 +2,7 @@ pub mod module;
 pub mod retriever;
 pub mod store;
 
-pub use module::{ModuleManifest, LoadedModule, ModuleInfo};
+pub use module::{LoadedModule, ModuleInfo, ModuleManifest};
 pub use retriever::KdbRetriever;
 pub use store::KdbStore;
 

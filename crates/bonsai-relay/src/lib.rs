@@ -9,12 +9,12 @@
 //!   3. Relay forwards chunks between the two TCP connections until either
 //!      peer disconnects or the session TTL expires.
 
-pub mod error;
-pub mod token;
-pub mod server;
 pub mod client;
+pub mod error;
+pub mod server;
+pub mod token;
 
-pub use error::{RelayError, RelayResult};
-pub use token::RelayToken;
-pub use server::RelayServer;
 pub use client::RelayClient;
+pub use error::{RelayError, RelayResult};
+pub use server::RelayServer;
+pub use token::RelayToken;

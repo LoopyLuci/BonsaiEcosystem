@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
@@ -75,11 +75,17 @@ impl HybridEngineState {
         }
         #[cfg(feature = "native-gpu")]
         {
-            guard.engine.load(path, n_gpu_layers).await
+            guard
+                .engine
+                .load(path, n_gpu_layers)
+                .await
                 .map_err(|e| e.to_string())?;
             guard.current_model_path = Some(path.to_string());
             guard.n_gpu_layers = n_gpu_layers;
-            info!("[hybrid_engine] model loaded: {} ({} GPU layers)", path, n_gpu_layers);
+            info!(
+                "[hybrid_engine] model loaded: {} ({} GPU layers)",
+                path, n_gpu_layers
+            );
             Ok(())
         }
         #[cfg(not(feature = "native-gpu"))]
@@ -97,7 +103,10 @@ impl HybridEngineState {
         }
         #[cfg(feature = "native-gpu")]
         {
-            guard.engine.apply_lora(lora_path, scale).await
+            guard
+                .engine
+                .apply_lora(lora_path, scale)
+                .await
                 .map_err(|e| e.to_string())
         }
         #[cfg(not(feature = "native-gpu"))]

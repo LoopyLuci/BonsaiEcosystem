@@ -40,18 +40,18 @@ pub enum BonsaiError {
 impl fmt::Display for BonsaiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Io(m)           => write!(f, "I/O error: {m}"),
-            Self::Serde(m)        => write!(f, "Serialization error: {m}"),
+            Self::Io(m) => write!(f, "I/O error: {m}"),
+            Self::Serde(m) => write!(f, "Serialization error: {m}"),
             Self::Orchestrator(m) => write!(f, "Orchestrator error: {m}"),
-            Self::Tool(m)         => write!(f, "Tool error: {m}"),
-            Self::Model(m)        => write!(f, "Model error: {m}"),
-            Self::Auth(m)         => write!(f, "Auth error: {m}"),
-            Self::Network(m)      => write!(f, "Network error: {m}"),
-            Self::Mcp(m)          => write!(f, "MCP error: {m}"),
-            Self::Config(m)       => write!(f, "Config error: {m}"),
-            Self::Database(m)     => write!(f, "Database error: {m}"),
-            Self::Cancelled(m)    => write!(f, "Cancelled: {m}"),
-            Self::Internal(m)     => write!(f, "Internal error: {m}"),
+            Self::Tool(m) => write!(f, "Tool error: {m}"),
+            Self::Model(m) => write!(f, "Model error: {m}"),
+            Self::Auth(m) => write!(f, "Auth error: {m}"),
+            Self::Network(m) => write!(f, "Network error: {m}"),
+            Self::Mcp(m) => write!(f, "MCP error: {m}"),
+            Self::Config(m) => write!(f, "Config error: {m}"),
+            Self::Database(m) => write!(f, "Database error: {m}"),
+            Self::Cancelled(m) => write!(f, "Cancelled: {m}"),
+            Self::Internal(m) => write!(f, "Internal error: {m}"),
         }
     }
 }
@@ -61,23 +61,33 @@ impl std::error::Error for BonsaiError {}
 // ── Conversions from standard error types ────────────────────────────────────
 
 impl From<std::io::Error> for BonsaiError {
-    fn from(e: std::io::Error) -> Self { Self::Io(e.to_string()) }
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e.to_string())
+    }
 }
 
 impl From<serde_json::Error> for BonsaiError {
-    fn from(e: serde_json::Error) -> Self { Self::Serde(e.to_string()) }
+    fn from(e: serde_json::Error) -> Self {
+        Self::Serde(e.to_string())
+    }
 }
 
 impl From<reqwest::Error> for BonsaiError {
-    fn from(e: reqwest::Error) -> Self { Self::Network(e.to_string()) }
+    fn from(e: reqwest::Error) -> Self {
+        Self::Network(e.to_string())
+    }
 }
 
 /// Convenience: promote any `String` error as `Internal`.
 impl From<String> for BonsaiError {
-    fn from(s: String) -> Self { Self::Internal(s) }
+    fn from(s: String) -> Self {
+        Self::Internal(s)
+    }
 }
 
 /// Convenience: promote any `&str` error as `Internal`.
 impl From<&str> for BonsaiError {
-    fn from(s: &str) -> Self { Self::Internal(s.to_owned()) }
+    fn from(s: &str) -> Self {
+        Self::Internal(s.to_owned())
+    }
 }

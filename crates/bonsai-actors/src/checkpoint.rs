@@ -22,6 +22,10 @@ pub struct CheckpointEnvelope {
 
 impl CheckpointEnvelope {
     pub fn new(actor_name: impl Into<String>, version: u64, payload: serde_json::Value) -> Self {
-        Self { actor_name: actor_name.into(), version, payload }
+        Self {
+            actor_name: actor_name.into(),
+            version,
+            payload,
+        }
     }
 }

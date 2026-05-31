@@ -32,14 +32,15 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use tracing::info;
 
-use crate::evaluation_harness::{CiqScore, DimensionAlert, DimensionSummary, BenchmarkResult};
-use crate::eternal_training_loop::{EternalTrainingLoop, SelfPlayState, TrainingPreferences, LoopCycleResult};
+use crate::eternal_training_loop::{
+    EternalTrainingLoop, LoopCycleResult, SelfPlayState, TrainingPreferences,
+};
+use crate::evaluation_harness::{BenchmarkResult, CiqScore, DimensionAlert, DimensionSummary};
 use crate::forgetting_prevention::CompetencyBaseline;
 use crate::promotion_gate::AdapterRegistry;
 use crate::unified_training_collector::{
-    BufferStats, CollectorStats, EditType, EventKind, FeedbackSignal,
-    HardwareSnapshot, InteractionEvent, PrivacyLevel, UnifiedTrainingCollector,
-    UnifiedTrainingExample,
+    BufferStats, CollectorStats, EditType, EventKind, FeedbackSignal, HardwareSnapshot,
+    InteractionEvent, PrivacyLevel, UnifiedTrainingCollector, UnifiedTrainingExample,
 };
 use crate::AppState;
 
@@ -49,18 +50,22 @@ use crate::AppState;
 
 /// Container for all training-related subsystems, stored in AppState.
 pub struct TrainingState {
-    pub collector:      Arc<UnifiedTrainingCollector>,
-    pub loop_engine:    Arc<EternalTrainingLoop>,
+    pub collector: Arc<UnifiedTrainingCollector>,
+    pub loop_engine: Arc<EternalTrainingLoop>,
     pub adapter_registry: Arc<AdapterRegistry>,
 }
 
 impl TrainingState {
     pub fn new(
-        collector:        Arc<UnifiedTrainingCollector>,
-        loop_engine:      Arc<EternalTrainingLoop>,
+        collector: Arc<UnifiedTrainingCollector>,
+        loop_engine: Arc<EternalTrainingLoop>,
         adapter_registry: Arc<AdapterRegistry>,
     ) -> Self {
-        Self { collector, loop_engine, adapter_registry }
+        Self {
+            collector,
+            loop_engine,
+            adapter_registry,
+        }
     }
 }
 
@@ -70,69 +75,69 @@ impl TrainingState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingStatsResponse {
-    pub collector:   CollectorStats,
-    pub self_play:   SelfPlayState,
-    pub ciq:         Option<CiqScore>,
-    pub alerts:      Vec<DimensionAlert>,
+    pub collector: CollectorStats,
+    pub self_play: SelfPlayState,
+    pub ciq: Option<CiqScore>,
+    pub alerts: Vec<DimensionAlert>,
     pub loop_running: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExamplesPage {
     pub examples: Vec<UnifiedTrainingExample>,
-    pub total:    usize,
-    pub offset:   usize,
-    pub limit:    usize,
+    pub total: usize,
+    pub offset: usize,
+    pub limit: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditExampleRequest {
-    pub example_id:     String,
-    pub new_output:     String,
-    pub new_quality:    Option<f32>,
+    pub example_id: String,
+    pub new_output: String,
+    pub new_quality: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BulkDeleteRequest {
     pub from_timestamp: Option<i64>,
-    pub to_timestamp:   Option<i64>,
-    pub source_filter:  Option<String>,
-    pub domain_filter:  Option<String>,
+    pub to_timestamp: Option<i64>,
+    pub source_filter: Option<String>,
+    pub domain_filter: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedbackRequest {
     pub target_event_id: String,
-    pub signal:          String,  // "thumbs_up" | "thumbs_down" | "five_star:<1-5>"
-    pub comment:         Option<String>,
-    pub session_id:      String,
+    pub signal: String, // "thumbs_up" | "thumbs_down" | "five_star:<1-5>"
+    pub comment: Option<String>,
+    pub session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditRequest {
-    pub prompt:        String,
-    pub original:      String,
-    pub edited:        String,
-    pub edit_type:     String,  // "correction" | "expansion" | "reformatting"
-    pub session_id:    String,
+    pub prompt: String,
+    pub original: String,
+    pub edited: String,
+    pub edit_type: String, // "correction" | "expansion" | "reformatting"
+    pub session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurriculumStatus {
-    pub current_stage:    u8,
-    pub stage_name:       String,
-    pub gates:            Vec<CurriculumGateStatus>,
-    pub can_advance:      bool,
-    pub progress_pct:     f32,
+    pub current_stage: u8,
+    pub stage_name: String,
+    pub gates: Vec<CurriculumGateStatus>,
+    pub can_advance: bool,
+    pub progress_pct: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CurriculumGateStatus {
     pub dimension: String,
-    pub metric:    String,
+    pub metric: String,
     pub threshold: f32,
-    pub current:   Option<f32>,
-    pub passed:    bool,
+    pub current: Option<f32>,
+    pub passed: bool,
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -162,22 +167,37 @@ pub async fn get_training_stats(
 /// Returns a paginated list of buffered training examples.
 #[tauri::command]
 pub async fn get_training_examples(
-    state:  State<'_, AppState>,
+    state: State<'_, AppState>,
     offset: usize,
-    limit:  usize,
+    limit: usize,
     domain: Option<String>,
 ) -> Result<ExamplesPage, String> {
     // Drain a snapshot from the buffer for display — non-destructive read
-    let examples = state.training.collector.snapshot(offset, limit, domain.as_deref()).await;
-    let total = state.training.collector.stats().await.buffer
-        .map(|b| b.total).unwrap_or(0);
-    Ok(ExamplesPage { examples, total, offset, limit })
+    let examples = state
+        .training
+        .collector
+        .snapshot(offset, limit, domain.as_deref())
+        .await;
+    let total = state
+        .training
+        .collector
+        .stats()
+        .await
+        .buffer
+        .map(|b| b.total)
+        .unwrap_or(0);
+    Ok(ExamplesPage {
+        examples,
+        total,
+        offset,
+        limit,
+    })
 }
 
 /// Delete a single training example from the buffer.
 #[tauri::command]
 pub async fn delete_training_example(
-    state:      State<'_, AppState>,
+    state: State<'_, AppState>,
     example_id: String,
 ) -> Result<bool, String> {
     let removed = state.training.collector.delete_example(&example_id).await;
@@ -188,11 +208,17 @@ pub async fn delete_training_example(
 /// Rewrite the expected output for an example (user correction).
 #[tauri::command]
 pub async fn edit_training_example(
-    state:   State<'_, AppState>,
+    state: State<'_, AppState>,
     request: EditExampleRequest,
 ) -> Result<bool, String> {
-    let ok = state.training.collector
-        .edit_example(&request.example_id, &request.new_output, request.new_quality)
+    let ok = state
+        .training
+        .collector
+        .edit_example(
+            &request.example_id,
+            &request.new_output,
+            request.new_quality,
+        )
         .await;
     Ok(ok)
 }
@@ -200,7 +226,7 @@ pub async fn edit_training_example(
 /// Set an example's priority to maximum so it enters the next training batch.
 #[tauri::command]
 pub async fn boost_training_example(
-    state:      State<'_, AppState>,
+    state: State<'_, AppState>,
     example_id: String,
 ) -> Result<bool, String> {
     Ok(state.training.collector.boost_example(&example_id).await)
@@ -209,15 +235,19 @@ pub async fn boost_training_example(
 /// Delete all examples matching the filter criteria.
 #[tauri::command]
 pub async fn bulk_delete_training_data(
-    state:   State<'_, AppState>,
+    state: State<'_, AppState>,
     request: BulkDeleteRequest,
 ) -> Result<usize, String> {
-    let removed = state.training.collector.bulk_delete(
-        request.from_timestamp,
-        request.to_timestamp,
-        request.source_filter.as_deref(),
-        request.domain_filter.as_deref(),
-    ).await;
+    let removed = state
+        .training
+        .collector
+        .bulk_delete(
+            request.from_timestamp,
+            request.to_timestamp,
+            request.source_filter.as_deref(),
+            request.domain_filter.as_deref(),
+        )
+        .await;
     info!("[training] bulk delete removed {removed} examples");
     Ok(removed)
 }
@@ -225,7 +255,7 @@ pub async fn bulk_delete_training_data(
 /// Export all training examples to a JSONL file at the given path.
 #[tauri::command]
 pub async fn export_training_data(
-    state:       State<'_, AppState>,
+    state: State<'_, AppState>,
     output_path: String,
 ) -> Result<usize, String> {
     let examples = state.training.collector.snapshot(0, usize::MAX, None).await;
@@ -237,16 +267,16 @@ pub async fn export_training_data(
             lines.push('\n');
         }
     }
-    tokio::fs::write(&output_path, lines).await.map_err(|e| e.to_string())?;
+    tokio::fs::write(&output_path, lines)
+        .await
+        .map_err(|e| e.to_string())?;
     info!("[training] exported {count} examples to {output_path}");
     Ok(count)
 }
 
 /// Wipe the entire training database and start fresh.
 #[tauri::command]
-pub async fn wipe_training_database(
-    state: State<'_, AppState>,
-) -> Result<(), String> {
+pub async fn wipe_training_database(state: State<'_, AppState>) -> Result<(), String> {
     state.training.collector.wipe().await;
     info!("[training] training database wiped");
     Ok(())
@@ -254,9 +284,7 @@ pub async fn wipe_training_database(
 
 /// Force an immediate self-play + ingest cycle without waiting for idle GPU.
 #[tauri::command]
-pub async fn trigger_training_cycle(
-    state: State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn trigger_training_cycle(state: State<'_, AppState>) -> Result<String, String> {
     state.training.loop_engine.trigger_now().await;
     Ok("Training cycle triggered".into())
 }
@@ -272,17 +300,13 @@ pub async fn get_evaluation_results(
 
 /// Returns historical CIQ scores.
 #[tauri::command]
-pub async fn get_ciq_history(
-    _state: State<'_, AppState>,
-) -> Result<Vec<CiqScore>, String> {
+pub async fn get_ciq_history(_state: State<'_, AppState>) -> Result<Vec<CiqScore>, String> {
     Ok(vec![])
 }
 
 /// Returns all currently firing dimension alerts.
 #[tauri::command]
-pub async fn get_alerts(
-    _state: State<'_, AppState>,
-) -> Result<Vec<DimensionAlert>, String> {
+pub async fn get_alerts(_state: State<'_, AppState>) -> Result<Vec<DimensionAlert>, String> {
     Ok(vec![])
 }
 
@@ -303,22 +327,38 @@ pub async fn get_curriculum_status(
     // Placeholder — full curriculum engine ties into dimension trackers
     Ok(CurriculumStatus {
         current_stage: 1,
-        stage_name:    "Foundation".into(),
-        gates:         vec![
-            CurriculumGateStatus { dimension: "safety".into(),     metric: "refusal_rate".into(), threshold: 0.99, current: None, passed: false },
-            CurriculumGateStatus { dimension: "tool_select".into(), metric: "correct_tool_rate".into(), threshold: 0.95, current: None, passed: false },
-            CurriculumGateStatus { dimension: "conv_quality".into(), metric: "satisfaction_score".into(), threshold: 0.90, current: None, passed: false },
+        stage_name: "Foundation".into(),
+        gates: vec![
+            CurriculumGateStatus {
+                dimension: "safety".into(),
+                metric: "refusal_rate".into(),
+                threshold: 0.99,
+                current: None,
+                passed: false,
+            },
+            CurriculumGateStatus {
+                dimension: "tool_select".into(),
+                metric: "correct_tool_rate".into(),
+                threshold: 0.95,
+                current: None,
+                passed: false,
+            },
+            CurriculumGateStatus {
+                dimension: "conv_quality".into(),
+                metric: "satisfaction_score".into(),
+                threshold: 0.90,
+                current: None,
+                passed: false,
+            },
         ],
-        can_advance:   false,
-        progress_pct:  0.0,
+        can_advance: false,
+        progress_pct: 0.0,
     })
 }
 
 /// Rollback to the previous adapter version.
 #[tauri::command]
-pub async fn rollback_adapter(
-    state: State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn rollback_adapter(state: State<'_, AppState>) -> Result<String, String> {
     match state.training.adapter_registry.rollback().await {
         Some(version) => {
             info!("[training] rolled back to adapter {}", version.id);
@@ -348,9 +388,7 @@ pub async fn get_training_preferences(
 
 /// Get self-play trainer statistics.
 #[tauri::command]
-pub async fn get_self_play_state(
-    _state: State<'_, AppState>,
-) -> Result<SelfPlayState, String> {
+pub async fn get_self_play_state(_state: State<'_, AppState>) -> Result<SelfPlayState, String> {
     Ok(SelfPlayState::default())
 }
 
@@ -373,11 +411,11 @@ pub async fn get_training_loop_history(
 /// Record explicit user feedback (thumbs up/down, star rating).
 #[tauri::command]
 pub async fn ingest_feedback_ui(
-    state:   State<'_, AppState>,
+    state: State<'_, AppState>,
     request: FeedbackRequest,
 ) -> Result<(), String> {
     let signal = match request.signal.as_str() {
-        "thumbs_up"   => FeedbackSignal::ThumbsUp,
+        "thumbs_up" => FeedbackSignal::ThumbsUp,
         "thumbs_down" => FeedbackSignal::ThumbsDown,
         s if s.starts_with("five_star:") => {
             let n: u8 = s.trim_start_matches("five_star:").parse().unwrap_or(3);
@@ -387,21 +425,24 @@ pub async fn ingest_feedback_ui(
     };
 
     let event = InteractionEvent {
-        id:           uuid::Uuid::new_v4().to_string(),
-        session_id:   request.session_id,
-        sequence:     0,
-        occurred_at:  chrono::Utc::now().timestamp_micros(),
-        model_id:     "bonsai-1.7b".into(),
-        adapter_id:   None,
-        kind:         EventKind::ExplicitFeedback {
+        id: uuid::Uuid::new_v4().to_string(),
+        session_id: request.session_id,
+        sequence: 0,
+        occurred_at: chrono::Utc::now().timestamp_micros(),
+        model_id: "bonsai-1.7b".into(),
+        adapter_id: None,
+        kind: EventKind::ExplicitFeedback {
             target_event_id: request.target_event_id,
             signal,
             comment: request.comment,
         },
-        hardware:     HardwareSnapshot {
-            gpu_util_pct: 0, vram_used_mb: 0,
-            cpu_util_pct: 0, ram_used_mb: 0,
-            battery_pct: None, thermal_throttling: false,
+        hardware: HardwareSnapshot {
+            gpu_util_pct: 0,
+            vram_used_mb: 0,
+            cpu_util_pct: 0,
+            ram_used_mb: 0,
+            battery_pct: None,
+            thermal_throttling: false,
         },
         privacy_level: PrivacyLevel::LocalOnly,
     };
@@ -414,7 +455,7 @@ pub async fn ingest_feedback_ui(
 pub async fn train_reasoning(
     state: tauri::State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let collector  = state.training.collector.clone();
+    let collector = state.training.collector.clone();
     let orchestrator = state.orchestrator.clone();
     tokio::spawn(async move {
         crate::eternal_training_loop::train_reasoning_step(collector, orchestrator).await;
@@ -424,33 +465,33 @@ pub async fn train_reasoning(
 
 /// Record a user edit as a correction signal.
 #[tauri::command]
-pub async fn ingest_edit(
-    state:   State<'_, AppState>,
-    request: EditRequest,
-) -> Result<(), String> {
+pub async fn ingest_edit(state: State<'_, AppState>, request: EditRequest) -> Result<(), String> {
     let edit_type = match request.edit_type.as_str() {
-        "correction"    => EditType::Correction,
-        "expansion"     => EditType::Expansion,
-        "reformatting"  => EditType::Reformatting,
-        _               => EditType::Correction,
+        "correction" => EditType::Correction,
+        "expansion" => EditType::Expansion,
+        "reformatting" => EditType::Reformatting,
+        _ => EditType::Correction,
     };
 
     let event = InteractionEvent {
-        id:           uuid::Uuid::new_v4().to_string(),
-        session_id:   request.session_id,
-        sequence:     0,
-        occurred_at:  chrono::Utc::now().timestamp_micros(),
-        model_id:     "bonsai-1.7b".into(),
-        adapter_id:   None,
-        kind:         EventKind::UserEdit {
-            original:  request.original,
-            edited:    request.edited,
+        id: uuid::Uuid::new_v4().to_string(),
+        session_id: request.session_id,
+        sequence: 0,
+        occurred_at: chrono::Utc::now().timestamp_micros(),
+        model_id: "bonsai-1.7b".into(),
+        adapter_id: None,
+        kind: EventKind::UserEdit {
+            original: request.original,
+            edited: request.edited,
             edit_type,
         },
-        hardware:     HardwareSnapshot {
-            gpu_util_pct: 0, vram_used_mb: 0,
-            cpu_util_pct: 0, ram_used_mb: 0,
-            battery_pct: None, thermal_throttling: false,
+        hardware: HardwareSnapshot {
+            gpu_util_pct: 0,
+            vram_used_mb: 0,
+            cpu_util_pct: 0,
+            ram_used_mb: 0,
+            battery_pct: None,
+            thermal_throttling: false,
         },
         privacy_level: PrivacyLevel::LocalOnly,
     };

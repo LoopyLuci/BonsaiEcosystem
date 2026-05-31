@@ -1,5 +1,5 @@
-use tauri::State;
 use crate::AppState;
+use tauri::State;
 
 use candle_core::Device;
 
@@ -33,7 +33,9 @@ pub async fn start_go_training(
 ) -> Result<String, String> {
     // Build a simple config from args
     let mut cfg = bonsai_go_nn::training_loop::GoTrainingConfig::default();
-    if let Some(n) = num_games_per_cycle { cfg.self_play_games_per_cycle = n; }
+    if let Some(n) = num_games_per_cycle {
+        cfg.self_play_games_per_cycle = n;
+    }
 
     let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
     let cas = state.cas_store.clone();
@@ -41,14 +43,12 @@ pub async fn start_go_training(
     // Spawn the training loop in the background.
     tokio::spawn(async move {
         match bonsai_go_nn::training_loop::GoTrainingLoop::new(cfg, device, None, cas).await {
-            Ok(mut loop_inst) => {
-                loop {
-                    if let Err(e) = loop_inst.run_cycle().await {
-                        tracing::error!("go training cycle failed: {}", e);
-                    }
-                    tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+            Ok(mut loop_inst) => loop {
+                if let Err(e) = loop_inst.run_cycle().await {
+                    tracing::error!("go training cycle failed: {}", e);
                 }
-            }
+                tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+            },
             Err(e) => tracing::error!("failed to start go training: {}", e),
         }
     });

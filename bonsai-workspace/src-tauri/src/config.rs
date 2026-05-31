@@ -6,12 +6,18 @@ use tauri::{AppHandle, Manager};
 use crate::inference_mode::InferenceMode;
 
 pub const DEFAULT_API_HOST: &str = "127.0.0.1";
-pub const DEFAULT_API_PORT: u16 = 11369;   // Bonsai Workspace
-pub const BUDDY_API_PORT:   u16 = 11420;   // Bonsai Buddy
+pub const DEFAULT_API_PORT: u16 = 11369; // Bonsai Workspace
+pub const BUDDY_API_PORT: u16 = 11420; // Bonsai Buddy
 
-fn default_buddy_api_port() -> u16 { BUDDY_API_PORT }
-fn default_inference_mode() -> InferenceMode { InferenceMode::default() }
-fn default_critic_threshold() -> f32 { 0.55 }
+fn default_buddy_api_port() -> u16 {
+    BUDDY_API_PORT
+}
+fn default_inference_mode() -> InferenceMode {
+    InferenceMode::default()
+}
+fn default_critic_threshold() -> f32 {
+    0.55
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -107,7 +113,10 @@ impl Default for AppConfig {
 }
 
 fn config_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
-    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
     Ok(app_data_dir.join("bonsai-config.json"))
 }

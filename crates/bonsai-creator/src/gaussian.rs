@@ -16,7 +16,9 @@ pub struct GaussianSplattingTool {
 }
 
 impl GaussianSplattingTool {
-    pub fn new(cas: Arc<CasStore>) -> Self { Self { cas } }
+    pub fn new(cas: Arc<CasStore>) -> Self {
+        Self { cas }
+    }
 }
 
 #[async_trait]
@@ -29,7 +31,9 @@ impl GenerativeTool for GaussianSplattingTool {
         let input_key = bonsai_cas::CasKey::from_hex(input_key_hex)
             .map_err(|e| anyhow::anyhow!("invalid CAS key: {e}"))?;
         if !self.cas.exists(&input_key).await? {
-            return Err(anyhow::anyhow!("input asset not found in CAS: {input_key_hex}"));
+            return Err(anyhow::anyhow!(
+                "input asset not found in CAS: {input_key_hex}"
+            ));
         }
 
         let num_points = params.extra["num_points"].as_u64().unwrap_or(500_000) as u32;
@@ -45,7 +49,11 @@ impl GenerativeTool for GaussianSplattingTool {
         let placeholder = format!(
             "3DGS asset | format={output_format} points={num_points} input={input_key_hex}"
         );
-        let mime = if output_format == "ply" { "model/ply" } else { "model/gltf-binary" };
+        let mime = if output_format == "ply" {
+            "model/ply"
+        } else {
+            "model/gltf-binary"
+        };
         let key = self.cas.put(placeholder.as_bytes(), mime).await?;
 
         Ok(GenerationResult {

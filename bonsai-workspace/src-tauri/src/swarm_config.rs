@@ -29,13 +29,15 @@ pub enum WorkerRole {
 impl WorkerRole {
     pub fn system_hint(&self) -> &str {
         match self {
-            Self::Implementer  => "You are an implementer. Write clean, correct code or prose.",
-            Self::Reviewer     => "You are a reviewer. Identify bugs, risks, and improvements.",
-            Self::Tester       => "You are a tester. Design test cases and find edge cases.",
-            Self::Researcher   => "You are a researcher. Find relevant facts and cite evidence.",
-            Self::Skeptic      => "You are a skeptic. Challenge assumptions and find flaws.",
-            Self::Synthesizer  => "You are a synthesizer. Combine worker outputs into a cohesive response.",
-            Self::Custom(_)    => "You are a specialized agent. Follow the task instructions.",
+            Self::Implementer => "You are an implementer. Write clean, correct code or prose.",
+            Self::Reviewer => "You are a reviewer. Identify bugs, risks, and improvements.",
+            Self::Tester => "You are a tester. Design test cases and find edge cases.",
+            Self::Researcher => "You are a researcher. Find relevant facts and cite evidence.",
+            Self::Skeptic => "You are a skeptic. Challenge assumptions and find flaws.",
+            Self::Synthesizer => {
+                "You are a synthesizer. Combine worker outputs into a cohesive response."
+            }
+            Self::Custom(_) => "You are a specialized agent. Follow the task instructions.",
         }
     }
 }
@@ -56,35 +58,35 @@ pub enum ChainStrategy {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmWorkerConfig {
     /// Slot index (0-based). Multiple workers can share a slot.
-    pub slot:           usize,
-    pub role:           WorkerRole,
+    pub slot: usize,
+    pub role: WorkerRole,
     /// Optional override: specific model to load for this worker.
     /// `None` = use whatever is currently loaded in the slot.
-    pub model:          Option<String>,
+    pub model: Option<String>,
     /// Optional LoRA adapter name.
-    pub adapter:        Option<String>,
+    pub adapter: Option<String>,
     /// GPU layer override (-1 = inherit from orchestrator).
-    pub gpu_layers:     i32,
+    pub gpu_layers: i32,
     /// Override system prompt for this worker (appended after role hint).
-    pub system_prompt:  Option<String>,
+    pub system_prompt: Option<String>,
     /// If set, worker only receives these tools.
-    pub allowed_tools:  Option<Vec<String>>,
+    pub allowed_tools: Option<Vec<String>>,
     /// Scheduling priority (higher = runs first in parallel sets).
-    pub priority:       u8,
+    pub priority: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmConfig {
-    pub id:               String,
-    pub name:             String,
-    pub description:      String,
-    pub workers:          Vec<SwarmWorkerConfig>,
-    pub chain_strategy:   ChainStrategy,
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub workers: Vec<SwarmWorkerConfig>,
+    pub chain_strategy: ChainStrategy,
     /// Model used for final synthesis / leader planning.
-    pub synthesis_model:  Option<String>,
-    pub enabled:          bool,
-    pub created_at:       String,
-    pub last_used_at:     Option<String>,
+    pub synthesis_model: Option<String>,
+    pub enabled: bool,
+    pub created_at: String,
+    pub last_used_at: Option<String>,
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -113,7 +115,7 @@ impl SwarmConfigStore {
     }
 
     pub async fn create(&self, mut cfg: SwarmConfig) -> anyhow::Result<SwarmConfig> {
-        cfg.id         = Uuid::new_v4().to_string();
+        cfg.id = Uuid::new_v4().to_string();
         cfg.created_at = Utc::now().to_rfc3339();
         cfg.last_used_at = None;
         let json = serde_json::to_string(&cfg)?;
@@ -201,14 +203,22 @@ pub async fn create_swarm_config(
     cfg: SwarmConfig,
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<SwarmConfig, String> {
-    state.swarm_config_store.create(cfg).await.map_err(|e| e.to_string())
+    state
+        .swarm_config_store
+        .create(cfg)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn list_swarm_configs(
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<Vec<SwarmConfig>, String> {
-    state.swarm_config_store.list().await.map_err(|e| e.to_string())
+    state
+        .swarm_config_store
+        .list()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -216,7 +226,11 @@ pub async fn get_swarm_config(
     id: String,
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<Option<SwarmConfig>, String> {
-    state.swarm_config_store.get(&id).await.map_err(|e| e.to_string())
+    state
+        .swarm_config_store
+        .get(&id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -224,7 +238,11 @@ pub async fn update_swarm_config(
     cfg: SwarmConfig,
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.swarm_config_store.update(&cfg).await.map_err(|e| e.to_string())
+    state
+        .swarm_config_store
+        .update(&cfg)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -232,7 +250,11 @@ pub async fn delete_swarm_config(
     id: String,
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    state.swarm_config_store.delete(&id).await.map_err(|e| e.to_string())
+    state
+        .swarm_config_store
+        .delete(&id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -240,7 +262,10 @@ pub async fn activate_swarm(
     id: String,
     state: tauri::State<'_, crate::AppState>,
 ) -> Result<SwarmConfig, String> {
-    let cfg = state.swarm_config_store.get(&id).await
+    let cfg = state
+        .swarm_config_store
+        .get(&id)
+        .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("Swarm config '{id}' not found"))?;
 

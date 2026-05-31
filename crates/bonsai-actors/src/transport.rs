@@ -17,16 +17,16 @@
 //! Messages are framed as:
 //! `[ 4-byte big-endian length ][ CBOR-encoded RemoteEnvelope ]`
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, RwLock};
-use serde::{Deserialize, Serialize};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-use thiserror::Error;
-use tracing::{info, warn, error, debug};
 
 use crate::ActorId;
 
@@ -109,14 +109,12 @@ async fn read_frame(stream: &mut TcpStream) -> TransportResult<Vec<u8>> {
 
 fn encode_cbor<T: Serialize>(val: &T) -> TransportResult<Vec<u8>> {
     let mut buf = Vec::new();
-    ciborium::into_writer(val, &mut buf)
-        .map_err(|e| TransportError::CborEncode(e.to_string()))?;
+    ciborium::into_writer(val, &mut buf).map_err(|e| TransportError::CborEncode(e.to_string()))?;
     Ok(buf)
 }
 
 fn decode_cbor<T: for<'de> Deserialize<'de>>(data: &[u8]) -> TransportResult<T> {
-    ciborium::from_reader(data)
-        .map_err(|e| TransportError::CborDecode(e.to_string()))
+    ciborium::from_reader(data).map_err(|e| TransportError::CborDecode(e.to_string()))
 }
 
 // ── Gossip Registry ───────────────────────────────────────────────────────────
@@ -146,15 +144,21 @@ impl GossipRegistry {
     }
 
     /// Return this node's identity.
-    pub fn local(&self) -> &NodeInfo { &self.inner.local }
+    pub fn local(&self) -> &NodeInfo {
+        &self.inner.local
+    }
 
     /// Merge an incoming gossip announcement.
     pub async fn merge(&self, info: NodeInfo) {
-        if info.id == self.inner.local.id { return; }
+        if info.id == self.inner.local.id {
+            return;
+        }
         let mut peers = self.inner.peers.write().await;
         match peers.get(&info.id) {
             Some(existing) if existing.generation >= info.generation => {}
-            _ => { peers.insert(info.id, info); }
+            _ => {
+                peers.insert(info.id, info);
+            }
         }
     }
 
@@ -213,7 +217,12 @@ impl TransportLayer {
         };
 
         // Spawn the accept loop
-        tokio::spawn(Self::accept_loop(listener, node.id, inbound_tx, registry.clone()));
+        tokio::spawn(Self::accept_loop(
+            listener,
+            node.id,
+            inbound_tx,
+            registry.clone(),
+        ));
 
         info!("TransportLayer listening on {bind_addr} (node {})", node.id);
         Ok((transport, inbound_rx))
@@ -233,18 +242,26 @@ impl TransportLayer {
         }
 
         // No existing connection — look up addr in registry and dial
-        let peer = self.registry.get(&target_node).await
+        let peer = self
+            .registry
+            .get(&target_node)
+            .await
             .ok_or(TransportError::NodeUnreachable(target_node))?;
 
         let (conn_tx, conn_rx) = mpsc::unbounded_channel::<Vec<u8>>();
         {
-            self.connections.write().await.insert(target_node, conn_tx.clone());
+            self.connections
+                .write()
+                .await
+                .insert(target_node, conn_tx.clone());
         }
 
-        let addr: SocketAddr = peer.addr.parse()
+        let addr: SocketAddr = peer
+            .addr
+            .parse()
             .map_err(|_| TransportError::Other(format!("bad addr: {}", peer.addr)))?;
 
-        let conns_clone  = self.connections.clone();
+        let conns_clone = self.connections.clone();
         let registry_clone = self.registry.clone();
         tokio::spawn(async move {
             if let Err(e) = outbound_loop(conn_rx, addr, target_node).await {
@@ -261,7 +278,8 @@ impl TransportLayer {
     /// Inject a message directly into the inbound queue without going over the
     /// network (used for local-to-local actor communication on the same node).
     pub fn deliver_local(&self, msg: InboundMessage) -> TransportResult<()> {
-        self.inbound_tx.send(msg)
+        self.inbound_tx
+            .send(msg)
             .map_err(|_| TransportError::Other("inbound channel closed".into()))
     }
 
@@ -337,20 +355,28 @@ async fn handle_inbound(
         };
         let envelope: RemoteEnvelope = match decode_cbor(&frame) {
             Ok(e) => e,
-            Err(e) => { warn!("decode error: {e}"); continue; }
+            Err(e) => {
+                warn!("decode error: {e}");
+                continue;
+            }
         };
 
         // Handle gossip internally
         if envelope.message_type == "__gossip__" {
             if let Ok(gossip) = decode_cbor::<GossipMsg>(&envelope.payload) {
                 match gossip {
-                    GossipMsg::Announce(info) => { registry.merge(info).await; }
+                    GossipMsg::Announce(info) => {
+                        registry.merge(info).await;
+                    }
                 }
             }
             continue;
         }
 
-        let _ = inbound_tx.send(InboundMessage { from_node, envelope });
+        let _ = inbound_tx.send(InboundMessage {
+            from_node,
+            envelope,
+        });
     }
     Ok(())
 }
@@ -399,8 +425,18 @@ mod tests {
 
     #[test]
     fn gossip_registry_merge() {
-        let local = NodeInfo { id: Uuid::new_v4(), addr: "127.0.0.1:7001".into(), actor_count: 0, generation: 1 };
-        let peer  = NodeInfo { id: Uuid::new_v4(), addr: "127.0.0.1:7002".into(), actor_count: 2, generation: 1 };
+        let local = NodeInfo {
+            id: Uuid::new_v4(),
+            addr: "127.0.0.1:7001".into(),
+            actor_count: 0,
+            generation: 1,
+        };
+        let peer = NodeInfo {
+            id: Uuid::new_v4(),
+            addr: "127.0.0.1:7002".into(),
+            actor_count: 2,
+            generation: 1,
+        };
         let reg = GossipRegistry::new(local);
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
@@ -413,15 +449,30 @@ mod tests {
 
     #[test]
     fn gossip_ignores_stale() {
-        let local = NodeInfo { id: Uuid::new_v4(), addr: "127.0.0.1:7001".into(), actor_count: 0, generation: 1 };
+        let local = NodeInfo {
+            id: Uuid::new_v4(),
+            addr: "127.0.0.1:7001".into(),
+            actor_count: 0,
+            generation: 1,
+        };
         let peer_id = Uuid::new_v4();
-        let peer_v2 = NodeInfo { id: peer_id, addr: "127.0.0.1:7002".into(), actor_count: 5, generation: 2 };
-        let peer_v1 = NodeInfo { id: peer_id, addr: "127.0.0.1:7002".into(), actor_count: 1, generation: 1 };
+        let peer_v2 = NodeInfo {
+            id: peer_id,
+            addr: "127.0.0.1:7002".into(),
+            actor_count: 5,
+            generation: 2,
+        };
+        let peer_v1 = NodeInfo {
+            id: peer_id,
+            addr: "127.0.0.1:7002".into(),
+            actor_count: 1,
+            generation: 1,
+        };
         let reg = GossipRegistry::new(local);
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             reg.merge(peer_v2.clone()).await;
-            reg.merge(peer_v1).await;  // stale — should not overwrite
+            reg.merge(peer_v1).await; // stale — should not overwrite
             let peers = reg.peers().await;
             assert_eq!(peers[0].actor_count, 5); // v2 preserved
         });

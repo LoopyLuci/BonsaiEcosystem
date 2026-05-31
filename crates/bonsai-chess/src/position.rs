@@ -2,15 +2,12 @@
 //!
 //! Wraps `shakmaty` for all game logic.
 
+use crate::error::ChessError;
 use serde::{Deserialize, Serialize};
 use shakmaty::{
-    Chess, CastlingMode, EnPassantMode, Position, Move,
-    fen::Fen,
-    uci::UciMove,
-    san::San,
-    Color, Outcome,
+    fen::Fen, san::San, uci::UciMove, CastlingMode, Chess, Color, EnPassantMode, Move, Outcome,
+    Position,
 };
-use crate::error::ChessError;
 
 // ── Move representation ───────────────────────────────────────────────────────
 
@@ -27,7 +24,9 @@ impl ChessMove {
         Ok(Self(s.to_lowercase()))
     }
 
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl std::fmt::Display for ChessMove {
@@ -58,9 +57,11 @@ impl ChessPosition {
 
     /// Parse from FEN string.
     pub fn from_fen(fen: &str) -> Result<Self, ChessError> {
-        let fen: Fen = fen.parse()
+        let fen: Fen = fen
+            .parse()
             .map_err(|_| ChessError::InvalidFen(fen.to_string()))?;
-        let pos: Chess = fen.into_position(CastlingMode::Standard)
+        let pos: Chess = fen
+            .into_position(CastlingMode::Standard)
             .map_err(|e| ChessError::InvalidFen(e.to_string()))?;
         Ok(Self {
             inner: pos,
@@ -86,16 +87,19 @@ impl ChessPosition {
     pub fn legal_moves_uci(&self) -> Vec<String> {
         use shakmaty::MoveList;
         let moves: MoveList = self.inner.legal_moves();
-        moves.iter()
+        moves
+            .iter()
             .map(|m| UciMove::from_chess960(m).to_string())
             .collect()
     }
 
     /// Parse and apply a move from UCI notation. Returns SAN for display.
     pub fn make_move_uci(&mut self, uci: &str) -> Result<String, ChessError> {
-        let uci_move: UciMove = uci.parse()
+        let uci_move: UciMove = uci
+            .parse()
             .map_err(|_| ChessError::InvalidMove(uci.to_string()))?;
-        let m = uci_move.to_move(&self.inner)
+        let m = uci_move
+            .to_move(&self.inner)
             .map_err(|_| ChessError::IllegalMove(uci.to_string()))?;
 
         // Compute SAN before applying
@@ -110,9 +114,11 @@ impl ChessPosition {
 
     /// Parse and apply a move from SAN notation. Returns UCI string.
     pub fn make_move_san(&mut self, san_str: &str) -> Result<String, ChessError> {
-        let san: San = san_str.parse()
+        let san: San = san_str
+            .parse()
             .map_err(|_| ChessError::InvalidMove(san_str.to_string()))?;
-        let m = san.to_move(&self.inner)
+        let m = san
+            .to_move(&self.inner)
             .map_err(|_| ChessError::IllegalMove(san_str.to_string()))?;
         let uci = UciMove::from_chess960(&m).to_string();
         self.inner.play_unchecked(&m);
@@ -132,8 +138,12 @@ impl ChessPosition {
             return Some(0.5);
         }
         match self.inner.outcome()? {
-            Outcome::Decisive { winner: Color::White } => Some(1.0),
-            Outcome::Decisive { winner: Color::Black } => Some(0.0),
+            Outcome::Decisive {
+                winner: Color::White,
+            } => Some(1.0),
+            Outcome::Decisive {
+                winner: Color::Black,
+            } => Some(0.0),
             Outcome::Draw => Some(0.5),
         }
     }
@@ -151,7 +161,9 @@ impl ChessPosition {
     }
 
     /// Number of half-moves played.
-    pub fn halfmove_count(&self) -> u32 { self.halfmove_clock }
+    pub fn halfmove_count(&self) -> u32 {
+        self.halfmove_clock
+    }
 
     /// Whether position is legal (used for validation).
     pub fn is_valid_move_uci(&self, uci: &str) -> bool {
@@ -170,7 +182,14 @@ impl ChessPosition {
 
         // Planes 0-11: piece positions (6 roles × 2 colors)
         let board = self.inner.board();
-        let roles = [Role::Pawn, Role::Knight, Role::Bishop, Role::Rook, Role::Queen, Role::King];
+        let roles = [
+            Role::Pawn,
+            Role::Knight,
+            Role::Bishop,
+            Role::Rook,
+            Role::Queen,
+            Role::King,
+        ];
         for (ri, role) in roles.iter().enumerate() {
             for sq in board.by_role(*role) & board.white() {
                 planes[ri * 64 + sq as usize] = 1.0;
@@ -182,7 +201,9 @@ impl ChessPosition {
 
         // Plane 12: side to move
         if self.inner.turn() == Color::White {
-            for i in 0..64 { planes[12 * 64 + i] = 1.0; }
+            for i in 0..64 {
+                planes[12 * 64 + i] = 1.0;
+            }
         }
 
         // Remaining planes: castling rights, en passant (simplified)
@@ -196,10 +217,15 @@ impl ChessPosition {
 /// Simple material-count heuristic returning a value in [0,1].
 /// 1.0 = white is winning, 0.0 = black is winning, 0.5 = equal.
 pub fn material_evaluation(pos: &ChessPosition) -> f32 {
-    use shakmaty::{Role};
+    use shakmaty::Role;
     let board = pos.inner.board();
-    let piece_values = [(Role::Pawn, 1.0), (Role::Knight, 3.0), (Role::Bishop, 3.0),
-                        (Role::Rook, 5.0), (Role::Queen, 9.0)];
+    let piece_values = [
+        (Role::Pawn, 1.0),
+        (Role::Knight, 3.0),
+        (Role::Bishop, 3.0),
+        (Role::Rook, 5.0),
+        (Role::Queen, 9.0),
+    ];
     let mut white_mat = 0.0f32;
     let mut black_mat = 0.0f32;
     for (role, val) in &piece_values {
@@ -207,7 +233,11 @@ pub fn material_evaluation(pos: &ChessPosition) -> f32 {
         black_mat += (board.by_role(*role) & board.black()).count() as f32 * val;
     }
     let total = white_mat + black_mat;
-    if total == 0.0 { 0.5 } else { (white_mat / total).clamp(0.0, 1.0) }
+    if total == 0.0 {
+        0.5
+    } else {
+        (white_mat / total).clamp(0.0, 1.0)
+    }
 }
 
 #[cfg(test)]

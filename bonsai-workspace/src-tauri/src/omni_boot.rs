@@ -14,9 +14,9 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
+use crate::process_manager::TrustLevel;
 use bonsai_cas::{CasKey, CasStore};
 use bonsai_verify::{AxiomKernel, Context, Term};
-use crate::process_manager::TrustLevel;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1 — Manifest types
@@ -66,11 +66,28 @@ impl Default for BootManifest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "step")]
 pub enum VerificationStep {
-    Verifying { component: String, expected: String },
-    Verified  { component: String, actual: String, duration_us: u64 },
-    ProofChecked { component: String, proof_key: String, valid: bool },
-    Failed    { component: String, reason: String },
-    Skipped   { component: String, reason: String },
+    Verifying {
+        component: String,
+        expected: String,
+    },
+    Verified {
+        component: String,
+        actual: String,
+        duration_us: u64,
+    },
+    ProofChecked {
+        component: String,
+        proof_key: String,
+        valid: bool,
+    },
+    Failed {
+        component: String,
+        reason: String,
+    },
+    Skipped {
+        component: String,
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -94,9 +111,16 @@ pub struct BootReport {
 #[derive(Debug)]
 pub enum BootError {
     MissingComponent(String),
-    HashMismatch { component: String, expected: String, actual: String },
+    HashMismatch {
+        component: String,
+        expected: String,
+        actual: String,
+    },
     ProofFailed(String),
-    InsufficientVerified { required: u32, got: u32 },
+    InsufficientVerified {
+        required: u32,
+        got: u32,
+    },
     Io(String),
     Serde(String),
 }
@@ -105,11 +129,21 @@ impl std::fmt::Display for BootError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::MissingComponent(n) => write!(f, "Required component '{}' is missing", n),
-            Self::HashMismatch { component, expected, actual } =>
-                write!(f, "Hash mismatch for '{}': expected {} got {}", component, &expected[..8], &actual[..8]),
+            Self::HashMismatch {
+                component,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "Hash mismatch for '{}': expected {} got {}",
+                component,
+                &expected[..8],
+                &actual[..8]
+            ),
             Self::ProofFailed(n) => write!(f, "Axiom proof verification failed for '{}'", n),
-            Self::InsufficientVerified { required, got } =>
-                write!(f, "Only {}/{} components verified", got, required),
+            Self::InsufficientVerified { required, got } => {
+                write!(f, "Only {}/{} components verified", got, required)
+            }
             Self::Io(e) => write!(f, "I/O error: {}", e),
             Self::Serde(e) => write!(f, "Serialization error: {}", e),
         }
@@ -117,7 +151,9 @@ impl std::fmt::Display for BootError {
 }
 
 impl From<std::io::Error> for BootError {
-    fn from(e: std::io::Error) -> Self { Self::Io(e.to_string()) }
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e.to_string())
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,7 +184,11 @@ impl OmniBoot {
 
     pub async fn load_manifest(&self, key_hex: &str) -> Result<(), String> {
         let key = CasKey::from_hex(key_hex).map_err(|e| e.to_string())?;
-        let bytes = self.cas.get(&key).await.map_err(|e| e.to_string())?
+        let bytes = self
+            .cas
+            .get(&key)
+            .await
+            .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Manifest not found in CAS: {}", key_hex))?;
         let manifest: BootManifest = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
         *self.manifest.write().unwrap() = manifest;
@@ -169,23 +209,35 @@ impl OmniBoot {
                 .into_iter()
                 .filter_map(|e| e.ok())
             {
-                if !entry.file_type().is_file() { continue; }
+                if !entry.file_type().is_file() {
+                    continue;
+                }
                 let path = entry.path();
                 let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
                 // Only hash executables and shared libraries
-                if !matches!(ext, "" | "exe" | "dll" | "so" | "dylib") { continue; }
+                if !matches!(ext, "" | "exe" | "dll" | "so" | "dylib") {
+                    continue;
+                }
 
                 let data = match std::fs::read(path) {
                     Ok(d) => d,
-                    Err(e) => { warn!("[omni-boot] cannot read {:?}: {}", path, e); continue; }
+                    Err(e) => {
+                        warn!("[omni-boot] cannot read {:?}: {}", path, e);
+                        continue;
+                    }
                 };
 
                 let hash_hex = CasKey::from_bytes(&data).hex();
-                let name = path.file_name()
+                let name = path
+                    .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default();
 
-                let trust_level = if name.contains("bonsai") { TrustLevel::System } else { TrustLevel::Managed };
+                let trust_level = if name.contains("bonsai") {
+                    TrustLevel::System
+                } else {
+                    TrustLevel::Managed
+                };
                 let required = name.contains("bonsai-workspace");
 
                 components.push(BootComponent {
@@ -206,14 +258,20 @@ impl OmniBoot {
         };
 
         let bytes = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
-        let key = self.cas.put(&bytes, "application/x-omni-boot-manifest")
-            .await.map_err(|e| e.to_string())?;
+        let key = self
+            .cas
+            .put(&bytes, "application/x-omni-boot-manifest")
+            .await
+            .map_err(|e| e.to_string())?;
         let hex = key.hex();
 
         *self.manifest.write().unwrap() = manifest;
         *self.manifest_key.write().unwrap() = Some(hex.clone());
-        info!("[omni-boot] manifest snapshotted: {} components, key={}",
-              self.manifest.read().unwrap().components.len(), &hex[..8]);
+        info!(
+            "[omni-boot] manifest snapshotted: {} components, key={}",
+            self.manifest.read().unwrap().components.len(),
+            &hex[..8]
+        );
         Ok(hex)
     }
 
@@ -250,8 +308,11 @@ impl OmniBoot {
             }
 
             let data = std::fs::read(path).map_err(|e| {
-                if component.required_for_boot { BootError::Io(e.to_string()) }
-                else { BootError::Io(e.to_string()) }
+                if component.required_for_boot {
+                    BootError::Io(e.to_string())
+                } else {
+                    BootError::Io(e.to_string())
+                }
             })?;
 
             let actual_hash = CasKey::from_bytes(&data).hex();
@@ -268,7 +329,11 @@ impl OmniBoot {
                 }
                 self.log.write().unwrap().push(VerificationStep::Failed {
                     component: component.name.clone(),
-                    reason: format!("Expected {} got {}", &component.expected_hash[..8], &actual_hash[..8]),
+                    reason: format!(
+                        "Expected {} got {}",
+                        &component.expected_hash[..8],
+                        &actual_hash[..8]
+                    ),
                 });
                 report.failed_components += 1;
                 continue;
@@ -290,20 +355,26 @@ impl OmniBoot {
 
                     if let Ok(proof_key) = CasKey::from_hex(proof_key_hex) {
                         if let Ok(Some(proof_bytes)) = self.cas.get(&proof_key).await {
-                            if let Ok(boot_proof) = serde_json::from_slice::<BootProof>(&proof_bytes) {
+                            if let Ok(boot_proof) =
+                                serde_json::from_slice::<BootProof>(&proof_bytes)
+                            {
                                 let ctx = Context::new();
-                                proof_valid = self.kernel
+                                proof_valid = self
+                                    .kernel
                                     .prove(boot_proof.proposition, boot_proof.proof_term, &ctx)
                                     .is_ok();
                             }
                         }
                     }
 
-                    self.log.write().unwrap().push(VerificationStep::ProofChecked {
-                        component: component.name.clone(),
-                        proof_key: proof_key_hex.clone(),
-                        valid: proof_valid,
-                    });
+                    self.log
+                        .write()
+                        .unwrap()
+                        .push(VerificationStep::ProofChecked {
+                            component: component.name.clone(),
+                            proof_key: proof_key_hex.clone(),
+                            valid: proof_valid,
+                        });
 
                     if proof_valid {
                         report.proofs_valid += 1;
@@ -319,7 +390,10 @@ impl OmniBoot {
         // Phase 3: minimum verified gate
         let min = manifest.minimum_verified;
         if (report.verified_components as u32) < min {
-            let reason = format!("Only {}/{} components verified", report.verified_components, min);
+            let reason = format!(
+                "Only {}/{} components verified",
+                report.verified_components, min
+            );
             report.failure_reason = Some(reason);
             return Err(BootError::InsufficientVerified {
                 required: min,
@@ -329,8 +403,10 @@ impl OmniBoot {
 
         report.total_duration_ms = start.elapsed().as_millis() as u64;
         report.boot_successful = true;
-        info!("[omni-boot] boot verified: {} components, {}ms",
-              report.verified_components, report.total_duration_ms);
+        info!(
+            "[omni-boot] boot verified: {} components, {}ms",
+            report.verified_components, report.total_duration_ms
+        );
 
         Ok(report)
     }
@@ -352,14 +428,25 @@ impl OmniBoot {
         proof: BootProof,
     ) -> Result<String, String> {
         let bytes = serde_json::to_vec(&proof).map_err(|e| e.to_string())?;
-        let key = self.cas.put(&bytes, "application/x-omni-boot-proof")
-            .await.map_err(|e| e.to_string())?;
+        let key = self
+            .cas
+            .put(&bytes, "application/x-omni-boot-proof")
+            .await
+            .map_err(|e| e.to_string())?;
         let hex = key.hex();
 
         let mut manifest = self.manifest.write().unwrap();
-        if let Some(comp) = manifest.components.iter_mut().find(|c| c.name == component_name) {
+        if let Some(comp) = manifest
+            .components
+            .iter_mut()
+            .find(|c| c.name == component_name)
+        {
             comp.proof_key = Some(hex.clone());
-            info!("[omni-boot] proof registered for {} → {}", component_name, &hex[..8]);
+            info!(
+                "[omni-boot] proof registered for {} → {}",
+                component_name,
+                &hex[..8]
+            );
         }
         Ok(hex)
     }
@@ -373,9 +460,7 @@ use crate::AppState;
 use tauri::State;
 
 #[tauri::command]
-pub async fn omni_boot_verify(
-    state: State<'_, AppState>,
-) -> Result<serde_json::Value, String> {
+pub async fn omni_boot_verify(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     match state.omni_boot.verify_and_boot().await {
         Ok(report) => Ok(serde_json::to_value(report).map_err(|e| e.to_string())?),
         Err(e) => Err(e.to_string()),
@@ -383,9 +468,7 @@ pub async fn omni_boot_verify(
 }
 
 #[tauri::command]
-pub async fn omni_boot_manifest(
-    state: State<'_, AppState>,
-) -> Result<serde_json::Value, String> {
+pub async fn omni_boot_manifest(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let manifest = state.omni_boot.get_manifest();
     Ok(serde_json::to_value(manifest).map_err(|e| e.to_string())?)
 }
@@ -401,9 +484,7 @@ pub async fn omni_boot_snapshot(
 }
 
 #[tauri::command]
-pub async fn omni_boot_report(
-    state: State<'_, AppState>,
-) -> Result<serde_json::Value, String> {
+pub async fn omni_boot_report(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let log = state.omni_boot.get_log();
     Ok(serde_json::to_value(log).map_err(|e| e.to_string())?)
 }

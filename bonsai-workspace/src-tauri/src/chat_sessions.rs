@@ -13,16 +13,16 @@ use sqlx::{Row, SqlitePool};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SessionMessage {
-    pub id:         String,
+    pub id: String,
     pub session_id: String,
-    pub role:       String,
-    pub content:    String,
+    pub role: String,
+    pub content: String,
     /// JSON-encoded token stats (optional; only on assistant messages).
-    pub stats:      Option<serde_json::Value>,
+    pub stats: Option<serde_json::Value>,
     /// JSON-encoded tool list used for this response.
     pub tools_used: Option<serde_json::Value>,
     /// Optional agent metadata for swarm/agent-attributed responses.
-    pub agent_id:   Option<String>,
+    pub agent_id: Option<String>,
     pub agent_label: Option<String>,
     pub agent_color: Option<String>,
     pub agent_icon: Option<String>,
@@ -32,42 +32,42 @@ pub struct SessionMessage {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ChatSession {
-    pub id:             String,
-    pub title:          String,
+    pub id: String,
+    pub title: String,
     pub workspace_path: Option<String>,
     #[serde(default)]
-    pub tags:           Vec<String>,
+    pub tags: Vec<String>,
     #[serde(default)]
-    pub is_locked:      bool,
+    pub is_locked: bool,
     #[serde(default)]
-    pub is_favorite:    bool,
+    pub is_favorite: bool,
     #[serde(default)]
-    pub is_deleted:     bool,
+    pub is_deleted: bool,
     #[serde(default)]
-    pub group_ids:      Vec<String>,
-    pub created_at:     i64,
-    pub updated_at:     i64,
+    pub group_ids: Vec<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
     /// Only populated when loading a specific session.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub messages:       Vec<SessionMessage>,
+    pub messages: Vec<SessionMessage>,
 }
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ChatSessionGroup {
-    pub id:          String,
-    pub title:       String,
+    pub id: String,
+    pub title: String,
     #[serde(default)]
-    pub tags:        Vec<String>,
+    pub tags: Vec<String>,
     #[serde(default)]
-    pub is_locked:   bool,
+    pub is_locked: bool,
     #[serde(default)]
     pub is_favorite: bool,
     #[serde(default)]
-    pub is_deleted:  bool,
+    pub is_deleted: bool,
     #[serde(default)]
-    pub chat_count:  i64,
-    pub created_at:  i64,
-    pub updated_at:  i64,
+    pub chat_count: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -130,18 +130,26 @@ impl ChatSessionStore {
         .execute(&pool)
         .await?;
 
-        let _ = sqlx::query("ALTER TABLE chat_sessions ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]'")
-            .execute(&pool)
-            .await;
-        let _ = sqlx::query("ALTER TABLE chat_sessions ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0")
-            .execute(&pool)
-            .await;
-        let _ = sqlx::query("ALTER TABLE chat_sessions ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
-            .execute(&pool)
-            .await;
-        let _ = sqlx::query("ALTER TABLE chat_sessions ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0")
-            .execute(&pool)
-            .await;
+        let _ = sqlx::query(
+            "ALTER TABLE chat_sessions ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]'",
+        )
+        .execute(&pool)
+        .await;
+        let _ = sqlx::query(
+            "ALTER TABLE chat_sessions ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0",
+        )
+        .execute(&pool)
+        .await;
+        let _ = sqlx::query(
+            "ALTER TABLE chat_sessions ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0",
+        )
+        .execute(&pool)
+        .await;
+        let _ = sqlx::query(
+            "ALTER TABLE chat_sessions ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0",
+        )
+        .execute(&pool)
+        .await;
 
         let _ = sqlx::query("ALTER TABLE session_messages ADD COLUMN tools_used_json TEXT")
             .execute(&pool)
@@ -172,7 +180,7 @@ impl ChatSessionStore {
         title: &str,
         workspace_path: Option<&str>,
     ) -> Result<String> {
-        let id  = uuid();
+        let id = uuid();
         let now = now_ms();
         sqlx::query(
             "INSERT INTO chat_sessions (id, title, workspace_path, created_at, updated_at) \
@@ -219,9 +227,15 @@ impl ChatSessionStore {
             Some(t) => serde_json::to_string(&t).unwrap_or_else(|_| "[]".to_string()),
             None => row.get("tags_json"),
         };
-        let next_locked: i64 = is_locked.map(|v| if v { 1 } else { 0 }).unwrap_or_else(|| row.get::<i64, _>("is_locked"));
-        let next_favorite: i64 = is_favorite.map(|v| if v { 1 } else { 0 }).unwrap_or_else(|| row.get::<i64, _>("is_favorite"));
-        let next_deleted: i64 = is_deleted.map(|v| if v { 1 } else { 0 }).unwrap_or_else(|| row.get::<i64, _>("is_deleted"));
+        let next_locked: i64 = is_locked
+            .map(|v| if v { 1 } else { 0 })
+            .unwrap_or_else(|| row.get::<i64, _>("is_locked"));
+        let next_favorite: i64 = is_favorite
+            .map(|v| if v { 1 } else { 0 })
+            .unwrap_or_else(|| row.get::<i64, _>("is_favorite"));
+        let next_deleted: i64 = is_deleted
+            .map(|v| if v { 1 } else { 0 })
+            .unwrap_or_else(|| row.get::<i64, _>("is_deleted"));
 
         sqlx::query(
             "UPDATE chat_sessions
@@ -261,8 +275,14 @@ impl ChatSessionStore {
         .await?;
 
         for message in source.messages {
-            let stats_json = message.stats.as_ref().and_then(|s| serde_json::to_string(s).ok());
-            let tools_used_json = message.tools_used.as_ref().and_then(|s| serde_json::to_string(s).ok());
+            let stats_json = message
+                .stats
+                .as_ref()
+                .and_then(|s| serde_json::to_string(s).ok());
+            let tools_used_json = message
+                .tools_used
+                .as_ref()
+                .and_then(|s| serde_json::to_string(s).ok());
             sqlx::query(
                 "INSERT INTO session_messages (id, session_id, role, content, stats_json, tools_used_json, agent_id, agent_label, agent_color, agent_icon, agent_slot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
@@ -358,12 +378,11 @@ impl ChatSessionStore {
     ) -> Result<String> {
         let id = session_id.unwrap_or_else(|| uuid());
         let now = now_ms();
-        let existing: Option<(i64,)> = sqlx::query_as(
-            "SELECT created_at FROM chat_sessions WHERE id = ?",
-        )
-        .bind(&id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let existing: Option<(i64,)> =
+            sqlx::query_as("SELECT created_at FROM chat_sessions WHERE id = ?")
+                .bind(&id)
+                .fetch_optional(&self.pool)
+                .await?;
 
         let created_at = existing.map(|row| row.0).unwrap_or(now);
 
@@ -409,7 +428,10 @@ impl ChatSessionStore {
             let agent_color = message.get("agent_color").and_then(|v| v.as_str());
             let agent_icon = message.get("agent_icon").and_then(|v| v.as_str());
             let agent_slot = message.get("agent_slot").and_then(|v| v.as_i64());
-            let created_at = message.get("created_at").and_then(|v| v.as_i64()).unwrap_or(now);
+            let created_at = message
+                .get("created_at")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(now);
             sqlx::query(
                 "INSERT INTO session_messages (id, session_id, role, content, stats_json, tools_used_json, agent_id, agent_label, agent_color, agent_icon, agent_slot, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
@@ -460,17 +482,17 @@ impl ChatSessionStore {
                 let stats_str: Option<String> = m.get("stats_json");
                 let tools_used_str: Option<String> = m.get("tools_used_json");
                 SessionMessage {
-                    id:         m.get("id"),
+                    id: m.get("id"),
                     session_id: m.get("session_id"),
-                    role:       m.get("role"),
-                    content:    m.get("content"),
-                    stats:      stats_str.and_then(|s| serde_json::from_str(&s).ok()),
+                    role: m.get("role"),
+                    content: m.get("content"),
+                    stats: stats_str.and_then(|s| serde_json::from_str(&s).ok()),
                     tools_used: tools_used_str.and_then(|s| serde_json::from_str(&s).ok()),
-                    agent_id:   m.get("agent_id"),
+                    agent_id: m.get("agent_id"),
                     agent_label: m.get("agent_label"),
                     agent_color: m.get("agent_color"),
-                    agent_icon:  m.get("agent_icon"),
-                    agent_slot:  m.get("agent_slot"),
+                    agent_icon: m.get("agent_icon"),
+                    agent_slot: m.get("agent_slot"),
                     created_at: m.get("created_at"),
                 }
             })
@@ -503,11 +525,12 @@ impl ChatSessionStore {
         let mut out = Vec::with_capacity(rows.len());
         for r in rows {
             let gid: String = r.get("id");
-            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM chat_group_links WHERE group_id = ?")
-                .bind(&gid)
-                .fetch_one(&self.pool)
-                .await
-                .unwrap_or(0);
+            let count: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM chat_group_links WHERE group_id = ?")
+                    .bind(&gid)
+                    .fetch_one(&self.pool)
+                    .await
+                    .unwrap_or(0);
             out.push(ChatSessionGroup {
                 id: gid,
                 title: r.get("title"),
@@ -560,9 +583,15 @@ impl ChatSessionStore {
             Some(t) => serde_json::to_string(&t).unwrap_or_else(|_| "[]".to_string()),
             None => row.get("tags_json"),
         };
-        let next_locked: i64 = is_locked.map(|v| if v { 1 } else { 0 }).unwrap_or_else(|| row.get::<i64, _>("is_locked"));
-        let next_favorite: i64 = is_favorite.map(|v| if v { 1 } else { 0 }).unwrap_or_else(|| row.get::<i64, _>("is_favorite"));
-        let next_deleted: i64 = is_deleted.map(|v| if v { 1 } else { 0 }).unwrap_or_else(|| row.get::<i64, _>("is_deleted"));
+        let next_locked: i64 = is_locked
+            .map(|v| if v { 1 } else { 0 })
+            .unwrap_or_else(|| row.get::<i64, _>("is_locked"));
+        let next_favorite: i64 = is_favorite
+            .map(|v| if v { 1 } else { 0 })
+            .unwrap_or_else(|| row.get::<i64, _>("is_favorite"));
+        let next_deleted: i64 = is_deleted
+            .map(|v| if v { 1 } else { 0 })
+            .unwrap_or_else(|| row.get::<i64, _>("is_deleted"));
 
         sqlx::query(
             "UPDATE chat_session_groups
@@ -582,10 +611,11 @@ impl ChatSessionStore {
     }
 
     pub async fn link_chat_to_group(&self, chat_id: &str, group_id: &str) -> Result<()> {
-        let group_locked: Option<i64> = sqlx::query_scalar("SELECT is_locked FROM chat_session_groups WHERE id = ?")
-            .bind(group_id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let group_locked: Option<i64> =
+            sqlx::query_scalar("SELECT is_locked FROM chat_session_groups WHERE id = ?")
+                .bind(group_id)
+                .fetch_optional(&self.pool)
+                .await?;
         if group_locked == Some(1) {
             anyhow::bail!("Session is locked. Unlock it before linking chats.");
         }
@@ -644,14 +674,23 @@ impl ChatSessionStore {
     }
 
     async fn group_ids_for_chat(&self, chat_id: &str) -> Result<Vec<String>> {
-        let rows = sqlx::query("SELECT group_id FROM chat_group_links WHERE chat_id = ? ORDER BY linked_at")
-            .bind(chat_id)
-            .fetch_all(&self.pool)
-            .await?;
-        Ok(rows.iter().map(|r| r.get::<String, _>("group_id")).collect())
+        let rows = sqlx::query(
+            "SELECT group_id FROM chat_group_links WHERE chat_id = ? ORDER BY linked_at",
+        )
+        .bind(chat_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|r| r.get::<String, _>("group_id"))
+            .collect())
     }
 
-    fn row_to_chat_session(&self, r: &sqlx::sqlite::SqliteRow, group_ids: Vec<String>) -> ChatSession {
+    fn row_to_chat_session(
+        &self,
+        r: &sqlx::sqlite::SqliteRow,
+        group_ids: Vec<String>,
+    ) -> ChatSession {
         ChatSession {
             id: r.get("id"),
             title: r.get("title"),
@@ -676,7 +715,7 @@ impl ChatSessionStore {
         content: &str,
         stats: Option<&serde_json::Value>,
     ) -> Result<String> {
-        let id  = uuid();
+        let id = uuid();
         let now = now_ms();
         let stats_json = stats.map(|s| s.to_string());
 
@@ -706,7 +745,11 @@ impl ChatSessionStore {
     /// Auto-title a session from its first user message.
     pub async fn auto_title(&self, session_id: &str, first_user_msg: &str) -> Result<()> {
         let title: String = first_user_msg.chars().take(60).collect();
-        let title = if first_user_msg.len() > 60 { format!("{title}…") } else { title };
+        let title = if first_user_msg.len() > 60 {
+            format!("{title}…")
+        } else {
+            title
+        };
         self.rename_session(session_id, &title).await
     }
 }

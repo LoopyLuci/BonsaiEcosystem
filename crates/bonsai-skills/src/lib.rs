@@ -3,9 +3,9 @@
 pub mod executor;
 pub use executor::{execute_skill, SkillResult};
 
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::Arc;
-use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tracing::{info, warn};
 
 use bonsai_skill_compiler::{load_compiled_skill, verify_skill_integrity};
@@ -19,23 +19,24 @@ pub fn watch_skills_dir(
     registry: Arc<ToolRegistry>,
     path: &Path,
 ) -> notify::Result<RecommendedWatcher> {
-    let mut watcher =
-        notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-            let event = match res {
-                Ok(e) => e,
-                Err(e) => { warn!("skills watcher error: {e}"); return; }
-            };
-            let relevant = matches!(
-                event.kind,
-                EventKind::Create(_) | EventKind::Modify(_)
-            );
-            if !relevant { return; }
-            for p in &event.paths {
-                if p.extension().map_or(false, |e| e == "json") {
-                    reload_one(&registry, p);
-                }
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        let event = match res {
+            Ok(e) => e,
+            Err(e) => {
+                warn!("skills watcher error: {e}");
+                return;
             }
-        })?;
+        };
+        let relevant = matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_));
+        if !relevant {
+            return;
+        }
+        for p in &event.paths {
+            if p.extension().map_or(false, |e| e == "json") {
+                reload_one(&registry, p);
+            }
+        }
+    })?;
     watcher.watch(path, RecursiveMode::NonRecursive)?;
     Ok(watcher)
 }

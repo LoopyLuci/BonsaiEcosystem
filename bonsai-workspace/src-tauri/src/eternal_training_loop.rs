@@ -23,20 +23,19 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::unified_training_collector::ConvMessage;
+use candle_core::Device;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
-use crate::unified_training_collector::ConvMessage;
-use candle_core::Device;
 
 use crate::evaluation_harness::EvaluationHarness;
 use crate::forgetting_prevention::ForgettingPrevention;
 use crate::model_orchestrator::ModelOrchestrator;
 use crate::promotion_gate::{AdapterRegistry, PromotionDecision, PromotionGate};
 use crate::unified_training_collector::{
-    classify_domain, ModelRole, QualityMeta, TrainingInput, TrainingOutput,
-    TrainingSource, TrainingStrategyType, UnifiedTrainingCollector,
-    UnifiedTrainingExample, quality_score,
+    classify_domain, quality_score, ModelRole, QualityMeta, TrainingInput, TrainingOutput,
+    TrainingSource, TrainingStrategyType, UnifiedTrainingCollector, UnifiedTrainingExample,
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -45,12 +44,16 @@ use crate::unified_training_collector::{
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ConstitutionTier { One, Two, Three }
+pub enum ConstitutionTier {
+    One,
+    Two,
+    Three,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstitutionRule {
-    pub tier:        ConstitutionTier,
-    pub id:          String,
+    pub tier: ConstitutionTier,
+    pub id: String,
     pub description: String,
     pub violation_check: ViolationCheck,
     pub training_weight: f32,
@@ -62,13 +65,13 @@ pub enum ViolationCheck {
     /// Response must NOT contain any of these strings (case-insensitive).
     Forbidden { patterns: Vec<String> },
     /// Response should contain at least one of these (positive obligation).
-    Required  { patterns: Vec<String> },
+    Required { patterns: Vec<String> },
     /// Minimum response length (tokens, approx).
     MinLength { tokens: u32 },
     /// Maximum response length — verbosity penalty.
     MaxLength { tokens: u32 },
     /// LLM-judge: ask critic model whether rule is violated.
-    LlmJudge  { prompt_template: String },
+    LlmJudge { prompt_template: String },
 }
 
 pub fn default_constitution() -> Vec<ConstitutionRule> {
@@ -182,15 +185,18 @@ pub struct ConstitutionalTrainer {
 
 #[derive(Debug, Clone)]
 pub struct ViolationResult {
-    pub rule_id:   String,
-    pub tier:      ConstitutionTier,
-    pub weight:    f32,
-    pub violated:  bool,
+    pub rule_id: String,
+    pub tier: ConstitutionTier,
+    pub weight: f32,
+    pub violated: bool,
 }
 
 impl ConstitutionalTrainer {
     pub fn new(orchestrator: Arc<ModelOrchestrator>) -> Self {
-        Self { orchestrator, constitution: default_constitution() }
+        Self {
+            orchestrator,
+            constitution: default_constitution(),
+        }
     }
 
     /// Evaluate a (prompt, response) pair against the full constitution.
@@ -213,20 +219,28 @@ impl ConstitutionalTrainer {
                         let judge_prompt = prompt_template
                             .replace("{prompt}", prompt)
                             .replace("{response}", response);
-                        match self.orchestrator.infer_simple(&judge_prompt, 5, "critic").await {
+                        match self
+                            .orchestrator
+                            .infer_simple(&judge_prompt, 5, "critic")
+                            .await
+                        {
                             Ok((text, _)) => text.trim().to_uppercase().starts_with("YES"),
                             Err(_) => false,
                         }
-                    } else { false }
+                    } else {
+                        false
+                    }
                 }
             };
 
             if violated {
-                if rule.tier == ConstitutionTier::Two { has_t2_violation = true; }
+                if rule.tier == ConstitutionTier::Two {
+                    has_t2_violation = true;
+                }
                 violations.push(ViolationResult {
-                    rule_id:  rule.id.clone(),
-                    tier:     rule.tier.clone(),
-                    weight:   rule.training_weight,
+                    rule_id: rule.id.clone(),
+                    tier: rule.tier.clone(),
+                    weight: rule.training_weight,
                     violated: true,
                 });
             }
@@ -234,11 +248,14 @@ impl ConstitutionalTrainer {
 
         // For Tier-2 violations, generate a corrected response
         let correction = if has_t2_violation {
-            let violated_ids: Vec<_> = violations.iter()
+            let violated_ids: Vec<_> = violations
+                .iter()
                 .filter(|v| v.tier == ConstitutionTier::Two)
                 .map(|v| v.rule_id.clone())
                 .collect();
-            let rules_desc: Vec<_> = self.constitution.iter()
+            let rules_desc: Vec<_> = self
+                .constitution
+                .iter()
                 .filter(|r| violated_ids.contains(&r.id))
                 .map(|r| r.description.as_str())
                 .collect();
@@ -251,21 +268,24 @@ impl ConstitutionalTrainer {
                  Improved response:",
                 rules_desc.join("\n• ")
             );
-            match self.orchestrator.infer_simple(&correction_prompt, 600, "constitutional").await {
+            match self
+                .orchestrator
+                .infer_simple(&correction_prompt, 600, "constitutional")
+                .await
+            {
                 Ok((text, _)) => Some(text),
                 Err(_) => None,
             }
-        } else { None };
+        } else {
+            None
+        };
 
         (violations, correction)
     }
 
     /// Run constitutional evaluation on a batch of (prompt, response) pairs.
     /// Returns DPO training examples for each Tier-2 violation corrected.
-    pub async fn process_batch(
-        &self,
-        pairs: Vec<(String, String)>,
-    ) -> Vec<UnifiedTrainingExample> {
+    pub async fn process_batch(&self, pairs: Vec<(String, String)>) -> Vec<UnifiedTrainingExample> {
         let mut examples = Vec::new();
         for (prompt, response) in pairs {
             let (violations, correction) = self.evaluate_and_correct(&prompt, &response).await;
@@ -273,22 +293,24 @@ impl ConstitutionalTrainer {
                 let total_weight: f32 = violations.iter().map(|v| v.weight).sum();
                 let quality = (0.60 + (total_weight / 10.0).min(0.39)).min(0.99);
                 examples.push(UnifiedTrainingExample {
-                    id:                  uuid::Uuid::new_v4().to_string(),
-                    target_model:        ModelRole::Primary,
+                    id: uuid::Uuid::new_v4().to_string(),
+                    target_model: ModelRole::Primary,
                     suitable_strategies: vec![TrainingStrategyType::Dpo],
-                    input:               TrainingInput::Prompt { text: prompt.clone() },
-                    expected_output:     TrainingOutput::PreferencePair {
-                        chosen:   corrected,
+                    input: TrainingInput::Prompt {
+                        text: prompt.clone(),
+                    },
+                    expected_output: TrainingOutput::PreferencePair {
+                        chosen: corrected,
                         rejected: response,
                     },
-                    source:              TrainingSource::ConstitutionalSelfPlay,
-                    quality_score:       quality,
-                    priority:            quality * 1.5,
-                    timestamp:           chrono::Utc::now().timestamp_micros(),
-                    dimensions:          vec![classify_domain(&prompt)],
-                    used:                false,
-                    use_count:           0,
-                    metadata:            serde_json::json!({
+                    source: TrainingSource::ConstitutionalSelfPlay,
+                    quality_score: quality,
+                    priority: quality * 1.5,
+                    timestamp: chrono::Utc::now().timestamp_micros(),
+                    dimensions: vec![classify_domain(&prompt)],
+                    used: false,
+                    use_count: 0,
+                    metadata: serde_json::json!({
                         "violated_rules": violations.iter().map(|v| &v.rule_id).collect::<Vec<_>>(),
                     }),
                 });
@@ -316,25 +338,38 @@ impl UncertaintyTargeter {
     pub async fn uncertainty(&self, prompt: &str, samples: u8) -> f32 {
         let mut responses = Vec::new();
         for _ in 0..samples {
-            if let Ok((text, _)) = self.orchestrator.infer_simple(prompt, 128, "uncertain").await {
+            if let Ok((text, _)) = self
+                .orchestrator
+                .infer_simple(prompt, 128, "uncertain")
+                .await
+            {
                 responses.push(text);
             }
         }
-        if responses.len() < 2 { return 0.5; }
+        if responses.len() < 2 {
+            return 0.5;
+        }
         // Approximate variance via pairwise edit-distance
         let mut total_dist = 0.0f32;
         let mut pairs = 0;
         for i in 0..responses.len() {
-            for j in i+1..responses.len() {
+            for j in i + 1..responses.len() {
                 let max_len = responses[i].len().max(responses[j].len()).max(1) as f32;
-                let sim = 1.0 - (crate::unified_training_collector::levenshtein_approx(
-                    &responses[i], &responses[j]
-                ) as f32 / max_len);
+                let sim = 1.0
+                    - (crate::unified_training_collector::levenshtein_approx(
+                        &responses[i],
+                        &responses[j],
+                    ) as f32
+                        / max_len);
                 total_dist += 1.0 - sim;
                 pairs += 1;
             }
         }
-        if pairs > 0 { total_dist / pairs as f32 } else { 0.0 }
+        if pairs > 0 {
+            total_dist / pairs as f32
+        } else {
+            0.0
+        }
     }
 
     /// Given a list of prompts, return those with highest uncertainty (best targets).
@@ -379,26 +414,32 @@ impl CounterfactualGenerator {
                     "The tool '{tool}' is not currently available. Respond helpfully by suggesting \
                      alternatives or explaining what you CAN do instead.\n\nUser request: {scenario}"
                 );
-                if let Ok((ideal, _)) = self.orchestrator.infer_simple(&ideal_prompt, 300, "counterfactual").await {
+                if let Ok((ideal, _)) = self
+                    .orchestrator
+                    .infer_simple(&ideal_prompt, 300, "counterfactual")
+                    .await
+                {
                     // Bad response: model pretends tool is available or returns an error without help
                     let bad = format!("I cannot use {tool} as it is not available.");
                     examples.push(UnifiedTrainingExample {
-                        id:                  uuid::Uuid::new_v4().to_string(),
-                        target_model:        ModelRole::Primary,
+                        id: uuid::Uuid::new_v4().to_string(),
+                        target_model: ModelRole::Primary,
                         suitable_strategies: vec![TrainingStrategyType::Dpo],
-                        input:               TrainingInput::Prompt { text: scenario.clone() },
-                        expected_output:     TrainingOutput::PreferencePair {
-                            chosen:   ideal,
+                        input: TrainingInput::Prompt {
+                            text: scenario.clone(),
+                        },
+                        expected_output: TrainingOutput::PreferencePair {
+                            chosen: ideal,
                             rejected: bad,
                         },
-                        source:              TrainingSource::SelfPlay,
-                        quality_score:       0.65,
-                        priority:            0.7,
-                        timestamp:           chrono::Utc::now().timestamp_micros(),
-                        dimensions:          vec!["tool_use".into()],
-                        used:                false,
-                        use_count:           0,
-                        metadata:            serde_json::json!({ "missing_tool": tool }),
+                        source: TrainingSource::SelfPlay,
+                        quality_score: 0.65,
+                        priority: 0.7,
+                        timestamp: chrono::Utc::now().timestamp_micros(),
+                        dimensions: vec!["tool_use".into()],
+                        used: false,
+                        use_count: 0,
+                        metadata: serde_json::json!({ "missing_tool": tool }),
                     });
                 }
             }
@@ -414,25 +455,76 @@ impl CounterfactualGenerator {
 pub const SELF_PLAY_SEEDS: &[(&str, &str)] = &[
     // (prompt, domain)
     ("Implement a thread-safe LRU cache in Rust", "code"),
-    ("Explain ACID properties of databases with examples", "reasoning"),
-    ("Write a Python script that monitors CPU usage and alerts when above 80%", "code"),
-    ("What is the difference between TCP's sliding window and congestion control?", "reasoning"),
+    (
+        "Explain ACID properties of databases with examples",
+        "reasoning",
+    ),
+    (
+        "Write a Python script that monitors CPU usage and alerts when above 80%",
+        "code",
+    ),
+    (
+        "What is the difference between TCP's sliding window and congestion control?",
+        "reasoning",
+    ),
     ("Create a React hook for debouncing user input", "code"),
-    ("Explain the CAP theorem and when each trade-off makes sense", "reasoning"),
-    ("Write a SQL query to find the top 3 customers by total spend per month", "code"),
-    ("What are the trade-offs between microservices and monolithic architecture?", "planning"),
-    ("Implement Dijkstra's algorithm in TypeScript with a priority queue", "code"),
-    ("Explain how gradient descent works intuitively", "reasoning"),
-    ("Write a bash script that backs up a directory with timestamp naming", "code"),
-    ("What security considerations matter most for a REST API?", "safety"),
-    ("Implement a rate limiter using the token bucket algorithm in Python", "code"),
-    ("Explain the difference between authentication and authorisation", "reasoning"),
-    ("Write a Dockerfile for a Python FastAPI application with health checks", "code"),
-    ("Design a database schema for a multi-tenant SaaS application", "planning"),
+    (
+        "Explain the CAP theorem and when each trade-off makes sense",
+        "reasoning",
+    ),
+    (
+        "Write a SQL query to find the top 3 customers by total spend per month",
+        "code",
+    ),
+    (
+        "What are the trade-offs between microservices and monolithic architecture?",
+        "planning",
+    ),
+    (
+        "Implement Dijkstra's algorithm in TypeScript with a priority queue",
+        "code",
+    ),
+    (
+        "Explain how gradient descent works intuitively",
+        "reasoning",
+    ),
+    (
+        "Write a bash script that backs up a directory with timestamp naming",
+        "code",
+    ),
+    (
+        "What security considerations matter most for a REST API?",
+        "safety",
+    ),
+    (
+        "Implement a rate limiter using the token bucket algorithm in Python",
+        "code",
+    ),
+    (
+        "Explain the difference between authentication and authorisation",
+        "reasoning",
+    ),
+    (
+        "Write a Dockerfile for a Python FastAPI application with health checks",
+        "code",
+    ),
+    (
+        "Design a database schema for a multi-tenant SaaS application",
+        "planning",
+    ),
     ("Implement a simple state machine in Rust", "code"),
-    ("What are the trade-offs between SQL and NoSQL databases?", "reasoning"),
-    ("Write a GitHub Actions workflow for CI/CD of a Node.js app", "code"),
-    ("Explain how vector embeddings capture semantic similarity", "reasoning"),
+    (
+        "What are the trade-offs between SQL and NoSQL databases?",
+        "reasoning",
+    ),
+    (
+        "Write a GitHub Actions workflow for CI/CD of a Node.js app",
+        "code",
+    ),
+    (
+        "Explain how vector embeddings capture semantic similarity",
+        "reasoning",
+    ),
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -440,17 +532,17 @@ pub const SELF_PLAY_SEEDS: &[(&str, &str)] = &[
 // ══════════════════════════════════════════════════════════════════════════════
 
 pub struct SelfPlayTrainer {
-    constitutional:   ConstitutionalTrainer,
-    uncertainty:      UncertaintyTargeter,
-    counterfactual:   CounterfactualGenerator,
-    collector:        Arc<UnifiedTrainingCollector>,
-    orchestrator:     Arc<ModelOrchestrator>,
-    state:            RwLock<SelfPlayState>,
+    constitutional: ConstitutionalTrainer,
+    uncertainty: UncertaintyTargeter,
+    counterfactual: CounterfactualGenerator,
+    collector: Arc<UnifiedTrainingCollector>,
+    orchestrator: Arc<ModelOrchestrator>,
+    state: RwLock<SelfPlayState>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct SelfPlayState {
-    pub rounds_completed:   u32,
+    pub rounds_completed: u32,
     pub examples_generated: u64,
     pub constitutional_violations_fixed: u64,
     pub adversarial_failures: u32,
@@ -460,12 +552,12 @@ pub struct SelfPlayState {
 impl SelfPlayTrainer {
     pub fn new(
         orchestrator: Arc<ModelOrchestrator>,
-        collector:    Arc<UnifiedTrainingCollector>,
+        collector: Arc<UnifiedTrainingCollector>,
     ) -> Arc<Self> {
         Arc::new(Self {
-            constitutional:  ConstitutionalTrainer::new(orchestrator.clone()),
-            uncertainty:     UncertaintyTargeter::new(orchestrator.clone()),
-            counterfactual:  CounterfactualGenerator::new(orchestrator.clone()),
+            constitutional: ConstitutionalTrainer::new(orchestrator.clone()),
+            uncertainty: UncertaintyTargeter::new(orchestrator.clone()),
+            counterfactual: CounterfactualGenerator::new(orchestrator.clone()),
             collector,
             orchestrator,
             state: RwLock::new(SelfPlayState::default()),
@@ -476,7 +568,13 @@ impl SelfPlayTrainer {
     pub async fn run_round(&self) -> SelfPlayRoundResult {
         {
             let mut s = self.state.write().await;
-            if s.running { return SelfPlayRoundResult { examples_added: 0, violations_fixed: 0, adversarial_failures: 0 }; }
+            if s.running {
+                return SelfPlayRoundResult {
+                    examples_added: 0,
+                    violations_fixed: 0,
+                    adversarial_failures: 0,
+                };
+            }
             s.running = true;
         }
 
@@ -489,19 +587,22 @@ impl SelfPlayTrainer {
         let constitutional_examples = self.constitutional.process_batch(seed_pairs).await;
         violations_fixed += constitutional_examples.len() as u64;
         for ex in constitutional_examples {
-            if self.collector.ingest_raw(ex).await { total_added += 1; }
+            if self.collector.ingest_raw(ex).await {
+                total_added += 1;
+            }
         }
 
         // 2. Uncertainty-targeted self-play
-        let seed_prompts: Vec<String> = SELF_PLAY_SEEDS.iter()
-            .map(|(p, _)| p.to_string())
-            .collect();
+        let seed_prompts: Vec<String> =
+            SELF_PLAY_SEEDS.iter().map(|(p, _)| p.to_string()).collect();
         let uncertain_prompts = self.uncertainty.top_uncertain(&seed_prompts, 5).await;
         for (prompt, uncertainty_score) in &uncertain_prompts {
             if *uncertainty_score > 0.30 {
                 let examples = self.generate_contrastive_pair(prompt).await;
                 for ex in examples {
-                    if self.collector.ingest_raw(ex).await { total_added += 1; }
+                    if self.collector.ingest_raw(ex).await {
+                        total_added += 1;
+                    }
                 }
             }
         }
@@ -510,17 +611,26 @@ impl SelfPlayTrainer {
         let probe_failures = self.run_adversarial_probes().await;
         adversarial_failures += probe_failures.len() as u32;
         for ex in probe_failures {
-            if self.collector.ingest_raw(ex).await { total_added += 1; }
+            if self.collector.ingest_raw(ex).await {
+                total_added += 1;
+            }
         }
 
         // 4. Tool unavailability counterfactuals (occasional)
         let state_round = self.state.read().await.rounds_completed;
         if state_round % 5 == 0 {
-            let tool_missing = self.counterfactual.generate_tool_missing_examples(
-                &["generate_music", "describe_image", "run_video_generation"]
-            ).await;
+            let tool_missing = self
+                .counterfactual
+                .generate_tool_missing_examples(&[
+                    "generate_music",
+                    "describe_image",
+                    "run_video_generation",
+                ])
+                .await;
             for ex in tool_missing {
-                if self.collector.ingest_raw(ex).await { total_added += 1; }
+                if self.collector.ingest_raw(ex).await {
+                    total_added += 1;
+                }
             }
         }
 
@@ -535,13 +645,21 @@ impl SelfPlayTrainer {
         }
 
         info!("[self_play] round complete: +{total_added} examples, {violations_fixed} violations fixed, {adversarial_failures} adversarial failures");
-        SelfPlayRoundResult { examples_added: total_added, violations_fixed, adversarial_failures }
+        SelfPlayRoundResult {
+            examples_added: total_added,
+            violations_fixed,
+            adversarial_failures,
+        }
     }
 
     async fn generate_seed_responses(&self) -> Vec<(String, String)> {
         let mut pairs = Vec::new();
         for (prompt, _) in SELF_PLAY_SEEDS {
-            if let Ok((response, _)) = self.orchestrator.infer_simple(prompt, 512, "self_play").await {
+            if let Ok((response, _)) = self
+                .orchestrator
+                .infer_simple(prompt, 512, "self_play")
+                .await
+            {
                 pairs.push((prompt.to_string(), response));
             }
         }
@@ -549,52 +667,69 @@ impl SelfPlayTrainer {
     }
 
     async fn generate_contrastive_pair(&self, prompt: &str) -> Vec<UnifiedTrainingExample> {
-        let chosen = match self.orchestrator.infer_simple(
-            &format!("Provide an excellent, thorough response to: {prompt}"),
-            512, "self_play"
-        ).await {
+        let chosen = match self
+            .orchestrator
+            .infer_simple(
+                &format!("Provide an excellent, thorough response to: {prompt}"),
+                512,
+                "self_play",
+            )
+            .await
+        {
             Ok((text, _)) => text,
             Err(_) => return vec![],
         };
 
-        let rejected = match self.orchestrator.infer_simple(
-            &format!(
-                "Provide a poor quality, incomplete, or incorrect response to: {prompt}\n\
+        let rejected = match self
+            .orchestrator
+            .infer_simple(
+                &format!(
+                    "Provide a poor quality, incomplete, or incorrect response to: {prompt}\n\
                  (Deliberately introduce a flaw — wrong assumption, missing step, or vague answer)"
-            ),
-            256, "self_play"
-        ).await {
+                ),
+                256,
+                "self_play",
+            )
+            .await
+        {
             Ok((text, _)) => text,
             Err(_) => return vec![],
         };
 
         vec![UnifiedTrainingExample {
-            id:                  uuid::Uuid::new_v4().to_string(),
-            target_model:        ModelRole::Primary,
+            id: uuid::Uuid::new_v4().to_string(),
+            target_model: ModelRole::Primary,
             suitable_strategies: vec![TrainingStrategyType::Dpo],
-            input:               TrainingInput::Prompt { text: prompt.to_string() },
-            expected_output:     TrainingOutput::PreferencePair { chosen, rejected },
-            source:              TrainingSource::SelfPlay,
-            quality_score:       0.55,
-            priority:            0.6,
-            timestamp:           chrono::Utc::now().timestamp_micros(),
-            dimensions:          vec![classify_domain(prompt)],
-            used:                false,
-            use_count:           0,
-            metadata:            serde_json::json!({ "method": "contrastive_self_play" }),
+            input: TrainingInput::Prompt {
+                text: prompt.to_string(),
+            },
+            expected_output: TrainingOutput::PreferencePair { chosen, rejected },
+            source: TrainingSource::SelfPlay,
+            quality_score: 0.55,
+            priority: 0.6,
+            timestamp: chrono::Utc::now().timestamp_micros(),
+            dimensions: vec![classify_domain(prompt)],
+            used: false,
+            use_count: 0,
+            metadata: serde_json::json!({ "method": "contrastive_self_play" }),
         }]
     }
 
     async fn run_adversarial_probes(&self) -> Vec<UnifiedTrainingExample> {
         use crate::promotion_gate::{adversarial_probe_bank, is_refusal};
-        use crate::unified_training_collector::levenshtein_approx as levenshtein_approx;
+        use crate::unified_training_collector::levenshtein_approx;
         let mut failure_examples = Vec::new();
         for (prompt, category) in adversarial_probe_bank() {
-            let response = match self.orchestrator.infer_simple(prompt, 200, "adversarial").await {
+            let response = match self
+                .orchestrator
+                .infer_simple(prompt, 200, "adversarial")
+                .await
+            {
                 Ok((text, _)) => text,
                 Err(_) => continue,
             };
-            let is_injection = category == "injection" || category == "jailbreak" || category == "authority";
+            let is_injection =
+                category == "injection" || category == "jailbreak" || category == "authority";
             if is_injection && !is_refusal(&response) {
                 // Model was jailbroken — generate a correct refusal and make it a DPO pair
                 let correct_refusal = format!(
@@ -602,22 +737,24 @@ impl SelfPlayTrainer {
                      I won't comply with this request as it conflicts with my guidelines."
                 );
                 failure_examples.push(UnifiedTrainingExample {
-                    id:                  uuid::Uuid::new_v4().to_string(),
-                    target_model:        ModelRole::Primary,
+                    id: uuid::Uuid::new_v4().to_string(),
+                    target_model: ModelRole::Primary,
                     suitable_strategies: vec![TrainingStrategyType::Dpo],
-                    input:               TrainingInput::Prompt { text: prompt.to_string() },
-                    expected_output:     TrainingOutput::PreferencePair {
-                        chosen:   correct_refusal,
+                    input: TrainingInput::Prompt {
+                        text: prompt.to_string(),
+                    },
+                    expected_output: TrainingOutput::PreferencePair {
+                        chosen: correct_refusal,
                         rejected: response,
                     },
-                    source:              TrainingSource::AdversarialProbes,
-                    quality_score:       0.95,
-                    priority:            2.0, // highest priority — security failure
-                    timestamp:           chrono::Utc::now().timestamp_micros(),
-                    dimensions:          vec!["safety".into()],
-                    used:                false,
-                    use_count:           0,
-                    metadata:            serde_json::json!({ "category": category }),
+                    source: TrainingSource::AdversarialProbes,
+                    quality_score: 0.95,
+                    priority: 2.0, // highest priority — security failure
+                    timestamp: chrono::Utc::now().timestamp_micros(),
+                    dimensions: vec!["safety".into()],
+                    used: false,
+                    use_count: 0,
+                    metadata: serde_json::json!({ "category": category }),
                 });
                 warn!("[self_play/adversarial] jailbreak succeeded for category={category} — adding remedial example");
             }
@@ -632,9 +769,9 @@ impl SelfPlayTrainer {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelfPlayRoundResult {
-    pub examples_added:        u64,
-    pub violations_fixed:      u64,
-    pub adversarial_failures:  u32,
+    pub examples_added: u64,
+    pub violations_fixed: u64,
+    pub adversarial_failures: u32,
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -643,81 +780,90 @@ pub struct SelfPlayRoundResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingPreferences {
-    pub enabled:             bool,
-    pub train_on_battery:    bool,
-    pub min_battery_pct:     u8,
+    pub enabled: bool,
+    pub train_on_battery: bool,
+    pub min_battery_pct: u8,
     pub idle_seconds_needed: u64,
     pub gpu_vram_reserve_mb: u32,
-    pub federated_opt_in:    bool,
-    pub topic_exclusions:    Vec<String>,
+    pub federated_opt_in: bool,
+    pub topic_exclusions: Vec<String>,
 }
 
 impl Default for TrainingPreferences {
     fn default() -> Self {
         Self {
-            enabled:             true,
-            train_on_battery:    false,
-            min_battery_pct:     20,
+            enabled: true,
+            train_on_battery: false,
+            min_battery_pct: 20,
             idle_seconds_needed: 300,
             gpu_vram_reserve_mb: 4096,
-            federated_opt_in:    false,
-            topic_exclusions:    vec![],
+            federated_opt_in: false,
+            topic_exclusions: vec![],
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoopCycleResult {
-    pub cycle:           u64,
+    pub cycle: u64,
     pub self_play_added: u64,
-    pub alerts_handled:  usize,
-    pub promotion:       Option<String>,
-    pub elapsed_ms:      u64,
-    pub timestamp:       i64,
+    pub alerts_handled: usize,
+    pub promotion: Option<String>,
+    pub elapsed_ms: u64,
+    pub timestamp: i64,
 }
 
 pub struct EternalTrainingLoop {
-    collector:         Arc<UnifiedTrainingCollector>,
-    harness:           Arc<EvaluationHarness>,
-    forgetting:        Arc<ForgettingPrevention>,
-    promotion_gate:    Arc<PromotionGate>,
-    self_play:         Arc<SelfPlayTrainer>,
-    preferences:       RwLock<TrainingPreferences>,
-    cycle_counter:     RwLock<u64>,
-    history:           RwLock<std::collections::VecDeque<LoopCycleResult>>,
-    running:           RwLock<bool>,
+    collector: Arc<UnifiedTrainingCollector>,
+    harness: Arc<EvaluationHarness>,
+    forgetting: Arc<ForgettingPrevention>,
+    promotion_gate: Arc<PromotionGate>,
+    self_play: Arc<SelfPlayTrainer>,
+    preferences: RwLock<TrainingPreferences>,
+    cycle_counter: RwLock<u64>,
+    history: RwLock<std::collections::VecDeque<LoopCycleResult>>,
+    running: RwLock<bool>,
     /// CAS store for deduplicating training datasets and LoRA adapter weights.
-    cas_store:         Option<Arc<bonsai_cas::CasStore>>,
+    cas_store: Option<Arc<bonsai_cas::CasStore>>,
     /// Maps cycle number → CAS key of the exported dataset snapshot.
-    dataset_keys:      RwLock<std::collections::VecDeque<(u64, String)>>,
+    dataset_keys: RwLock<std::collections::VecDeque<(u64, String)>>,
     /// Knowledge graph shared with AppState — feeds reasoning self-play.
-    knowledge:         Arc<bonsai_knowledge::KnowledgeGraph>,
+    knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
     /// Model orchestrator — accepts DPO batches from reasoning training.
-    orchestrator:      Arc<crate::model_orchestrator::ModelOrchestrator>,
+    orchestrator: Arc<crate::model_orchestrator::ModelOrchestrator>,
 }
 
 impl EternalTrainingLoop {
     pub fn new(
-        collector:      Arc<UnifiedTrainingCollector>,
-        harness:        Arc<EvaluationHarness>,
-        forgetting:     Arc<ForgettingPrevention>,
+        collector: Arc<UnifiedTrainingCollector>,
+        harness: Arc<EvaluationHarness>,
+        forgetting: Arc<ForgettingPrevention>,
         promotion_gate: Arc<PromotionGate>,
-        self_play:      Arc<SelfPlayTrainer>,
-        orchestrator:   Arc<crate::model_orchestrator::ModelOrchestrator>,
-        knowledge:      Arc<bonsai_knowledge::KnowledgeGraph>,
+        self_play: Arc<SelfPlayTrainer>,
+        orchestrator: Arc<crate::model_orchestrator::ModelOrchestrator>,
+        knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
     ) -> Arc<Self> {
-        Self::with_cas(collector, harness, forgetting, promotion_gate, self_play, None, orchestrator, knowledge)
+        Self::with_cas(
+            collector,
+            harness,
+            forgetting,
+            promotion_gate,
+            self_play,
+            None,
+            orchestrator,
+            knowledge,
+        )
     }
 
     pub fn with_cas(
-        collector:      Arc<UnifiedTrainingCollector>,
-        harness:        Arc<EvaluationHarness>,
-        forgetting:     Arc<ForgettingPrevention>,
+        collector: Arc<UnifiedTrainingCollector>,
+        harness: Arc<EvaluationHarness>,
+        forgetting: Arc<ForgettingPrevention>,
         promotion_gate: Arc<PromotionGate>,
-        self_play:      Arc<SelfPlayTrainer>,
-        cas_store:      Option<Arc<bonsai_cas::CasStore>>,
-        orchestrator:   Arc<crate::model_orchestrator::ModelOrchestrator>,
-        knowledge:      Arc<bonsai_knowledge::KnowledgeGraph>,
+        self_play: Arc<SelfPlayTrainer>,
+        cas_store: Option<Arc<bonsai_cas::CasStore>>,
+        orchestrator: Arc<crate::model_orchestrator::ModelOrchestrator>,
+        knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
     ) -> Arc<Self> {
         Arc::new(Self {
             collector,
@@ -725,12 +871,12 @@ impl EternalTrainingLoop {
             forgetting,
             promotion_gate,
             self_play,
-            preferences:   RwLock::new(TrainingPreferences::default()),
+            preferences: RwLock::new(TrainingPreferences::default()),
             cycle_counter: RwLock::new(0),
-            history:       RwLock::new(std::collections::VecDeque::new()),
-            running:       RwLock::new(false),
+            history: RwLock::new(std::collections::VecDeque::new()),
+            running: RwLock::new(false),
             cas_store,
-            dataset_keys:  RwLock::new(std::collections::VecDeque::new()),
+            dataset_keys: RwLock::new(std::collections::VecDeque::new()),
             knowledge,
             orchestrator,
         })
@@ -763,11 +909,16 @@ impl EternalTrainingLoop {
             let alerts = self.harness.check_alerts().await;
             let alert_count = alerts.len();
             if !alerts.is_empty() {
-                info!("[eternal] {} dimension alerts firing — handling", alert_count);
+                info!(
+                    "[eternal] {} dimension alerts firing — handling",
+                    alert_count
+                );
                 // Boost self-play for alerted dimensions
                 for alert in &alerts {
-                    debug!("[eternal] alert: {} at {:.3} (threshold {:.3})",
-                        alert.dimension, alert.current_value, alert.alert_threshold);
+                    debug!(
+                        "[eternal] alert: {} at {:.3} (threshold {:.3})",
+                        alert.dimension, alert.current_value, alert.alert_threshold
+                    );
                 }
             }
 
@@ -777,8 +928,12 @@ impl EternalTrainingLoop {
                 if cycle_now % 10 == 0 {
                     let c1 = Arc::clone(&self.collector);
                     let c2 = Arc::clone(&self.collector);
-                    tokio::spawn(async move { run_chess_self_play_once(c1).await; });
-                    tokio::spawn(async move { run_go_self_play_once(c2).await; });
+                    tokio::spawn(async move {
+                        run_chess_self_play_once(c1).await;
+                    });
+                    tokio::spawn(async move {
+                        run_go_self_play_once(c2).await;
+                    });
                     debug!("[eternal] cycle {cycle_now} — game self-play tasks spawned");
                 }
 
@@ -786,7 +941,9 @@ impl EternalTrainingLoop {
                 if cycle_now % 15 == 0 {
                     let c = Arc::clone(&self.collector);
                     let kg = self.knowledge.clone();
-                    tokio::spawn(async move { run_reasoning_self_improvement(c, kg).await; });
+                    tokio::spawn(async move {
+                        run_reasoning_self_improvement(c, kg).await;
+                    });
                     debug!("[eternal] cycle {cycle_now} — reasoning self-improvement spawned");
                 }
 
@@ -799,7 +956,7 @@ impl EternalTrainingLoop {
                         // We pass empty vecs here; the training functions load weights from disk
                         // and the raw game data was already persisted by the self-play tasks.
                         let orch50 = self.orchestrator.clone();
-                        let col50  = Arc::clone(&self.collector);
+                        let col50 = Arc::clone(&self.collector);
                         tokio::spawn(async move {
                             train_chess_network_step(vec![]).await;
                             train_go_network_step(vec![]).await;
@@ -815,7 +972,9 @@ impl EternalTrainingLoop {
 
             // 3. Check if we have enough new data to attempt training
             let stats = self.collector.stats().await;
-            let has_dpo_data = stats.buffer.as_ref()
+            let has_dpo_data = stats
+                .buffer
+                .as_ref()
                 .map(|b| b.total >= 50)
                 .unwrap_or(false);
 
@@ -856,15 +1015,24 @@ impl EternalTrainingLoop {
                     Ok(key) => {
                         let mut dkeys = self.dataset_keys.write().await;
                         dkeys.push_back((cycle_preview, key.hex()));
-                        if dkeys.len() > 500 { dkeys.pop_front(); }
-                        debug!("[eternal] CAS snapshot at cycle {cycle_preview} → {}", key.hex());
+                        if dkeys.len() > 500 {
+                            dkeys.pop_front();
+                        }
+                        debug!(
+                            "[eternal] CAS snapshot at cycle {cycle_preview} → {}",
+                            key.hex()
+                        );
                     }
                     Err(e) => warn!("[eternal] CAS put failed: {e}"),
                 }
             }
 
             // 6. Dynamic benchmark evolution (every 1000 cycles)
-            let cycle = { let mut c = self.cycle_counter.write().await; *c += 1; *c };
+            let cycle = {
+                let mut c = self.cycle_counter.write().await;
+                *c += 1;
+                *c
+            };
             if cycle % 1000 == 0 {
                 info!("[eternal] benchmark evolution checkpoint at cycle {cycle}");
             }
@@ -881,7 +1049,9 @@ impl EternalTrainingLoop {
             {
                 let mut h = self.history.write().await;
                 h.push_back(result);
-                if h.len() > 200 { h.pop_front(); }
+                if h.len() > 200 {
+                    h.pop_front();
+                }
             }
 
             // Sleep between cycles — 5 minutes
@@ -893,7 +1063,10 @@ impl EternalTrainingLoop {
         // Signal one immediate cycle by temporarily resetting the sleep
         // (In practice the training loop would use a channel to wake early)
         let sp_result = self.self_play.run_round().await;
-        info!("[eternal] on-demand cycle: +{} examples", sp_result.examples_added);
+        info!(
+            "[eternal] on-demand cycle: +{} examples",
+            sp_result.examples_added
+        );
     }
 
     pub async fn history(&self) -> Vec<LoopCycleResult> {
@@ -919,7 +1092,10 @@ impl EternalTrainingLoop {
 
     /// Start an asynchronous Go training loop that repeatedly runs self-play
     /// cycles and training. Requires `cas_store` to be configured on this loop.
-    pub async fn start_go_training(&self, config: bonsai_go_nn::training_loop::GoTrainingConfig) -> Result<(), String> {
+    pub async fn start_go_training(
+        &self,
+        config: bonsai_go_nn::training_loop::GoTrainingConfig,
+    ) -> Result<(), String> {
         let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
         let cas = match &self.cas_store {
             Some(c) => c.clone(),
@@ -927,7 +1103,14 @@ impl EternalTrainingLoop {
         };
 
         // Create training loop instance
-        let mut loop_inst = match bonsai_go_nn::training_loop::GoTrainingLoop::new(config, device, None, cas.clone()).await {
+        let mut loop_inst = match bonsai_go_nn::training_loop::GoTrainingLoop::new(
+            config,
+            device,
+            None,
+            cas.clone(),
+        )
+        .await
+        {
             Ok(l) => l,
             Err(e) => return Err(format!("failed to create GoTrainingLoop: {}", e)),
         };
@@ -969,11 +1152,11 @@ impl IngestRaw for UnifiedTrainingCollector {
 /// Uses the neural network evaluator when weights are available, otherwise
 /// falls back to `MaterialEvaluator`.
 pub async fn run_chess_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
-    use bonsai_chess::mcts::{MctsConfig, self_play_game};
+    use bonsai_chess::mcts::{self_play_game, MctsConfig};
     use bonsai_chess::network::NetworkEvaluator;
-    use uuid::Uuid;
     use chrono::Utc;
     use serde_json::json;
+    use uuid::Uuid;
 
     let net_eval = NetworkEvaluator::load_default();
     let cfg = MctsConfig::interactive();
@@ -986,37 +1169,45 @@ pub async fn run_chess_self_play_once(collector: Arc<UnifiedTrainingCollector>) 
     };
     tracing::info!(count = examples.len(), "generated chess self-play examples");
 
-    let unified: Vec<UnifiedTrainingExample> = examples.into_iter().map(|ex| {
-        let id = Uuid::new_v4().to_string();
-        let ts = Utc::now().timestamp_micros();
-        let input = TrainingInput::Prompt { text: format!("chess_fen:{}", ex.fen) };
-        let output_val = json!({
-            "move_probs": ex.move_probs,
-            "selected_move": ex.selected_move,
-            "game_result": ex.game_result,
-        });
-        let quality_meta = QualityMeta { critique_len: ex.move_probs.len() as u32, ..Default::default() };
-        let q = quality_score(&TrainingSource::SelfPlay, &quality_meta);
-        UnifiedTrainingExample {
-            id,
-            target_model: ModelRole::Primary,
-            suitable_strategies: vec![TrainingStrategyType::Dpo, TrainingStrategyType::Rl],
-            input,
-            expected_output: TrainingOutput::Json { value: output_val },
-            source: TrainingSource::SelfPlay,
-            quality_score: q,
-            priority: q,
-            timestamp: ts,
-            dimensions: vec!["games".into()],
-            used: false,
-            use_count: 0,
-            metadata: json!({
-                "source": "chess_self_play",
+    let unified: Vec<UnifiedTrainingExample> = examples
+        .into_iter()
+        .map(|ex| {
+            let id = Uuid::new_v4().to_string();
+            let ts = Utc::now().timestamp_micros();
+            let input = TrainingInput::Prompt {
+                text: format!("chess_fen:{}", ex.fen),
+            };
+            let output_val = json!({
+                "move_probs": ex.move_probs,
                 "selected_move": ex.selected_move,
-                "move_count": ex.move_probs.len(),
-            }),
-        }
-    }).collect();
+                "game_result": ex.game_result,
+            });
+            let quality_meta = QualityMeta {
+                critique_len: ex.move_probs.len() as u32,
+                ..Default::default()
+            };
+            let q = quality_score(&TrainingSource::SelfPlay, &quality_meta);
+            UnifiedTrainingExample {
+                id,
+                target_model: ModelRole::Primary,
+                suitable_strategies: vec![TrainingStrategyType::Dpo, TrainingStrategyType::Rl],
+                input,
+                expected_output: TrainingOutput::Json { value: output_val },
+                source: TrainingSource::SelfPlay,
+                quality_score: q,
+                priority: q,
+                timestamp: ts,
+                dimensions: vec!["games".into()],
+                used: false,
+                use_count: 0,
+                metadata: json!({
+                    "source": "chess_self_play",
+                    "selected_move": ex.selected_move,
+                    "move_count": ex.move_probs.len(),
+                }),
+            }
+        })
+        .collect();
 
     collector.ingest_bulk(unified).await;
 }
@@ -1024,11 +1215,11 @@ pub async fn run_chess_self_play_once(collector: Arc<UnifiedTrainingCollector>) 
 /// Run one Go self-play game and ingest all resulting training examples.
 /// Uses the neural network evaluator when weights are available.
 pub async fn run_go_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
-    use bonsai_go::mcts::{GoMctsConfig, self_play_game};
+    use bonsai_go::mcts::{self_play_game, GoMctsConfig};
     use bonsai_go::network::NetworkGoEvaluator;
-    use uuid::Uuid;
     use chrono::Utc;
     use serde_json::json;
+    use uuid::Uuid;
 
     let net_eval = NetworkGoEvaluator::load_default();
     let cfg = GoMctsConfig::interactive();
@@ -1046,7 +1237,9 @@ pub async fn run_go_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
         let id = Uuid::new_v4().to_string();
         let ts = Utc::now().timestamp_micros();
 
-        let input = TrainingInput::Prompt { text: format!("go_board_json:{}", ex.board_json) };
+        let input = TrainingInput::Prompt {
+            text: format!("go_board_json:{}", ex.board_json),
+        };
 
         let output_val = json!({
             "move_probs": ex.move_probs,
@@ -1054,7 +1247,10 @@ pub async fn run_go_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
             "game_result": ex.game_result,
         });
 
-        let quality_meta = QualityMeta { critique_len: ex.move_probs.len() as u32, ..Default::default() };
+        let quality_meta = QualityMeta {
+            critique_len: ex.move_probs.len() as u32,
+            ..Default::default()
+        };
         let q = quality_score(&TrainingSource::SelfPlay, &quality_meta);
 
         let example = UnifiedTrainingExample {
@@ -1094,10 +1290,14 @@ pub async fn run_go_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
 ///
 /// Call this after enough game data has been collected (e.g., every 50 games).
 pub async fn train_chess_network_step(game_examples: Vec<bonsai_chess::TrainingExample>) {
-    use bonsai_chess::network::{NetworkEvaluator, teacher_distill_examples, train_epoch, AdamState, TOTAL_PARAMS};
+    use bonsai_chess::network::{
+        teacher_distill_examples, train_epoch, AdamState, NetworkEvaluator, TOTAL_PARAMS,
+    };
     use bonsai_chess::ChessPosition;
 
-    if game_examples.is_empty() { return; }
+    if game_examples.is_empty() {
+        return;
+    }
 
     tokio::task::spawn_blocking(move || {
         let mut evaluator = NetworkEvaluator::load_default();
@@ -1110,42 +1310,66 @@ pub async fn train_chess_network_step(game_examples: Vec<bonsai_chess::TrainingE
         }
 
         // Convert game examples to supervised training examples
-        let train_examples: Vec<_> = game_examples.iter().filter_map(|ex| {
-            let pos = ChessPosition::from_fen(&ex.fen).ok()?;
-            let raw = pos.to_nn_input();
-            let n   = bonsai_chess::network::INPUT_SIZE;
-            let mut input = vec![0.0f32; n];
-            let copy_len = raw.len().min(n);
-            input[..copy_len].copy_from_slice(&raw[..copy_len]);
-            let policy_target = ex.move_probs.iter().map(|(_, p)| *p).collect::<Vec<f32>>();
-            let value_target  = ex.game_result.unwrap_or(0.5);
-            let n_moves       = policy_target.len();
-            Some(bonsai_chess::network::NetTrainExample { input, policy_target, value_target, n_moves })
-        }).collect();
+        let train_examples: Vec<_> = game_examples
+            .iter()
+            .filter_map(|ex| {
+                let pos = ChessPosition::from_fen(&ex.fen).ok()?;
+                let raw = pos.to_nn_input();
+                let n = bonsai_chess::network::INPUT_SIZE;
+                let mut input = vec![0.0f32; n];
+                let copy_len = raw.len().min(n);
+                input[..copy_len].copy_from_slice(&raw[..copy_len]);
+                let policy_target = ex.move_probs.iter().map(|(_, p)| *p).collect::<Vec<f32>>();
+                let value_target = ex.game_result.unwrap_or(0.5);
+                let n_moves = policy_target.len();
+                Some(bonsai_chess::network::NetTrainExample {
+                    input,
+                    policy_target,
+                    value_target,
+                    n_moves,
+                })
+            })
+            .collect();
 
-        if train_examples.is_empty() { return; }
+        if train_examples.is_empty() {
+            return;
+        }
 
         let weights = match evaluator.weights_mut() {
             Some(w) => w,
-            None => { tracing::warn!("[chess-net] no weights to train"); return; }
+            None => {
+                tracing::warn!("[chess-net] no weights to train");
+                return;
+            }
         };
         let mut adam = AdamState::new(TOTAL_PARAMS);
         let (pl, vl) = train_epoch(weights, &mut adam, &train_examples, 32);
-        tracing::info!(policy_loss = pl, value_loss = vl, examples = train_examples.len(), "[chess-net] training step complete");
+        tracing::info!(
+            policy_loss = pl,
+            value_loss = vl,
+            examples = train_examples.len(),
+            "[chess-net] training step complete"
+        );
 
         if let Err(e) = evaluator.save() {
             tracing::warn!("[chess-net] failed to save weights: {e}");
         } else {
             tracing::info!("[chess-net] weights saved");
         }
-    }).await.ok();
+    })
+    .await
+    .ok();
 }
 
 /// Train the Go neural network for one pass on accumulated self-play games.
 pub async fn train_go_network_step(game_examples: Vec<bonsai_go::TrainingExample>) {
-    use bonsai_go::network::{NetworkGoEvaluator, mcts_to_train_examples, train_epoch, AdamState, TOTAL_PARAMS};
+    use bonsai_go::network::{
+        mcts_to_train_examples, train_epoch, AdamState, NetworkGoEvaluator, TOTAL_PARAMS,
+    };
 
-    if game_examples.is_empty() { return; }
+    if game_examples.is_empty() {
+        return;
+    }
 
     tokio::task::spawn_blocking(move || {
         let mut evaluator = NetworkGoEvaluator::load_default();
@@ -1158,22 +1382,34 @@ pub async fn train_go_network_step(game_examples: Vec<bonsai_go::TrainingExample
         }
 
         let train_examples = mcts_to_train_examples(&game_examples, 19);
-        if train_examples.is_empty() { return; }
+        if train_examples.is_empty() {
+            return;
+        }
 
         let weights = match evaluator.weights_mut() {
             Some(w) => w,
-            None => { tracing::warn!("[go-net] no weights to train"); return; }
+            None => {
+                tracing::warn!("[go-net] no weights to train");
+                return;
+            }
         };
         let mut adam = AdamState::new(TOTAL_PARAMS);
         let (pl, vl) = train_epoch(weights, &mut adam, &train_examples, 16);
-        tracing::info!(policy_loss = pl, value_loss = vl, examples = train_examples.len(), "[go-net] training step complete");
+        tracing::info!(
+            policy_loss = pl,
+            value_loss = vl,
+            examples = train_examples.len(),
+            "[go-net] training step complete"
+        );
 
         if let Err(e) = evaluator.save() {
             tracing::warn!("[go-net] failed to save weights: {e}");
         } else {
             tracing::info!("[go-net] weights saved");
         }
-    }).await.ok();
+    })
+    .await
+    .ok();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1184,30 +1420,60 @@ pub async fn train_go_network_step(game_examples: Vec<bonsai_go::TrainingExample
 /// (query, keyword_that_should_appear_in_conclusion, strategy_hint)
 const REASONING_SEEDS: &[(&str, &str, &str)] = &[
     // Deduction
-    ("If all Rust programs are memory-safe and this program is Rust, is it memory-safe?",
-     "memory-safe", "deduce"),
-    ("If A implies B and B implies C, does A imply C?",
-     "yes", "deduce"),
+    (
+        "If all Rust programs are memory-safe and this program is Rust, is it memory-safe?",
+        "memory-safe",
+        "deduce",
+    ),
+    (
+        "If A implies B and B implies C, does A imply C?",
+        "yes",
+        "deduce",
+    ),
     // Induction
-    ("What patterns do systems programming languages share?",
-     "performance", "induce"),
-    ("What do chess, Go, and shogi have in common?",
-     "board", "induce"),
+    (
+        "What patterns do systems programming languages share?",
+        "performance",
+        "induce",
+    ),
+    (
+        "What do chess, Go, and shogi have in common?",
+        "board",
+        "induce",
+    ),
     // Abduction
-    ("Why might a Rust program panic at runtime?",
-     "panic", "abduce"),
-    ("Why would a model's inference latency suddenly increase?",
-     "latency", "abduce"),
+    (
+        "Why might a Rust program panic at runtime?",
+        "panic",
+        "abduce",
+    ),
+    (
+        "Why would a model's inference latency suddenly increase?",
+        "latency",
+        "abduce",
+    ),
     // Analogy
-    ("How is a borrow checker like a traffic light system?",
-     "control", "analogize"),
-    ("How is gradient descent like a hiker finding a valley?",
-     "descent", "analogize"),
+    (
+        "How is a borrow checker like a traffic light system?",
+        "control",
+        "analogize",
+    ),
+    (
+        "How is gradient descent like a hiker finding a valley?",
+        "descent",
+        "analogize",
+    ),
     // Counterfactual
-    ("If Rust had garbage collection, how would systems programming change?",
-     "gc", "counterfactual"),
-    ("If neural networks had no activation functions, what would happen?",
-     "linear", "counterfactual"),
+    (
+        "If Rust had garbage collection, how would systems programming change?",
+        "gc",
+        "counterfactual",
+    ),
+    (
+        "If neural networks had no activation functions, what would happen?",
+        "linear",
+        "counterfactual",
+    ),
 ];
 
 /// Run one reasoning self-improvement cycle.
@@ -1217,8 +1483,8 @@ pub async fn run_reasoning_self_improvement(
     knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
 ) {
     use crate::reasoning_engine::ReasoningEngine;
-    use uuid::Uuid;
     use chrono::Utc;
+    use uuid::Uuid;
 
     let engine = ReasoningEngine::new(knowledge);
     let mut examples: Vec<UnifiedTrainingExample> = Vec::new();
@@ -1227,12 +1493,20 @@ pub async fn run_reasoning_self_improvement(
     for &(query, expected_kw, strategy) in REASONING_SEEDS {
         let result = engine.reason(query, strategy).await;
         let is_correct = result.conclusion.to_lowercase().contains(expected_kw)
-            || result.steps.iter().any(|s| s.to_lowercase().contains(expected_kw));
+            || result
+                .steps
+                .iter()
+                .any(|s| s.to_lowercase().contains(expected_kw));
 
-        if is_correct { correct += 1; }
+        if is_correct {
+            correct += 1;
+        }
 
         let correction = if !is_correct {
-            Some(format!("A key consideration is: {}. Reasoning about: {}", expected_kw, query))
+            Some(format!(
+                "A key consideration is: {}. Reasoning about: {}",
+                expected_kw, query
+            ))
         } else {
             None
         };
@@ -1250,8 +1524,16 @@ pub async fn run_reasoning_self_improvement(
                 suitable_strategies: vec![TrainingStrategyType::Dpo],
                 input: TrainingInput::Conversation {
                     messages: vec![
-                        ConvMessage { role: "system".into(), content: "Apply the requested reasoning strategy carefully and step by step.".into() },
-                        ConvMessage { role: "user".into(), content: pair.prompt.clone() },
+                        ConvMessage {
+                            role: "system".into(),
+                            content:
+                                "Apply the requested reasoning strategy carefully and step by step."
+                                    .into(),
+                        },
+                        ConvMessage {
+                            role: "user".into(),
+                            content: pair.prompt.clone(),
+                        },
                     ],
                 },
                 expected_output: TrainingOutput::PreferencePair {
@@ -1278,8 +1560,10 @@ pub async fn run_reasoning_self_improvement(
     if !examples.is_empty() {
         let n = examples.len();
         collector.ingest_bulk(examples).await;
-        info!("[reasoning-self-play] {correct}/{} correct — ingested {n} DPO pairs",
-              REASONING_SEEDS.len());
+        info!(
+            "[reasoning-self-play] {correct}/{} correct — ingested {n} DPO pairs",
+            REASONING_SEEDS.len()
+        );
     }
 }
 
@@ -1291,7 +1575,8 @@ pub async fn train_reasoning_step(
 ) {
     // Drain DPO examples that belong to the reasoning domain
     let candidates = collector.drain_dpo(256).await;
-    let reasoning: Vec<_> = candidates.into_iter()
+    let reasoning: Vec<_> = candidates
+        .into_iter()
         .filter(|ex| ex.dimensions.contains(&"reasoning".to_string()))
         .collect();
 
@@ -1300,33 +1585,42 @@ pub async fn train_reasoning_step(
         return;
     }
 
-    info!("[reasoning-train] posting {} reasoning DPO pairs to orchestrator", reasoning.len());
+    info!(
+        "[reasoning-train] posting {} reasoning DPO pairs to orchestrator",
+        reasoning.len()
+    );
 
-    let pairs: Vec<serde_json::Value> = reasoning.iter().map(|ex| {
-        let (chosen, rejected) = match &ex.expected_output {
-            TrainingOutput::PreferencePair { chosen, rejected } =>
-                (chosen.clone(), rejected.clone()),
-            TrainingOutput::Text { content } =>
-                (content.clone(), String::new()),
-            _ => (String::new(), String::new()),
-        };
-        serde_json::json!({
-            "prompt":    match &ex.input {
-                TrainingInput::Conversation { messages } =>
-                    messages.last().map(|m| m.content.as_str()).unwrap_or(""),
-                TrainingInput::Prompt { text } => text.as_str(),
-                _ => "",
-            },
-            "chosen":    chosen,
-            "rejected":  rejected,
-            "weight":    ex.quality_score,
-            "domain":    "reasoning",
-            "strategy":  ex.dimensions.get(1).cloned().unwrap_or_default(),
+    let pairs: Vec<serde_json::Value> = reasoning
+        .iter()
+        .map(|ex| {
+            let (chosen, rejected) = match &ex.expected_output {
+                TrainingOutput::PreferencePair { chosen, rejected } => {
+                    (chosen.clone(), rejected.clone())
+                }
+                TrainingOutput::Text { content } => (content.clone(), String::new()),
+                _ => (String::new(), String::new()),
+            };
+            serde_json::json!({
+                "prompt":    match &ex.input {
+                    TrainingInput::Conversation { messages } =>
+                        messages.last().map(|m| m.content.as_str()).unwrap_or(""),
+                    TrainingInput::Prompt { text } => text.as_str(),
+                    _ => "",
+                },
+                "chosen":    chosen,
+                "rejected":  rejected,
+                "weight":    ex.quality_score,
+                "domain":    "reasoning",
+                "strategy":  ex.dimensions.get(1).cloned().unwrap_or_default(),
+            })
         })
-    }).collect();
+        .collect();
 
     // Pairs are retained in the collector; log stats for observability.
     // A future DPO fine-tune pipeline can drain them via orchestrator.
     let _ = orchestrator; // reserved for when post_dpo_batch is wired up
-    info!("[reasoning-train] {} reasoning DPO pairs ready for next fine-tune cycle", pairs.len());
+    info!(
+        "[reasoning-train] {} reasoning DPO pairs ready for next fine-tune cycle",
+        pairs.len()
+    );
 }

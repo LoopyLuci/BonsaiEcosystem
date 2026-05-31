@@ -47,12 +47,17 @@ impl CoordinatorActor {
     pub async fn submit_task(&self, task: FabricTask, deadline_ms: u64) -> Option<TaskResult> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         let _ = self.tx.send(CoordMsg::SubmitTask(task, resp_tx)).await;
-        timeout(Duration::from_millis(deadline_ms), resp_rx).await.ok()?.ok()
+        timeout(Duration::from_millis(deadline_ms), resp_rx)
+            .await
+            .ok()?
+            .ok()
     }
 }
 
 impl Default for CoordinatorActor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 struct CoordState {
@@ -65,11 +70,16 @@ struct CoordState {
 
 impl CoordState {
     fn new() -> Self {
-        Self { nodes: HashMap::new(), pending: HashMap::new(), queue: Vec::new() }
+        Self {
+            nodes: HashMap::new(),
+            pending: HashMap::new(),
+            queue: Vec::new(),
+        }
     }
 
     fn best_node_for(&self, task: &FabricTask) -> Option<String> {
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|n| {
                 n.is_online
                     && n.available_cores >= task.required_cores

@@ -42,9 +42,15 @@ pub async fn run_sandboxed_code(request: SandboxRequest) -> Result<SandboxResult
 
 // ── Python venv tier ──────────────────────────────────────────────────────────
 
-async fn execute_in_venv(language: &str, code: &str, timeout: Duration) -> Result<SandboxResult, String> {
+async fn execute_in_venv(
+    language: &str,
+    code: &str,
+    timeout: Duration,
+) -> Result<SandboxResult, String> {
     if language != "python" {
-        return Err(format!("venv tier only supports 'python', got '{language}'"));
+        return Err(format!(
+            "venv tier only supports 'python', got '{language}'"
+        ));
     }
 
     let venv_dir = get_or_create_venv().await?;

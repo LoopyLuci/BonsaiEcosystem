@@ -3,13 +3,13 @@
 //! Each chunk gets a unique 96-bit nonce derived from the chunk's GSN and a
 //! per-session nonce seed, ensuring nonce uniqueness without a counter per-key.
 
+use crate::error::{CryptoError, CryptoResult};
+use crate::session::SessionKey;
 use aes_gcm::{
-    Aes256Gcm, Key, Nonce,
     aead::{Aead, KeyInit},
+    Aes256Gcm, Key, Nonce,
 };
 use serde::{Deserialize, Serialize};
-use crate::session::SessionKey;
-use crate::error::{CryptoError, CryptoResult};
 
 // ── Chunk ciphertext ──────────────────────────────────────────────────────────
 
@@ -29,7 +29,11 @@ pub struct ChunkCiphertext {
 // ── Encrypt ───────────────────────────────────────────────────────────────────
 
 /// Encrypt `plaintext` as chunk `gsn` using `session_key`.
-pub fn encrypt_chunk(session_key: &SessionKey, gsn: u64, plaintext: &[u8]) -> CryptoResult<ChunkCiphertext> {
+pub fn encrypt_chunk(
+    session_key: &SessionKey,
+    gsn: u64,
+    plaintext: &[u8],
+) -> CryptoResult<ChunkCiphertext> {
     let key = Key::<Aes256Gcm>::from_slice(session_key.as_bytes());
     let cipher = Aes256Gcm::new(key);
 
@@ -40,7 +44,8 @@ pub fn encrypt_chunk(session_key: &SessionKey, gsn: u64, plaintext: &[u8]) -> Cr
     nonce_bytes[8..].copy_from_slice(&rand_suffix);
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    let ciphertext = cipher.encrypt(nonce, plaintext)
+    let ciphertext = cipher
+        .encrypt(nonce, plaintext)
         .map_err(|_| CryptoError::EncryptionError("AES-GCM encrypt failed".into()))?;
 
     let plaintext_hash = *blake3::hash(plaintext).as_bytes();
@@ -61,7 +66,8 @@ pub fn decrypt_chunk(session_key: &SessionKey, chunk: &ChunkCiphertext) -> Crypt
     let cipher = Aes256Gcm::new(key);
     let nonce = Nonce::from_slice(&chunk.nonce);
 
-    let plaintext = cipher.decrypt(nonce, chunk.ciphertext.as_slice())
+    let plaintext = cipher
+        .decrypt(nonce, chunk.ciphertext.as_slice())
         .map_err(|_| CryptoError::DecryptionFailed)?;
 
     // Verify BLAKE3 hash matches

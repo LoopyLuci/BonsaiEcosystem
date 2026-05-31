@@ -155,7 +155,12 @@ impl ClusterOrchestrator {
         self.nodes.remove(node_id).is_some()
     }
 
-    pub fn update_node_metrics(&mut self, node_id: &str, metrics: NodeRuntimeMetrics, last_seen_ms: u64) -> bool {
+    pub fn update_node_metrics(
+        &mut self,
+        node_id: &str,
+        metrics: NodeRuntimeMetrics,
+        last_seen_ms: u64,
+    ) -> bool {
         if let Some(node) = self.nodes.get_mut(node_id) {
             node.metrics = metrics;
             node.last_seen_ms = last_seen_ms;
@@ -221,7 +226,9 @@ impl ClusterOrchestrator {
                 reasons.push("workload disallows mobile/tablet nodes".to_string());
                 return (0.0, reasons);
             }
-            ClusterDeviceType::Desktop | ClusterDeviceType::Laptop | ClusterDeviceType::Server if !workload.allow_desktop => {
+            ClusterDeviceType::Desktop | ClusterDeviceType::Laptop | ClusterDeviceType::Server
+                if !workload.allow_desktop =>
+            {
                 reasons.push("workload disallows desktop/server nodes".to_string());
                 return (0.0, reasons);
             }
@@ -248,16 +255,17 @@ impl ClusterOrchestrator {
             if battery < node.share.min_battery_pct {
                 reasons.push(format!(
                     "battery {}% below allowed minimum {}%",
-                    battery,
-                    node.share.min_battery_pct
+                    battery, node.share.min_battery_pct
                 ));
                 return (0.0, reasons);
             }
         }
 
-        let available_cpu = (node.share.cpu_share_pct * self.policy.overcommit_ratio) - node.metrics.cpu_utilization_pct;
+        let available_cpu = (node.share.cpu_share_pct * self.policy.overcommit_ratio)
+            - node.metrics.cpu_utilization_pct;
         let available_ram = node.metrics.free_ram_mb.min(node.share.ram_share_mb);
-        let available_gpu = (node.share.gpu_share_pct * self.policy.overcommit_ratio) - (100.0 - node.metrics.available_gpu_pct);
+        let available_gpu = (node.share.gpu_share_pct * self.policy.overcommit_ratio)
+            - (100.0 - node.metrics.available_gpu_pct);
 
         if available_cpu < workload.cpu_cost_pct {
             reasons.push("insufficient CPU budget".to_string());
@@ -275,7 +283,8 @@ impl ClusterOrchestrator {
         }
 
         let cpu_headroom_score = ((available_cpu - workload.cpu_cost_pct) / 100.0).max(0.0);
-        let ram_headroom_score = ((available_ram.saturating_sub(workload.ram_required_mb)) as f32 / 32768.0).max(0.0);
+        let ram_headroom_score =
+            ((available_ram.saturating_sub(workload.ram_required_mb)) as f32 / 32768.0).max(0.0);
         let gpu_headroom_score = if workload.gpu_cost_pct > 0.0 {
             ((available_gpu - workload.gpu_cost_pct) / 100.0).max(0.0)
         } else {
@@ -285,23 +294,39 @@ impl ClusterOrchestrator {
 
         let mut score = match self.policy.strategy {
             SchedulingStrategy::Balanced => {
-                cpu_headroom_score * 0.35 + ram_headroom_score * 0.25 + gpu_headroom_score * 0.15 + latency_score * 0.25
+                cpu_headroom_score * 0.35
+                    + ram_headroom_score * 0.25
+                    + gpu_headroom_score * 0.15
+                    + latency_score * 0.25
             }
             SchedulingStrategy::Throughput => {
-                cpu_headroom_score * 0.45 + ram_headroom_score * 0.35 + gpu_headroom_score * 0.15 + latency_score * 0.05
+                cpu_headroom_score * 0.45
+                    + ram_headroom_score * 0.35
+                    + gpu_headroom_score * 0.15
+                    + latency_score * 0.05
             }
             SchedulingStrategy::LowestLatency => {
-                cpu_headroom_score * 0.20 + ram_headroom_score * 0.10 + gpu_headroom_score * 0.10 + latency_score * 0.60
+                cpu_headroom_score * 0.20
+                    + ram_headroom_score * 0.10
+                    + gpu_headroom_score * 0.10
+                    + latency_score * 0.60
             }
             SchedulingStrategy::EnergySaver => {
                 let battery_bonus = node.metrics.battery_pct.unwrap_or(100) as f32 / 100.0;
-                cpu_headroom_score * 0.20 + ram_headroom_score * 0.20 + gpu_headroom_score * 0.10 + latency_score * 0.20 + battery_bonus * 0.30
+                cpu_headroom_score * 0.20
+                    + ram_headroom_score * 0.20
+                    + gpu_headroom_score * 0.10
+                    + latency_score * 0.20
+                    + battery_bonus * 0.30
             }
         };
 
         if workload.latency_sensitive {
             score += latency_score * 0.25;
-            reasons.push(format!("latency-sensitive boost ({:.0}ms)", node.metrics.latency_ms));
+            reasons.push(format!(
+                "latency-sensitive boost ({:.0}ms)",
+                node.metrics.latency_ms
+            ));
         }
 
         reasons.push(format!(
@@ -312,7 +337,10 @@ impl ClusterOrchestrator {
         ));
 
         if !workload.required_labels.is_empty() {
-            reasons.push(format!("label match requirement: {}", workload.required_labels.join(", ")));
+            reasons.push(format!(
+                "label match requirement: {}",
+                workload.required_labels.join(", ")
+            ));
         }
 
         (score.max(0.0), reasons)

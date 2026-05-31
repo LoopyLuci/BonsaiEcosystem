@@ -41,17 +41,23 @@ fn default_whitelist() -> Vec<String> {
         "stackoverflow.com".into(),
     ]
 }
-fn default_max_chars() -> usize { 125 }
-fn default_summarizer_url() -> String { "http://127.0.0.1:8082".into() }
-fn default_timeout_secs() -> u64 { 15 }
+fn default_max_chars() -> usize {
+    125
+}
+fn default_summarizer_url() -> String {
+    "http://127.0.0.1:8082".into()
+}
+fn default_timeout_secs() -> u64 {
+    15
+}
 
 impl Default for WebRouterConfig {
     fn default() -> Self {
         Self {
-            whitelist:        default_whitelist(),
+            whitelist: default_whitelist(),
             max_excerpt_chars: default_max_chars(),
-            summarizer_url:   default_summarizer_url(),
-            timeout_secs:     default_timeout_secs(),
+            summarizer_url: default_summarizer_url(),
+            timeout_secs: default_timeout_secs(),
         }
     }
 }
@@ -60,11 +66,11 @@ impl Default for WebRouterConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebResult {
-    pub url:       String,
-    pub trusted:   bool,
+    pub url: String,
+    pub trusted: bool,
     /// Full markdown (trusted) or ≤125-char summary (untrusted).
-    pub content:   String,
-    pub title:     Option<String>,
+    pub content: String,
+    pub title: Option<String>,
     pub truncated: bool,
 }
 
@@ -87,7 +93,10 @@ impl WebRouter {
 
     pub fn is_trusted(&self, url: &str) -> bool {
         let lower = url.to_lowercase();
-        self.config.whitelist.iter().any(|domain| lower.contains(domain.as_str()))
+        self.config
+            .whitelist
+            .iter()
+            .any(|domain| lower.contains(domain.as_str()))
     }
 
     /// Fetch a URL and return either full markdown (trusted) or a brief summary.
@@ -103,12 +112,18 @@ impl WebRouter {
             } else {
                 markdown
             };
-            Ok(WebResult { url: url.to_string(), trusted: true, content, title, truncated })
+            Ok(WebResult {
+                url: url.to_string(),
+                trusted: true,
+                content,
+                title,
+                truncated,
+            })
         } else {
             let plain = html_to_plain(&html);
             let summary = self.summarize(&plain, url).await;
             Ok(WebResult {
-                url:     url.to_string(),
+                url: url.to_string(),
                 trusted: false,
                 content: summary,
                 title,
@@ -148,8 +163,12 @@ impl WebRouter {
             "temperature": 0.1,
         });
 
-        match self.client
-            .post(format!("{}/v1/chat/completions", self.config.summarizer_url))
+        match self
+            .client
+            .post(format!(
+                "{}/v1/chat/completions",
+                self.config.summarizer_url
+            ))
             .json(&payload)
             .send()
             .await
@@ -161,11 +180,17 @@ impl WebRouter {
                     }
                 }
                 // Sidecar responded but JSON parse failed
-                excerpt.chars().take(self.config.max_excerpt_chars).collect()
+                excerpt
+                    .chars()
+                    .take(self.config.max_excerpt_chars)
+                    .collect()
             }
             Err(_) => {
                 // DreamAgent sidecar not running — use plain excerpt
-                excerpt.chars().take(self.config.max_excerpt_chars).collect()
+                excerpt
+                    .chars()
+                    .take(self.config.max_excerpt_chars)
+                    .collect()
             }
         }
     }
@@ -176,7 +201,7 @@ impl WebRouter {
 fn extract_title(html: &str) -> Option<String> {
     let lower = html.to_lowercase();
     let start = lower.find("<title>")? + 7;
-    let end   = lower.find("</title>")?;
+    let end = lower.find("</title>")?;
     if start < end {
         Some(html[start..end].trim().to_string())
     } else {
@@ -191,27 +216,30 @@ fn html_to_markdown(html: &str) -> String {
     // Strip scripts and style blocks (regex crate doesn't support backreferences,
     // so handle each tag separately).
     let re_script = regex::Regex::new(r"(?si)<script[^>]*>.*?</script>").unwrap();
-    let re_style  = regex::Regex::new(r"(?si)<style[^>]*>.*?</style>").unwrap();
+    let re_style = regex::Regex::new(r"(?si)<style[^>]*>.*?</style>").unwrap();
     let stripped = re_script.replace_all(html, "");
     let s = re_style.replace_all(&stripped, "").to_string();
 
     // Convert common tags
     let rules: &[(&str, &str)] = &[
-        (r"(?i)<h1[^>]*>(.*?)</h1>",   "# $1\n\n"),
-        (r"(?i)<h2[^>]*>(.*?)</h2>",   "## $1\n\n"),
-        (r"(?i)<h3[^>]*>(.*?)</h3>",   "### $1\n\n"),
-        (r"(?i)<h4[^>]*>(.*?)</h4>",   "#### $1\n\n"),
+        (r"(?i)<h1[^>]*>(.*?)</h1>", "# $1\n\n"),
+        (r"(?i)<h2[^>]*>(.*?)</h2>", "## $1\n\n"),
+        (r"(?i)<h3[^>]*>(.*?)</h3>", "### $1\n\n"),
+        (r"(?i)<h4[^>]*>(.*?)</h4>", "#### $1\n\n"),
         (r"(?i)<strong[^>]*>(.*?)</strong>", "**$1**"),
-        (r"(?i)<b[^>]*>(.*?)</b>",      "**$1**"),
-        (r"(?i)<em[^>]*>(.*?)</em>",    "*$1*"),
-        (r"(?i)<i[^>]*>(.*?)</i>",      "*$1*"),
+        (r"(?i)<b[^>]*>(.*?)</b>", "**$1**"),
+        (r"(?i)<em[^>]*>(.*?)</em>", "*$1*"),
+        (r"(?i)<i[^>]*>(.*?)</i>", "*$1*"),
         (r#"(?i)<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>"#, "[$2]($1)"),
-        (r"(?si)<pre[^>]*><code[^>]*>(.*?)</code></pre>", "```\n$1\n```\n"),
+        (
+            r"(?si)<pre[^>]*><code[^>]*>(.*?)</code></pre>",
+            "```\n$1\n```\n",
+        ),
         (r"(?si)<code[^>]*>(.*?)</code>", "`$1`"),
-        (r"(?i)<li[^>]*>(.*?)</li>",    "- $1\n"),
-        (r"(?i)<br\s*/?>",             "\n"),
-        (r"(?i)<p[^>]*>(.*?)</p>",     "$1\n\n"),
-        (r"<[^>]+>",                    ""),   // strip remaining tags
+        (r"(?i)<li[^>]*>(.*?)</li>", "- $1\n"),
+        (r"(?i)<br\s*/?>", "\n"),
+        (r"(?i)<p[^>]*>(.*?)</p>", "$1\n\n"),
+        (r"<[^>]+>", ""), // strip remaining tags
     ];
 
     let mut out = s.to_string();
@@ -223,11 +251,11 @@ fn html_to_markdown(html: &str) -> String {
 
     // Decode HTML entities
     out = out
-        .replace("&amp;",  "&")
-        .replace("&lt;",   "<")
-        .replace("&gt;",   ">")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
         .replace("&quot;", "\"")
-        .replace("&#39;",  "'")
+        .replace("&#39;", "'")
         .replace("&nbsp;", " ");
 
     // Collapse excessive blank lines
@@ -245,19 +273,24 @@ fn html_to_plain(html: &str) -> String {
 
 // ── Middleware integration ────────────────────────────────────────────────────
 
-use std::sync::Arc;
 use crate::middleware::{MiddlewareOutcome, ToolCall, ToolMiddleware};
+use std::sync::Arc;
 
 pub struct WebRouterMiddleware {
     pub router: Arc<WebRouter>,
 }
 
 impl ToolMiddleware for WebRouterMiddleware {
-    fn name(&self) -> &'static str { "web_router" }
+    fn name(&self) -> &'static str {
+        "web_router"
+    }
 
     fn intercept(&self, call: ToolCall) -> MiddlewareOutcome {
         // Only intercept web_search / browse_url tool calls
-        if !matches!(call.tool.as_str(), "web_search" | "browse_url" | "fetch_url") {
+        if !matches!(
+            call.tool.as_str(),
+            "web_search" | "browse_url" | "fetch_url"
+        ) {
             return MiddlewareOutcome::Continue(call);
         }
 
@@ -274,7 +307,7 @@ impl ToolMiddleware for WebRouterMiddleware {
         let trusted = self.router.is_trusted(&url);
         let mut rewritten = call;
         rewritten.args["__web_router"] = serde_json::Value::Bool(true);
-        rewritten.args["__trusted"]    = serde_json::Value::Bool(trusted);
+        rewritten.args["__trusted"] = serde_json::Value::Bool(trusted);
         MiddlewareOutcome::Continue(rewritten)
     }
 }

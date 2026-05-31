@@ -320,7 +320,10 @@ impl TaskQueue {
             }
         }
 
-        if let Some(idx) = pending.iter().position(|t| t.task_type.priority() == top_priority) {
+        if let Some(idx) = pending
+            .iter()
+            .position(|t| t.task_type.priority() == top_priority)
+        {
             return pending.remove(idx);
         }
 
@@ -423,7 +426,8 @@ impl TaskQueue {
             let key = format!("{:?}", src).to_lowercase();
             let pending_count = pending.iter().filter(|t| t.source == src).count();
             let active_count = active.values().filter(|t| t.source == src).count();
-            let recent: Vec<&CompletedSample> = stats.recent.iter().filter(|r| r.source == src).collect();
+            let recent: Vec<&CompletedSample> =
+                stats.recent.iter().filter(|r| r.source == src).collect();
             let served_last_60s = recent.len();
             let avg_latency_ms_last_60s = if recent.is_empty() {
                 0

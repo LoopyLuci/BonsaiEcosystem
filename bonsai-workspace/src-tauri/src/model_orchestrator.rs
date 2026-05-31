@@ -49,7 +49,8 @@ const MODEL_LOAD_TIMEOUT_SECS: u64 = 420;
 const MODEL_LOAD_TIMEOUT_SECS: u64 = 240;
 const MODEL_LOAD_TIMEOUT_GRACE_SECS: u64 = 120;
 const MODEL_LOAD_MAX_POLLS: u64 = (MODEL_LOAD_TIMEOUT_SECS * 1000) / MODEL_LOAD_POLL_INTERVAL_MS;
-const MODEL_LOAD_GRACE_POLLS: u64 = (MODEL_LOAD_TIMEOUT_GRACE_SECS * 1000) / MODEL_LOAD_POLL_INTERVAL_MS;
+const MODEL_LOAD_GRACE_POLLS: u64 =
+    (MODEL_LOAD_TIMEOUT_GRACE_SECS * 1000) / MODEL_LOAD_POLL_INTERVAL_MS;
 const MAX_MODEL_LOAD_ATTEMPTS: u8 = 2; // 1 GPU attempt + 1 CPU fallback
 
 // ── Slot state ────────────────────────────────────────────────────────────────
@@ -58,10 +59,21 @@ const MAX_MODEL_LOAD_ATTEMPTS: u8 = 2; // 1 GPU attempt + 1 CPU fallback
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum SlotState {
     Empty,
-    Loading { model_id: String, #[serde(skip_serializing_if = "Option::is_none")] load_pct: Option<u32> },
-    Ready   { model_id: String },
-    Busy    { model_id: String },
-    Crashed { model_id: String, error: String },
+    Loading {
+        model_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        load_pct: Option<u32>,
+    },
+    Ready {
+        model_id: String,
+    },
+    Busy {
+        model_id: String,
+    },
+    Crashed {
+        model_id: String,
+        error: String,
+    },
 }
 
 impl SlotState {
@@ -69,34 +81,40 @@ impl SlotState {
         match self {
             Self::Loading { model_id, .. }
             | Self::Ready { model_id }
-            | Self::Busy  { model_id }
+            | Self::Busy { model_id }
             | Self::Crashed { model_id, .. } => Some(model_id),
             Self::Empty => None,
         }
     }
-    pub fn is_ready(&self)   -> bool { matches!(self, Self::Ready { .. }) }
-    pub fn is_empty(&self)   -> bool { matches!(self, Self::Empty) }
-    pub fn is_loading(&self) -> bool { matches!(self, Self::Loading { .. }) }
+    pub fn is_ready(&self) -> bool {
+        matches!(self, Self::Ready { .. })
+    }
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+    pub fn is_loading(&self) -> bool {
+        matches!(self, Self::Loading { .. })
+    }
 }
 
 // ── Slot ──────────────────────────────────────────────────────────────────────
 
 struct Slot {
-    index:          usize,
-    port:           u16,
-    base_url:       String,
-    state:          SlotState,
-    process:        Option<std::process::Child>,
-    supervisor:     Option<SidecarSupervisor>,
-    last_used:      Instant,
+    index: usize,
+    port: u16,
+    base_url: String,
+    state: SlotState,
+    process: Option<std::process::Child>,
+    supervisor: Option<SidecarSupervisor>,
+    last_used: Instant,
     total_requests: u64,
-    load_started:   Option<Instant>,
-    current_model:  Option<ModelInfo>,
-    load_attempt:   u8,
-    gpu_layers:     u32,
-    cpu_mode:       bool,
+    load_started: Option<Instant>,
+    current_model: Option<ModelInfo>,
+    load_attempt: u8,
+    gpu_layers: u32,
+    cpu_mode: bool,
     inference_mode: InferenceMode,
-    fallback_note:  Option<String>,
+    fallback_note: Option<String>,
 }
 
 impl Slot {
@@ -148,18 +166,20 @@ impl Slot {
 }
 
 impl Drop for Slot {
-    fn drop(&mut self) { self.kill(); }
+    fn drop(&mut self) {
+        self.kill();
+    }
 }
 
 // ── Public status types ───────────────────────────────────────────────────────
 
 #[derive(Serialize, Clone)]
 pub struct SlotStatus {
-    pub index:        usize,
-    pub port:         u16,
-    pub state:        SlotState,
-    pub requests:     u64,
-    pub idle_secs:    u64,
+    pub index: usize,
+    pub port: u16,
+    pub state: SlotState,
+    pub requests: u64,
+    pub idle_secs: u64,
     pub load_elapsed_secs: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fallback_note: Option<String>,
@@ -170,21 +190,21 @@ pub struct SlotStatus {
 
 #[derive(Serialize, Clone)]
 pub struct OrchestratorStatus {
-    pub slots:        Vec<SlotStatus>,
-    pub queue_depth:  usize,
+    pub slots: Vec<SlotStatus>,
+    pub queue_depth: usize,
     pub total_ram_mb: u64,
-    pub free_ram_mb:  u64,
+    pub free_ram_mb: u64,
 }
 
 // ── Token stats ───────────────────────────────────────────────────────────────
 
 #[derive(Serialize, Clone, Default, Debug)]
 pub struct InferStats {
-    pub prompt_tokens:          u32,
-    pub completion_tokens:      u32,
-    pub tokens_per_second:      f32,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub tokens_per_second: f32,
     pub time_to_first_token_ms: u64,
-    pub total_time_ms:          u64,
+    pub total_time_ms: u64,
 }
 
 // ── Per-request inference overrides ──────────────────────────────────────────
@@ -193,31 +213,31 @@ pub struct InferStats {
 /// Populated from `ModelData::inference` when available; all fields optional.
 #[derive(Debug, Clone, Default)]
 pub struct InferenceOverrides {
-    pub temperature:       Option<f32>,
-    pub top_p:             Option<f32>,
-    pub top_k:             Option<u32>,
-    pub min_p:             Option<f32>,
-    pub repeat_penalty:    Option<f32>,
-    pub presence_penalty:  Option<f32>,
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+    pub top_k: Option<u32>,
+    pub min_p: Option<f32>,
+    pub repeat_penalty: Option<f32>,
+    pub presence_penalty: Option<f32>,
     pub frequency_penalty: Option<f32>,
-    pub stop_sequences:    Vec<String>,
+    pub stop_sequences: Vec<String>,
 }
 
 // ── Infer request ─────────────────────────────────────────────────────────────
 
 pub struct InferRequest {
     /// Which model to use; None = any ready slot.
-    pub model_id:   Option<String>,
+    pub model_id: Option<String>,
     /// Full OpenAI-format message history (system + user + assistant turns).
-    pub messages:   Vec<serde_json::Value>,
+    pub messages: Vec<serde_json::Value>,
     pub max_tokens: u32,
     /// Per-model sampling overrides from `ModelData`. None = use defaults.
-    pub overrides:  Option<InferenceOverrides>,
+    pub overrides: Option<InferenceOverrides>,
     /// If Some, tokens are streamed here instead of via the app event bus.
-    pub stream_tx:  Option<mpsc::UnboundedSender<String>>,
+    pub stream_tx: Option<mpsc::UnboundedSender<String>>,
     /// Optional cancellation flag set by the UI to stop active generation.
     pub cancel_flag: Option<Arc<AtomicBool>>,
-    pub resp_tx:    oneshot::Sender<Result<(String, InferStats), String>>,
+    pub resp_tx: oneshot::Sender<Result<(String, InferStats), String>>,
     /// Request source tag for fairness scheduling ("workspace" | "assistant").
     pub source: &'static str,
 }
@@ -226,11 +246,22 @@ pub struct InferRequest {
 
 enum Cmd {
     Infer(InferRequest),
-    Load { model_id: String, resp_tx: oneshot::Sender<Result<(), String>> },
+    Load {
+        model_id: String,
+        resp_tx: oneshot::Sender<Result<(), String>>,
+    },
     Unload(usize),
-    Status { resp_tx: oneshot::Sender<OrchestratorStatus> },
-    SetInferenceMode { model_id: String, mode: InferenceMode },
-    GetInferenceMode { model_id: String, resp_tx: oneshot::Sender<Option<InferenceMode>> },
+    Status {
+        resp_tx: oneshot::Sender<OrchestratorStatus>,
+    },
+    SetInferenceMode {
+        model_id: String,
+        mode: InferenceMode,
+    },
+    GetInferenceMode {
+        model_id: String,
+        resp_tx: oneshot::Sender<Option<InferenceMode>>,
+    },
     RefreshRegistry,
     SlotFreed(usize),
 }
@@ -239,7 +270,7 @@ enum Cmd {
 
 #[derive(Clone)]
 pub struct ModelOrchestrator {
-    cmd_tx:   mpsc::UnboundedSender<Cmd>,
+    cmd_tx: mpsc::UnboundedSender<Cmd>,
     registry: Arc<Mutex<ModelRegistry>>,
 }
 
@@ -251,12 +282,14 @@ impl ModelOrchestrator {
 
         let mut all_dirs: Vec<std::path::PathBuf> = vec![models_dir];
         for d in extra_dirs {
-            if !all_dirs.contains(&d) { all_dirs.push(d); }
+            if !all_dirs.contains(&d) {
+                all_dirs.push(d);
+            }
         }
         let dir_refs: Vec<&std::path::Path> = all_dirs.iter().map(|p| p.as_path()).collect();
         let registry = Arc::new(Mutex::new(ModelRegistry::scan_dirs_recursive(&dir_refs)));
 
-        let reg2    = registry.clone();
+        let reg2 = registry.clone();
         let cmd_tx2 = cmd_tx.clone();
         tauri::async_runtime::spawn(async move {
             event_loop(cmd_rx, cmd_tx2, reg2, app).await;
@@ -267,13 +300,18 @@ impl ModelOrchestrator {
 
     /// Submit a streaming inference request.
     pub fn infer(&self, req: InferRequest) -> Result<(), String> {
-        self.cmd_tx.send(Cmd::Infer(req)).map_err(|_| "orchestrator offline".into())
+        self.cmd_tx
+            .send(Cmd::Infer(req))
+            .map_err(|_| "orchestrator offline".into())
     }
 
     /// Load a model by ID (non-blocking; use the returned receiver to await readiness).
     pub fn load(&self, model_id: String) -> oneshot::Receiver<Result<(), String>> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.cmd_tx.send(Cmd::Load { model_id, resp_tx: tx });
+        let _ = self.cmd_tx.send(Cmd::Load {
+            model_id,
+            resp_tx: tx,
+        });
         rx
     }
 
@@ -291,21 +329,28 @@ impl ModelOrchestrator {
 
     pub async fn get_inference_mode(&self, model_id: String) -> Option<InferenceMode> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.cmd_tx.send(Cmd::GetInferenceMode { model_id, resp_tx: tx });
+        let _ = self.cmd_tx.send(Cmd::GetInferenceMode {
+            model_id,
+            resp_tx: tx,
+        });
         rx.await.ok().flatten()
     }
 
     pub async fn is_model_loaded(&self, model_id: &str) -> bool {
         let status = self.status().await;
-        status
-            .slots
-            .iter()
-            .any(|s| s.state.model_id() == Some(model_id) && !matches!(s.state, SlotState::Empty | SlotState::Crashed { .. }))
+        status.slots.iter().any(|s| {
+            s.state.model_id() == Some(model_id)
+                && !matches!(s.state, SlotState::Empty | SlotState::Crashed { .. })
+        })
     }
 
     pub async fn unload_model(&self, model_id: &str) {
         let status = self.status().await;
-        for slot in status.slots.into_iter().filter(|s| s.state.model_id() == Some(model_id)) {
+        for slot in status
+            .slots
+            .into_iter()
+            .filter(|s| s.state.model_id() == Some(model_id))
+        {
             self.unload(slot.index);
         }
     }
@@ -314,7 +359,10 @@ impl ModelOrchestrator {
         let (tx, rx) = oneshot::channel();
         let _ = self.cmd_tx.send(Cmd::Status { resp_tx: tx });
         rx.await.unwrap_or_else(|_| OrchestratorStatus {
-            slots: vec![], queue_depth: 0, total_ram_mb: 0, free_ram_mb: 0,
+            slots: vec![],
+            queue_depth: 0,
+            total_ram_mb: 0,
+            free_ram_mb: 0,
         })
     }
 
@@ -338,7 +386,9 @@ impl ModelOrchestrator {
         let mut loading = Vec::new();
         for slot in status.slots.iter() {
             if let SlotState::Loading { model_id, load_pct } = &slot.state {
-                let pct = load_pct.map(|p| format!("{p}%")).unwrap_or_else(|| "starting".to_string());
+                let pct = load_pct
+                    .map(|p| format!("{p}%"))
+                    .unwrap_or_else(|| "starting".to_string());
                 loading.push(format!("slot {}: {} ({})", slot.index, model_id, pct));
             }
         }
@@ -363,9 +413,9 @@ impl ModelOrchestrator {
     /// response text. Used by the model-data generator and similar internal tools.
     pub async fn infer_simple(
         &self,
-        prompt:     &str,
+        prompt: &str,
         max_tokens: u32,
-        source:     &'static str,
+        source: &'static str,
     ) -> Result<(String, InferStats), String> {
         let _permit = infer_semaphore()
             .acquire()
@@ -375,27 +425,29 @@ impl ModelOrchestrator {
         let messages = vec![json!({ "role": "user", "content": prompt })];
         let (resp_tx, resp_rx) = oneshot::channel();
         let req = InferRequest {
-            model_id:   None,
+            model_id: None,
             messages,
             max_tokens,
-            overrides:  None,
-            stream_tx:  None,
+            overrides: None,
+            stream_tx: None,
             cancel_flag: None,
             resp_tx,
             source,
         };
         self.infer(req)?;
-        resp_rx.await.map_err(|_| "orchestrator dropped the response channel".to_string())?
+        resp_rx
+            .await
+            .map_err(|_| "orchestrator dropped the response channel".to_string())?
     }
 }
 
 // ── Event loop ────────────────────────────────────────────────────────────────
 
 async fn event_loop(
-    mut rx:     mpsc::UnboundedReceiver<Cmd>,
-    cmd_tx:     mpsc::UnboundedSender<Cmd>,
-    registry:   Arc<Mutex<ModelRegistry>>,
-    app:        AppHandle,
+    mut rx: mpsc::UnboundedReceiver<Cmd>,
+    cmd_tx: mpsc::UnboundedSender<Cmd>,
+    registry: Arc<Mutex<ModelRegistry>>,
+    app: AppHandle,
 ) {
     let n_slots = decide_slot_count();
     let mut slots: Vec<Slot> = (0..n_slots).map(Slot::new).collect();
@@ -409,7 +461,8 @@ async fn event_loop(
 
     // Auto-load the last-used model on startup (falls back to first in registry)
     {
-        let last_id = crate::config::load_config(&app).ok()
+        let last_id = crate::config::load_config(&app)
+            .ok()
             .and_then(|c| c.last_model_id);
         let reg = registry.lock().await;
         let info = last_id
@@ -418,10 +471,7 @@ async fn event_loop(
             .or_else(|| reg.models.first().cloned());
         if let Some(info) = info {
             drop(reg);
-            let mode = inference_modes
-                .get(&info.id)
-                .cloned()
-                .unwrap_or_default();
+            let mode = inference_modes.get(&info.id).cloned().unwrap_or_default();
             spawn_model(&mut slots[0], &info, &app, &mode);
         }
     }
@@ -443,14 +493,14 @@ async fn event_loop(
 }
 
 async fn handle_cmd(
-    cmd:      Cmd,
-    slots:    &mut Vec<Slot>,
-    queue:    &mut VecDeque<InferRequest>,
+    cmd: Cmd,
+    slots: &mut Vec<Slot>,
+    queue: &mut VecDeque<InferRequest>,
     inference_modes: &mut HashMap<String, InferenceMode>,
-    cmd_tx:   &mpsc::UnboundedSender<Cmd>,
+    cmd_tx: &mpsc::UnboundedSender<Cmd>,
     registry: &Arc<Mutex<ModelRegistry>>,
-    client:   &Client,
-    app:      &AppHandle,
+    client: &Client,
+    app: &AppHandle,
 ) {
     match cmd {
         Cmd::Infer(req) => {
@@ -468,12 +518,18 @@ async fn handle_cmd(
 
         Cmd::Load { model_id, resp_tx } => {
             // Already ready?
-            if slots.iter().any(|s| s.state.model_id() == Some(&model_id) && s.state.is_ready()) {
+            if slots
+                .iter()
+                .any(|s| s.state.model_id() == Some(&model_id) && s.state.is_ready())
+            {
                 let _ = resp_tx.send(Ok(()));
                 return;
             }
             // Already loading?
-            if slots.iter().any(|s| s.state.model_id() == Some(&model_id) && s.state.is_loading()) {
+            if slots
+                .iter()
+                .any(|s| s.state.model_id() == Some(&model_id) && s.state.is_loading())
+            {
                 // Poll until ready in background
                 let url = slots
                     .iter()
@@ -492,13 +548,12 @@ async fn handle_cmd(
             drop(reg);
 
             match info {
-                None => { let _ = resp_tx.send(Err(format!("model {model_id} not in registry"))); }
+                None => {
+                    let _ = resp_tx.send(Err(format!("model {model_id} not in registry")));
+                }
                 Some(info) => {
                     let idx = empty_or_evict(slots);
-                    let mode = inference_modes
-                        .get(&model_id)
-                        .cloned()
-                        .unwrap_or_default();
+                    let mode = inference_modes.get(&model_id).cloned().unwrap_or_default();
                     spawn_model(&mut slots[idx], &info, app, &mode);
                     let url = slots[idx].base_url.clone();
                     tauri::async_runtime::spawn(async move {
@@ -534,17 +589,14 @@ async fn handle_cmd(
             }
             let _ = app.emit("registry-updated", ());
             // If all slots are empty/crashed, try to auto-load the first model
-            let all_idle = slots.iter().all(|s| {
-                matches!(s.state, SlotState::Empty | SlotState::Crashed { .. })
-            });
+            let all_idle = slots
+                .iter()
+                .all(|s| matches!(s.state, SlotState::Empty | SlotState::Crashed { .. }));
             if all_idle {
                 let reg = registry.lock().await;
                 if let Some(info) = reg.models.first().cloned() {
                     drop(reg);
-                    let mode = inference_modes
-                        .get(&info.id)
-                        .cloned()
-                        .unwrap_or_default();
+                    let mode = inference_modes.get(&info.id).cloned().unwrap_or_default();
                     spawn_model(&mut slots[0], &info, app, &mode);
                 }
             }
@@ -553,7 +605,9 @@ async fn handle_cmd(
         Cmd::SlotFreed(idx) => {
             if let Some(slot) = slots.get_mut(idx) {
                 if let SlotState::Busy { model_id } = &slot.state.clone() {
-                    slot.state = SlotState::Ready { model_id: model_id.clone() };
+                    slot.state = SlotState::Ready {
+                        model_id: model_id.clone(),
+                    };
                 }
             }
             drain_queue(queue, slots, cmd_tx, client, app).await;
@@ -580,13 +634,14 @@ async fn wait_for_model_health(url: String) -> Result<(), String> {
 
     Err(format!(
         "model load timeout after {}s (+{}s grace)",
-        MODEL_LOAD_TIMEOUT_SECS,
-        MODEL_LOAD_TIMEOUT_GRACE_SECS
+        MODEL_LOAD_TIMEOUT_SECS, MODEL_LOAD_TIMEOUT_GRACE_SECS
     ))
 }
 
 async fn resolve_active_slot_url(status: &OrchestratorStatus, probe: &Client) -> Option<String> {
-    if let Some(url) = status.slots.iter()
+    if let Some(url) = status
+        .slots
+        .iter()
         .find(|s| s.state.is_ready())
         .map(|s| format!("http://127.0.0.1:{}", s.port))
     {
@@ -595,7 +650,11 @@ async fn resolve_active_slot_url(status: &OrchestratorStatus, probe: &Client) ->
 
     // Startup race guard: a slot can be process-healthy for a brief window
     // before the orchestrator poll loop transitions Loading -> Ready.
-    for slot in status.slots.iter().filter(|s| matches!(s.state, SlotState::Loading { .. })) {
+    for slot in status
+        .slots
+        .iter()
+        .filter(|s| matches!(s.state, SlotState::Loading { .. }))
+    {
         let url = format!("http://127.0.0.1:{}", slot.port);
         if probe_model_ready(probe, &url).await {
             return Some(url);
@@ -604,9 +663,11 @@ async fn resolve_active_slot_url(status: &OrchestratorStatus, probe: &Client) ->
 
     // Last-chance probe: if any non-crashed slot process is healthy, allow the
     // caller to proceed even before the next orchestrator status transition.
-    for slot in status.slots.iter().filter(|s| {
-        !matches!(s.state, SlotState::Empty | SlotState::Crashed { .. })
-    }) {
+    for slot in status
+        .slots
+        .iter()
+        .filter(|s| !matches!(s.state, SlotState::Empty | SlotState::Crashed { .. }))
+    {
         let url = format!("http://127.0.0.1:{}", slot.port);
         if probe_model_ready(probe, &url).await {
             return Some(url);
@@ -643,7 +704,8 @@ fn spawn_model(slot: &mut Slot, info: &ModelInfo, app: &AppHandle, mode: &Infere
         .unwrap_or(false);
 
     let exe = bootstrap::llama_exe(app);
-    let exe_name = exe.file_name()
+    let exe_name = exe
+        .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_lowercase();
@@ -674,7 +736,10 @@ fn spawn_model_with_layers(
     slot.cpu_mode = gpu_layers == 0;
     slot.inference_mode = mode;
     slot.fallback_note = fallback_note;
-    slot.state = SlotState::Loading { model_id: info.id.clone(), load_pct: None };
+    slot.state = SlotState::Loading {
+        model_id: info.id.clone(),
+        load_pct: None,
+    };
     slot.load_started = Some(Instant::now());
 
     let exe = bootstrap::llama_exe(app);
@@ -693,10 +758,15 @@ fn spawn_model_with_layers(
     let gpu_layers_str = gpu_layers.to_string();
 
     // Pipe stderr to a per-slot log file so crash reasons are diagnosable.
-    let log_dir = app.path().app_log_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
     let stderr_log = log_dir.join(format!("llama-slot-{}.log", slot.index));
     let stderr_file = std::fs::OpenOptions::new()
-        .create(true).write(true).truncate(true)
+        .create(true)
+        .write(true)
+        .truncate(true)
         .open(&stderr_log)
         .ok()
         .map(std::process::Stdio::from)
@@ -704,18 +774,26 @@ fn spawn_model_with_layers(
 
     let mut cmd = std::process::Command::new(&exe);
     cmd.args([
-        "--port", &port_str,
-        "--host", "127.0.0.1",
-        "--model", &info.path.to_string_lossy(),
-        "--ctx-size", &ctx,
-        "--threads", &threads,
-        "--n-gpu-layers", &gpu_layers_str,
+        "--port",
+        &port_str,
+        "--host",
+        "127.0.0.1",
+        "--model",
+        &info.path.to_string_lossy(),
+        "--ctx-size",
+        &ctx,
+        "--threads",
+        &threads,
+        "--n-gpu-layers",
+        &gpu_layers_str,
         // Limit parallel slots to 1: the auto value (4) inflates compute-buffer
         // allocations by 4× and can push AMD Vulkan over its contiguous-heap limit.
-        "--parallel", "1",
+        "--parallel",
+        "1",
         // Disable flash attention: for Gemma 4 on AMD Vulkan it triggers a 547 MB
         // single-allocation for FA compute buffers which ErrorOutOfDeviceMemory.
-        "--flash-attn", "off",
+        "--flash-attn",
+        "off",
         "--no-warmup",
     ]);
 
@@ -725,10 +803,14 @@ fn spawn_model_with_layers(
         if let Some(ref draft_path) = cfg.draft_model_path {
             if std::path::Path::new(draft_path).exists() {
                 cmd.args([
-                    "--model-draft", draft_path,
-                    "--draft-max", "8",
-                    "--draft-min", "1",
-                    "--draft-p-split", "0.1",
+                    "--model-draft",
+                    draft_path,
+                    "--draft-max",
+                    "8",
+                    "--draft-min",
+                    "1",
+                    "--draft-p-split",
+                    "0.1",
                 ]);
                 tracing::info!(draft=%draft_path, "[orchestrator] speculative decoding enabled");
             }
@@ -743,8 +825,8 @@ fn spawn_model_with_layers(
     }
 
     cmd.current_dir(&dir)
-    .stdout(std::process::Stdio::null())
-    .stderr(stderr_file);
+        .stdout(std::process::Stdio::null())
+        .stderr(stderr_file);
 
     #[cfg(windows)]
     {
@@ -755,11 +837,13 @@ fn spawn_model_with_layers(
     match cmd.spawn() {
         Ok(child) => {
             let cfg = SidecarConfig {
-                base_url:      slot.base_url.clone(),
-                health_path:   "/health".into(),
-                load_timeout:  Duration::from_secs(MODEL_LOAD_TIMEOUT_SECS + MODEL_LOAD_TIMEOUT_GRACE_SECS),
+                base_url: slot.base_url.clone(),
+                health_path: "/health".into(),
+                load_timeout: Duration::from_secs(
+                    MODEL_LOAD_TIMEOUT_SECS + MODEL_LOAD_TIMEOUT_GRACE_SECS,
+                ),
                 poll_interval: Duration::from_millis(MODEL_LOAD_POLL_INTERVAL_MS),
-                log_path:      Some(stderr_log.clone()),
+                log_path: Some(stderr_log.clone()),
             };
             slot.supervisor = Some(SidecarSupervisor::start(child, cfg));
             slot.process = None;
@@ -776,18 +860,24 @@ fn spawn_model_with_layers(
 fn best_ready_slot(slots: &[Slot], model_id: Option<&str>) -> Option<usize> {
     // Prefer an exact model match
     if let Some(mid) = model_id {
-        if let Some(i) = slots.iter().position(|s| {
-            s.state.is_ready() && s.state.model_id() == Some(mid)
-        }) { return Some(i); }
+        if let Some(i) = slots
+            .iter()
+            .position(|s| s.state.is_ready() && s.state.model_id() == Some(mid))
+        {
+            return Some(i);
+        }
     }
     // Any ready slot
     slots.iter().position(|s| s.state.is_ready())
 }
 
 fn empty_or_evict(slots: &mut Vec<Slot>) -> usize {
-    if let Some(i) = slots.iter().position(|s| s.state.is_empty()) { return i; }
+    if let Some(i) = slots.iter().position(|s| s.state.is_empty()) {
+        return i;
+    }
     // LRU eviction among Ready/Crashed slots (not Busy or Loading)
-    slots.iter()
+    slots
+        .iter()
         .enumerate()
         .filter(|(_, s)| matches!(s.state, SlotState::Ready { .. } | SlotState::Crashed { .. }))
         .min_by_key(|(_, s)| s.last_used)
@@ -803,15 +893,14 @@ async fn maybe_start_load(
     app: &AppHandle,
 ) {
     // Don't load if already loading/ready
-    if slots.iter().any(|s| s.state.model_id() == Some(&model_id)) { return; }
+    if slots.iter().any(|s| s.state.model_id() == Some(&model_id)) {
+        return;
+    }
     let reg = registry.lock().await;
     if let Some(info) = reg.models.iter().find(|m| m.id == model_id).cloned() {
         drop(reg);
         let idx = empty_or_evict(slots);
-        let mode = inference_modes
-            .get(&model_id)
-            .cloned()
-            .unwrap_or_default();
+        let mode = inference_modes.get(&model_id).cloned().unwrap_or_default();
         spawn_model(&mut slots[idx], &info, app, &mode);
     }
 }
@@ -830,11 +919,19 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
                 None
             };
             if let Some(status) = exited {
-                let log_dir = app.path().app_log_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let log_dir = app
+                    .path()
+                    .app_log_dir()
+                    .unwrap_or_else(|_| std::path::PathBuf::from("."));
                 let log_path = log_dir.join(format!("llama-slot-{}.log", slot.index));
                 let detail = std::fs::read_to_string(&log_path)
                     .ok()
-                    .and_then(|s| s.lines().filter(|l| !l.trim().is_empty()).last().map(|l| l.to_owned()))
+                    .and_then(|s| {
+                        s.lines()
+                            .filter(|l| !l.trim().is_empty())
+                            .last()
+                            .map(|l| l.to_owned())
+                    })
                     .unwrap_or_default();
                 let code = status.code();
 
@@ -855,12 +952,15 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
                         let _ = crate::config::save_config(app, &cfg);
                     }
 
-                    let _ = app.emit("model-load-fallback", json!({
-                        "slot": slot.index,
-                        "model_id": model_id,
-                        "message": note,
-                        "exit_code": format!("{exit_code:#010X}"),
-                    }));
+                    let _ = app.emit(
+                        "model-load-fallback",
+                        json!({
+                            "slot": slot.index,
+                            "model_id": model_id,
+                            "message": note,
+                            "exit_code": format!("{exit_code:#010X}"),
+                        }),
+                    );
 
                     if let Some(info) = slot.current_model.clone() {
                         let next_attempt = (slot.load_attempt + 1).min(MAX_MODEL_LOAD_ATTEMPTS);
@@ -887,7 +987,10 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
             }
 
             // Parse load progress from log: "llama_model_load: loaded N of M tensors (P%)"
-            let log_dir = app.path().app_log_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let log_dir = app
+                .path()
+                .app_log_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."));
             let log_path = log_dir.join(format!("llama-slot-{}.log", slot.index));
             if let Ok(log) = std::fs::read_to_string(&log_path) {
                 // Walk lines in reverse to find the latest progress line
@@ -921,26 +1024,34 @@ async fn poll_loading_slots(slots: &mut Vec<Slot>, client: &Client, app: &AppHan
                 probe_model_ready(client, &slot.base_url).await
             };
             if ok {
-                slot.state = SlotState::Ready { model_id: model_id.clone() };
+                slot.state = SlotState::Ready {
+                    model_id: model_id.clone(),
+                };
                 slot.load_started = None;
                 // Persist last-used model id so next startup can pre-load it
                 if let Ok(mut cfg) = crate::config::load_config(app) {
                     cfg.last_model_id = Some(model_id.clone());
                     let _ = crate::config::save_config(app, &cfg);
                 }
-                let _ = app.emit("model-ready", json!({
-                    "slot":     slot.index,
-                    "model_id": model_id,
-                    "port":     slot.port,
-                    "cpu_mode": slot.cpu_mode,
-                }));
+                let _ = app.emit(
+                    "model-ready",
+                    json!({
+                        "slot":     slot.index,
+                        "model_id": model_id,
+                        "port":     slot.port,
+                        "cpu_mode": slot.cpu_mode,
+                    }),
+                );
             }
         }
     }
 }
 
 fn should_retry_cpu_fallback(slot: &Slot, code: Option<i32>, detail: &str) -> bool {
-    if slot.cpu_mode || slot.load_attempt >= MAX_MODEL_LOAD_ATTEMPTS || !slot.inference_mode.allows_cpu_fallback() {
+    if slot.cpu_mode
+        || slot.load_attempt >= MAX_MODEL_LOAD_ATTEMPTS
+        || !slot.inference_mode.allows_cpu_fallback()
+    {
         return false;
     }
 
@@ -1002,25 +1113,30 @@ fn is_gpu_memory_crash(code: i32) -> bool {
 // ── Queue drain ───────────────────────────────────────────────────────────────
 
 // Fairness counter: alternates between "workspace" and "assistant" sources.
-static FAIRNESS_TOGGLE: std::sync::atomic::AtomicU8 =
-    std::sync::atomic::AtomicU8::new(0);
+static FAIRNESS_TOGGLE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
 async fn drain_queue(
-    queue:  &mut VecDeque<InferRequest>,
-    slots:  &mut Vec<Slot>,
+    queue: &mut VecDeque<InferRequest>,
+    slots: &mut Vec<Slot>,
     cmd_tx: &mpsc::UnboundedSender<Cmd>,
     client: &Client,
-    app:    &AppHandle,
+    app: &AppHandle,
 ) {
     while !queue.is_empty() {
         // Check if both sources are present — if so, apply round-robin
-        let has_workspace  = queue.iter().any(|r| r.source == "workspace");
-        let has_assistant  = queue.iter().any(|r| r.source == "assistant");
+        let has_workspace = queue.iter().any(|r| r.source == "workspace");
+        let has_assistant = queue.iter().any(|r| r.source == "assistant");
 
         let chosen_idx = if has_workspace && has_assistant {
             let toggle = FAIRNESS_TOGGLE.fetch_xor(1, Ordering::Relaxed);
-            let prefer = if toggle == 0 { "workspace" } else { "assistant" };
-            queue.iter().position(|r| r.source == prefer)
+            let prefer = if toggle == 0 {
+                "workspace"
+            } else {
+                "assistant"
+            };
+            queue
+                .iter()
+                .position(|r| r.source == prefer)
                 .or_else(|| Some(0))
         } else {
             Some(0)
@@ -1043,12 +1159,12 @@ async fn drain_queue(
 }
 
 fn dispatch(
-    idx:    usize,
-    req:    InferRequest,
-    slots:  &mut Vec<Slot>,
+    idx: usize,
+    req: InferRequest,
+    slots: &mut Vec<Slot>,
     cmd_tx: &mpsc::UnboundedSender<Cmd>,
     client: &Client,
-    app:    &AppHandle,
+    app: &AppHandle,
 ) {
     let slot = &mut slots[idx];
     let model_id = slot.state.model_id().unwrap_or("").to_string();
@@ -1056,10 +1172,10 @@ fn dispatch(
     slot.last_used = Instant::now();
     slot.total_requests += 1;
 
-    let url      = slot.base_url.clone();
-    let client2  = client.clone();
-    let app2     = app.clone();
-    let notify   = cmd_tx.clone();
+    let url = slot.base_url.clone();
+    let client2 = client.clone();
+    let app2 = app.clone();
+    let notify = cmd_tx.clone();
 
     tauri::async_runtime::spawn(async move {
         let result = infer(
@@ -1071,7 +1187,8 @@ fn dispatch(
             req.stream_tx,
             req.cancel_flag,
             &app2,
-        ).await;
+        )
+        .await;
         let _ = req.resp_tx.send(result);
         let _ = notify.send(Cmd::SlotFreed(idx));
     });
@@ -1080,14 +1197,14 @@ fn dispatch(
 // ── Inference HTTP call ───────────────────────────────────────────────────────
 
 async fn infer(
-    messages:    Vec<serde_json::Value>,
-    max_tokens:  u32,
-    overrides:   Option<InferenceOverrides>,
-    base_url:    &str,
-    client:      &Client,
-    stream_tx:   Option<mpsc::UnboundedSender<String>>,
+    messages: Vec<serde_json::Value>,
+    max_tokens: u32,
+    overrides: Option<InferenceOverrides>,
+    base_url: &str,
+    client: &Client,
+    stream_tx: Option<mpsc::UnboundedSender<String>>,
     cancel_flag: Option<Arc<AtomicBool>>,
-    app:         &AppHandle,
+    app: &AppHandle,
 ) -> Result<(String, InferStats), String> {
     let ov = overrides.unwrap_or_default();
     let temperature = ov.temperature.unwrap_or(0.7);
@@ -1103,13 +1220,27 @@ async fn infer(
 
     // Apply optional sampling overrides.
     let obj = body.as_object_mut().unwrap();
-    if let Some(v) = ov.top_p             { obj.insert("top_p".into(),             json!(v)); }
-    if let Some(v) = ov.top_k             { obj.insert("top_k".into(),             json!(v)); }
-    if let Some(v) = ov.min_p             { obj.insert("min_p".into(),             json!(v)); }
-    if let Some(v) = ov.repeat_penalty    { obj.insert("repeat_penalty".into(),    json!(v)); }
-    if let Some(v) = ov.presence_penalty  { obj.insert("presence_penalty".into(),  json!(v)); }
-    if let Some(v) = ov.frequency_penalty { obj.insert("frequency_penalty".into(), json!(v)); }
-    if !ov.stop_sequences.is_empty()      { obj.insert("stop".into(), json!(ov.stop_sequences)); }
+    if let Some(v) = ov.top_p {
+        obj.insert("top_p".into(), json!(v));
+    }
+    if let Some(v) = ov.top_k {
+        obj.insert("top_k".into(), json!(v));
+    }
+    if let Some(v) = ov.min_p {
+        obj.insert("min_p".into(), json!(v));
+    }
+    if let Some(v) = ov.repeat_penalty {
+        obj.insert("repeat_penalty".into(), json!(v));
+    }
+    if let Some(v) = ov.presence_penalty {
+        obj.insert("presence_penalty".into(), json!(v));
+    }
+    if let Some(v) = ov.frequency_penalty {
+        obj.insert("frequency_penalty".into(), json!(v));
+    }
+    if !ov.stop_sequences.is_empty() {
+        obj.insert("stop".into(), json!(ov.stop_sequences));
+    }
 
     let resp = client
         .post(format!("{}/v1/chat/completions", base_url))
@@ -1128,15 +1259,15 @@ async fn infer(
         return Err(format!("llama-server returned HTTP {status}: {detail}"));
     }
 
-    let mut full                 = String::new();
-    let mut fallback_tokens      = 0u32;
-    let mut prompt_tokens        = 0u32;
-    let mut completion_tokens    = 0u32;
-    let mut got_usage            = false;
-    let     start                = Instant::now();
+    let mut full = String::new();
+    let mut fallback_tokens = 0u32;
+    let mut prompt_tokens = 0u32;
+    let mut completion_tokens = 0u32;
+    let mut got_usage = false;
+    let start = Instant::now();
     let mut first_token_at: Option<Duration> = None;
-    let mut last_speed           = Instant::now();
-    let mut stream               = resp.bytes_stream();
+    let mut last_speed = Instant::now();
+    let mut stream = resp.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
         if cancel_flag
@@ -1155,14 +1286,18 @@ async fn infer(
                 return Err("Generation cancelled by user".to_string());
             }
 
-            let Some(data) = line.strip_prefix("data: ") else { continue };
-            if data.trim() == "[DONE]" { break; }
+            let Some(data) = line.strip_prefix("data: ") else {
+                continue;
+            };
+            if data.trim() == "[DONE]" {
+                break;
+            }
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
                 // Capture usage stats from the final streaming chunk
                 if let Some(usage) = v.get("usage").filter(|u| !u.is_null()) {
-                    prompt_tokens     = usage["prompt_tokens"].as_u64().unwrap_or(0) as u32;
+                    prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(0) as u32;
                     completion_tokens = usage["completion_tokens"].as_u64().unwrap_or(0) as u32;
-                    got_usage         = true;
+                    got_usage = true;
                 }
                 if let Some(c) = v["choices"][0]["delta"]["content"].as_str() {
                     if first_token_at.is_none() {
@@ -1171,8 +1306,12 @@ async fn infer(
                     full.push_str(c);
                     fallback_tokens += 1;
                     match &stream_tx {
-                        Some(tx) => { let _ = tx.send(c.to_string()); }
-                        None     => { let _ = app.emit("token-stream", c); }
+                        Some(tx) => {
+                            let _ = tx.send(c.to_string());
+                        }
+                        None => {
+                            let _ = app.emit("token-stream", c);
+                        }
                     }
                     if last_speed.elapsed() >= Duration::from_secs(2) {
                         let elapsed = start.elapsed().as_secs_f64().max(0.001);
@@ -1199,9 +1338,9 @@ async fn infer(
     let stats = InferStats {
         prompt_tokens,
         completion_tokens,
-        tokens_per_second:      tps,
+        tokens_per_second: tps,
         time_to_first_token_ms: first_token_at.map(|d| d.as_millis() as u64).unwrap_or(0),
-        total_time_ms:          total_ms,
+        total_time_ms: total_ms,
     };
 
     Ok((full, stats))
@@ -1213,24 +1352,29 @@ fn build_status(slots: &[Slot], queue: &VecDeque<InferRequest>) -> OrchestratorS
     let mut sys = System::new();
     sys.refresh_memory();
     OrchestratorStatus {
-        slots: slots.iter().map(|s| SlotStatus {
-            index:     s.index,
-            port:      s.port,
-            state:     s.state.clone(),
-            requests:  s.total_requests,
-            idle_secs: s.last_used.elapsed().as_secs(),
-            load_elapsed_secs: s.load_started.map(|t| t.elapsed().as_secs()),
-            fallback_note: s.fallback_note.clone(),
-            cpu_mode: s.cpu_mode,
-            inference_mode: s.inference_mode.clone(),
-        }).collect(),
-        queue_depth:  queue.len(),
+        slots: slots
+            .iter()
+            .map(|s| SlotStatus {
+                index: s.index,
+                port: s.port,
+                state: s.state.clone(),
+                requests: s.total_requests,
+                idle_secs: s.last_used.elapsed().as_secs(),
+                load_elapsed_secs: s.load_started.map(|t| t.elapsed().as_secs()),
+                fallback_note: s.fallback_note.clone(),
+                cpu_mode: s.cpu_mode,
+                inference_mode: s.inference_mode.clone(),
+            })
+            .collect(),
+        queue_depth: queue.len(),
         total_ram_mb: sys.total_memory() / (1024 * 1024),
-        free_ram_mb:  sys.available_memory() / (1024 * 1024),
+        free_ram_mb: sys.available_memory() / (1024 * 1024),
     }
 }
 
-fn is_false(v: &bool) -> bool { !*v }
+fn is_false(v: &bool) -> bool {
+    !*v
+}
 
 fn emit_status(slots: &[Slot], queue: &VecDeque<InferRequest>, app: &AppHandle) {
     let _ = app.emit("orchestrator-status", build_status(slots, queue));
@@ -1243,7 +1387,11 @@ fn decide_slot_count() -> usize {
     sys.refresh_memory();
     let ram_gb = sys.total_memory() / (1024 * 1024 * 1024);
     // 2 slots if ≥ 16 GB RAM, else 1
-    if ram_gb >= 16 { 2 } else { 1 }
+    if ram_gb >= 16 {
+        2
+    } else {
+        1
+    }
 }
 
 fn thread_count() -> usize {
@@ -1270,7 +1418,11 @@ fn has_discrete_gpu() -> bool {
         if let Ok(out) = {
             let mut c = std::process::Command::new("wmic");
             c.args(["path", "win32_VideoController", "get", "name"]);
-            #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                c.creation_flags(0x0800_0000);
+            }
             c.output()
         } {
             let s = String::from_utf8_lossy(&out.stdout);
@@ -1288,7 +1440,11 @@ fn has_discrete_gpu() -> bool {
                 "-Command",
                 "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
             ]);
-            #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                c.creation_flags(0x0800_0000);
+            }
             c.output()
         } {
             let s = String::from_utf8_lossy(&out.stdout);
@@ -1315,7 +1471,9 @@ mod tests {
     use tokio::net::TcpListener;
 
     async fn spawn_ok_server() -> (u16, tokio::task::JoinHandle<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind test server");
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test server");
         let port = listener.local_addr().expect("local addr").port();
 
         let handle = tokio::spawn(async move {
@@ -1323,7 +1481,9 @@ mod tests {
                 let mut buf = [0u8; 1024];
                 let _ = socket.read(&mut buf).await;
                 let _ = socket
-                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK",
+                    )
                     .await;
                 let _ = socket.shutdown().await;
             }

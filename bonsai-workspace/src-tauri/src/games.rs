@@ -1,22 +1,22 @@
 //! Chess and Go game session management with Tauri commands, GamePlayer trait,
 //! tournament support, and daily puzzles.
 
+use crate::AppState;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 use tauri::State;
+use tokio::sync::RwLock;
 use uuid::Uuid;
-use crate::AppState;
 
 use bonsai_chess::{
-    ChessGameSession, Player as ChessPlayer, PlayerKind as ChessPlayerKind,
-    ChessColor, GameResult as ChessGameResult,
-    MaterialEvaluator, MctsConfig, search as chess_search, ChessPosition,
+    search as chess_search, ChessColor, ChessGameSession, ChessPosition,
+    GameResult as ChessGameResult, MaterialEvaluator, MctsConfig, Player as ChessPlayer,
+    PlayerKind as ChessPlayerKind,
 };
 use bonsai_go::{
-    GoGameSession, GoPlayer, GoPlayerKind, GoColor, GoGameResult,
-    Stone, GoMctsConfig, go_search, mcts::RandomGoEvaluator,
+    go_search, mcts::RandomGoEvaluator, GoColor, GoGameResult, GoGameSession, GoMctsConfig,
+    GoPlayer, GoPlayerKind, Stone,
 };
 
 // ── Chat-embeddable game state ─────────────────────────────────────────────────
@@ -24,35 +24,37 @@ use bonsai_go::{
 /// Serialized game state embedded in a chat message for inline board rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatGameState {
-    pub game_type:    String,           // "chess" | "go"
-    pub session_id:   String,
-    pub position:     String,           // FEN for chess; JSON array for Go
-    pub last_move:    Option<String>,   // UCI / GTP
-    pub legal_moves:  Vec<String>,
-    pub turn:         String,           // "white" | "black"
-    pub orientation:  String,           // board orientation for the viewer
-    pub interactive:  bool,
-    pub result:       String,
-    pub board_size:   Option<u8>,
+    pub game_type: String, // "chess" | "go"
+    pub session_id: String,
+    pub position: String,          // FEN for chess; JSON array for Go
+    pub last_move: Option<String>, // UCI / GTP
+    pub legal_moves: Vec<String>,
+    pub turn: String,        // "white" | "black"
+    pub orientation: String, // board orientation for the viewer
+    pub interactive: bool,
+    pub result: String,
+    pub board_size: Option<u8>,
     pub score_estimate: Option<f32>,
 }
 
 // ── Session stores ─────────────────────────────────────────────────────────────
 
 pub struct GameSessionStore {
-    pub chess:       RwLock<HashMap<Uuid, ChessGameSession>>,
-    pub go:          RwLock<HashMap<Uuid, GoGameSession>>,
+    pub chess: RwLock<HashMap<Uuid, ChessGameSession>>,
+    pub go: RwLock<HashMap<Uuid, GoGameSession>>,
     pub tournaments: TournamentManager,
-    pub puzzles:     PuzzleStore,
+    pub puzzles: PuzzleStore,
 }
 
 impl GameSessionStore {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
-            chess:       RwLock::new(HashMap::new()),
-            go:          RwLock::new(HashMap::new()),
-            tournaments: TournamentManager { tournaments: RwLock::new(HashMap::new()) },
-            puzzles:     PuzzleStore::build(),
+            chess: RwLock::new(HashMap::new()),
+            go: RwLock::new(HashMap::new()),
+            tournaments: TournamentManager {
+                tournaments: RwLock::new(HashMap::new()),
+            },
+            puzzles: PuzzleStore::build(),
         })
     }
 }
@@ -62,7 +64,7 @@ impl GameSessionStore {
 #[derive(Debug, Deserialize)]
 pub struct CreateChessGameRequest {
     pub human_name: String,
-    pub human_color: String, // "white" | "black"
+    pub human_color: String,         // "white" | "black"
     pub ai_strength: Option<String>, // "interactive" | "strong" | "training"
 }
 
@@ -85,8 +87,8 @@ impl ChessGameView {
         let result = match &s.result {
             ChessGameResult::WhiteWins(_) => "1-0",
             ChessGameResult::BlackWins(_) => "0-1",
-            ChessGameResult::Draw(_)      => "1/2-1/2",
-            ChessGameResult::Ongoing      => "*",
+            ChessGameResult::Draw(_) => "1/2-1/2",
+            ChessGameResult::Ongoing => "*",
         };
         Self {
             id: s.id.to_string(),
@@ -106,8 +108,8 @@ impl ChessGameView {
 #[derive(Debug, Deserialize)]
 pub struct CreateGoGameRequest {
     pub human_name: String,
-    pub human_color: String, // "black" | "white"
-    pub board_size: Option<u8>,  // 9 | 13 | 19
+    pub human_color: String,    // "black" | "white"
+    pub board_size: Option<u8>, // 9 | 13 | 19
     pub komi: Option<f32>,
 }
 
@@ -147,10 +149,17 @@ impl GoGameView {
             GoColor::Black => "black",
             GoColor::White => "white",
         };
-        let stones: Vec<StoneView> = s.board.stones.iter()
+        let stones: Vec<StoneView> = s
+            .board
+            .stones
+            .iter()
             .map(|(pt, stone)| StoneView {
-                x: pt.x, y: pt.y,
-                color: match stone { Stone::Black => "black".into(), Stone::White => "white".into() },
+                x: pt.x,
+                y: pt.y,
+                color: match stone {
+                    Stone::Black => "black".into(),
+                    Stone::White => "white".into(),
+                },
             })
             .collect();
 
@@ -180,12 +189,36 @@ pub async fn create_chess_game(
     store: State<'_, AppState>,
 ) -> Result<ChessGameView, String> {
     let (white, black) = if req.human_color.to_lowercase() == "white" {
-        let human = ChessPlayer { id: "user".into(), name: req.human_name.clone(), kind: ChessPlayerKind::Human, color: ChessColor::White, elo: None };
-        let ai    = ChessPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: ChessPlayerKind::BonsAI, color: ChessColor::Black, elo: None };
+        let human = ChessPlayer {
+            id: "user".into(),
+            name: req.human_name.clone(),
+            kind: ChessPlayerKind::Human,
+            color: ChessColor::White,
+            elo: None,
+        };
+        let ai = ChessPlayer {
+            id: "bonsai".into(),
+            name: "BonsAI".into(),
+            kind: ChessPlayerKind::BonsAI,
+            color: ChessColor::Black,
+            elo: None,
+        };
         (human, ai)
     } else {
-        let ai    = ChessPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: ChessPlayerKind::BonsAI, color: ChessColor::White, elo: None };
-        let human = ChessPlayer { id: "user".into(), name: req.human_name.clone(), kind: ChessPlayerKind::Human, color: ChessColor::Black, elo: None };
+        let ai = ChessPlayer {
+            id: "bonsai".into(),
+            name: "BonsAI".into(),
+            kind: ChessPlayerKind::BonsAI,
+            color: ChessColor::White,
+            elo: None,
+        };
+        let human = ChessPlayer {
+            id: "user".into(),
+            name: req.human_name.clone(),
+            kind: ChessPlayerKind::Human,
+            color: ChessColor::Black,
+            elo: None,
+        };
         (ai, human)
     };
 
@@ -199,7 +232,12 @@ pub async fn create_chess_game(
         ChessGameView::from_session(&session)
     };
 
-    store.game_sessions.chess.write().await.insert(session.id, session);
+    store
+        .game_sessions
+        .chess
+        .write()
+        .await
+        .insert(session.id, session);
     Ok(view)
 }
 
@@ -213,7 +251,9 @@ pub async fn make_chess_move(
     let mut sessions = store.game_sessions.chess.write().await;
     let session = sessions.get_mut(&id).ok_or("game not found")?;
 
-    session.apply_move("user", &notation).map_err(|e| e.to_string())?;
+    session
+        .apply_move("user", &notation)
+        .map_err(|e| e.to_string())?;
 
     // AI responds if needed
     if session.needs_ai_move() {
@@ -247,9 +287,7 @@ pub async fn resign_chess_game(
 }
 
 #[tauri::command]
-pub async fn list_chess_games(
-    store: State<'_, AppState>,
-) -> Result<Vec<ChessGameView>, String> {
+pub async fn list_chess_games(store: State<'_, AppState>) -> Result<Vec<ChessGameView>, String> {
     let sessions = store.game_sessions.chess.read().await;
     Ok(sessions.values().map(ChessGameView::from_session).collect())
 }
@@ -283,28 +321,37 @@ pub async fn make_chess_ai_move_with_events(
         _ => MctsConfig::interactive(),
     };
 
-    let _ = app.emit("agent-thinking-started", serde_json::json!({
-        "session_id": session.id.to_string(),
-        "agent": "BonsAI",
-        "game_type": "chess",
-    }));
+    let _ = app.emit(
+        "agent-thinking-started",
+        serde_json::json!({
+            "session_id": session.id.to_string(),
+            "agent": "BonsAI",
+            "game_type": "chess",
+        }),
+    );
 
     if let Ok(pos) = ChessPosition::from_fen(&session.current_fen) {
         let eval = MaterialEvaluator;
         let result = chess_search(&pos, &eval, &config);
         if !result.best_move.is_empty() {
             let pct = (result.value * 100.0) as i32;
-            let top_moves: Vec<String> = result.move_probs.iter().take(5)
+            let top_moves: Vec<String> = result
+                .move_probs
+                .iter()
+                .take(5)
                 .map(|(m, p)| format!("{} ({:.0}%)", m, p * 100.0))
                 .collect();
-            let _ = app.emit("agent-thinking-complete", serde_json::json!({
-                "session_id": session.id.to_string(),
-                "agent": "BonsAI",
-                "best_move": result.best_move,
-                "value_pct": pct,
-                "simulations": result.simulations,
-                "top_moves": top_moves,
-            }));
+            let _ = app.emit(
+                "agent-thinking-complete",
+                serde_json::json!({
+                    "session_id": session.id.to_string(),
+                    "agent": "BonsAI",
+                    "best_move": result.best_move,
+                    "value_pct": pct,
+                    "simulations": result.simulations,
+                    "top_moves": top_moves,
+                }),
+            );
             let _ = session.apply_move("bonsai", &result.best_move);
         }
     }
@@ -320,22 +367,32 @@ pub async fn make_go_ai_move_with_events(
     let config = GoMctsConfig::interactive();
     let eval = RandomGoEvaluator;
 
-    let _ = app.emit("agent-thinking-started", serde_json::json!({
-        "session_id": session.id.to_string(),
-        "agent": "BonsAI",
-        "game_type": "go",
-    }));
+    let _ = app.emit(
+        "agent-thinking-started",
+        serde_json::json!({
+            "session_id": session.id.to_string(),
+            "agent": "BonsAI",
+            "game_type": "go",
+        }),
+    );
 
     let result = go_search(&session.board, color, &eval, &config);
-    let gtp = if result.best_move.is_empty() { "pass".to_string() } else { result.best_move.clone() };
+    let gtp = if result.best_move.is_empty() {
+        "pass".to_string()
+    } else {
+        result.best_move.clone()
+    };
 
-    let _ = app.emit("agent-thinking-complete", serde_json::json!({
-        "session_id": session.id.to_string(),
-        "agent": "BonsAI",
-        "best_move": gtp,
-        "value": result.value,
-        "simulations": result.simulations,
-    }));
+    let _ = app.emit(
+        "agent-thinking-complete",
+        serde_json::json!({
+            "session_id": session.id.to_string(),
+            "agent": "BonsAI",
+            "best_move": gtp,
+            "value": result.value,
+            "simulations": result.simulations,
+        }),
+    );
 
     let _ = session.play("bonsai", &gtp);
 }
@@ -417,12 +474,36 @@ pub async fn create_go_game(
     let komi = req.komi.unwrap_or(7.5);
 
     let (black, white) = if req.human_color.to_lowercase() == "black" {
-        let human = GoPlayer { id: "user".into(), name: req.human_name.clone(), kind: GoPlayerKind::Human, color: GoColor::Black, rank: None };
-        let ai    = GoPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: GoPlayerKind::BonsAI, color: GoColor::White, rank: None };
+        let human = GoPlayer {
+            id: "user".into(),
+            name: req.human_name.clone(),
+            kind: GoPlayerKind::Human,
+            color: GoColor::Black,
+            rank: None,
+        };
+        let ai = GoPlayer {
+            id: "bonsai".into(),
+            name: "BonsAI".into(),
+            kind: GoPlayerKind::BonsAI,
+            color: GoColor::White,
+            rank: None,
+        };
         (human, ai)
     } else {
-        let ai    = GoPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: GoPlayerKind::BonsAI, color: GoColor::Black, rank: None };
-        let human = GoPlayer { id: "user".into(), name: req.human_name.clone(), kind: GoPlayerKind::Human, color: GoColor::White, rank: None };
+        let ai = GoPlayer {
+            id: "bonsai".into(),
+            name: "BonsAI".into(),
+            kind: GoPlayerKind::BonsAI,
+            color: GoColor::Black,
+            rank: None,
+        };
+        let human = GoPlayer {
+            id: "user".into(),
+            name: req.human_name.clone(),
+            kind: GoPlayerKind::Human,
+            color: GoColor::White,
+            rank: None,
+        };
         (ai, human)
     };
 
@@ -434,7 +515,12 @@ pub async fn create_go_game(
     }
 
     let view = GoGameView::from_session(&session);
-    store.game_sessions.go.write().await.insert(session.id, session);
+    store
+        .game_sessions
+        .go
+        .write()
+        .await
+        .insert(session.id, session);
     Ok(view)
 }
 
@@ -448,7 +534,9 @@ pub async fn make_go_move(
     let mut sessions = store.game_sessions.go.write().await;
     let session = sessions.get_mut(&id).ok_or("game not found")?;
 
-    session.play("user", &gtp_coord).map_err(|e| e.to_string())?;
+    session
+        .play("user", &gtp_coord)
+        .map_err(|e| e.to_string())?;
 
     if session.needs_ai_move() {
         make_go_ai_move_inner(session);
@@ -481,18 +569,13 @@ pub async fn resign_go_game(
 }
 
 #[tauri::command]
-pub async fn list_go_games(
-    store: State<'_, AppState>,
-) -> Result<Vec<GoGameView>, String> {
+pub async fn list_go_games(store: State<'_, AppState>) -> Result<Vec<GoGameView>, String> {
     let sessions = store.game_sessions.go.read().await;
     Ok(sessions.values().map(GoGameView::from_session).collect())
 }
 
 #[tauri::command]
-pub async fn export_go_sgf(
-    game_id: String,
-    store: State<'_, AppState>,
-) -> Result<String, String> {
+pub async fn export_go_sgf(game_id: String, store: State<'_, AppState>) -> Result<String, String> {
     let id: Uuid = game_id.parse().map_err(|_| "invalid game id".to_string())?;
     let sessions = store.game_sessions.go.read().await;
     let session = sessions.get(&id).ok_or("game not found")?;
@@ -504,7 +587,11 @@ fn make_go_ai_move_inner(session: &mut GoGameSession) {
     let config = GoMctsConfig::interactive();
     let eval = RandomGoEvaluator;
     let result = go_search(&session.board, color, &eval, &config);
-    let gtp = if result.best_move.is_empty() { "pass".to_string() } else { result.best_move };
+    let gtp = if result.best_move.is_empty() {
+        "pass".to_string()
+    } else {
+        result.best_move
+    };
     let _ = session.play("bonsai", &gtp);
 }
 
@@ -515,35 +602,51 @@ pub fn make_chess_ai_move_inner_pub(session: &mut ChessGameSession, strength: Op
 }
 
 impl ChessGameView {
-    pub fn from_session_pub(s: &ChessGameSession) -> Self { Self::from_session(s) }
+    pub fn from_session_pub(s: &ChessGameSession) -> Self {
+        Self::from_session(s)
+    }
 }
 
 impl GoGameView {
-    pub fn from_session_pub(s: &GoGameSession) -> Self { Self::from_session(s) }
+    pub fn from_session_pub(s: &GoGameSession) -> Self {
+        Self::from_session(s)
+    }
 }
 
 // ── ChatGameState builders ─────────────────────────────────────────────────────
 
-pub fn chess_to_chat_state(s: &ChessGameSession, interactive: bool, viewer_color: &str) -> ChatGameState {
+pub fn chess_to_chat_state(
+    s: &ChessGameSession,
+    interactive: bool,
+    viewer_color: &str,
+) -> ChatGameState {
     let result = match &s.result {
         ChessGameResult::WhiteWins(_) => "1-0",
         ChessGameResult::BlackWins(_) => "0-1",
         ChessGameResult::Draw(_) => "1/2-1/2",
         ChessGameResult::Ongoing => "*",
     };
-    let turn = if s.moves.len() % 2 == 0 { "white" } else { "black" };
+    let turn = if s.moves.len() % 2 == 0 {
+        "white"
+    } else {
+        "black"
+    };
     let last_move = s.moves.last().map(|m| m.uci.clone());
     ChatGameState {
-        game_type:     "chess".into(),
-        session_id:    s.id.to_string(),
-        position:      s.current_fen.clone(),
+        game_type: "chess".into(),
+        session_id: s.id.to_string(),
+        position: s.current_fen.clone(),
         last_move,
-        legal_moves:   if interactive { s.legal_moves_uci() } else { vec![] },
-        turn:          turn.into(),
-        orientation:   viewer_color.into(),
+        legal_moves: if interactive {
+            s.legal_moves_uci()
+        } else {
+            vec![]
+        },
+        turn: turn.into(),
+        orientation: viewer_color.into(),
         interactive,
-        result:        result.into(),
-        board_size:    None,
+        result: result.into(),
+        board_size: None,
         score_estimate: None,
     }
 }
@@ -564,16 +667,16 @@ pub fn go_to_chat_state(s: &GoGameSession, interactive: bool, viewer_color: &str
     }).collect::<Vec<_>>()).unwrap_or_default();
     let last_move = s.moves.last().map(|m| m.gtp.clone());
     ChatGameState {
-        game_type:      "go".into(),
-        session_id:     s.id.to_string(),
-        position:       stones_json,
+        game_type: "go".into(),
+        session_id: s.id.to_string(),
+        position: stones_json,
         last_move,
-        legal_moves:    vec![],
-        turn:           turn.into(),
-        orientation:    viewer_color.into(),
+        legal_moves: vec![],
+        turn: turn.into(),
+        orientation: viewer_color.into(),
         interactive,
         result,
-        board_size:     Some(s.size),
+        board_size: Some(s.size),
         score_estimate: Some(s.current_score()),
     }
 }
@@ -582,28 +685,65 @@ pub fn go_to_chat_state(s: &GoGameSession, interactive: bool, viewer_color: &str
 
 #[derive(Debug)]
 pub enum GameSlashCmd {
-    ChessNew { human_color: String, ai_strength: String },
-    ChessMove { game_id: String, notation: String },
-    ChessResign { game_id: String },
-    ChessDraw { game_id: String },
-    ChessAnalyze { game_id: Option<String> },
-    GoNew { size: u8, human_color: String, komi: f32 },
-    GoMove { game_id: String, gtp: String },
-    GoPass { game_id: String },
-    GoResign { game_id: String },
+    ChessNew {
+        human_color: String,
+        ai_strength: String,
+    },
+    ChessMove {
+        game_id: String,
+        notation: String,
+    },
+    ChessResign {
+        game_id: String,
+    },
+    ChessDraw {
+        game_id: String,
+    },
+    ChessAnalyze {
+        game_id: Option<String>,
+    },
+    GoNew {
+        size: u8,
+        human_color: String,
+        komi: f32,
+    },
+    GoMove {
+        game_id: String,
+        gtp: String,
+    },
+    GoPass {
+        game_id: String,
+    },
+    GoResign {
+        game_id: String,
+    },
     PuzzleDaily,
-    PuzzleGuess { puzzle_id: String, uci_move: String },
-    PuzzleHint { puzzle_id: String },
-    PuzzleSolution { puzzle_id: String },
-    TournamentCreate { name: String, agents: Vec<String> },
-    TournamentStandings { tournament_id: String },
+    PuzzleGuess {
+        puzzle_id: String,
+        uci_move: String,
+    },
+    PuzzleHint {
+        puzzle_id: String,
+    },
+    PuzzleSolution {
+        puzzle_id: String,
+    },
+    TournamentCreate {
+        name: String,
+        agents: Vec<String>,
+    },
+    TournamentStandings {
+        tournament_id: String,
+    },
     TournamentList,
     Unknown,
 }
 
 pub fn parse_slash_command(text: &str) -> Option<GameSlashCmd> {
     let text = text.trim();
-    if !text.starts_with('/') { return None; }
+    if !text.starts_with('/') {
+        return None;
+    }
     let parts: Vec<&str> = text.split_whitespace().collect();
     let cmd = parts.first().map(|s| s.to_lowercase())?;
 
@@ -613,13 +753,20 @@ pub fn parse_slash_command(text: &str) -> Option<GameSlashCmd> {
             match sub.as_str() {
                 "new" | "" => {
                     let color = extract_flag(&parts, "--color").unwrap_or("white".into());
-                    let strength = extract_flag(&parts, "--strength").unwrap_or("interactive".into());
-                    Some(GameSlashCmd::ChessNew { human_color: color, ai_strength: strength })
+                    let strength =
+                        extract_flag(&parts, "--strength").unwrap_or("interactive".into());
+                    Some(GameSlashCmd::ChessNew {
+                        human_color: color,
+                        ai_strength: strength,
+                    })
                 }
                 "move" => {
                     let id = extract_flag(&parts, "--game").unwrap_or_default();
                     let notation = parts.get(2).map(|s| s.to_string()).unwrap_or_default();
-                    Some(GameSlashCmd::ChessMove { game_id: id, notation })
+                    Some(GameSlashCmd::ChessMove {
+                        game_id: id,
+                        notation,
+                    })
                 }
                 "resign" => {
                     let id = extract_flag(&parts, "--game").unwrap_or_default();
@@ -636,10 +783,18 @@ pub fn parse_slash_command(text: &str) -> Option<GameSlashCmd> {
             let sub = parts.get(1).map(|s| s.to_lowercase()).unwrap_or_default();
             match sub.as_str() {
                 "new" | "" => {
-                    let size: u8 = extract_flag(&parts, "--size").and_then(|s| s.parse().ok()).unwrap_or(19);
+                    let size: u8 = extract_flag(&parts, "--size")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(19);
                     let color = extract_flag(&parts, "--color").unwrap_or("black".into());
-                    let komi: f32 = extract_flag(&parts, "--komi").and_then(|s| s.parse().ok()).unwrap_or(7.5);
-                    Some(GameSlashCmd::GoNew { size, human_color: color, komi })
+                    let komi: f32 = extract_flag(&parts, "--komi")
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(7.5);
+                    Some(GameSlashCmd::GoNew {
+                        size,
+                        human_color: color,
+                        komi,
+                    })
                 }
                 "move" | "play" => {
                     let id = extract_flag(&parts, "--game").unwrap_or_default();
@@ -660,8 +815,15 @@ pub fn parse_slash_command(text: &str) -> Option<GameSlashCmd> {
         "/game" => {
             let sub = parts.get(1).map(|s| s.to_lowercase()).unwrap_or_default();
             match sub.as_str() {
-                "chess" => Some(GameSlashCmd::ChessNew { human_color: "white".into(), ai_strength: "interactive".into() }),
-                "go" => Some(GameSlashCmd::GoNew { size: 19, human_color: "black".into(), komi: 7.5 }),
+                "chess" => Some(GameSlashCmd::ChessNew {
+                    human_color: "white".into(),
+                    ai_strength: "interactive".into(),
+                }),
+                "go" => Some(GameSlashCmd::GoNew {
+                    size: 19,
+                    human_color: "black".into(),
+                    komi: 7.5,
+                }),
                 _ => None,
             }
         }
@@ -673,7 +835,10 @@ pub fn parse_slash_command(text: &str) -> Option<GameSlashCmd> {
                 "daily" => Some(GameSlashCmd::PuzzleDaily),
                 "guess" | "check" => {
                     let mv = parts.get(2).map(|s| s.to_string()).unwrap_or_default();
-                    Some(GameSlashCmd::PuzzleGuess { puzzle_id, uci_move: mv })
+                    Some(GameSlashCmd::PuzzleGuess {
+                        puzzle_id,
+                        uci_move: mv,
+                    })
                 }
                 "hint" => Some(GameSlashCmd::PuzzleHint { puzzle_id }),
                 "solution" | "reveal" => Some(GameSlashCmd::PuzzleSolution { puzzle_id }),
@@ -684,13 +849,19 @@ pub fn parse_slash_command(text: &str) -> Option<GameSlashCmd> {
             let sub = parts.get(1).map(|s| s.to_lowercase()).unwrap_or_default();
             match sub.as_str() {
                 "new" | "create" => {
-                    let name = extract_flag(&parts, "--name").unwrap_or_else(|| "BonsAI Tournament".into());
+                    let name = extract_flag(&parts, "--name")
+                        .unwrap_or_else(|| "BonsAI Tournament".into());
                     let agents_str = extract_flag(&parts, "--agents").unwrap_or_default();
-                    let agents: Vec<String> = agents_str.split(',').map(|s| s.trim().to_string()).collect();
+                    let agents: Vec<String> = agents_str
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .collect();
                     Some(GameSlashCmd::TournamentCreate { name, agents })
                 }
                 "standings" | "scores" => {
-                    let id = extract_flag(&parts, "--id").or_else(|| parts.get(2).map(|s| s.to_string())).unwrap_or_default();
+                    let id = extract_flag(&parts, "--id")
+                        .or_else(|| parts.get(2).map(|s| s.to_string()))
+                        .unwrap_or_default();
                     Some(GameSlashCmd::TournamentStandings { tournament_id: id })
                 }
                 "list" | "" => Some(GameSlashCmd::TournamentList),
@@ -724,15 +895,42 @@ pub async fn execute_slash_command(
     active_go_id: Option<Uuid>,
 ) -> (String, Option<ChatGameState>) {
     match cmd {
-        GameSlashCmd::ChessNew { human_color, ai_strength } => {
+        GameSlashCmd::ChessNew {
+            human_color,
+            ai_strength,
+        } => {
             let human_c = human_color.clone();
             let (white, black) = if human_c == "white" {
-                let h = ChessPlayer { id: "user".into(), name: player_name.into(), kind: ChessPlayerKind::Human, color: ChessColor::White, elo: None };
-                let a = ChessPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: ChessPlayerKind::BonsAI, color: ChessColor::Black, elo: None };
+                let h = ChessPlayer {
+                    id: "user".into(),
+                    name: player_name.into(),
+                    kind: ChessPlayerKind::Human,
+                    color: ChessColor::White,
+                    elo: None,
+                };
+                let a = ChessPlayer {
+                    id: "bonsai".into(),
+                    name: "BonsAI".into(),
+                    kind: ChessPlayerKind::BonsAI,
+                    color: ChessColor::Black,
+                    elo: None,
+                };
                 (h, a)
             } else {
-                let a = ChessPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: ChessPlayerKind::BonsAI, color: ChessColor::White, elo: None };
-                let h = ChessPlayer { id: "user".into(), name: player_name.into(), kind: ChessPlayerKind::Human, color: ChessColor::Black, elo: None };
+                let a = ChessPlayer {
+                    id: "bonsai".into(),
+                    name: "BonsAI".into(),
+                    kind: ChessPlayerKind::BonsAI,
+                    color: ChessColor::White,
+                    elo: None,
+                };
+                let h = ChessPlayer {
+                    id: "user".into(),
+                    name: player_name.into(),
+                    kind: ChessPlayerKind::Human,
+                    color: ChessColor::Black,
+                    elo: None,
+                };
                 (a, h)
             };
             let mut session = ChessGameSession::new(white, black);
@@ -742,35 +940,63 @@ pub async fn execute_slash_command(
             let state = chess_to_chat_state(&session, true, &human_color);
             let id = session.id;
             sessions.chess.write().await.insert(id, session);
-            (format!("Chess game started! You are {}. {}", human_color, if human_color == "white" { "Your move." } else { "BonsAI played first." }), Some(state))
+            (
+                format!(
+                    "Chess game started! You are {}. {}",
+                    human_color,
+                    if human_color == "white" {
+                        "Your move."
+                    } else {
+                        "BonsAI played first."
+                    }
+                ),
+                Some(state),
+            )
         }
         GameSlashCmd::ChessMove { game_id, notation } => {
             let id = game_id.parse::<Uuid>().or_else(|_| {
-                active_chess_id.ok_or_else(|| "no active game".to_string().parse::<Uuid>().unwrap_err())
+                active_chess_id
+                    .ok_or_else(|| "no active game".to_string().parse::<Uuid>().unwrap_err())
             });
             match id {
                 Ok(id) => {
                     let mut games = sessions.chess.write().await;
                     match games.get_mut(&id) {
-                        Some(s) => {
-                            match s.apply_move("user", &notation) {
-                                Ok(rec) => {
-                                    if s.needs_ai_move() { make_chess_ai_move_inner(s, None); }
-                                    let last = s.moves.last().map(|m| m.san.clone()).unwrap_or_default();
-                                    let state = chess_to_chat_state(s, s.result == ChessGameResult::Ongoing, "white");
-                                    (format!("Move {}: {}. BonsAI replied: {}", rec.move_number, rec.san, last), Some(state))
+                        Some(s) => match s.apply_move("user", &notation) {
+                            Ok(rec) => {
+                                if s.needs_ai_move() {
+                                    make_chess_ai_move_inner(s, None);
                                 }
-                                Err(e) => (format!("Illegal move: {}", e), None),
+                                let last =
+                                    s.moves.last().map(|m| m.san.clone()).unwrap_or_default();
+                                let state = chess_to_chat_state(
+                                    s,
+                                    s.result == ChessGameResult::Ongoing,
+                                    "white",
+                                );
+                                (
+                                    format!(
+                                        "Move {}: {}. BonsAI replied: {}",
+                                        rec.move_number, rec.san, last
+                                    ),
+                                    Some(state),
+                                )
                             }
-                        }
+                            Err(e) => (format!("Illegal move: {}", e), None),
+                        },
                         None => ("Game not found.".into(), None),
                     }
                 }
-                Err(_) => ("No active chess game. Use `/chess new` to start one.".into(), None),
+                Err(_) => (
+                    "No active chess game. Use `/chess new` to start one.".into(),
+                    None,
+                ),
             }
         }
         GameSlashCmd::ChessResign { game_id } => {
-            let id = game_id.parse::<Uuid>().or_else(|_| active_chess_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
+            let id = game_id
+                .parse::<Uuid>()
+                .or_else(|_| active_chess_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
             match id {
                 Ok(id) => {
                     let mut games = sessions.chess.write().await;
@@ -785,7 +1011,9 @@ pub async fn execute_slash_command(
             }
         }
         GameSlashCmd::ChessAnalyze { game_id } => {
-            let id = game_id.as_deref().and_then(|s| s.parse::<Uuid>().ok())
+            let id = game_id
+                .as_deref()
+                .and_then(|s| s.parse::<Uuid>().ok())
                 .or(active_chess_id);
             match id {
                 Some(id) => {
@@ -797,7 +1025,10 @@ pub async fn execute_slash_command(
                                 Err(e) => return (format!("FEN error: {}", e), None),
                             };
                             let eval = MaterialEvaluator;
-                            let config = MctsConfig { num_simulations: 800, ..Default::default() };
+                            let config = MctsConfig {
+                                num_simulations: 800,
+                                ..Default::default()
+                            };
                             let result = chess_search(&pos, &eval, &config);
                             let pct = (result.value * 100.0) as i32;
                             let msg = format!(
@@ -806,11 +1037,19 @@ pub async fn execute_slash_command(
                                  Win probability for {} to move: **{}%**\n\
                                  Top moves: {}",
                                 result.best_move,
-                                if s.moves.len() % 2 == 0 { "White" } else { "Black" },
+                                if s.moves.len() % 2 == 0 {
+                                    "White"
+                                } else {
+                                    "Black"
+                                },
                                 pct,
-                                result.move_probs.iter().take(5)
+                                result
+                                    .move_probs
+                                    .iter()
+                                    .take(5)
                                     .map(|(m, p)| format!("`{}` {:.0}%", m, p * 100.0))
-                                    .collect::<Vec<_>>().join(", "),
+                                    .collect::<Vec<_>>()
+                                    .join(", "),
                             );
                             let state = chess_to_chat_state(s, false, "white");
                             (msg, Some(state))
@@ -821,67 +1060,133 @@ pub async fn execute_slash_command(
                 None => ("No active chess game to analyze.".into(), None),
             }
         }
-        GameSlashCmd::GoNew { size, human_color, komi } => {
+        GameSlashCmd::GoNew {
+            size,
+            human_color,
+            komi,
+        } => {
             let hc = human_color.clone();
             let (black, white) = if hc == "black" {
-                let h = GoPlayer { id: "user".into(), name: player_name.into(), kind: GoPlayerKind::Human, color: GoColor::Black, rank: None };
-                let a = GoPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: GoPlayerKind::BonsAI, color: GoColor::White, rank: None };
+                let h = GoPlayer {
+                    id: "user".into(),
+                    name: player_name.into(),
+                    kind: GoPlayerKind::Human,
+                    color: GoColor::Black,
+                    rank: None,
+                };
+                let a = GoPlayer {
+                    id: "bonsai".into(),
+                    name: "BonsAI".into(),
+                    kind: GoPlayerKind::BonsAI,
+                    color: GoColor::White,
+                    rank: None,
+                };
                 (h, a)
             } else {
-                let a = GoPlayer { id: "bonsai".into(), name: "BonsAI".into(), kind: GoPlayerKind::BonsAI, color: GoColor::Black, rank: None };
-                let h = GoPlayer { id: "user".into(), name: player_name.into(), kind: GoPlayerKind::Human, color: GoColor::White, rank: None };
+                let a = GoPlayer {
+                    id: "bonsai".into(),
+                    name: "BonsAI".into(),
+                    kind: GoPlayerKind::BonsAI,
+                    color: GoColor::Black,
+                    rank: None,
+                };
+                let h = GoPlayer {
+                    id: "user".into(),
+                    name: player_name.into(),
+                    kind: GoPlayerKind::Human,
+                    color: GoColor::White,
+                    rank: None,
+                };
                 (a, h)
             };
             let mut session = bonsai_go::GoGameSession::with_options(black, white, size, komi);
-            if session.needs_ai_move() { make_go_ai_move_inner(&mut session); }
+            if session.needs_ai_move() {
+                make_go_ai_move_inner(&mut session);
+            }
             let state = go_to_chat_state(&session, true, &hc);
             let id = session.id;
             sessions.go.write().await.insert(id, session);
-            (format!("{}×{} Go game started! You are {}. Komi: {}. {}", size, size, hc, komi,
-                if hc == "black" { "Your move." } else { "BonsAI played first." }), Some(state))
+            (
+                format!(
+                    "{}×{} Go game started! You are {}. Komi: {}. {}",
+                    size,
+                    size,
+                    hc,
+                    komi,
+                    if hc == "black" {
+                        "Your move."
+                    } else {
+                        "BonsAI played first."
+                    }
+                ),
+                Some(state),
+            )
         }
         GameSlashCmd::GoMove { game_id, gtp } => {
             let gtp_move = gtp;
-            let id = game_id.parse::<Uuid>().or_else(|_| active_go_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
+            let id = game_id
+                .parse::<Uuid>()
+                .or_else(|_| active_go_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
             match id {
                 Ok(id) => {
                     let mut games = sessions.go.write().await;
                     match games.get_mut(&id) {
-                        Some(s) => {
-                            match s.play("user", &gtp_move) {
-                                Ok(rec) => {
-                                    if s.needs_ai_move() { make_go_ai_move_inner(s); }
-                                    let last = s.moves.last().map(|m| m.gtp.clone()).unwrap_or_default();
-                                    let state = go_to_chat_state(s, s.result == bonsai_go::GoGameResult::Ongoing, "black");
-                                    (format!("Move {}: {}. BonsAI played: {}", rec.move_number, rec.gtp, last), Some(state))
+                        Some(s) => match s.play("user", &gtp_move) {
+                            Ok(rec) => {
+                                if s.needs_ai_move() {
+                                    make_go_ai_move_inner(s);
                                 }
-                                Err(e) => (format!("Invalid move: {}", e), None),
+                                let last =
+                                    s.moves.last().map(|m| m.gtp.clone()).unwrap_or_default();
+                                let state = go_to_chat_state(
+                                    s,
+                                    s.result == bonsai_go::GoGameResult::Ongoing,
+                                    "black",
+                                );
+                                (
+                                    format!(
+                                        "Move {}: {}. BonsAI played: {}",
+                                        rec.move_number, rec.gtp, last
+                                    ),
+                                    Some(state),
+                                )
                             }
-                        }
+                            Err(e) => (format!("Invalid move: {}", e), None),
+                        },
                         None => ("Game not found.".into(), None),
                     }
                 }
-                Err(_) => ("No active Go game. Use `/go new` to start one.".into(), None),
+                Err(_) => (
+                    "No active Go game. Use `/go new` to start one.".into(),
+                    None,
+                ),
             }
         }
         GameSlashCmd::GoPass { game_id } => {
             let gtp_move = "pass".to_string();
-            let id = game_id.parse::<Uuid>().or_else(|_| active_go_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
+            let id = game_id
+                .parse::<Uuid>()
+                .or_else(|_| active_go_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
             match id {
                 Ok(id) => {
                     let mut games = sessions.go.write().await;
                     match games.get_mut(&id) {
-                        Some(s) => {
-                            match s.play("user", &gtp_move) {
-                                Ok(rec) => {
-                                    if s.needs_ai_move() { make_go_ai_move_inner(s); }
-                                    let last = s.moves.last().map(|m| m.gtp.clone()).unwrap_or_default();
-                                    let state = go_to_chat_state(s, s.result == bonsai_go::GoGameResult::Ongoing, "black");
-                                    (format!("You passed. BonsAI played: {}", last), Some(state))
+                        Some(s) => match s.play("user", &gtp_move) {
+                            Ok(rec) => {
+                                if s.needs_ai_move() {
+                                    make_go_ai_move_inner(s);
                                 }
-                                Err(e) => (format!("Error: {}", e), None),
+                                let last =
+                                    s.moves.last().map(|m| m.gtp.clone()).unwrap_or_default();
+                                let state = go_to_chat_state(
+                                    s,
+                                    s.result == bonsai_go::GoGameResult::Ongoing,
+                                    "black",
+                                );
+                                (format!("You passed. BonsAI played: {}", last), Some(state))
                             }
-                        }
+                            Err(e) => (format!("Error: {}", e), None),
+                        },
                         None => ("Game not found.".into(), None),
                     }
                 }
@@ -889,7 +1194,9 @@ pub async fn execute_slash_command(
             }
         }
         GameSlashCmd::GoResign { game_id } => {
-            let id = game_id.parse::<Uuid>().or_else(|_| active_go_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
+            let id = game_id
+                .parse::<Uuid>()
+                .or_else(|_| active_go_id.ok_or_else(|| "".parse::<Uuid>().unwrap_err()));
             match id {
                 Ok(id) => {
                     let mut games = sessions.go.write().await;
@@ -903,50 +1210,59 @@ pub async fn execute_slash_command(
                 Err(_) => ("No active Go game.".into(), None),
             }
         }
-        GameSlashCmd::ChessDraw { .. } => ("Draw offer sent. BonsAI declines — it wants to keep playing!".into(), None),
+        GameSlashCmd::ChessDraw { .. } => (
+            "Draw offer sent. BonsAI declines — it wants to keep playing!".into(),
+            None,
+        ),
 
-        GameSlashCmd::PuzzleDaily => {
-            match sessions.puzzles.daily() {
-                Some(p) => {
-                    let state = ChatGameState {
-                        game_type:      "chess".into(),
-                        session_id:     format!("puzzle-{}", p.id),
-                        position:       p.fen.clone(),
-                        last_move:      None,
-                        legal_moves:    vec![],
-                        turn:           "white".into(),
-                        orientation:    "white".into(),
-                        interactive:    true,
-                        result:         "*".into(),
-                        board_size:     None,
-                        score_estimate: None,
-                    };
-                    let msg = format!(
+        GameSlashCmd::PuzzleDaily => match sessions.puzzles.daily() {
+            Some(p) => {
+                let state = ChatGameState {
+                    game_type: "chess".into(),
+                    session_id: format!("puzzle-{}", p.id),
+                    position: p.fen.clone(),
+                    last_move: None,
+                    legal_moves: vec![],
+                    turn: "white".into(),
+                    orientation: "white".into(),
+                    interactive: true,
+                    result: "*".into(),
+                    board_size: None,
+                    score_estimate: None,
+                };
+                let msg = format!(
                         "**Daily Chess Puzzle** — {}\nTheme: {} | Difficulty: {} Elo\nHint: {}\n\n*Type `/puzzle guess <move>` to try!*",
                         p.date, p.theme, p.difficulty, p.hint
                     );
-                    (msg, Some(state))
-                }
-                None => ("No daily puzzle available.".into(), None),
+                (msg, Some(state))
             }
-        }
+            None => ("No daily puzzle available.".into(), None),
+        },
 
-        GameSlashCmd::PuzzleGuess { puzzle_id, uci_move } => {
+        GameSlashCmd::PuzzleGuess {
+            puzzle_id,
+            uci_move,
+        } => {
             let reply = match sessions.puzzles.check_move(&puzzle_id, &uci_move) {
-                PuzzleCheckResult::Solved { explanation } =>
-                    format!("Puzzle solved! {}", explanation),
-                PuzzleCheckResult::CorrectContinue { next_hint } =>
-                    format!("Correct move! Keep going: {}", next_hint),
-                PuzzleCheckResult::Wrong { hint } =>
-                    format!("Not quite. Hint: {}", hint),
-                PuzzleCheckResult::NotFound =>
-                    "Puzzle not found. Try `/puzzle` for today's puzzle.".into(),
+                PuzzleCheckResult::Solved { explanation } => {
+                    format!("Puzzle solved! {}", explanation)
+                }
+                PuzzleCheckResult::CorrectContinue { next_hint } => {
+                    format!("Correct move! Keep going: {}", next_hint)
+                }
+                PuzzleCheckResult::Wrong { hint } => format!("Not quite. Hint: {}", hint),
+                PuzzleCheckResult::NotFound => {
+                    "Puzzle not found. Try `/puzzle` for today's puzzle.".into()
+                }
             };
             (reply, None)
         }
 
         GameSlashCmd::PuzzleHint { puzzle_id } => {
-            let hint = sessions.puzzles.puzzles.iter()
+            let hint = sessions
+                .puzzles
+                .puzzles
+                .iter()
                 .find(|p| p.id == puzzle_id || puzzle_id == "daily")
                 .map(|p| p.hint.clone())
                 .unwrap_or_else(|| "No hint available.".into());
@@ -954,7 +1270,10 @@ pub async fn execute_slash_command(
         }
 
         GameSlashCmd::PuzzleSolution { puzzle_id } => {
-            let solution = sessions.puzzles.puzzles.iter()
+            let solution = sessions
+                .puzzles
+                .puzzles
+                .iter()
                 .find(|p| p.id == puzzle_id || puzzle_id == "daily")
                 .map(|p| format!("Solution: {}\n{}", p.solution.join(" "), p.explanation))
                 .unwrap_or_else(|| "Solution not available.".into());
@@ -963,23 +1282,49 @@ pub async fn execute_slash_command(
 
         GameSlashCmd::TournamentCreate { name, agents } => {
             let names = agents.clone();
-            let t = sessions.tournaments.create(
-                name.clone(),
-                "chess".into(),
-                agents,
-                names,
-                TournamentFormat::RoundRobin { games_per_pair: 2 },
-            ).await;
-            (format!("Tournament **{}** created with {} participants. ID: `{}`", name, t.participants.len(), t.id), None)
+            let t = sessions
+                .tournaments
+                .create(
+                    name.clone(),
+                    "chess".into(),
+                    agents,
+                    names,
+                    TournamentFormat::RoundRobin { games_per_pair: 2 },
+                )
+                .await;
+            (
+                format!(
+                    "Tournament **{}** created with {} participants. ID: `{}`",
+                    name,
+                    t.participants.len(),
+                    t.id
+                ),
+                None,
+            )
         }
 
         GameSlashCmd::TournamentStandings { tournament_id } => {
             match sessions.tournaments.standings(&tournament_id).await {
                 Some(standings) => {
-                    let rows: Vec<String> = standings.iter().enumerate()
-                        .map(|(i, p)| format!("{}. **{}** — {:.1} pts ({}/{}/{})", i+1, p.name, p.score, p.wins, p.draws, p.losses))
+                    let rows: Vec<String> = standings
+                        .iter()
+                        .enumerate()
+                        .map(|(i, p)| {
+                            format!(
+                                "{}. **{}** — {:.1} pts ({}/{}/{})",
+                                i + 1,
+                                p.name,
+                                p.score,
+                                p.wins,
+                                p.draws,
+                                p.losses
+                            )
+                        })
                         .collect();
-                    (format!("**Tournament Standings**\n{}", rows.join("\n")), None)
+                    (
+                        format!("**Tournament Standings**\n{}", rows.join("\n")),
+                        None,
+                    )
                 }
                 None => ("Tournament not found.".into(), None),
             }
@@ -990,7 +1335,8 @@ pub async fn execute_slash_command(
             if ts.is_empty() {
                 ("No tournaments yet. Use `/tournament create --name \"My Cup\" --agents agent1,agent2` to create one.".into(), None)
             } else {
-                let lines: Vec<String> = ts.values()
+                let lines: Vec<String> = ts
+                    .values()
                     .map(|t| format!("• **{}** ({}) — {:?}", t.name, t.id, t.state))
                     .collect();
                 (format!("**Tournaments:**\n{}", lines.join("\n")), None)
@@ -1004,39 +1350,49 @@ pub async fn execute_slash_command(
 // ── Tournament system ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum TournamentFormat { RoundRobin { games_per_pair: u32 }, Swiss { rounds: u32 }, Knockout, Arena { duration_hours: u32 } }
+pub enum TournamentFormat {
+    RoundRobin { games_per_pair: u32 },
+    Swiss { rounds: u32 },
+    Knockout,
+    Arena { duration_hours: u32 },
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum TournamentState { Pending, Running, Completed, Aborted }
+pub enum TournamentState {
+    Pending,
+    Running,
+    Completed,
+    Aborted,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TournamentParticipant {
     pub agent_id: String,
-    pub name:     String,
-    pub score:    f64,
-    pub wins:     u32,
-    pub losses:   u32,
-    pub draws:    u32,
+    pub name: String,
+    pub score: f64,
+    pub wins: u32,
+    pub losses: u32,
+    pub draws: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TournamentPairing {
-    pub white:      String,
-    pub black:      String,
+    pub white: String,
+    pub black: String,
     pub session_id: Option<String>,
-    pub result:     Option<String>,
+    pub result: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tournament {
-    pub id:           String,
-    pub name:         String,
-    pub game_type:    String,
-    pub format:       TournamentFormat,
+    pub id: String,
+    pub name: String,
+    pub game_type: String,
+    pub format: TournamentFormat,
     pub participants: Vec<TournamentParticipant>,
-    pub pairings:     Vec<TournamentPairing>,
-    pub state:        TournamentState,
-    pub created_at:   i64,
+    pub pairings: Vec<TournamentPairing>,
+    pub state: TournamentState,
+    pub created_at: i64,
 }
 
 pub struct TournamentManager {
@@ -1044,9 +1400,25 @@ pub struct TournamentManager {
 }
 
 impl TournamentManager {
-    pub async fn create(&self, name: String, game_type: String, agent_ids: Vec<String>, agent_names: Vec<String>, format: TournamentFormat) -> Tournament {
-        let participants: Vec<TournamentParticipant> = agent_ids.iter().zip(agent_names.iter())
-            .map(|(id, name)| TournamentParticipant { agent_id: id.clone(), name: name.clone(), score: 0.0, wins: 0, losses: 0, draws: 0 })
+    pub async fn create(
+        &self,
+        name: String,
+        game_type: String,
+        agent_ids: Vec<String>,
+        agent_names: Vec<String>,
+        format: TournamentFormat,
+    ) -> Tournament {
+        let participants: Vec<TournamentParticipant> = agent_ids
+            .iter()
+            .zip(agent_names.iter())
+            .map(|(id, name)| TournamentParticipant {
+                agent_id: id.clone(),
+                name: name.clone(),
+                score: 0.0,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+            })
             .collect();
 
         // Generate round-robin pairings
@@ -1055,10 +1427,10 @@ impl TournamentManager {
         for i in 0..n {
             for j in (i + 1)..n {
                 pairings.push(TournamentPairing {
-                    white:      participants[i].agent_id.clone(),
-                    black:      participants[j].agent_id.clone(),
+                    white: participants[i].agent_id.clone(),
+                    black: participants[j].agent_id.clone(),
                     session_id: None,
-                    result:     None,
+                    result: None,
                 });
             }
         }
@@ -1089,7 +1461,11 @@ impl TournamentManager {
         let ts = self.tournaments.read().await;
         ts.get(id).map(|t| {
             let mut p = t.participants.clone();
-            p.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+            p.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
             p
         })
     }
@@ -1099,13 +1475,13 @@ impl TournamentManager {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GamePuzzle {
-    pub id:          String,
-    pub date:        String,
-    pub fen:         String,
-    pub solution:    Vec<String>,   // UCI moves
-    pub theme:       String,
-    pub difficulty:  u32,
-    pub hint:        String,
+    pub id: String,
+    pub date: String,
+    pub fen: String,
+    pub solution: Vec<String>, // UCI moves
+    pub theme: String,
+    pub difficulty: u32,
+    pub hint: String,
     pub explanation: String,
 }
 
@@ -1135,7 +1511,9 @@ impl PuzzleStore {
                 theme: "Discovered Attack".into(),
                 difficulty: 1400,
                 hint: "A piece sacrifice that wins material".into(),
-                explanation: "Bxf7+ forces the king to move and wins material with a discovered attack".into(),
+                explanation:
+                    "Bxf7+ forces the king to move and wins material with a discovered attack"
+                        .into(),
             },
             GamePuzzle {
                 id: "003".into(),
@@ -1165,12 +1543,18 @@ impl PuzzleStore {
 
         if puzzle.solution.first().map(|s| s.as_str()) == Some(uci) {
             if puzzle.solution.len() == 1 {
-                PuzzleCheckResult::Solved { explanation: puzzle.explanation.clone() }
+                PuzzleCheckResult::Solved {
+                    explanation: puzzle.explanation.clone(),
+                }
             } else {
-                PuzzleCheckResult::CorrectContinue { next_hint: puzzle.hint.clone() }
+                PuzzleCheckResult::CorrectContinue {
+                    next_hint: puzzle.hint.clone(),
+                }
             }
         } else {
-            PuzzleCheckResult::Wrong { hint: puzzle.hint.clone() }
+            PuzzleCheckResult::Wrong {
+                hint: puzzle.hint.clone(),
+            }
         }
     }
 }
@@ -1193,10 +1577,17 @@ pub async fn create_tournament(
     agent_names: Vec<String>,
     store: State<'_, AppState>,
 ) -> Result<Tournament, String> {
-    let t = store.game_sessions.tournaments.create(
-        name, game_type, agent_ids, agent_names,
-        TournamentFormat::RoundRobin { games_per_pair: 2 }
-    ).await;
+    let t = store
+        .game_sessions
+        .tournaments
+        .create(
+            name,
+            game_type,
+            agent_ids,
+            agent_names,
+            TournamentFormat::RoundRobin { games_per_pair: 2 },
+        )
+        .await;
     Ok(t)
 }
 
@@ -1205,14 +1596,16 @@ pub async fn get_tournament_standings(
     tournament_id: String,
     store: State<'_, AppState>,
 ) -> Result<Vec<TournamentParticipant>, String> {
-    store.game_sessions.tournaments.standings(&tournament_id).await
+    store
+        .game_sessions
+        .tournaments
+        .standings(&tournament_id)
+        .await
         .ok_or_else(|| "tournament not found".into())
 }
 
 #[tauri::command]
-pub async fn list_tournaments(
-    store: State<'_, AppState>,
-) -> Result<Vec<Tournament>, String> {
+pub async fn list_tournaments(store: State<'_, AppState>) -> Result<Vec<Tournament>, String> {
     let ts = store.game_sessions.tournaments.tournaments.read().await;
     Ok(ts.values().cloned().collect())
 }
@@ -1220,9 +1613,7 @@ pub async fn list_tournaments(
 // ── Tauri commands: puzzles ────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn get_daily_puzzle(
-    store: State<'_, AppState>,
-) -> Result<Option<GamePuzzle>, String> {
+pub async fn get_daily_puzzle(store: State<'_, AppState>) -> Result<Option<GamePuzzle>, String> {
     Ok(store.game_sessions.puzzles.daily().cloned())
 }
 
@@ -1232,10 +1623,17 @@ pub async fn check_puzzle_move(
     uci_move: String,
     store: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let result = store.game_sessions.puzzles.check_move(&puzzle_id, &uci_move);
+    let result = store
+        .game_sessions
+        .puzzles
+        .check_move(&puzzle_id, &uci_move);
     Ok(match result {
-        PuzzleCheckResult::Solved { explanation } => serde_json::json!({"status": "solved", "message": explanation}),
-        PuzzleCheckResult::CorrectContinue { next_hint } => serde_json::json!({"status": "correct", "message": next_hint}),
+        PuzzleCheckResult::Solved { explanation } => {
+            serde_json::json!({"status": "solved", "message": explanation})
+        }
+        PuzzleCheckResult::CorrectContinue { next_hint } => {
+            serde_json::json!({"status": "correct", "message": next_hint})
+        }
         PuzzleCheckResult::Wrong { hint } => serde_json::json!({"status": "wrong", "hint": hint}),
         PuzzleCheckResult::NotFound => serde_json::json!({"status": "not_found"}),
     })

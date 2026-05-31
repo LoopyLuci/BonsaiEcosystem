@@ -7,58 +7,60 @@ static FEATURES: Lazy<RwLock<FeatureFlags>> =
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeatureFlags {
-    pub swarm_enabled:               bool,
-    pub bot_enabled:                 bool,
-    pub browser_extension_enabled:   bool,
-    pub android_enabled:             bool,
-    pub sandbox_system_enabled:      bool,
-    pub mobile_automation_enabled:   bool,
-    pub mcp_bridge_enabled:          bool,
+    pub swarm_enabled: bool,
+    pub bot_enabled: bool,
+    pub browser_extension_enabled: bool,
+    pub android_enabled: bool,
+    pub sandbox_system_enabled: bool,
+    pub mobile_automation_enabled: bool,
+    pub mcp_bridge_enabled: bool,
     pub cluster_orchestrator_enabled: bool,
-    pub tts_enabled:                 bool,
+    pub tts_enabled: bool,
     #[serde(default)]
-    pub hybrid_engine_enabled:       bool,
+    pub hybrid_engine_enabled: bool,
     /// BONSAI.md — inject the self-evolving system prompt into every chat turn.
     #[serde(default)]
-    pub bonsai_md_enabled:           bool,
+    pub bonsai_md_enabled: bool,
     /// Undercover Mode — strip internal product names from outputs and commits.
     #[serde(default)]
-    pub undercover_mode:             bool,
+    pub undercover_mode: bool,
     /// Plan Gate — require human approval for high-risk tool calls.
     #[serde(default)]
-    pub plan_gate_enabled:           bool,
+    pub plan_gate_enabled: bool,
     /// Trusted Web Router — whitelist-based documentation fetcher.
     #[serde(default)]
-    pub web_router_enabled:          bool,
+    pub web_router_enabled: bool,
     /// EternalWorkshop — background memory consolidation daemon.
     #[serde(default)]
-    pub eternal_workshop_enabled:    bool,
+    pub eternal_workshop_enabled: bool,
     /// Model Trainer GUI — in-app training control panel.
     #[serde(default = "default_true")]
-    pub model_trainer_enabled:       bool,
+    pub model_trainer_enabled: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl Default for FeatureFlags {
     fn default() -> Self {
         Self {
-            swarm_enabled:               false,
-            bot_enabled:                 false,
-            browser_extension_enabled:   false,
-            android_enabled:             false,
-            sandbox_system_enabled:      false,
-            mobile_automation_enabled:   false,
-            mcp_bridge_enabled:          false,
+            swarm_enabled: false,
+            bot_enabled: false,
+            browser_extension_enabled: false,
+            android_enabled: false,
+            sandbox_system_enabled: false,
+            mobile_automation_enabled: false,
+            mcp_bridge_enabled: false,
             cluster_orchestrator_enabled: false,
-            tts_enabled:                 false,
-            hybrid_engine_enabled:       false,
-            bonsai_md_enabled:           true,
-            undercover_mode:             false,
-            plan_gate_enabled:           false,
-            web_router_enabled:          true,
-            eternal_workshop_enabled:    true,
-            model_trainer_enabled:       true,
+            tts_enabled: false,
+            hybrid_engine_enabled: false,
+            bonsai_md_enabled: true,
+            undercover_mode: false,
+            plan_gate_enabled: false,
+            web_router_enabled: true,
+            eternal_workshop_enabled: true,
+            model_trainer_enabled: true,
         }
     }
 }
@@ -103,17 +105,17 @@ impl FeatureFlags {
     pub fn is_enabled(flag: &str) -> bool {
         let f = FEATURES.read().unwrap();
         match flag {
-            "swarm"               => f.swarm_enabled,
-            "bot"                 => f.bot_enabled,
-            "browser_extension"   => f.browser_extension_enabled,
-            "android"             => f.android_enabled,
-            "sandbox_system"      => f.sandbox_system_enabled,
-            "mobile_automation"   => f.mobile_automation_enabled,
-            "mcp_bridge"          => f.mcp_bridge_enabled,
+            "swarm" => f.swarm_enabled,
+            "bot" => f.bot_enabled,
+            "browser_extension" => f.browser_extension_enabled,
+            "android" => f.android_enabled,
+            "sandbox_system" => f.sandbox_system_enabled,
+            "mobile_automation" => f.mobile_automation_enabled,
+            "mcp_bridge" => f.mcp_bridge_enabled,
             "cluster_orchestrator" => f.cluster_orchestrator_enabled,
-            "tts"                 => f.tts_enabled,
+            "tts" => f.tts_enabled,
             "hybrid_engine_enabled" => f.hybrid_engine_enabled,
-            _                     => false,
+            _ => false,
         }
     }
 }

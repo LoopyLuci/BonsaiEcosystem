@@ -10,8 +10,8 @@ use tracing::info;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BrainMetadata {
     pub lessons_completed: u32,
-    pub phases_done:       Vec<String>,
-    pub last_training:     Option<String>,
+    pub phases_done: Vec<String>,
+    pub last_training: Option<String>,
 }
 
 fn metadata_path() -> PathBuf {

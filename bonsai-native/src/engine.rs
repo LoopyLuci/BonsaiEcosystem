@@ -54,18 +54,24 @@ impl HybridEngine {
 
     /// Load a GGUF model with the given GPU layer count.
     pub async fn load(&self, model_path: &str, n_gpu_layers: i32) -> Result<()> {
-        let path = CString::new(model_path)
-            .map_err(|_| anyhow!("model path contains null byte"))?;
+        let path =
+            CString::new(model_path).map_err(|_| anyhow!("model path contains null byte"))?;
 
         let mut mp = unsafe { ffi::llama_model_default_params() };
         mp.n_gpu_layers = n_gpu_layers;
         mp.use_mmap = true;
 
-        info!("loading model {} with {} GPU layers", model_path, n_gpu_layers);
+        info!(
+            "loading model {} with {} GPU layers",
+            model_path, n_gpu_layers
+        );
 
         let model_ptr = unsafe { ffi::llama_load_model_from_file(path.as_ptr(), mp) };
         if model_ptr.is_null() {
-            return Err(anyhow!("llama_load_model_from_file returned null for {}", model_path));
+            return Err(anyhow!(
+                "llama_load_model_from_file returned null for {}",
+                model_path
+            ));
         }
 
         let cp = unsafe { ffi::llama_context_default_params() };
@@ -96,8 +102,8 @@ impl HybridEngine {
         let guard = self.model.read().await;
         let loaded = guard.as_ref().ok_or_else(|| anyhow!("no model loaded"))?;
 
-        let lora_c = CString::new(lora_path)
-            .map_err(|_| anyhow!("lora path contains null byte"))?;
+        let lora_c =
+            CString::new(lora_path).map_err(|_| anyhow!("lora path contains null byte"))?;
 
         let ret = unsafe {
             ffi::llama_model_apply_lora_from_file(

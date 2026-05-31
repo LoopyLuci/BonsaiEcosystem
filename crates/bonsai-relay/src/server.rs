@@ -4,6 +4,8 @@
 //! When both slots are occupied the server acts as a byte-level forwarder,
 //! never inspecting payload content.
 
+use crate::error::{RelayError, RelayResult};
+use crate::token::RegisterRequest;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -11,8 +13,6 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex};
 use tracing::{info, warn};
-use crate::error::{RelayError, RelayResult};
-use crate::token::RegisterRequest;
 
 const SESSION_TTL: Duration = Duration::from_secs(300); // 5 minutes
 const MAX_FRAME: usize = 18 * 1024 * 1024; // 18 MiB
@@ -27,7 +27,11 @@ struct Session {
 
 impl Session {
     fn new() -> Self {
-        Self { peer_a: None, peer_b: None, created_at: Instant::now() }
+        Self {
+            peer_a: None,
+            peer_b: None,
+            created_at: Instant::now(),
+        }
     }
 
     fn is_expired(&self) -> bool {
@@ -39,9 +43,10 @@ impl Session {
     }
 
     /// Add a peer; returns which slot they got and the sender for the other peer.
-    fn join(&mut self, tx: mpsc::UnboundedSender<Vec<u8>>)
-        -> RelayResult<Option<mpsc::UnboundedSender<Vec<u8>>>>
-    {
+    fn join(
+        &mut self,
+        tx: mpsc::UnboundedSender<Vec<u8>>,
+    ) -> RelayResult<Option<mpsc::UnboundedSender<Vec<u8>>>> {
         if self.peer_a.is_none() {
             self.peer_a = Some(tx);
             Ok(None)
@@ -107,7 +112,9 @@ async fn handle_connection(mut stream: TcpStream, sessions: Sessions) -> RelayRe
     let reg_frame = read_frame(&mut stream).await?;
     let reg: RegisterRequest = serde_json::from_slice(&reg_frame)?;
 
-    if !reg.verify() { return Err(RelayError::PowFailed); }
+    if !reg.verify() {
+        return Err(RelayError::PowFailed);
+    }
 
     let token_key = reg.token.0;
 
@@ -153,7 +160,9 @@ async fn handle_connection(mut stream: TcpStream, sessions: Sessions) -> RelayRe
                     // Send to whichever slot is not us — here we just broadcast to both
                     // channels (dedup at recipient is harmless since data is encrypted)
                     let mut out = None;
-                    if let Some(ref tx) = s.peer_a { out = Some(tx.clone()); }
+                    if let Some(ref tx) = s.peer_a {
+                        out = Some(tx.clone());
+                    }
                     if let Some(ref tx) = s.peer_b {
                         // prefer the non-self channel — simplified: send to both
                         let _ = tx.send(frame.clone());
@@ -172,7 +181,9 @@ async fn handle_connection(mut stream: TcpStream, sessions: Sessions) -> RelayRe
 
     // Forward outbound queue → TCP writer
     while let Some(data) = out_rx.recv().await {
-        if write_frame_writer(&mut writer, &data).await.is_err() { break; }
+        if write_frame_writer(&mut writer, &data).await.is_err() {
+            break;
+        }
     }
 
     fwd_handle.abort();
@@ -183,7 +194,9 @@ async fn handle_connection(mut stream: TcpStream, sessions: Sessions) -> RelayRe
 
 async fn read_frame(stream: &mut TcpStream) -> RelayResult<Vec<u8>> {
     let len = stream.read_u32().await? as usize;
-    if len > MAX_FRAME { return Err(RelayError::FrameTooLarge(len)); }
+    if len > MAX_FRAME {
+        return Err(RelayError::FrameTooLarge(len));
+    }
     let mut buf = vec![0u8; len];
     stream.read_exact(&mut buf).await?;
     Ok(buf)
@@ -194,7 +207,9 @@ async fn read_frame_reader<R: AsyncReadExt + Unpin>(
     max: usize,
 ) -> RelayResult<Vec<u8>> {
     let len = reader.read_u32().await? as usize;
-    if len > max { return Err(RelayError::FrameTooLarge(len)); }
+    if len > max {
+        return Err(RelayError::FrameTooLarge(len));
+    }
     let mut buf = vec![0u8; len];
     reader.read_exact(&mut buf).await?;
     Ok(buf)

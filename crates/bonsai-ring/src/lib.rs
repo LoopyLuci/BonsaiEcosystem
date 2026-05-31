@@ -11,12 +11,12 @@
 //! The ring implements [`TransportLane`] so it drops directly into the
 //! ECF-RG scheduler alongside TCP and relay lanes.
 
-use std::sync::Arc;
 use bonsai_transfer_core::{
     error::{TransferError, TransferResult},
     lane::{LaneHealth, LaneKind, TransportLane},
 };
 use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use std::sync::Arc;
 
 // ── Platform split ────────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ use bonsai_transfer_crypto::cipher::ChunkCiphertext;
 pub mod shm;
 
 // Re-export the concrete ring type regardless of platform.
-pub use ring_impl::{RingLane, open_ring_pair};
+pub use ring_impl::{open_ring_pair, RingLane};
 
 // ── Ring configuration ────────────────────────────────────────────────────────
 
@@ -57,7 +57,6 @@ mod ring_impl {
     use std::sync::atomic::{AtomicU64, Ordering};
     use tokio::sync::Notify;
 
-
     // Safety: the raw pointer is to an mmap region we own.
     struct RingMem {
         ptr: *mut u8,
@@ -68,7 +67,9 @@ mod ring_impl {
 
     impl Drop for RingMem {
         fn drop(&mut self) {
-            unsafe { libc::munmap(self.ptr as *mut libc::c_void, self.len); }
+            unsafe {
+                libc::munmap(self.ptr as *mut libc::c_void, self.len);
+            }
         }
     }
 
@@ -123,29 +124,39 @@ mod ring_impl {
 
     #[async_trait::async_trait]
     impl TransportLane for RingLane {
-        fn name(&self) -> &str { &self.name }
-        fn kind(&self) -> LaneKind { LaneKind::Dmi }
-        fn health(&self) -> LaneHealth { self.health.lock().unwrap().clone() }
-
-        async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
-            self.tx.send(chunk.clone()).map_err(|_| TransferError::Other("lane closed".into()))
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn kind(&self) -> LaneKind {
+            LaneKind::Dmi
+        }
+        fn health(&self) -> LaneHealth {
+            self.health.lock().unwrap().clone()
         }
 
-        async fn send_ack(&self, _gsn: u64) -> TransferResult<()> { Ok(()) }
-        async fn send_nack(&self, _gsn: u64) -> TransferResult<()> { Ok(()) }
+        async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
+            self.tx
+                .send(chunk.clone())
+                .map_err(|_| TransferError::Other("lane closed".into()))
+        }
 
-        async fn ping(&self) -> Option<Duration> { Some(Duration::from_micros(50)) }
+        async fn send_ack(&self, _gsn: u64) -> TransferResult<()> {
+            Ok(())
+        }
+        async fn send_nack(&self, _gsn: u64) -> TransferResult<()> {
+            Ok(())
+        }
+
+        async fn ping(&self) -> Option<Duration> {
+            Some(Duration::from_micros(50))
+        }
     }
 
     /// Attempt to madvise hugepages on a memory region. Best-effort — silently
     /// ignored if hugepages are unavailable (requires kernel ≥ 2.6.38).
     pub fn try_madvise_hugepages(ptr: *mut u8, len: usize) {
         unsafe {
-            libc::madvise(
-                ptr as *mut libc::c_void,
-                len,
-                libc::MADV_HUGEPAGE,
-            );
+            libc::madvise(ptr as *mut libc::c_void, len, libc::MADV_HUGEPAGE);
         }
     }
 
@@ -163,7 +174,9 @@ mod ring_impl {
                 0,
             )
         };
-        if ptr == libc::MAP_FAILED { return None; }
+        if ptr == libc::MAP_FAILED {
+            return None;
+        }
         let ptr = ptr as *mut u8;
         try_madvise_hugepages(ptr, aligned);
         Some((ptr, aligned))
@@ -174,7 +187,10 @@ mod ring_impl {
     }
 
     /// Convenience: open a matched producer/consumer ring pair.
-    pub fn open_ring_pair(name: impl Into<String>, config: RingConfig) -> (Arc<RingLane>, Arc<RingLane>) {
+    pub fn open_ring_pair(
+        name: impl Into<String>,
+        config: RingConfig,
+    ) -> (Arc<RingLane>, Arc<RingLane>) {
         RingLane::new_pair(name, config)
     }
 }
@@ -184,7 +200,6 @@ mod ring_impl {
 #[cfg(not(target_os = "linux"))]
 mod ring_impl {
     use super::*;
-
 
     /// On non-Linux platforms the ring falls back to a tokio mpsc lane
     /// identical to `InProcessLane`, so downstream code compiles and tests
@@ -200,8 +215,16 @@ mod ring_impl {
             let name = name.into();
             let (tx1, rx1) = tokio::sync::mpsc::unbounded_channel();
             let (tx2, rx2) = tokio::sync::mpsc::unbounded_channel();
-            let a = Arc::new(Self { name: format!("{name}:a"), tx: tx1, rx: std::sync::Mutex::new(Some(rx2)) });
-            let b = Arc::new(Self { name: format!("{name}:b"), tx: tx2, rx: std::sync::Mutex::new(Some(rx1)) });
+            let a = Arc::new(Self {
+                name: format!("{name}:a"),
+                tx: tx1,
+                rx: std::sync::Mutex::new(Some(rx2)),
+            });
+            let b = Arc::new(Self {
+                name: format!("{name}:b"),
+                tx: tx2,
+                rx: std::sync::Mutex::new(Some(rx1)),
+            });
             (a, b)
         }
 
@@ -213,18 +236,33 @@ mod ring_impl {
 
     #[async_trait::async_trait]
     impl TransportLane for RingLane {
-        fn name(&self) -> &str { &self.name }
-        fn kind(&self) -> LaneKind { LaneKind::Dmi }
-        fn health(&self) -> LaneHealth { LaneHealth::ideal() }
-        async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
-            self.tx.send(chunk.clone()).map_err(|_| TransferError::Other("lane closed".into()))
+        fn name(&self) -> &str {
+            &self.name
         }
-        async fn send_ack(&self, _gsn: u64) -> TransferResult<()> { Ok(()) }
-        async fn send_nack(&self, _gsn: u64) -> TransferResult<()> { Ok(()) }
+        fn kind(&self) -> LaneKind {
+            LaneKind::Dmi
+        }
+        fn health(&self) -> LaneHealth {
+            LaneHealth::ideal()
+        }
+        async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
+            self.tx
+                .send(chunk.clone())
+                .map_err(|_| TransferError::Other("lane closed".into()))
+        }
+        async fn send_ack(&self, _gsn: u64) -> TransferResult<()> {
+            Ok(())
+        }
+        async fn send_nack(&self, _gsn: u64) -> TransferResult<()> {
+            Ok(())
+        }
     }
 
     /// On non-Linux, this is a no-op pair of in-process channels.
-    pub fn open_ring_pair(name: impl Into<String>, config: RingConfig) -> (Arc<RingLane>, Arc<RingLane>) {
+    pub fn open_ring_pair(
+        name: impl Into<String>,
+        config: RingConfig,
+    ) -> (Arc<RingLane>, Arc<RingLane>) {
         RingLane::new_pair(name, config)
     }
 }

@@ -4,9 +4,8 @@
 
 pub mod trust_score;
 pub use trust_score::{
-    TrustScore, ProofToken, DeploymentGate, GateResult,
-    GATE_DEV, GATE_STAGING, GATE_PRODUCTION, GATE_SAFETY_CRITICAL,
-    effect_penalty,
+    effect_penalty, DeploymentGate, GateResult, ProofToken, TrustScore, GATE_DEV, GATE_PRODUCTION,
+    GATE_SAFETY_CRITICAL, GATE_STAGING,
 };
 
 use std::collections::HashMap;

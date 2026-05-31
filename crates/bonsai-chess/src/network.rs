@@ -10,18 +10,18 @@
 //! Weights are stored as a compact binary file (raw f32 little-endian).
 //! Falls back to MaterialEvaluator if no weights are loaded.
 
-use std::path::{Path, PathBuf};
-use std::io::{Read, Write};
-use rand::Rng;
 use crate::mcts::{BoardEvaluator, MaterialEvaluator};
 use crate::position::ChessPosition;
+use rand::Rng;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-pub const INPUT_SIZE:   usize = 768;   // 12 × 64
-pub const HIDDEN_SIZE:  usize = 256;
-pub const POLICY_SIZE:  usize = 1858;  // max possible moves in any chess position
-pub const VALUE_SIZE:   usize = 1;
+pub const INPUT_SIZE: usize = 768; // 12 × 64
+pub const HIDDEN_SIZE: usize = 256;
+pub const POLICY_SIZE: usize = 1858; // max possible moves in any chess position
+pub const VALUE_SIZE: usize = 1;
 
 // Weight counts:
 //   W1: INPUT × HIDDEN, b1: HIDDEN
@@ -39,12 +39,12 @@ pub const TOTAL_PARAMS: usize = W1_LEN + B1_LEN + WP_LEN + BP_LEN + WV_LEN + BV_
 
 #[derive(Clone)]
 pub struct ChessNetWeights {
-    pub w1: Vec<f32>,  // [INPUT × HIDDEN]
-    pub b1: Vec<f32>,  // [HIDDEN]
-    pub wp: Vec<f32>,  // [HIDDEN × POLICY]
-    pub bp: Vec<f32>,  // [POLICY]
-    pub wv: Vec<f32>,  // [HIDDEN × VALUE]
-    pub bv: Vec<f32>,  // [VALUE]
+    pub w1: Vec<f32>, // [INPUT × HIDDEN]
+    pub b1: Vec<f32>, // [HIDDEN]
+    pub wp: Vec<f32>, // [HIDDEN × POLICY]
+    pub bp: Vec<f32>, // [POLICY]
+    pub wv: Vec<f32>, // [HIDDEN × VALUE]
+    pub bv: Vec<f32>, // [VALUE]
 }
 
 impl ChessNetWeights {
@@ -55,18 +55,33 @@ impl ChessNetWeights {
         let hep = (2.0_f32 / HIDDEN_SIZE as f32).sqrt();
         let hev = (2.0_f32 / HIDDEN_SIZE as f32).sqrt();
 
-        let w1: Vec<f32> = (0..W1_LEN).map(|_| rng.gen::<f32>() * 2.0 * he1 - he1).collect();
+        let w1: Vec<f32> = (0..W1_LEN)
+            .map(|_| rng.gen::<f32>() * 2.0 * he1 - he1)
+            .collect();
         let b1 = vec![0.0f32; B1_LEN];
-        let wp: Vec<f32> = (0..WP_LEN).map(|_| rng.gen::<f32>() * 2.0 * hep - hep).collect();
+        let wp: Vec<f32> = (0..WP_LEN)
+            .map(|_| rng.gen::<f32>() * 2.0 * hep - hep)
+            .collect();
         let bp = vec![0.0f32; BP_LEN];
-        let wv: Vec<f32> = (0..WV_LEN).map(|_| rng.gen::<f32>() * 2.0 * hev - hev).collect();
+        let wv: Vec<f32> = (0..WV_LEN)
+            .map(|_| rng.gen::<f32>() * 2.0 * hev - hev)
+            .collect();
         let bv = vec![0.5f32; BV_LEN];
-        Self { w1, b1, wp, bp, wv, bv }
+        Self {
+            w1,
+            b1,
+            wp,
+            bp,
+            wv,
+            bv,
+        }
     }
 
     /// Save weights to a compact binary file (raw f32 LE).
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        if let Some(parent) = path.parent() { std::fs::create_dir_all(parent)?; }
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let mut f = std::fs::File::create(path)?;
         for slice in [&self.w1, &self.b1, &self.wp, &self.bp, &self.wv, &self.bv] {
             for &v in slice {
@@ -88,11 +103,16 @@ impl ChessNetWeights {
                 format!("expected {} bytes, got {}", expected, buf.len()),
             ));
         }
-        let floats: Vec<f32> = buf.chunks_exact(4)
+        let floats: Vec<f32> = buf
+            .chunks_exact(4)
             .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
             .collect();
         let mut off = 0;
-        let take = |off: &mut usize, n: usize| { let v = floats[*off..*off + n].to_vec(); *off += n; v };
+        let take = |off: &mut usize, n: usize| {
+            let v = floats[*off..*off + n].to_vec();
+            *off += n;
+            v
+        };
         Ok(Self {
             w1: take(&mut off, W1_LEN),
             b1: take(&mut off, B1_LEN),
@@ -110,7 +130,9 @@ impl ChessNetWeights {
         let mut h = self.b1.clone();
         for (j, h_j) in h.iter_mut().enumerate() {
             let row_start = j * INPUT_SIZE;
-            let sum: f32 = input[..INPUT_SIZE].iter().enumerate()
+            let sum: f32 = input[..INPUT_SIZE]
+                .iter()
+                .enumerate()
                 .map(|(i, &x)| x * self.w1[row_start + i])
                 .sum();
             *h_j = (*h_j + sum).max(0.0); // ReLU
@@ -120,13 +142,17 @@ impl ChessNetWeights {
 
     /// Policy head: linear → softmax over first `n_moves` outputs.
     pub fn policy(&self, hidden: &[f32], n_moves: usize) -> Vec<f32> {
-        if n_moves == 0 { return vec![]; }
+        if n_moves == 0 {
+            return vec![];
+        }
         let n = n_moves.min(POLICY_SIZE);
         let mut logits = vec![0.0f32; n];
         for (j, l) in logits.iter_mut().enumerate() {
             let row_start = j * HIDDEN_SIZE;
             *l = self.bp[j]
-                + hidden.iter().enumerate()
+                + hidden
+                    .iter()
+                    .enumerate()
                     .map(|(i, &h)| h * self.wp[row_start + i])
                     .sum::<f32>();
         }
@@ -137,7 +163,9 @@ impl ChessNetWeights {
     /// Value head: linear → sigmoid.
     pub fn value(&self, hidden: &[f32]) -> f32 {
         let logit: f32 = self.bv[0]
-            + hidden.iter().enumerate()
+            + hidden
+                .iter()
+                .enumerate()
                 .map(|(i, &h)| h * self.wv[i])
                 .sum::<f32>();
         sigmoid(logit)
@@ -149,11 +177,20 @@ impl ChessNetWeights {
 fn softmax(v: &mut [f32]) {
     let max = v.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let mut sum = 0.0f32;
-    for x in v.iter_mut() { *x = (*x - max).exp(); sum += *x; }
-    if sum > 0.0 { for x in v.iter_mut() { *x /= sum; } }
+    for x in v.iter_mut() {
+        *x = (*x - max).exp();
+        sum += *x;
+    }
+    if sum > 0.0 {
+        for x in v.iter_mut() {
+            *x /= sum;
+        }
+    }
 }
 
-fn sigmoid(x: f32) -> f32 { 1.0 / (1.0 + (-x).exp()) }
+fn sigmoid(x: f32) -> f32 {
+    1.0 / (1.0 + (-x).exp())
+}
 
 // ── ADAM optimizer ────────────────────────────────────────────────────────────
 
@@ -161,10 +198,10 @@ pub struct AdamState {
     pub m: Vec<f32>,
     pub v: Vec<f32>,
     pub t: u32,
-    pub lr:    f32,
+    pub lr: f32,
     pub beta1: f32,
     pub beta2: f32,
-    pub eps:   f32,
+    pub eps: f32,
 }
 
 impl AdamState {
@@ -173,10 +210,10 @@ impl AdamState {
             m: vec![0.0; n],
             v: vec![0.0; n],
             t: 0,
-            lr:    1e-3,
+            lr: 1e-3,
             beta1: 0.9,
             beta2: 0.999,
-            eps:   1e-8,
+            eps: 1e-8,
         }
     }
 
@@ -225,7 +262,10 @@ impl NetworkEvaluator {
     pub fn new(weights_path: impl Into<PathBuf>) -> Self {
         let path: PathBuf = weights_path.into();
         let weights = ChessNetWeights::load(&path).ok();
-        Self { weights, weights_path: path }
+        Self {
+            weights,
+            weights_path: path,
+        }
     }
 
     /// Default path: `~/.bonsai/models/chess_net.bin`
@@ -240,7 +280,9 @@ impl NetworkEvaluator {
     }
 
     /// Returns true if network weights are loaded.
-    pub fn is_loaded(&self) -> bool { self.weights.is_some() }
+    pub fn is_loaded(&self) -> bool {
+        self.weights.is_some()
+    }
 
     /// Initialize with random weights and save them to disk.
     /// Used for bootstrapping a new network from scratch.
@@ -262,10 +304,14 @@ impl NetworkEvaluator {
     }
 
     /// Get a reference to the loaded weights (if any).
-    pub fn weights(&self) -> Option<&ChessNetWeights> { self.weights.as_ref() }
+    pub fn weights(&self) -> Option<&ChessNetWeights> {
+        self.weights.as_ref()
+    }
 
     /// Get a mutable reference to the loaded weights (if any).
-    pub fn weights_mut(&mut self) -> Option<&mut ChessNetWeights> { self.weights.as_mut() }
+    pub fn weights_mut(&mut self) -> Option<&mut ChessNetWeights> {
+        self.weights.as_mut()
+    }
 
     /// Save current weights to disk.
     pub fn save(&self) -> std::io::Result<()> {
@@ -284,7 +330,9 @@ fn dirs_or_home() -> PathBuf {
 }
 
 fn truncate_input(raw: Vec<f32>) -> Vec<f32> {
-    if raw.len() >= INPUT_SIZE { return raw[..INPUT_SIZE].to_vec(); }
+    if raw.len() >= INPUT_SIZE {
+        return raw[..INPUT_SIZE].to_vec();
+    }
     let mut out = raw;
     out.resize(INPUT_SIZE, 0.0);
     out
@@ -318,17 +366,25 @@ impl BoardEvaluator for NetworkEvaluator {
 /// network so it plays legal chess immediately rather than randomly.
 pub fn teacher_distill_examples(positions: &[ChessPosition]) -> Vec<NetTrainExample> {
     let teacher = MaterialEvaluator;
-    positions.iter().map(|pos| {
-        let raw = pos.to_nn_input();
-        // Truncate / zero-pad to INPUT_SIZE (network uses first 768 features)
-        let mut input = vec![0.0f32; INPUT_SIZE];
-        let copy_len = raw.len().min(INPUT_SIZE);
-        input[..copy_len].copy_from_slice(&raw[..copy_len]);
-        let policy_target = teacher.evaluate_policy(pos);
-        let value_target  = teacher.evaluate_value(pos);
-        let n_moves = policy_target.len();
-        NetTrainExample { input, policy_target, value_target, n_moves }
-    }).collect()
+    positions
+        .iter()
+        .map(|pos| {
+            let raw = pos.to_nn_input();
+            // Truncate / zero-pad to INPUT_SIZE (network uses first 768 features)
+            let mut input = vec![0.0f32; INPUT_SIZE];
+            let copy_len = raw.len().min(INPUT_SIZE);
+            input[..copy_len].copy_from_slice(&raw[..copy_len]);
+            let policy_target = teacher.evaluate_policy(pos);
+            let value_target = teacher.evaluate_value(pos);
+            let n_moves = policy_target.len();
+            NetTrainExample {
+                input,
+                policy_target,
+                value_target,
+                n_moves,
+            }
+        })
+        .collect()
 }
 
 /// Train the network for one epoch on the given examples using ADAM.
@@ -339,11 +395,13 @@ pub fn train_epoch(
     examples: &[NetTrainExample],
     batch_size: usize,
 ) -> (f32, f32) {
-    if examples.is_empty() { return (0.0, 0.0); }
+    if examples.is_empty() {
+        return (0.0, 0.0);
+    }
 
     let mut total_pl = 0.0f32;
     let mut total_vl = 0.0f32;
-    let mut batches  = 0u32;
+    let mut batches = 0u32;
 
     for batch in examples.chunks(batch_size) {
         // Accumulate gradients over the batch (simple SGD-style accumulation)
@@ -361,7 +419,7 @@ pub fn train_epoch(
             let h = weights.hidden(&ex.input);
             let n_moves = ex.n_moves.min(POLICY_SIZE);
             let policy_out = weights.policy(&h, n_moves);
-            let value_out  = weights.value(&h);
+            let value_out = weights.value(&h);
 
             // Policy loss gradient (cross-entropy: dL/dlogit = p_out - p_target)
             let mut d_policy = vec![0.0f32; n_moves];
@@ -402,12 +460,16 @@ pub fn train_epoch(
 
             // ReLU gate
             for i in 0..HIDDEN_SIZE {
-                if h[i] <= 0.0 { d_hidden[i] = 0.0; }
+                if h[i] <= 0.0 {
+                    d_hidden[i] = 0.0;
+                }
             }
 
             // Backprop through W1
             for j in 0..HIDDEN_SIZE {
-                if d_hidden[j] == 0.0 { continue; }
+                if d_hidden[j] == 0.0 {
+                    continue;
+                }
                 let row_start = j * INPUT_SIZE;
                 for (i, &x) in ex.input.iter().enumerate() {
                     g_w1[row_start + i] += d_hidden[j] * x / n;
@@ -418,16 +480,24 @@ pub fn train_epoch(
 
         // Flatten all params + grads and apply ADAM
         let mut all_params: Vec<f32> = [
-            weights.w1.as_slice(), weights.b1.as_slice(),
-            weights.wp.as_slice(), weights.bp.as_slice(),
-            weights.wv.as_slice(), weights.bv.as_slice(),
-        ].concat();
+            weights.w1.as_slice(),
+            weights.b1.as_slice(),
+            weights.wp.as_slice(),
+            weights.bp.as_slice(),
+            weights.wv.as_slice(),
+            weights.bv.as_slice(),
+        ]
+        .concat();
 
         let all_grads: Vec<f32> = [
-            g_w1.as_slice(), g_b1.as_slice(),
-            g_wp.as_slice(), g_bp.as_slice(),
-            g_wv.as_slice(), g_bv.as_slice(),
-        ].concat();
+            g_w1.as_slice(),
+            g_b1.as_slice(),
+            g_wp.as_slice(),
+            g_bp.as_slice(),
+            g_wv.as_slice(),
+            g_bv.as_slice(),
+        ]
+        .concat();
 
         adam.step(&mut all_params, &all_grads);
 
@@ -476,7 +546,10 @@ mod tests {
         let policy = w.policy(&h, legal_moves.len());
         assert_eq!(policy.len(), legal_moves.len());
         let sum: f32 = policy.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-4, "policy should sum to 1, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 1e-4,
+            "policy should sum to 1, got {sum}"
+        );
 
         let value = w.value(&h);
         assert!((0.0..=1.0).contains(&value), "value out of range: {value}");
@@ -513,8 +586,14 @@ mod tests {
         let (pl0, vl0) = train_epoch(&mut weights, &mut adam, &examples, 4);
         let (pl1, vl1) = train_epoch(&mut weights, &mut adam, &examples, 4);
         // Losses should generally not explode; not guaranteed to decrease in 2 steps
-        assert!(pl0 >= 0.0 && pl1 >= 0.0, "policy loss should be non-negative");
-        assert!(vl0 >= 0.0 && vl1 >= 0.0, "value loss should be non-negative");
+        assert!(
+            pl0 >= 0.0 && pl1 >= 0.0,
+            "policy loss should be non-negative"
+        );
+        assert!(
+            vl0 >= 0.0 && vl1 >= 0.0,
+            "value loss should be non-negative"
+        );
     }
 
     #[test]

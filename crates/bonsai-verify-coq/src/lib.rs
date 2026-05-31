@@ -9,9 +9,9 @@
 //! 2. Spawn `coqc <file>`.
 //! 3. Parse exit code + stderr for "Error:" / "Proof completed" patterns.
 
+use serde::{Deserialize, Serialize};
 use std::io::Write as _;
 use std::process::{Command, Stdio};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -56,24 +56,38 @@ pub struct CoqSidecar {
 }
 
 impl Default for CoqSidecar {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CoqSidecar {
     pub fn new() -> Self {
-        Self { coqc_path: Self::find_coqc() }
+        Self {
+            coqc_path: Self::find_coqc(),
+        }
     }
 
     pub fn with_path(path: impl Into<std::path::PathBuf>) -> Self {
-        Self { coqc_path: Some(path.into()) }
+        Self {
+            coqc_path: Some(path.into()),
+        }
     }
 
-    pub fn coqc_available() -> bool { Self::find_coqc().is_some() }
+    pub fn coqc_available() -> bool {
+        Self::find_coqc().is_some()
+    }
 
     fn find_coqc() -> Option<std::path::PathBuf> {
-        let names = if cfg!(windows) { vec!["coqc.exe", "coqc"] } else { vec!["coqc"] };
+        let names = if cfg!(windows) {
+            vec!["coqc.exe", "coqc"]
+        } else {
+            vec!["coqc"]
+        };
         for name in names {
-            if let Some(p) = which_bin(name) { return Some(p); }
+            if let Some(p) = which_bin(name) {
+                return Some(p);
+            }
         }
         None
     }
@@ -89,7 +103,9 @@ impl CoqSidecar {
         }
 
         let mut cmd = Command::new(coqc);
-        cmd.arg(&src_path).stdout(Stdio::piped()).stderr(Stdio::piped());
+        cmd.arg(&src_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
         if let Some(secs) = req.timeout_secs {
             // coqc has no built-in timeout flag; rely on OS-level kill via thread
@@ -107,7 +123,12 @@ impl CoqSidecar {
             return Err(CoqError::VerificationFailed(stderr));
         }
 
-        Ok(CoqResponse { success, diagnostics, stdout, stderr })
+        Ok(CoqResponse {
+            success,
+            diagnostics,
+            stdout,
+            stderr,
+        })
     }
 
     fn run_with_timeout(
@@ -138,17 +159,32 @@ impl CoqSidecar {
         let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
         let success = out.status.success() && !stderr.contains("Error:");
         let diagnostics = parse_coq_diagnostics(&stderr);
-        if !success { return Err(CoqError::VerificationFailed(stderr)); }
-        Ok(CoqResponse { success, diagnostics, stdout, stderr })
+        if !success {
+            return Err(CoqError::VerificationFailed(stderr));
+        }
+        Ok(CoqResponse {
+            success,
+            diagnostics,
+            stdout,
+            stderr,
+        })
     }
 }
 
 fn parse_coq_diagnostics(stderr: &str) -> Vec<CoqDiagnostic> {
-    stderr.lines()
+    stderr
+        .lines()
         .filter(|l| l.contains("Error:") || l.contains("Warning:"))
         .map(|l| {
-            let severity = if l.contains("Error:") { "error" } else { "warning" };
-            CoqDiagnostic { severity: severity.into(), message: l.to_string() }
+            let severity = if l.contains("Error:") {
+                "error"
+            } else {
+                "warning"
+            };
+            CoqDiagnostic {
+                severity: severity.into(),
+                message: l.to_string(),
+            }
         })
         .collect()
 }

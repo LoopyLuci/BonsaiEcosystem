@@ -1,5 +1,5 @@
+use bonsai_cas::{CasKey, CasStore};
 use std::sync::Arc;
-use bonsai_cas::{CasStore, CasKey};
 use tracing::info;
 
 use crate::state::DaemonState;
@@ -12,7 +12,8 @@ pub async fn checkpoint(state: &Arc<DaemonState>, cas: &CasStore) -> Result<CasK
     let snap = serde_json::to_vec(&*transfers).map_err(|e| e.to_string())?;
     drop(transfers);
 
-    let key = cas.put(&snap, "application/json")
+    let key = cas
+        .put(&snap, "application/json")
         .await
         .map_err(|e| e.to_string())?;
     info!(cas_key = %key, "daemon state checkpointed");
@@ -21,7 +22,10 @@ pub async fn checkpoint(state: &Arc<DaemonState>, cas: &CasStore) -> Result<CasK
 
 /// Restore transfer statuses from a previous checkpoint.
 pub async fn restore(state: &Arc<DaemonState>, cas: &CasStore, key: &CasKey) -> Result<(), String> {
-    let data = cas.get(key).await.map_err(|e| e.to_string())?
+    let data = cas
+        .get(key)
+        .await
+        .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("checkpoint key not found: {key}"))?;
     let map: std::collections::HashMap<String, bonsai_transfer_core::transfer::TransferStatus> =
         serde_json::from_slice(&data).map_err(|e| e.to_string())?;

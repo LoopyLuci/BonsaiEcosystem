@@ -1,5 +1,5 @@
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Deserialize, Serialize)]
 pub struct BonsaiPlugin {
@@ -62,6 +62,5 @@ pub fn list_plugins_cmd() -> Vec<String> {
 
 #[tauri::command]
 pub fn load_plugin_cmd(path: String) -> Result<String, String> {
-    load_plugin(Path::new(&path))
-        .map(|p| serde_json::to_string_pretty(&p).unwrap_or_default())
+    load_plugin(Path::new(&path)).map(|p| serde_json::to_string_pretty(&p).unwrap_or_default())
 }

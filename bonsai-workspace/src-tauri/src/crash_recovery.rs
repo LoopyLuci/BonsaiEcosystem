@@ -7,7 +7,6 @@
 ///   4. Remove the flag so a clean second boot doesn't think it crashed.
 ///
 /// On clean exit, `on_exit_cleanup` removes the flag.
-
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::{info, warn};
@@ -34,10 +33,7 @@ pub fn arm_crash_flag(app: &AppHandle) {
 
 /// Check for a crash flag and emit recovery events if one is found.
 /// Returns `true` if a crash was detected.
-pub async fn check_and_recover(
-    app: &AppHandle,
-    wal: &crate::wal::WAL,
-) -> bool {
+pub async fn check_and_recover(app: &AppHandle, wal: &crate::wal::WAL) -> bool {
     let path = flag_path(app);
     if !path.exists() {
         return false;
@@ -56,11 +52,14 @@ pub async fn check_and_recover(
     }
 
     // Emit event so the frontend can show a non-blocking recovery notice.
-    let _ = app.emit("recovery-state", serde_json::json!({
-        "crashed": true,
-        "wal_replayed": true,
-        "message": "Bonsai recovered from an unexpected shutdown. Your data is intact."
-    }));
+    let _ = app.emit(
+        "recovery-state",
+        serde_json::json!({
+            "crashed": true,
+            "wal_replayed": true,
+            "message": "Bonsai recovered from an unexpected shutdown. Your data is intact."
+        }),
+    );
 
     // Remove the flag so the next boot is clean.
     let _ = std::fs::remove_file(&path);

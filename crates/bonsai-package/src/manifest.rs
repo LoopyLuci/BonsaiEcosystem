@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageManifest {
@@ -45,7 +45,11 @@ pub struct KnowledgeModuleRef {
 }
 
 impl PackageManifest {
-    pub fn new(name: impl Into<String>, version: impl Into<String>, base_model: BaseModelInfo) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        version: impl Into<String>,
+        base_model: BaseModelInfo,
+    ) -> Self {
         PackageManifest {
             id: Uuid::new_v4(),
             name: name.into(),

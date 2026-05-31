@@ -1,20 +1,23 @@
-use std::sync::{Arc, Mutex as StdMutex, atomic::{AtomicBool, Ordering}};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use enigo::{Enigo, Key, KeyboardControllable, MouseButton, MouseControllable};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use image::{codecs::png::PngEncoder, ColorType, ImageBuffer, ImageEncoder, RgbaImage};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use scrap::{Capturer, Display};
+use serde::Serialize;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+use std::io;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex as StdMutex,
+};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use std::thread::sleep;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[cfg(any(target_os = "android", target_os = "ios"))]
 use std::time::{SystemTime, UNIX_EPOCH};
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use std::io;
 use tauri::AppHandle;
-use serde::Serialize;
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use scrap::{Capturer, Display};
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use image::{codecs::png::PngEncoder, ColorType, ImageBuffer, ImageEncoder, RgbaImage};
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
-use enigo::{Enigo, KeyboardControllable, Key, MouseButton, MouseControllable};
 
 use crate::remote_input::RemoteInputEvent;
 
@@ -123,7 +126,12 @@ impl RemoteManager {
             }
             "key" | "key_press" | "key_click" => {
                 if let Some(key) = event.key.as_deref() {
-                    Self::perform_key_event(&mut enigo, key, event.modifiers.as_deref(), event.text.as_deref())
+                    Self::perform_key_event(
+                        &mut enigo,
+                        key,
+                        event.modifiers.as_deref(),
+                        event.text.as_deref(),
+                    )
                 } else {
                     Err("Missing key for key event".into())
                 }
@@ -154,7 +162,10 @@ impl RemoteManager {
                     Err("Missing text for text_input event".into())
                 }
             }
-            _ => Err(format!("Unsupported remote input event type: {}", event.event_type)),
+            _ => Err(format!(
+                "Unsupported remote input event type: {}",
+                event.event_type
+            )),
         }
     }
 
@@ -164,7 +175,12 @@ impl RemoteManager {
     }
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    fn perform_key_event(enigo: &mut Enigo, key: &str, modifiers: Option<&[String]>, text: Option<&str>) -> Result<(), String> {
+    fn perform_key_event(
+        enigo: &mut Enigo,
+        key: &str,
+        modifiers: Option<&[String]>,
+        text: Option<&str>,
+    ) -> Result<(), String> {
         if let Some(mods) = modifiers {
             for modifier in mods {
                 match modifier.to_lowercase().as_str() {
@@ -239,7 +255,10 @@ impl RemoteManager {
     }
 
     pub fn get_active_session(&self) -> Option<RemoteSessionInfo> {
-        self.active_session.lock().ok().and_then(|session| session.clone())
+        self.active_session
+            .lock()
+            .ok()
+            .and_then(|session| session.clone())
     }
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]

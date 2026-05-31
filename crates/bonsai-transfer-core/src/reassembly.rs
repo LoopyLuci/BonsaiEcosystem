@@ -4,10 +4,10 @@
 //! If a gap persists beyond the NACK timeout, a NACK is emitted so the
 //! sender can retransmit on the fastest available lane.
 
+use crate::error::TransferResult;
+use bonsai_transfer_crypto::cipher::ChunkCiphertext;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
-use crate::error::TransferResult;
 
 /// Gap timeout before a NACK is emitted (milliseconds).
 const GAP_NACK_TIMEOUT_MS: u64 = 500;
@@ -71,7 +71,8 @@ impl ReassemblyWindow {
     /// Drain all contiguously-available chunks starting at `next_expected`.
     /// Returns decrypted payloads in order using the provided decrypt function.
     pub fn drain_ready<F>(&mut self, decrypt: F) -> TransferResult<Vec<(u64, Vec<u8>)>>
-    where F: Fn(&ChunkCiphertext) -> TransferResult<Vec<u8>>
+    where
+        F: Fn(&ChunkCiphertext) -> TransferResult<Vec<u8>>,
     {
         let mut out = Vec::new();
         while let Some(pending) = self.buffer.remove(&self.next_expected) {
@@ -116,14 +117,21 @@ impl ReassemblyWindow {
         }
     }
 
-    pub fn next_expected(&self) -> u64 { self.next_expected }
-    pub fn buffered_count(&self) -> usize { self.buffer.len() }
+    pub fn next_expected(&self) -> u64 {
+        self.next_expected
+    }
+    pub fn buffered_count(&self) -> usize {
+        self.buffer.len()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonsai_transfer_crypto::{session::SessionKey, cipher::{encrypt_chunk, decrypt_chunk}};
+    use bonsai_transfer_crypto::{
+        cipher::{decrypt_chunk, encrypt_chunk},
+        session::SessionKey,
+    };
 
     fn make_chunk(key: &SessionKey, gsn: u64, data: &[u8]) -> ChunkCiphertext {
         encrypt_chunk(key, gsn, data).unwrap()
@@ -139,7 +147,9 @@ mod tests {
             win.receive(make_chunk(&key, i, &[i as u8; 16]));
         }
 
-        let ready = win.drain_ready(|c| decrypt_chunk(&key, c).map_err(Into::into)).unwrap();
+        let ready = win
+            .drain_ready(|c| decrypt_chunk(&key, c).map_err(Into::into))
+            .unwrap();
         assert_eq!(ready.len(), 3);
         assert_eq!(ready[0].0, 0);
         assert_eq!(ready[1].0, 1);
@@ -155,12 +165,16 @@ mod tests {
         win.receive(make_chunk(&key, 2, b"chunk2"));
         win.receive(make_chunk(&key, 1, b"chunk1"));
         // GSN 0 not yet arrived → nothing drainable
-        let ready = win.drain_ready(|c| decrypt_chunk(&key, c).map_err(Into::into)).unwrap();
+        let ready = win
+            .drain_ready(|c| decrypt_chunk(&key, c).map_err(Into::into))
+            .unwrap();
         assert_eq!(ready.len(), 0);
 
         // Now GSN 0 arrives
         win.receive(make_chunk(&key, 0, b"chunk0"));
-        let ready = win.drain_ready(|c| decrypt_chunk(&key, c).map_err(Into::into)).unwrap();
+        let ready = win
+            .drain_ready(|c| decrypt_chunk(&key, c).map_err(Into::into))
+            .unwrap();
         assert_eq!(ready.len(), 3);
     }
 }

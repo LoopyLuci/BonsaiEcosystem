@@ -1,10 +1,13 @@
+use rusqlite::OptionalExtension;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio_rusqlite::Connection;
-use rusqlite::OptionalExtension;
 
 fn now_secs() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
 }
 
 pub type Db = Arc<Connection>;
@@ -107,7 +110,16 @@ pub async fn upsert_runtime_record(
                    status = excluded.status,
                    started_at = excluded.started_at,
                    timeout_secs = excluded.timeout_secs"#,
-            rusqlite::params![id_s, kind_s, script_s, u, pid, status_s, started_at, timeout_secs],
+            rusqlite::params![
+                id_s,
+                kind_s,
+                script_s,
+                u,
+                pid,
+                status_s,
+                started_at,
+                timeout_secs
+            ],
         )
         .map(|_| ())
         .map_err(tokio_rusqlite::Error::from)
@@ -123,16 +135,16 @@ pub async fn update_runtime_status(
 ) -> Result<(), tokio_rusqlite::Error> {
     let id_s = id.to_string();
     let status_s = status.to_string();
-        let p = pid;
-        db.call(move |conn| {
-            conn.execute(
-                "UPDATE runtime_records SET status = ?1, pid = COALESCE(?2, pid) WHERE id = ?3",
-                rusqlite::params![status_s, p, id_s],
-            )
-            .map(|_| ())
-            .map_err(tokio_rusqlite::Error::from)
-        })
-        .await
+    let p = pid;
+    db.call(move |conn| {
+        conn.execute(
+            "UPDATE runtime_records SET status = ?1, pid = COALESCE(?2, pid) WHERE id = ?3",
+            rusqlite::params![status_s, p, id_s],
+        )
+        .map(|_| ())
+        .map_err(tokio_rusqlite::Error::from)
+    })
+    .await
 }
 
 pub async fn list_runtime_records(db: &Db) -> Vec<serde_json::Value> {
@@ -227,7 +239,15 @@ pub async fn upsert_session(
                    display_name     = excluded.display_name,
                    last_active      = excluded.last_active,
                    is_archived      = 0"#,
-            rusqlite::params![id, platform, user_id, chat_id, buddy_session_id, display_name, ts],
+            rusqlite::params![
+                id,
+                platform,
+                user_id,
+                chat_id,
+                buddy_session_id,
+                display_name,
+                ts
+            ],
         )
         .map(|_| ())
         .map_err(tokio_rusqlite::Error::from)
@@ -237,35 +257,37 @@ pub async fn upsert_session(
 
 pub async fn touch_session(db: &Db, platform: String, user_id: String, chat_id: String) {
     let ts = now_secs();
-    let _ = db.call(move |conn| {
-        conn.execute(
-            "UPDATE bot_sessions SET last_active = ?1
+    let _ = db
+        .call(move |conn| {
+            conn.execute(
+                "UPDATE bot_sessions SET last_active = ?1
              WHERE platform = ?2 AND platform_user_id = ?3 AND platform_chat_id = ?4",
-            rusqlite::params![ts, platform, user_id, chat_id],
-        )
-        .map(|_| ())
-        .map_err(tokio_rusqlite::Error::from)
-    })
-    .await;
+                rusqlite::params![ts, platform, user_id, chat_id],
+            )
+            .map(|_| ())
+            .map_err(tokio_rusqlite::Error::from)
+        })
+        .await;
 }
 
 pub async fn list_active_sessions(db: &Db) -> Vec<serde_json::Value> {
     db.call(|conn| {
         let mut stmt = conn.prepare(
             "SELECT platform, platform_user_id, platform_chat_id, display_name, last_active
-             FROM bot_sessions WHERE is_archived = 0 ORDER BY last_active DESC LIMIT 200"
+             FROM bot_sessions WHERE is_archived = 0 ORDER BY last_active DESC LIMIT 200",
         )?;
-        let rows = stmt.query_map([], |row| {
-            Ok(serde_json::json!({
-                "platform":      row.get::<_, String>(0)?,
-                "user_id":       row.get::<_, String>(1)?,
-                "chat_id":       row.get::<_, String>(2)?,
-                "display_name":  row.get::<_, Option<String>>(3)?,
-                "last_active":   row.get::<_, i64>(4)?,
-            }))
-        })?
-        .filter_map(|r| r.ok())
-        .collect();
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "platform":      row.get::<_, String>(0)?,
+                    "user_id":       row.get::<_, String>(1)?,
+                    "chat_id":       row.get::<_, String>(2)?,
+                    "display_name":  row.get::<_, Option<String>>(3)?,
+                    "last_active":   row.get::<_, i64>(4)?,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(rows)
     })
     .await
@@ -292,32 +314,34 @@ pub async fn cleanup_stale(db: &Db) {
     let now = now_secs();
     let soft = now - 30 * 86400;
     let hard = now - 90 * 86400;
-    let _ = db.call(move |conn: &mut rusqlite::Connection| {
-        conn.execute(
+    let _ = db
+        .call(move |conn: &mut rusqlite::Connection| {
+            conn.execute(
             "UPDATE bot_sessions SET is_archived = 1 WHERE last_active < ?1 AND is_archived = 0",
             rusqlite::params![soft],
         ).map(|_| ())?;
-        conn.execute(
-            "DELETE FROM bot_sessions WHERE is_archived = 1 AND last_active < ?1",
-            rusqlite::params![hard],
-        ).map(|_| ())?;
-        Ok(())
-    })
-    .await;
+            conn.execute(
+                "DELETE FROM bot_sessions WHERE is_archived = 1 AND last_active < ?1",
+                rusqlite::params![hard],
+            )
+            .map(|_| ())?;
+            Ok(())
+        })
+        .await;
 }
 
 // ── Pending confirmations ─────────────────────────────────────────────────────
 
 #[allow(dead_code)]
 pub struct PendingConfirm {
-    pub token:        String,
-    pub platform:     String,
-    pub chat_id:      String,
-    pub user_id:      String,
-    pub tool:         String,
-    pub args_json:    String,
-    pub prompt:       String,
-    pub expires_at:   i64,
+    pub token: String,
+    pub platform: String,
+    pub chat_id: String,
+    pub user_id: String,
+    pub tool: String,
+    pub args_json: String,
+    pub prompt: String,
+    pub expires_at: i64,
     pub prompt_state: String,
     pub prompt_nonce: i64,
 }
@@ -339,7 +363,9 @@ pub async fn insert_confirm(
                (token, platform, chat_id, user_id, tool, args_json, prompt, expires_at,
                 prompt_state, prompt_nonce)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'created', 0)"#,
-            rusqlite::params![token, platform, chat_id, user_id, tool, args_json, prompt, expires_at],
+            rusqlite::params![
+                token, platform, chat_id, user_id, tool, args_json, prompt, expires_at
+            ],
         )
         .map(|_| ())
         .map_err(tokio_rusqlite::Error::from)
@@ -386,22 +412,23 @@ pub async fn load_unresolved_confirms(db: &Db) -> Vec<PendingConfirm> {
                FROM pending_confirms
                WHERE prompt_state IN ('created', 'prompted') AND expires_at > ?1"#,
         )?;
-        let rows = stmt.query_map(rusqlite::params![now], |row| {
-            Ok(PendingConfirm {
-                token:        row.get(0)?,
-                platform:     row.get(1)?,
-                chat_id:      row.get(2)?,
-                user_id:      row.get(3)?,
-                tool:         row.get(4)?,
-                args_json:    row.get(5)?,
-                prompt:       row.get(6)?,
-                expires_at:   row.get(7)?,
-                prompt_state: row.get(8)?,
-                prompt_nonce: row.get(9)?,
-            })
-        })?
-        .filter_map(|r| r.ok())
-        .collect();
+        let rows = stmt
+            .query_map(rusqlite::params![now], |row| {
+                Ok(PendingConfirm {
+                    token: row.get(0)?,
+                    platform: row.get(1)?,
+                    chat_id: row.get(2)?,
+                    user_id: row.get(3)?,
+                    tool: row.get(4)?,
+                    args_json: row.get(5)?,
+                    prompt: row.get(6)?,
+                    expires_at: row.get(7)?,
+                    prompt_state: row.get(8)?,
+                    prompt_nonce: row.get(9)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(rows)
     })
     .await
@@ -425,7 +452,16 @@ mod tests {
     #[tokio::test]
     async fn session_create_and_find() {
         let db = mem_db().await;
-        upsert_session(&db, "discord".into(), "u1".into(), "c1".into(), "User".into(), "sess-1".into()).await.unwrap();
+        upsert_session(
+            &db,
+            "discord".into(),
+            "u1".into(),
+            "c1".into(),
+            "User".into(),
+            "sess-1".into(),
+        )
+        .await
+        .unwrap();
         let found = find_active_session(&db, "discord".into(), "u1".into(), "c1".into()).await;
         assert_eq!(found, Some("sess-1".to_string()));
     }
@@ -433,7 +469,16 @@ mod tests {
     #[tokio::test]
     async fn session_not_found_different_platform() {
         let db = mem_db().await;
-        upsert_session(&db, "discord".into(), "u2".into(), "c2".into(), "User".into(), "sess-2".into()).await.unwrap();
+        upsert_session(
+            &db,
+            "discord".into(),
+            "u2".into(),
+            "c2".into(),
+            "User".into(),
+            "sess-2".into(),
+        )
+        .await
+        .unwrap();
         let found = find_active_session(&db, "telegram".into(), "u2".into(), "c2".into()).await;
         assert!(found.is_none());
     }
@@ -442,8 +487,19 @@ mod tests {
     async fn confirm_insert_mark_resolve_nonce() {
         let db = mem_db().await;
         let expires = future_secs(120);
-        insert_confirm(&db, "tok1".into(), "discord".into(), "c1".into(), "u1".into(),
-            "run_cmd".into(), "{}".into(), "Run rm -rf?".into(), expires).await.unwrap();
+        insert_confirm(
+            &db,
+            "tok1".into(),
+            "discord".into(),
+            "c1".into(),
+            "u1".into(),
+            "run_cmd".into(),
+            "{}".into(),
+            "Run rm -rf?".into(),
+            expires,
+        )
+        .await
+        .unwrap();
 
         // mark_prompted increments nonce to 1
         let nonce1 = mark_prompted(&db, "tok1".into()).await.unwrap();
@@ -470,8 +526,19 @@ mod tests {
         let db = mem_db().await;
         // Insert with expires_at in the past
         let past = now_secs() - 10;
-        insert_confirm(&db, "tok-expired".into(), "discord".into(), "c1".into(), "u1".into(),
-            "tool".into(), "{}".into(), "prompt".into(), past).await.unwrap();
+        insert_confirm(
+            &db,
+            "tok-expired".into(),
+            "discord".into(),
+            "c1".into(),
+            "u1".into(),
+            "tool".into(),
+            "{}".into(),
+            "prompt".into(),
+            past,
+        )
+        .await
+        .unwrap();
         let pending = load_unresolved_confirms(&db).await;
         assert!(pending.is_empty(), "expired confirm should not be returned");
     }
@@ -480,8 +547,19 @@ mod tests {
     async fn stale_nonce_detect() {
         let db = mem_db().await;
         let expires = future_secs(120);
-        insert_confirm(&db, "tok-stale".into(), "discord".into(), "c1".into(), "u1".into(),
-            "tool".into(), "{}".into(), "prompt".into(), expires).await.unwrap();
+        insert_confirm(
+            &db,
+            "tok-stale".into(),
+            "discord".into(),
+            "c1".into(),
+            "u1".into(),
+            "tool".into(),
+            "{}".into(),
+            "prompt".into(),
+            expires,
+        )
+        .await
+        .unwrap();
         let nonce = mark_prompted(&db, "tok-stale".into()).await.unwrap(); // nonce = 1
 
         // Simulate restart: prompt sent again, nonce becomes 2
@@ -489,8 +567,15 @@ mod tests {
 
         // A Discord callback arrives with the OLD nonce (1) — must be rejected
         let pending = load_unresolved_confirms(&db).await;
-        let stored = pending.iter().find(|p| p.token == "tok-stale").map(|p| p.prompt_nonce);
-        assert_ne!(stored, Some(nonce), "old nonce should not match stored nonce after restart");
+        let stored = pending
+            .iter()
+            .find(|p| p.token == "tok-stale")
+            .map(|p| p.prompt_nonce);
+        assert_ne!(
+            stored,
+            Some(nonce),
+            "old nonce should not match stored nonce after restart"
+        );
         assert_eq!(stored, Some(new_nonce));
     }
 }
@@ -499,15 +584,15 @@ mod tests {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SkillRecord {
-    pub id:          String,
-    pub name:        String,
+    pub id: String,
+    pub name: String,
     pub description: String,
-    pub language:    String,
+    pub language: String,
     pub script_path: String,
-    pub version:     i64,
-    pub enabled:     bool,
-    pub created_at:  i64,
-    pub updated_at:  i64,
+    pub version: i64,
+    pub enabled: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 pub async fn upsert_skill(db: &Db, rec: SkillRecord) -> Result<(), tokio_rusqlite::Error> {
@@ -561,9 +646,11 @@ pub async fn toggle_skill(db: &Db, id: String, enabled: bool) -> Result<(), toki
         conn.execute(
             "UPDATE skills SET enabled = ?1, updated_at = ?2 WHERE id = ?3",
             rusqlite::params![enabled as i64, now, id],
-        ).map(|_| ())?;
+        )
+        .map(|_| ())?;
         Ok(())
-    }).await
+    })
+    .await
 }
 
 pub async fn delete_skill(db: &Db, id: String) -> Result<(), tokio_rusqlite::Error> {
@@ -571,7 +658,8 @@ pub async fn delete_skill(db: &Db, id: String) -> Result<(), tokio_rusqlite::Err
         conn.execute("DELETE FROM skills WHERE id = ?1", rusqlite::params![id])
             .map(|_| ())?;
         Ok(())
-    }).await
+    })
+    .await
 }
 
 /// Scan manifest files under `base_dirs` and sync them into the skills table.
@@ -579,28 +667,38 @@ pub async fn sync_skills_from_disk(db: &Db, base_dirs: Vec<String>) {
     let now = now_secs();
     for base in &base_dirs {
         let skills_dir = std::path::PathBuf::from(base).join("skills");
-        if !skills_dir.exists() { continue; }
+        if !skills_dir.exists() {
+            continue;
+        }
         let entries = match std::fs::read_dir(&skills_dir) {
-            Ok(e) => e, Err(_) => continue,
+            Ok(e) => e,
+            Err(_) => continue,
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("json") { continue; }
-            let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-            if !fname.ends_with(".skill.json") { continue; }
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            let fname = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default();
+            if !fname.ends_with(".skill.json") {
+                continue;
+            }
 
             if let Ok(s) = std::fs::read_to_string(&path) {
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
                     let rec = SkillRecord {
-                        id:          v["id"].as_str().unwrap_or_default().to_string(),
-                        name:        v["name"].as_str().unwrap_or_default().to_string(),
+                        id: v["id"].as_str().unwrap_or_default().to_string(),
+                        name: v["name"].as_str().unwrap_or_default().to_string(),
                         description: v["description"].as_str().unwrap_or_default().to_string(),
-                        language:    v["language"].as_str().unwrap_or_default().to_string(),
+                        language: v["language"].as_str().unwrap_or_default().to_string(),
                         script_path: v["script_path"].as_str().unwrap_or_default().to_string(),
-                        version:     1,
-                        enabled:     true,
-                        created_at:  now,
-                        updated_at:  now,
+                        version: 1,
+                        enabled: true,
+                        created_at: now,
+                        updated_at: now,
                     };
                     if !rec.id.is_empty() {
                         let _ = upsert_skill(db, rec).await;
@@ -614,45 +712,56 @@ pub async fn sync_skills_from_disk(db: &Db, base_dirs: Vec<String>) {
 pub async fn purge_expired_confirms(db: &Db) {
     let now = now_secs();
     let stale = now - 3600;
-    let _ = db.call(move |conn: &mut rusqlite::Connection| {
-        conn.execute(
-            "UPDATE pending_confirms SET prompt_state = 'expired'
+    let _ = db
+        .call(move |conn: &mut rusqlite::Connection| {
+            conn.execute(
+                "UPDATE pending_confirms SET prompt_state = 'expired'
              WHERE expires_at < ?1 AND prompt_state IN ('created', 'prompted')",
-            rusqlite::params![now],
-        ).map(|_| ())?;
-        conn.execute(
-            "DELETE FROM pending_confirms WHERE prompt_state = 'expired' AND expires_at < ?1",
-            rusqlite::params![stale],
-        ).map(|_| ())?;
-        Ok(())
-    })
-    .await;
+                rusqlite::params![now],
+            )
+            .map(|_| ())?;
+            conn.execute(
+                "DELETE FROM pending_confirms WHERE prompt_state = 'expired' AND expires_at < ?1",
+                rusqlite::params![stale],
+            )
+            .map(|_| ())?;
+            Ok(())
+        })
+        .await;
 }
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
 
-pub async fn audit(db: &Db, event: &str, platform: Option<&str>, user_id: Option<&str>, detail: Option<&str>) {
-    let ts       = now_secs();
-    let event    = event.to_string();
+pub async fn audit(
+    db: &Db,
+    event: &str,
+    platform: Option<&str>,
+    user_id: Option<&str>,
+    detail: Option<&str>,
+) {
+    let ts = now_secs();
+    let event = event.to_string();
     let platform = platform.map(str::to_string);
-    let user_id  = user_id.map(str::to_string);
-    let detail   = detail.map(str::to_string);
-    let _ = db.call(move |conn| {
-        conn.execute(
+    let user_id = user_id.map(str::to_string);
+    let detail = detail.map(str::to_string);
+    let _ = db
+        .call(move |conn| {
+            conn.execute(
             "INSERT INTO audit_log (ts, event, platform, user_id, detail) VALUES (?1,?2,?3,?4,?5)",
             rusqlite::params![ts, event, platform, user_id, detail],
         ).map(|_| ())?;
-        Ok(())
-    }).await;
+            Ok(())
+        })
+        .await;
 }
 
 pub struct AuditEntry {
-    pub id:       i64,
-    pub ts:       i64,
-    pub event:    String,
+    pub id: i64,
+    pub ts: i64,
+    pub event: String,
     pub platform: Option<String>,
-    pub user_id:  Option<String>,
-    pub detail:   Option<String>,
+    pub user_id: Option<String>,
+    pub detail: Option<String>,
 }
 
 pub async fn list_audit(db: &Db, limit: usize) -> Vec<AuditEntry> {

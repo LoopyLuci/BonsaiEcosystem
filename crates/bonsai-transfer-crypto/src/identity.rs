@@ -4,11 +4,11 @@
 //! component. We implement the Ed25519 layer now; ML-DSA-87 is additive when the
 //! `fips204` crate stabilises (the combined public key would be 2624 bytes).
 
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use crate::error::{CryptoError, CryptoResult};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
-use crate::error::{CryptoError, CryptoResult};
 
 // ── Public identity ───────────────────────────────────────────────────────────
 
@@ -25,7 +25,10 @@ impl IdentityPublicKey {
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
         let fp_hash = blake3::hash(&bytes);
         let fingerprint = hex::encode(&fp_hash.as_bytes()[..8]);
-        Self { ed25519_pk: bytes, fingerprint }
+        Self {
+            ed25519_pk: bytes,
+            fingerprint,
+        }
     }
 
     pub fn to_hex(&self) -> String {
@@ -33,10 +36,11 @@ impl IdentityPublicKey {
     }
 
     pub fn from_hex(s: &str) -> CryptoResult<Self> {
-        let bytes = hex::decode(s)
-            .map_err(|e| CryptoError::InvalidKey(e.to_string()))?;
+        let bytes = hex::decode(s).map_err(|e| CryptoError::InvalidKey(e.to_string()))?;
         if bytes.len() != 32 {
-            return Err(CryptoError::InvalidKey("Ed25519 key must be 32 bytes".into()));
+            return Err(CryptoError::InvalidKey(
+                "Ed25519 key must be 32 bytes".into(),
+            ));
         }
         let mut arr = [0u8; 32];
         arr.copy_from_slice(&bytes);
@@ -47,8 +51,8 @@ impl IdentityPublicKey {
     pub fn verify(&self, message: &[u8], signature: &[u8]) -> CryptoResult<()> {
         let vk = VerifyingKey::from_bytes(&self.ed25519_pk)
             .map_err(|e| CryptoError::InvalidKey(e.to_string()))?;
-        let sig = Signature::from_slice(signature)
-            .map_err(|e| CryptoError::InvalidKey(e.to_string()))?;
+        let sig =
+            Signature::from_slice(signature).map_err(|e| CryptoError::InvalidKey(e.to_string()))?;
         vk.verify(message, &sig)
             .map_err(|_| CryptoError::HandshakeFailed("signature verification failed".into()))
     }
@@ -68,7 +72,10 @@ impl BonsaiIdentity {
         let signing_key = SigningKey::generate(&mut OsRng);
         let pk_bytes = signing_key.verifying_key().to_bytes();
         let public_key = IdentityPublicKey::from_bytes(pk_bytes);
-        Self { signing_key, public_key }
+        Self {
+            signing_key,
+            public_key,
+        }
     }
 
     /// Restore from a raw 32-byte seed (produced by KDF from BIP-39 phrase).
@@ -76,7 +83,10 @@ impl BonsaiIdentity {
         let signing_key = SigningKey::from_bytes(seed);
         let pk_bytes = signing_key.verifying_key().to_bytes();
         let public_key = IdentityPublicKey::from_bytes(pk_bytes);
-        Ok(Self { signing_key, public_key })
+        Ok(Self {
+            signing_key,
+            public_key,
+        })
     }
 
     /// Export the raw 32-byte signing seed (store encrypted, never in plaintext logs).

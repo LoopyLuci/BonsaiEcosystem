@@ -10,20 +10,20 @@
 //! Smaller boards (9×9, 13×13) pad the input with zeros to the 19×19 size.
 //! Weights stored as raw f32 little-endian binary.
 
-use std::path::{Path, PathBuf};
-use std::io::{Read, Write};
-use rand::Rng;
+use crate::board::{BoardSize, GoBoard, Point, Stone};
 use crate::mcts::{GoEvaluator, RandomGoEvaluator};
-use crate::board::{GoBoard, Stone, Point, BoardSize};
+use rand::Rng;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-pub const BOARD_SIZE:   usize = 19;
-pub const SQUARES:      usize = BOARD_SIZE * BOARD_SIZE; // 361
-pub const INPUT_SIZE:   usize = 17 * SQUARES;            // 6137
-pub const HIDDEN_SIZE:  usize = 512;
-pub const POLICY_SIZE:  usize = SQUARES + 1;             // 362 (pass included)
-pub const VALUE_SIZE:   usize = 1;
+pub const BOARD_SIZE: usize = 19;
+pub const SQUARES: usize = BOARD_SIZE * BOARD_SIZE; // 361
+pub const INPUT_SIZE: usize = 17 * SQUARES; // 6137
+pub const HIDDEN_SIZE: usize = 512;
+pub const POLICY_SIZE: usize = SQUARES + 1; // 362 (pass included)
+pub const VALUE_SIZE: usize = 1;
 
 const W1_LEN: usize = INPUT_SIZE * HIDDEN_SIZE;
 const B1_LEN: usize = HIDDEN_SIZE;
@@ -53,20 +53,30 @@ impl GoNetWeights {
         let hev = (2.0_f32 / HIDDEN_SIZE as f32).sqrt();
 
         Self {
-            w1: (0..W1_LEN).map(|_| rng.gen::<f32>() * 2.0 * he1 - he1).collect(),
+            w1: (0..W1_LEN)
+                .map(|_| rng.gen::<f32>() * 2.0 * he1 - he1)
+                .collect(),
             b1: vec![0.0f32; B1_LEN],
-            wp: (0..WP_LEN).map(|_| rng.gen::<f32>() * 2.0 * hep - hep).collect(),
+            wp: (0..WP_LEN)
+                .map(|_| rng.gen::<f32>() * 2.0 * hep - hep)
+                .collect(),
             bp: vec![0.0f32; BP_LEN],
-            wv: (0..WV_LEN).map(|_| rng.gen::<f32>() * 2.0 * hev - hev).collect(),
+            wv: (0..WV_LEN)
+                .map(|_| rng.gen::<f32>() * 2.0 * hev - hev)
+                .collect(),
             bv: vec![0.5f32; BV_LEN],
         }
     }
 
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
-        if let Some(p) = path.parent() { std::fs::create_dir_all(p)?; }
+        if let Some(p) = path.parent() {
+            std::fs::create_dir_all(p)?;
+        }
         let mut f = std::fs::File::create(path)?;
         for slice in [&self.w1, &self.b1, &self.wp, &self.bp, &self.wv, &self.bv] {
-            for &v in slice { f.write_all(&v.to_le_bytes())?; }
+            for &v in slice {
+                f.write_all(&v.to_le_bytes())?;
+            }
         }
         Ok(())
     }
@@ -82,15 +92,25 @@ impl GoNetWeights {
                 format!("expected {expected} bytes, got {}", buf.len()),
             ));
         }
-        let floats: Vec<f32> = buf.chunks_exact(4)
+        let floats: Vec<f32> = buf
+            .chunks_exact(4)
             .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
             .collect();
         let mut off = 0usize;
-        macro_rules! take { ($n:expr) => {{ let v = floats[off..off+$n].to_vec(); off += $n; v }}; }
+        macro_rules! take {
+            ($n:expr) => {{
+                let v = floats[off..off + $n].to_vec();
+                off += $n;
+                v
+            }};
+        }
         let result = Ok(Self {
-            w1: take!(W1_LEN), b1: take!(B1_LEN),
-            wp: take!(WP_LEN), bp: take!(BP_LEN),
-            wv: take!(WV_LEN), bv: take!(BV_LEN),
+            w1: take!(W1_LEN),
+            b1: take!(B1_LEN),
+            wp: take!(WP_LEN),
+            bp: take!(BP_LEN),
+            wv: take!(WV_LEN),
+            bv: take!(BV_LEN),
         });
         let _ = off; // off is fully consumed by the take! sequence above
         result
@@ -100,7 +120,11 @@ impl GoNetWeights {
         let mut h = self.b1.clone();
         for (j, h_j) in h.iter_mut().enumerate() {
             let row = j * INPUT_SIZE;
-            let sum: f32 = input.iter().enumerate().map(|(i, &x)| x * self.w1[row + i]).sum();
+            let sum: f32 = input
+                .iter()
+                .enumerate()
+                .map(|(i, &x)| x * self.w1[row + i])
+                .sum();
             *h_j = (*h_j + sum).max(0.0);
         }
         h
@@ -110,7 +134,11 @@ impl GoNetWeights {
         let mut logits = self.bp.clone();
         for (j, l) in logits.iter_mut().enumerate() {
             let row = j * HIDDEN_SIZE;
-            *l += hidden.iter().enumerate().map(|(i, &h)| h * self.wp[row + i]).sum::<f32>();
+            *l += hidden
+                .iter()
+                .enumerate()
+                .map(|(i, &h)| h * self.wp[row + i])
+                .sum::<f32>();
         }
         softmax(&mut logits);
         logits
@@ -118,7 +146,11 @@ impl GoNetWeights {
 
     pub fn value(&self, hidden: &[f32]) -> f32 {
         let logit: f32 = self.bv[0]
-            + hidden.iter().enumerate().map(|(i, &h)| h * self.wv[i]).sum::<f32>();
+            + hidden
+                .iter()
+                .enumerate()
+                .map(|(i, &h)| h * self.wv[i])
+                .sum::<f32>();
         sigmoid(logit)
     }
 }
@@ -126,11 +158,20 @@ impl GoNetWeights {
 fn softmax(v: &mut [f32]) {
     let max = v.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let mut sum = 0.0f32;
-    for x in v.iter_mut() { *x = (*x - max).exp(); sum += *x; }
-    if sum > 0.0 { for x in v.iter_mut() { *x /= sum; } }
+    for x in v.iter_mut() {
+        *x = (*x - max).exp();
+        sum += *x;
+    }
+    if sum > 0.0 {
+        for x in v.iter_mut() {
+            *x /= sum;
+        }
+    }
 }
 
-fn sigmoid(x: f32) -> f32 { 1.0 / (1.0 + (-x).exp()) }
+fn sigmoid(x: f32) -> f32 {
+    1.0 / (1.0 + (-x).exp())
+}
 
 /// Pad a board's `to_nn_input()` to the canonical 19×19 input size.
 /// Boards smaller than 19×19 are placed in the top-left corner.
@@ -140,7 +181,7 @@ pub fn board_to_canonical_input(board: &GoBoard, color: Stone) -> Vec<f32> {
         return raw;
     }
     // Pad: 17 planes, each SQUARES long, filled from raw (smaller square)
-    let src_sq  = board.size as usize * board.size as usize;
+    let src_sq = board.size as usize * board.size as usize;
     let src_per = 17 * src_sq;
     if raw.len() != src_per {
         return vec![0.0; INPUT_SIZE]; // safety fallback
@@ -165,12 +206,23 @@ pub struct AdamState {
     pub m: Vec<f32>,
     pub v: Vec<f32>,
     pub t: u32,
-    pub lr: f32, pub beta1: f32, pub beta2: f32, pub eps: f32,
+    pub lr: f32,
+    pub beta1: f32,
+    pub beta2: f32,
+    pub eps: f32,
 }
 
 impl AdamState {
     pub fn new(n: usize) -> Self {
-        Self { m: vec![0.0; n], v: vec![0.0; n], t: 0, lr: 1e-3, beta1: 0.9, beta2: 0.999, eps: 1e-8 }
+        Self {
+            m: vec![0.0; n],
+            v: vec![0.0; n],
+            t: 0,
+            lr: 1e-3,
+            beta1: 0.9,
+            beta2: 0.999,
+            eps: 1e-8,
+        }
     }
 
     pub fn step(&mut self, params: &mut [f32], grads: &[f32]) {
@@ -209,7 +261,10 @@ impl NetworkGoEvaluator {
     pub fn new(weights_path: impl Into<PathBuf>) -> Self {
         let path: PathBuf = weights_path.into();
         let weights = GoNetWeights::load(&path).ok();
-        Self { weights, weights_path: path }
+        Self {
+            weights,
+            weights_path: path,
+        }
     }
 
     pub fn default_path() -> PathBuf {
@@ -217,9 +272,13 @@ impl NetworkGoEvaluator {
         base.join(".bonsai").join("models").join("go_net.bin")
     }
 
-    pub fn load_default() -> Self { Self::new(Self::default_path()) }
+    pub fn load_default() -> Self {
+        Self::new(Self::default_path())
+    }
 
-    pub fn is_loaded(&self) -> bool { self.weights.is_some() }
+    pub fn is_loaded(&self) -> bool {
+        self.weights.is_some()
+    }
 
     pub fn init_random(&mut self) -> std::io::Result<()> {
         let w = GoNetWeights::random();
@@ -232,7 +291,9 @@ impl NetworkGoEvaluator {
         if let Ok(w) = GoNetWeights::load(&self.weights_path) {
             self.weights = Some(w);
             true
-        } else { false }
+        } else {
+            false
+        }
     }
 
     pub fn save(&self) -> std::io::Result<()> {
@@ -242,8 +303,12 @@ impl NetworkGoEvaluator {
         }
     }
 
-    pub fn weights(&self) -> Option<&GoNetWeights> { self.weights.as_ref() }
-    pub fn weights_mut(&mut self) -> Option<&mut GoNetWeights> { self.weights.as_mut() }
+    pub fn weights(&self) -> Option<&GoNetWeights> {
+        self.weights.as_ref()
+    }
+    pub fn weights_mut(&mut self) -> Option<&mut GoNetWeights> {
+        self.weights.as_mut()
+    }
 }
 
 fn dirs_or_home() -> PathBuf {
@@ -279,16 +344,22 @@ impl GoEvaluator for NetworkGoEvaluator {
         // Re-normalize over legal candidates
         let total: f32 = moves.iter().map(|(_, p)| p).sum();
         if total > 0.0 {
-            for (_, p) in moves.iter_mut() { *p /= total; }
+            for (_, p) in moves.iter_mut() {
+                *p /= total;
+            }
         } else {
             let n = moves.len() as f32;
-            for (_, p) in moves.iter_mut() { *p = 1.0 / n; }
+            for (_, p) in moves.iter_mut() {
+                *p = 1.0 / n;
+            }
         }
         moves
     }
 
     fn evaluate_value(&self, board: &GoBoard, color: Stone) -> f32 {
-        let Some(w) = &self.weights else { return 0.5; };
+        let Some(w) = &self.weights else {
+            return 0.5;
+        };
         let input = board_to_canonical_input(board, color);
         let hidden = w.hidden(&input);
         w.value(&hidden)
@@ -302,34 +373,45 @@ pub fn mcts_to_train_examples(
     examples: &[crate::mcts::TrainingExample],
     board_size: BoardSize,
 ) -> Vec<GoNetTrainExample> {
-    examples.iter().map(|ex| {
-        // Reconstruct board from JSON
-        let board: GoBoard = serde_json::from_str(&ex.board_json)
-            .unwrap_or_else(|_| GoBoard::new(board_size));
-        // We don't know the color from the example directly — derive from move count
-        let color = Stone::Black; // default; GameExample doesn't encode the color
-        let input = board_to_canonical_input(&board, color);
+    examples
+        .iter()
+        .map(|ex| {
+            // Reconstruct board from JSON
+            let board: GoBoard =
+                serde_json::from_str(&ex.board_json).unwrap_or_else(|_| GoBoard::new(board_size));
+            // We don't know the color from the example directly — derive from move count
+            let color = Stone::Black; // default; GameExample doesn't encode the color
+            let input = board_to_canonical_input(&board, color);
 
-        // Build policy target over POLICY_SIZE
-        let mut policy_target = vec![1.0 / POLICY_SIZE as f32; POLICY_SIZE];
-        for (gtp, prob) in &ex.move_probs {
-            let idx = if gtp == "pass" {
-                SQUARES
-            } else if let Some(pt) = Point::from_gtp(gtp, board_size) {
-                (pt.y as usize * BOARD_SIZE + pt.x as usize).min(SQUARES - 1)
-            } else {
-                continue;
-            };
-            policy_target[idx] = *prob;
-        }
-        // Re-normalize
-        let sum: f32 = policy_target.iter().sum();
-        if sum > 0.0 { for p in policy_target.iter_mut() { *p /= sum; } }
+            // Build policy target over POLICY_SIZE
+            let mut policy_target = vec![1.0 / POLICY_SIZE as f32; POLICY_SIZE];
+            for (gtp, prob) in &ex.move_probs {
+                let idx = if gtp == "pass" {
+                    SQUARES
+                } else if let Some(pt) = Point::from_gtp(gtp, board_size) {
+                    (pt.y as usize * BOARD_SIZE + pt.x as usize).min(SQUARES - 1)
+                } else {
+                    continue;
+                };
+                policy_target[idx] = *prob;
+            }
+            // Re-normalize
+            let sum: f32 = policy_target.iter().sum();
+            if sum > 0.0 {
+                for p in policy_target.iter_mut() {
+                    *p /= sum;
+                }
+            }
 
-        let value_target = ex.game_result.unwrap_or(0.5);
+            let value_target = ex.game_result.unwrap_or(0.5);
 
-        GoNetTrainExample { input, policy_target, value_target }
-    }).collect()
+            GoNetTrainExample {
+                input,
+                policy_target,
+                value_target,
+            }
+        })
+        .collect()
 }
 
 /// Train for one epoch on Go network training examples.
@@ -340,11 +422,13 @@ pub fn train_epoch(
     examples: &[GoNetTrainExample],
     batch_size: usize,
 ) -> (f32, f32) {
-    if examples.is_empty() { return (0.0, 0.0); }
+    if examples.is_empty() {
+        return (0.0, 0.0);
+    }
 
     let mut total_pl = 0.0f32;
     let mut total_vl = 0.0f32;
-    let mut batches  = 0u32;
+    let mut batches = 0u32;
 
     for batch in examples.chunks(batch_size) {
         let mut g_w1 = vec![0.0f32; W1_LEN];
@@ -358,7 +442,7 @@ pub fn train_epoch(
         for ex in batch {
             let h = weights.hidden(&ex.input);
             let policy_out = weights.policy(&h);
-            let value_out  = weights.value(&h);
+            let value_out = weights.value(&h);
 
             // Policy gradient
             let mut d_policy = vec![0.0f32; POLICY_SIZE];
@@ -375,28 +459,40 @@ pub fn train_epoch(
             let d_value = 2.0 * (value_out - ex.value_target) * value_out * (1.0 - value_out) / n;
 
             // Backprop value head
-            for i in 0..HIDDEN_SIZE { g_wv[i] += d_value * h[i]; }
+            for i in 0..HIDDEN_SIZE {
+                g_wv[i] += d_value * h[i];
+            }
             g_bv[0] += d_value;
 
             // Backprop policy head + accumulate d_hidden
             let mut d_hidden = vec![0.0f32; HIDDEN_SIZE];
             for j in 0..POLICY_SIZE {
-                if d_policy[j].abs() < 1e-9 { continue; }
+                if d_policy[j].abs() < 1e-9 {
+                    continue;
+                }
                 let row = j * HIDDEN_SIZE;
                 for i in 0..HIDDEN_SIZE {
                     g_wp[row + i] += d_policy[j] * h[i];
-                    d_hidden[i]   += d_policy[j] * weights.wp[row + i];
+                    d_hidden[i] += d_policy[j] * weights.wp[row + i];
                 }
                 g_bp[j] += d_policy[j];
             }
-            for (i, dh) in d_hidden.iter_mut().enumerate() { *dh += d_value * weights.wv[i]; }
+            for (i, dh) in d_hidden.iter_mut().enumerate() {
+                *dh += d_value * weights.wv[i];
+            }
 
             // ReLU gate
-            for i in 0..HIDDEN_SIZE { if h[i] <= 0.0 { d_hidden[i] = 0.0; } }
+            for i in 0..HIDDEN_SIZE {
+                if h[i] <= 0.0 {
+                    d_hidden[i] = 0.0;
+                }
+            }
 
             // Backprop W1
             for j in 0..HIDDEN_SIZE {
-                if d_hidden[j] == 0.0 { continue; }
+                if d_hidden[j] == 0.0 {
+                    continue;
+                }
                 let row = j * INPUT_SIZE;
                 for (i, &x) in ex.input.iter().enumerate() {
                     g_w1[row + i] += d_hidden[j] * x / n;
@@ -406,15 +502,23 @@ pub fn train_epoch(
         }
 
         let mut all_params: Vec<f32> = [
-            weights.w1.as_slice(), weights.b1.as_slice(),
-            weights.wp.as_slice(), weights.bp.as_slice(),
-            weights.wv.as_slice(), weights.bv.as_slice(),
-        ].concat();
+            weights.w1.as_slice(),
+            weights.b1.as_slice(),
+            weights.wp.as_slice(),
+            weights.bp.as_slice(),
+            weights.wv.as_slice(),
+            weights.bv.as_slice(),
+        ]
+        .concat();
         let all_grads: Vec<f32> = [
-            g_w1.as_slice(), g_b1.as_slice(),
-            g_wp.as_slice(), g_bp.as_slice(),
-            g_wv.as_slice(), g_bv.as_slice(),
-        ].concat();
+            g_w1.as_slice(),
+            g_b1.as_slice(),
+            g_wp.as_slice(),
+            g_bp.as_slice(),
+            g_wv.as_slice(),
+            g_bv.as_slice(),
+        ]
+        .concat();
 
         adam.step(&mut all_params, &all_grads);
 
@@ -426,9 +530,12 @@ pub fn train_epoch(
                 off += n;
             }};
         }
-        copy_back!(weights.w1); copy_back!(weights.b1);
-        copy_back!(weights.wp); copy_back!(weights.bp);
-        copy_back!(weights.wv); copy_back!(weights.bv);
+        copy_back!(weights.w1);
+        copy_back!(weights.b1);
+        copy_back!(weights.wp);
+        copy_back!(weights.bp);
+        copy_back!(weights.wv);
+        copy_back!(weights.bv);
         let _ = off; // off is fully consumed by the copy_back! sequence above
 
         batches += 1;
@@ -451,12 +558,18 @@ mod tests {
 
         let h = w.hidden(&input);
         assert_eq!(h.len(), HIDDEN_SIZE);
-        assert!(h.iter().all(|&v| v >= 0.0), "ReLU: all hidden should be >= 0");
+        assert!(
+            h.iter().all(|&v| v >= 0.0),
+            "ReLU: all hidden should be >= 0"
+        );
 
         let policy = w.policy(&h);
         assert_eq!(policy.len(), POLICY_SIZE);
         let sum: f32 = policy.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-4, "policy should sum to 1, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 1e-4,
+            "policy should sum to 1, got {sum}"
+        );
 
         let value = w.value(&h);
         assert!((0.0..=1.0).contains(&value), "value out of range: {value}");

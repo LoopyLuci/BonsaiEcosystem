@@ -82,11 +82,14 @@ impl PluginHost {
 
         let entrypoint_path = plugin_dir.join(&manifest.entrypoint);
         if !entrypoint_path.exists() {
-            return Err(format!("Entrypoint '{}' not found in plugin dir", manifest.entrypoint));
+            return Err(format!(
+                "Entrypoint '{}' not found in plugin dir",
+                manifest.entrypoint
+            ));
         }
 
-        let entrypoint_bytes = std::fs::read(&entrypoint_path)
-            .map_err(|e| format!("Cannot read entrypoint: {e}"))?;
+        let entrypoint_bytes =
+            std::fs::read(&entrypoint_path).map_err(|e| format!("Cannot read entrypoint: {e}"))?;
         let hash = blake3::hash(&entrypoint_bytes).to_hex().to_string();
 
         info!(id, hash=%&hash[..16], caps=?manifest.capabilities, "[plugin_host] loaded plugin");
@@ -105,7 +108,9 @@ impl PluginHost {
     /// Auto-discover and load all plugins in the plugins directory.
     pub async fn load_all(&self) {
         let dir = self.plugins_dir.clone();
-        if !dir.exists() { return; }
+        if !dir.exists() {
+            return;
+        }
         if let Ok(entries) = std::fs::read_dir(&dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -128,15 +133,14 @@ impl PluginHost {
         required_caps: &[Capability],
     ) -> Result<PluginOutput, String> {
         let plugins = self.plugins.read().await;
-        let plugin = plugins.get(id).ok_or_else(|| format!("Plugin '{id}' not loaded"))?;
+        let plugin = plugins
+            .get(id)
+            .ok_or_else(|| format!("Plugin '{id}' not loaded"))?;
 
         // Capability enforcement
         for cap in required_caps {
             if !plugin.manifest.capabilities.contains(cap) {
-                return Err(format!(
-                    "Plugin '{id}' does not have capability {:?}",
-                    cap
-                ));
+                return Err(format!("Plugin '{id}' does not have capability {:?}", cap));
             }
         }
 
@@ -145,14 +149,16 @@ impl PluginHost {
         drop(plugins); // release read lock before async work
 
         // Integrity re-check at execution time
-        let current_bytes = std::fs::read(&entrypoint_path)
-            .map_err(|e| format!("Cannot read entrypoint: {e}"))?;
+        let current_bytes =
+            std::fs::read(&entrypoint_path).map_err(|e| format!("Cannot read entrypoint: {e}"))?;
         let current_hash = blake3::hash(&current_bytes).to_hex().to_string();
         {
             let plugins = self.plugins.read().await;
             let plugin = plugins.get(id).unwrap();
             if current_hash != plugin.entrypoint_hash {
-                return Err(format!("Plugin '{id}' integrity check failed — entrypoint was modified"));
+                return Err(format!(
+                    "Plugin '{id}' integrity check failed — entrypoint was modified"
+                ));
             }
         }
 
@@ -180,11 +186,10 @@ impl PluginHost {
                 let wasm_bytes = current_bytes.clone();
                 let payload_str = payload.to_string();
                 // Run in blocking thread pool to avoid starving the async runtime
-                let output = tokio::task::spawn_blocking(move || {
-                    run_wasm_plugin(&wasm_bytes, &payload_str)
-                })
-                .await
-                .map_err(|e| format!("WASM task join error: {e}"))??;
+                let output =
+                    tokio::task::spawn_blocking(move || run_wasm_plugin(&wasm_bytes, &payload_str))
+                        .await
+                        .map_err(|e| format!("WASM task join error: {e}"))??;
                 SandboxResult {
                     stdout: output,
                     stderr: String::new(),
@@ -232,36 +237,47 @@ struct WasmHostState {
 ///   - `log(ptr: i32, len: i32)` — append UTF-8 string to host log buffer.
 fn run_wasm_plugin(wasm_bytes: &[u8], payload: &str) -> Result<String, String> {
     let engine = Engine::default();
-    let module = Module::new(&engine, wasm_bytes)
-        .map_err(|e| format!("WASM compile error: {e}"))?;
+    let module =
+        Module::new(&engine, wasm_bytes).map_err(|e| format!("WASM compile error: {e}"))?;
 
     let mut linker: Linker<WasmHostState> = Linker::new(&engine);
 
     // Provide `bonsai::log(ptr, len)` — plugins call this to emit log lines.
     linker
-        .func_wrap("bonsai", "log", |mut caller: wasmtime::Caller<'_, WasmHostState>, ptr: i32, len: i32| {
-            let mem = match caller.get_export("memory") {
-                Some(wasmtime::Extern::Memory(m)) => m,
-                _ => return,
-            };
-            let start = ptr as usize;
-            let end = start.saturating_add(len as usize);
-            // Copy out before mutable borrow of store data.
-            let copied: Option<String> = {
-                let data = mem.data(&caller);
-                if end <= data.len() {
-                    std::str::from_utf8(&data[start..end]).ok().map(|s| s.to_string())
-                } else {
-                    None
+        .func_wrap(
+            "bonsai",
+            "log",
+            |mut caller: wasmtime::Caller<'_, WasmHostState>, ptr: i32, len: i32| {
+                let mem = match caller.get_export("memory") {
+                    Some(wasmtime::Extern::Memory(m)) => m,
+                    _ => return,
+                };
+                let start = ptr as usize;
+                let end = start.saturating_add(len as usize);
+                // Copy out before mutable borrow of store data.
+                let copied: Option<String> = {
+                    let data = mem.data(&caller);
+                    if end <= data.len() {
+                        std::str::from_utf8(&data[start..end])
+                            .ok()
+                            .map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                };
+                if let Some(s) = copied {
+                    caller.data_mut().log_buf.push(s);
                 }
-            };
-            if let Some(s) = copied {
-                caller.data_mut().log_buf.push(s);
-            }
-        })
+            },
+        )
         .map_err(|e| format!("Linker error: {e}"))?;
 
-    let mut store = Store::new(&engine, WasmHostState { log_buf: Vec::new() });
+    let mut store = Store::new(
+        &engine,
+        WasmHostState {
+            log_buf: Vec::new(),
+        },
+    );
     let instance = linker
         .instantiate(&mut store, &module)
         .map_err(|e| format!("WASM instantiate error: {e}"))?;
@@ -361,34 +377,47 @@ fn run_skill_wasm_sync(
 
     // ── env::bonsai_log(ptr, len) ──────────────────────────────────────────────
     linker
-        .func_wrap("env", "bonsai_log", |mut caller: wasmtime::Caller<'_, SkillHostState>, ptr: i32, len: i32| {
-            let mem = match caller.get_export("memory") {
-                Some(wasmtime::Extern::Memory(m)) => m,
-                _ => return,
-            };
-            let start = ptr as usize;
-            let end = start.saturating_add(len as usize);
-            let msg = {
-                let data = mem.data(&caller);
-                if end <= data.len() {
-                    std::str::from_utf8(&data[start..end]).unwrap_or("").to_string()
-                } else { String::new() }
-            };
-            if !msg.is_empty() {
-                tracing::info!(skill = "wasm_skill", "[skill] {}", msg);
-                caller.data_mut().log_buf.push(msg);
-            }
-        })
+        .func_wrap(
+            "env",
+            "bonsai_log",
+            |mut caller: wasmtime::Caller<'_, SkillHostState>, ptr: i32, len: i32| {
+                let mem = match caller.get_export("memory") {
+                    Some(wasmtime::Extern::Memory(m)) => m,
+                    _ => return,
+                };
+                let start = ptr as usize;
+                let end = start.saturating_add(len as usize);
+                let msg = {
+                    let data = mem.data(&caller);
+                    if end <= data.len() {
+                        std::str::from_utf8(&data[start..end])
+                            .unwrap_or("")
+                            .to_string()
+                    } else {
+                        String::new()
+                    }
+                };
+                if !msg.is_empty() {
+                    tracing::info!(skill = "wasm_skill", "[skill] {}", msg);
+                    caller.data_mut().log_buf.push(msg);
+                }
+            },
+        )
         .map_err(|e| format!("Linker bonsai_log: {e}"))?;
 
     // ── env::bonsai_call_tool(name_ptr, name_len, args_ptr, args_len) -> i32 ──
     // Writes result JSON into guest memory at offset 0x8000; returns byte count.
     let registry_for_tool = tool_registry.clone();
     linker
-        .func_wrap("env", "bonsai_call_tool",
+        .func_wrap(
+            "env",
+            "bonsai_call_tool",
             move |mut caller: wasmtime::Caller<'_, SkillHostState>,
-                  name_ptr: i32, name_len: i32,
-                  args_ptr: i32, args_len: i32| -> i32 {
+                  name_ptr: i32,
+                  name_len: i32,
+                  args_ptr: i32,
+                  args_len: i32|
+                  -> i32 {
                 let mem = match caller.get_export("memory") {
                     Some(wasmtime::Extern::Memory(m)) => m,
                     _ => return -1,
@@ -426,10 +455,15 @@ fn run_skill_wasm_sync(
 
     // ── env::bonsai_read_file(path_ptr, path_len, out_ptr, out_len) -> i32 ────
     linker
-        .func_wrap("env", "bonsai_read_file",
+        .func_wrap(
+            "env",
+            "bonsai_read_file",
             |mut caller: wasmtime::Caller<'_, SkillHostState>,
-             path_ptr: i32, path_len: i32,
-             out_ptr: i32, out_len: i32| -> i32 {
+             path_ptr: i32,
+             path_len: i32,
+             out_ptr: i32,
+             out_len: i32|
+             -> i32 {
                 let mem = match caller.get_export("memory") {
                     Some(wasmtime::Extern::Memory(m)) => m,
                     _ => return -1,
@@ -444,7 +478,10 @@ fn run_skill_wasm_sync(
                 };
                 let bytes = content.as_bytes();
                 let copy_len = bytes.len().min(out_len as usize);
-                if mem.write(&mut caller, out_ptr as usize, &bytes[..copy_len]).is_ok() {
+                if mem
+                    .write(&mut caller, out_ptr as usize, &bytes[..copy_len])
+                    .is_ok()
+                {
                     copy_len as i32
                 } else {
                     -1
@@ -455,23 +492,30 @@ fn run_skill_wasm_sync(
 
     // Also wire the legacy "bonsai::log" namespace so old plugins still work.
     linker
-        .func_wrap("bonsai", "log", |mut caller: wasmtime::Caller<'_, SkillHostState>, ptr: i32, len: i32| {
-            let mem = match caller.get_export("memory") {
-                Some(wasmtime::Extern::Memory(m)) => m,
-                _ => return,
-            };
-            let msg = {
-                let data = mem.data(&caller);
-                read_str(data, ptr, len)
-            };
-            caller.data_mut().log_buf.push(msg);
-        })
+        .func_wrap(
+            "bonsai",
+            "log",
+            |mut caller: wasmtime::Caller<'_, SkillHostState>, ptr: i32, len: i32| {
+                let mem = match caller.get_export("memory") {
+                    Some(wasmtime::Extern::Memory(m)) => m,
+                    _ => return,
+                };
+                let msg = {
+                    let data = mem.data(&caller);
+                    read_str(data, ptr, len)
+                };
+                caller.data_mut().log_buf.push(msg);
+            },
+        )
         .map_err(|e| format!("Linker bonsai::log: {e}"))?;
 
-    let mut store = Store::new(&engine, SkillHostState {
-        log_buf: Vec::new(),
-        last_tool_result: Vec::new(),
-    });
+    let mut store = Store::new(
+        &engine,
+        SkillHostState {
+            log_buf: Vec::new(),
+            last_tool_result: Vec::new(),
+        },
+    );
 
     let instance = linker
         .instantiate(&mut store, &module)
@@ -490,38 +534,49 @@ fn run_skill_wasm_sync(
 
     // Try `invoke` first (skills compiled by bonsai-skill-compiler), then fall
     // back to `handle_message` (legacy plugin format).
-    let result_str = if let Ok(invoke) = instance
-        .get_typed_func::<(i32, i32), i32>(&mut store, "invoke")
-    {
-        let result_len = invoke
-            .call(&mut store, (ARGS_OFFSET as i32, args_bytes.len() as i32))
-            .map_err(|e| format!("[skill:{skill_name}] invoke error: {e}"))?;
-        if result_len > 0 {
-            const RES_OFFSET: usize = 0x6000;
+    let result_str =
+        if let Ok(invoke) = instance.get_typed_func::<(i32, i32), i32>(&mut store, "invoke") {
+            let result_len = invoke
+                .call(&mut store, (ARGS_OFFSET as i32, args_bytes.len() as i32))
+                .map_err(|e| format!("[skill:{skill_name}] invoke error: {e}"))?;
+            if result_len > 0 {
+                const RES_OFFSET: usize = 0x6000;
+                let data = memory.data(&store);
+                let end = (RES_OFFSET + result_len as usize).min(data.len());
+                std::str::from_utf8(&data[RES_OFFSET..end])
+                    .unwrap_or("")
+                    .to_string()
+            } else {
+                String::new()
+            }
+        } else if let Ok(handle) =
+            instance.get_typed_func::<(i32, i32), i32>(&mut store, "handle_message")
+        {
+            let result_ptr = handle
+                .call(&mut store, (ARGS_OFFSET as i32, args_bytes.len() as i32))
+                .map_err(|e| format!("[skill:{skill_name}] handle_message error: {e}"))?;
             let data = memory.data(&store);
-            let end = (RES_OFFSET + result_len as usize).min(data.len());
-            std::str::from_utf8(&data[RES_OFFSET..end])
+            let start = result_ptr as usize;
+            let end = data[start..]
+                .iter()
+                .position(|&b| b == 0)
+                .map(|p| start + p)
+                .unwrap_or(start);
+            std::str::from_utf8(&data[start..end])
                 .unwrap_or("")
                 .to_string()
         } else {
-            String::new()
-        }
-    } else if let Ok(handle) = instance
-        .get_typed_func::<(i32, i32), i32>(&mut store, "handle_message")
-    {
-        let result_ptr = handle
-            .call(&mut store, (ARGS_OFFSET as i32, args_bytes.len() as i32))
-            .map_err(|e| format!("[skill:{skill_name}] handle_message error: {e}"))?;
-        let data = memory.data(&store);
-        let start = result_ptr as usize;
-        let end = data[start..].iter().position(|&b| b == 0).map(|p| start + p).unwrap_or(start);
-        std::str::from_utf8(&data[start..end]).unwrap_or("").to_string()
-    } else {
-        return Err(format!("[skill:{skill_name}] no callable export (invoke or handle_message)"));
-    };
+            return Err(format!(
+                "[skill:{skill_name}] no callable export (invoke or handle_message)"
+            ));
+        };
 
     let logs = store.data().log_buf.join("\n");
-    if logs.is_empty() { Ok(result_str) } else { Ok(format!("{logs}\n{result_str}")) }
+    if logs.is_empty() {
+        Ok(result_str)
+    } else {
+        Ok(format!("{logs}\n{result_str}"))
+    }
 }
 
 /// Helper: read a UTF-8 string from WASM linear memory.
@@ -529,7 +584,9 @@ fn run_skill_wasm_sync(
 fn read_str(data: &[u8], ptr: i32, len: i32) -> String {
     let start = ptr as usize;
     let end = start.saturating_add(len as usize).min(data.len());
-    std::str::from_utf8(&data[start..end]).unwrap_or("").to_string()
+    std::str::from_utf8(&data[start..end])
+        .unwrap_or("")
+        .to_string()
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────

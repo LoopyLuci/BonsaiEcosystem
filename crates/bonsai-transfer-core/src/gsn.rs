@@ -16,12 +16,16 @@ pub struct GsnAllocator {
 impl GsnAllocator {
     /// Create a new allocator starting at 0.
     pub fn new() -> Self {
-        Self { next: Arc::new(AtomicU64::new(0)) }
+        Self {
+            next: Arc::new(AtomicU64::new(0)),
+        }
     }
 
     /// Create starting at a specific value (useful for resuming a transfer).
     pub fn starting_at(n: u64) -> Self {
-        Self { next: Arc::new(AtomicU64::new(n)) }
+        Self {
+            next: Arc::new(AtomicU64::new(n)),
+        }
     }
 
     /// Allocate the next GSN (monotonically increasing, wraps at u64::MAX).
@@ -42,7 +46,9 @@ impl GsnAllocator {
 }
 
 impl Default for GsnAllocator {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -69,13 +75,16 @@ mod tests {
     #[test]
     fn concurrent() {
         let alloc = GsnAllocator::new();
-        let handles: Vec<_> = (0..4).map(|_| {
-            let a = alloc.clone();
-            std::thread::spawn(move || {
-                (0..1000).map(|_| a.next()).collect::<Vec<_>>()
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let a = alloc.clone();
+                std::thread::spawn(move || (0..1000).map(|_| a.next()).collect::<Vec<_>>())
             })
-        }).collect();
-        let mut all: Vec<u64> = handles.into_iter().flat_map(|h| h.join().unwrap()).collect();
+            .collect();
+        let mut all: Vec<u64> = handles
+            .into_iter()
+            .flat_map(|h| h.join().unwrap())
+            .collect();
         all.sort();
         all.dedup();
         assert_eq!(all.len(), 4000, "each GSN must be unique");

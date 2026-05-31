@@ -53,21 +53,30 @@ use crate::tool_registry::{Tool, ToolResult};
 fn find_worker() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("OPENCV_WORKER_PATH") {
         let pb = PathBuf::from(&p);
-        if pb.exists() { return Some(pb); }
+        if pb.exists() {
+            return Some(pb);
+        }
     }
     let candidates = [
-        dirs::home_dir().unwrap_or_default().join(".bonsai/sidecars/opencv_worker.py"),
+        dirs::home_dir()
+            .unwrap_or_default()
+            .join(".bonsai/sidecars/opencv_worker.py"),
         PathBuf::from("sidecars/opencv_worker.py"),
     ];
     candidates.into_iter().find(|p| p.exists())
 }
 
-pub fn is_available() -> bool { find_worker().is_some() }
+pub fn is_available() -> bool {
+    find_worker().is_some()
+}
 
 fn which_python() -> Result<PathBuf, String> {
     for c in &["python3", "python"] {
-        if std::process::Command::new(c).arg("--version").output()
-            .map(|o| o.status.success()).unwrap_or(false)
+        if std::process::Command::new(c)
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
         {
             return Ok(PathBuf::from(c));
         }
@@ -79,14 +88,15 @@ fn not_installed() -> String {
     "opencv_worker.py not found. \
      Run: pip install opencv-python && \
      place opencv_worker.py in ~/.bonsai/sidecars/ \
-     (see Bonsai Docs → Vision Tools)".to_string()
+     (see Bonsai Docs → Vision Tools)"
+        .to_string()
 }
 
 // ── Core worker call ──────────────────────────────────────────────────────────
 
 async fn call_worker(payload: &Value) -> Result<Value, String> {
-    let worker  = find_worker().ok_or_else(not_installed)?;
-    let python  = which_python()?;
+    let worker = find_worker().ok_or_else(not_installed)?;
+    let python = which_python()?;
     let encoded = serde_json::to_string(payload).map_err(|e| e.to_string())?;
 
     let mut child = tokio::process::Command::new(&python)
@@ -99,7 +109,9 @@ async fn call_worker(payload: &Value) -> Result<Value, String> {
         .map_err(|e| format!("Failed to start opencv_worker: {e}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(encoded.as_bytes()).await
+        stdin
+            .write_all(encoded.as_bytes())
+            .await
             .map_err(|e| format!("stdin write: {e}"))?;
     }
 
@@ -110,7 +122,10 @@ async fn call_worker(payload: &Value) -> Result<Value, String> {
 
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
-        return Err(format!("opencv_worker exited {:?}: {err}", out.status.code()));
+        return Err(format!(
+            "opencv_worker exited {:?}: {err}",
+            out.status.code()
+        ));
     }
 
     serde_json::from_slice(&out.stdout)
@@ -123,8 +138,12 @@ fn validate_image_path(path: &str) -> Result<(), String> {
     if !p.exists() {
         return Err(format!("File not found: {path}"));
     }
-    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-    if !["jpg","jpeg","png","bmp","tiff","tif","webp","gif"].contains(&ext.as_str()) {
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if !["jpg", "jpeg", "png", "bmp", "tiff", "tif", "webp", "gif"].contains(&ext.as_str()) {
         return Err(format!("Unsupported image format: .{ext}"));
     }
     Ok(())
@@ -135,19 +154,19 @@ fn validate_image_path(path: &str) -> Result<(), String> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CvImageResult {
     /// Output image as base64-encoded PNG.
-    pub image_b64:    Option<String>,
+    pub image_b64: Option<String>,
     /// Path where the image was saved (if requested).
-    pub saved_path:   Option<String>,
+    pub saved_path: Option<String>,
     /// Width of the output image in pixels.
-    pub width:        u32,
+    pub width: u32,
     /// Height of the output image in pixels.
-    pub height:        u32,
+    pub height: u32,
     /// Channels (1=gray, 3=BGR, 4=BGRA).
-    pub channels:     u32,
+    pub channels: u32,
     /// Optional structured metadata (contours, faces, histogram, etc.).
-    pub metadata:     Value,
+    pub metadata: Value,
     /// Wall-clock time spent in the worker.
-    pub elapsed_ms:   u64,
+    pub elapsed_ms: u64,
 }
 
 // ── Tool: convert_color ───────────────────────────────────────────────────────
@@ -156,7 +175,9 @@ pub struct ConvertColorTool;
 
 #[async_trait]
 impl Tool for ConvertColorTool {
-    fn name(&self) -> &str { "convert_color" }
+    fn name(&self) -> &str {
+        "convert_color"
+    }
     fn description(&self) -> &str {
         "Convert an image between color spaces using OpenCV. \
          Args: {image_path: string, color_space: \"grayscale\"|\"hsv\"|\"lab\"|\"yuv\"|\"rgb\", \
@@ -166,13 +187,14 @@ impl Tool for ConvertColorTool {
         let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
         let color_space = args["color_space"].as_str().unwrap_or("grayscale");
-        info!(op="convert_color", space=color_space, "[opencv]");
+        info!(op = "convert_color", space = color_space, "[opencv]");
         let result = call_worker(&json!({
             "op":          "convert_color",
             "image_path":  image_path,
             "color_space": color_space,
             "save_path":   args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -183,7 +205,9 @@ pub struct ResizeImageTool;
 
 #[async_trait]
 impl Tool for ResizeImageTool {
-    fn name(&self) -> &str { "resize_image" }
+    fn name(&self) -> &str {
+        "resize_image"
+    }
     fn description(&self) -> &str {
         "Resize an image with OpenCV. \
          Args: {image_path: string, width: number, height: number, \
@@ -192,13 +216,13 @@ impl Tool for ResizeImageTool {
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
         let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let width  = args["width"].as_u64().ok_or("Missing 'width'")?;
+        let width = args["width"].as_u64().ok_or("Missing 'width'")?;
         let height = args["height"].as_u64().ok_or("Missing 'height'")?;
         if width == 0 || height == 0 || width > 16384 || height > 16384 {
             return Err("width/height must be 1–16384".into());
         }
         let interp = args["interpolation"].as_str().unwrap_or("linear");
-        info!(op="resize_image", w=width, h=height, "[opencv]");
+        info!(op = "resize_image", w = width, h = height, "[opencv]");
         let result = call_worker(&json!({
             "op":            "resize_image",
             "image_path":    image_path,
@@ -206,7 +230,8 @@ impl Tool for ResizeImageTool {
             "height":        height,
             "interpolation": interp,
             "save_path":     args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -217,7 +242,9 @@ pub struct BlurImageTool;
 
 #[async_trait]
 impl Tool for BlurImageTool {
-    fn name(&self) -> &str { "blur_image" }
+    fn name(&self) -> &str {
+        "blur_image"
+    }
     fn description(&self) -> &str {
         "Apply blur to an image using OpenCV. \
          Args: {image_path: string, blur_type: \"gaussian\"|\"median\"|\"bilateral\", \
@@ -226,18 +253,28 @@ impl Tool for BlurImageTool {
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
         let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let blur_type   = args["blur_type"].as_str().unwrap_or("gaussian");
+        let blur_type = args["blur_type"].as_str().unwrap_or("gaussian");
         let kernel_size = args["kernel_size"].as_u64().unwrap_or(5).clamp(1, 99);
         // Force odd kernel
-        let kernel_size = if kernel_size % 2 == 0 { kernel_size + 1 } else { kernel_size };
-        info!(op="blur_image", blur_type, kernel=kernel_size, "[opencv]");
+        let kernel_size = if kernel_size % 2 == 0 {
+            kernel_size + 1
+        } else {
+            kernel_size
+        };
+        info!(
+            op = "blur_image",
+            blur_type,
+            kernel = kernel_size,
+            "[opencv]"
+        );
         let result = call_worker(&json!({
             "op":          "blur_image",
             "image_path":  image_path,
             "blur_type":   blur_type,
             "kernel_size": kernel_size,
             "save_path":   args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -248,19 +285,26 @@ pub struct DetectEdgesTool;
 
 #[async_trait]
 impl Tool for DetectEdgesTool {
-    fn name(&self) -> &str { "detect_edges" }
+    fn name(&self) -> &str {
+        "detect_edges"
+    }
     fn description(&self) -> &str {
         "Detect edges in an image using the Canny algorithm (OpenCV imgproc). \
          Args: {image_path: string, threshold1?: number (default 100), \
          threshold2?: number (default 200), aperture_size?: number (3/5/7), save_path?: string}."
     }
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
-        let image_path  = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
+        let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let threshold1   = args["threshold1"].as_f64().unwrap_or(100.0);
-        let threshold2   = args["threshold2"].as_f64().unwrap_or(200.0);
-        let aperture     = args["aperture_size"].as_u64().unwrap_or(3);
-        info!(op="detect_edges", t1=threshold1, t2=threshold2, "[opencv]");
+        let threshold1 = args["threshold1"].as_f64().unwrap_or(100.0);
+        let threshold2 = args["threshold2"].as_f64().unwrap_or(200.0);
+        let aperture = args["aperture_size"].as_u64().unwrap_or(3);
+        info!(
+            op = "detect_edges",
+            t1 = threshold1,
+            t2 = threshold2,
+            "[opencv]"
+        );
         let result = call_worker(&json!({
             "op":           "detect_edges",
             "image_path":   image_path,
@@ -268,7 +312,8 @@ impl Tool for DetectEdgesTool {
             "threshold2":   threshold2,
             "aperture_size": aperture,
             "save_path":    args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -279,7 +324,9 @@ pub struct FindContoursTool;
 
 #[async_trait]
 impl Tool for FindContoursTool {
-    fn name(&self) -> &str { "find_contours" }
+    fn name(&self) -> &str {
+        "find_contours"
+    }
     fn description(&self) -> &str {
         "Find and draw object contours using OpenCV imgproc. \
          Args: {image_path: string, mode?: \"external\"|\"list\"|\"tree\", \
@@ -289,16 +336,17 @@ impl Tool for FindContoursTool {
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
         let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let mode         = args["mode"].as_str().unwrap_or("external");
+        let mode = args["mode"].as_str().unwrap_or("external");
         let draw_overlay = args["draw_overlay"].as_bool().unwrap_or(true);
-        info!(op="find_contours", mode, "[opencv]");
+        info!(op = "find_contours", mode, "[opencv]");
         let result = call_worker(&json!({
             "op":           "find_contours",
             "image_path":   image_path,
             "mode":         mode,
             "draw_overlay": draw_overlay,
             "save_path":    args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -309,7 +357,9 @@ pub struct DetectFacesTool;
 
 #[async_trait]
 impl Tool for DetectFacesTool {
-    fn name(&self) -> &str { "detect_faces" }
+    fn name(&self) -> &str {
+        "detect_faces"
+    }
     fn description(&self) -> &str {
         "Detect human faces using OpenCV Haar cascade (objdetect). \
          Args: {image_path: string, scale_factor?: number (default 1.1), \
@@ -317,12 +367,15 @@ impl Tool for DetectFacesTool {
          Returns: image_b64, metadata.faces[] (x,y,w,h)."
     }
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
-        let image_path   = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
+        let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let scale_factor  = args["scale_factor"].as_f64().unwrap_or(1.1).clamp(1.01, 3.0);
+        let scale_factor = args["scale_factor"]
+            .as_f64()
+            .unwrap_or(1.1)
+            .clamp(1.01, 3.0);
         let min_neighbors = args["min_neighbors"].as_u64().unwrap_or(5).clamp(1, 20);
-        let draw_overlay  = args["draw_overlay"].as_bool().unwrap_or(true);
-        info!(op="detect_faces", scale=scale_factor, "[opencv]");
+        let draw_overlay = args["draw_overlay"].as_bool().unwrap_or(true);
+        info!(op = "detect_faces", scale = scale_factor, "[opencv]");
         let result = call_worker(&json!({
             "op":            "detect_faces",
             "image_path":    image_path,
@@ -330,7 +383,8 @@ impl Tool for DetectFacesTool {
             "min_neighbors": min_neighbors,
             "draw_overlay":  draw_overlay,
             "save_path":     args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -341,7 +395,9 @@ pub struct ApplyThresholdTool;
 
 #[async_trait]
 impl Tool for ApplyThresholdTool {
-    fn name(&self) -> &str { "apply_threshold" }
+    fn name(&self) -> &str {
+        "apply_threshold"
+    }
     fn description(&self) -> &str {
         "Apply image thresholding using OpenCV (imgproc). \
          Args: {image_path: string, \
@@ -351,16 +407,22 @@ impl Tool for ApplyThresholdTool {
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
         let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let method    = args["method"].as_str().unwrap_or("otsu");
+        let method = args["method"].as_str().unwrap_or("otsu");
         let threshold = args["threshold"].as_u64().unwrap_or(127).clamp(0, 255);
-        info!(op="apply_threshold", method, thresh=threshold, "[opencv]");
+        info!(
+            op = "apply_threshold",
+            method,
+            thresh = threshold,
+            "[opencv]"
+        );
         let result = call_worker(&json!({
             "op":         "apply_threshold",
             "image_path": image_path,
             "method":     method,
             "threshold":  threshold,
             "save_path":  args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -371,7 +433,9 @@ pub struct ApplyMorphologyTool;
 
 #[async_trait]
 impl Tool for ApplyMorphologyTool {
-    fn name(&self) -> &str { "apply_morphology" }
+    fn name(&self) -> &str {
+        "apply_morphology"
+    }
     fn description(&self) -> &str {
         "Apply morphological operations using OpenCV (imgproc). \
          Args: {image_path: string, \
@@ -379,13 +443,22 @@ impl Tool for ApplyMorphologyTool {
          kernel_size?: number (odd, default 5), iterations?: number, save_path?: string}."
     }
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
-        let image_path  = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
+        let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let operation   = args["operation"].as_str().unwrap_or("dilate");
+        let operation = args["operation"].as_str().unwrap_or("dilate");
         let kernel_size = args["kernel_size"].as_u64().unwrap_or(5).clamp(1, 99);
-        let kernel_size = if kernel_size % 2 == 0 { kernel_size + 1 } else { kernel_size };
-        let iterations  = args["iterations"].as_u64().unwrap_or(1).clamp(1, 10);
-        info!(op="apply_morphology", operation, kernel=kernel_size, "[opencv]");
+        let kernel_size = if kernel_size % 2 == 0 {
+            kernel_size + 1
+        } else {
+            kernel_size
+        };
+        let iterations = args["iterations"].as_u64().unwrap_or(1).clamp(1, 10);
+        info!(
+            op = "apply_morphology",
+            operation,
+            kernel = kernel_size,
+            "[opencv]"
+        );
         let result = call_worker(&json!({
             "op":          "apply_morphology",
             "image_path":  image_path,
@@ -393,7 +466,8 @@ impl Tool for ApplyMorphologyTool {
             "kernel_size": kernel_size,
             "iterations":  iterations,
             "save_path":   args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -404,7 +478,9 @@ pub struct AnalyzeHistogramTool;
 
 #[async_trait]
 impl Tool for AnalyzeHistogramTool {
-    fn name(&self) -> &str { "analyze_histogram" }
+    fn name(&self) -> &str {
+        "analyze_histogram"
+    }
     fn description(&self) -> &str {
         "Compute and visualise a colour histogram using OpenCV (imgproc). \
          Args: {image_path: string, bins?: number (default 256), \
@@ -415,14 +491,15 @@ impl Tool for AnalyzeHistogramTool {
         let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
         let bins = args["bins"].as_u64().unwrap_or(256).clamp(2, 256);
-        info!(op="analyze_histogram", bins, "[opencv]");
+        info!(op = "analyze_histogram", bins, "[opencv]");
         let result = call_worker(&json!({
             "op":         "analyze_histogram",
             "image_path": image_path,
             "bins":       bins,
             "channels":   args["channels"],
             "save_path":  args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -433,7 +510,9 @@ pub struct DrawAnnotationsTool;
 
 #[async_trait]
 impl Tool for DrawAnnotationsTool {
-    fn name(&self) -> &str { "draw_annotations" }
+    fn name(&self) -> &str {
+        "draw_annotations"
+    }
     fn description(&self) -> &str {
         "Draw bounding boxes, labels, circles, or text on an image using OpenCV core. \
          Args: {image_path: string, \
@@ -443,17 +522,19 @@ impl Tool for DrawAnnotationsTool {
          save_path?: string}."
     }
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
-        let image_path   = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
+        let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let annotations  = args.get("annotations")
+        let annotations = args
+            .get("annotations")
             .ok_or("Missing 'annotations' array")?;
-        info!(op="draw_annotations", "[opencv]");
+        info!(op = "draw_annotations", "[opencv]");
         let result = call_worker(&json!({
             "op":          "draw_annotations",
             "image_path":  image_path,
             "annotations": annotations,
             "save_path":   args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -464,7 +545,9 @@ pub struct WarpPerspectiveTool;
 
 #[async_trait]
 impl Tool for WarpPerspectiveTool {
-    fn name(&self) -> &str { "warp_perspective" }
+    fn name(&self) -> &str {
+        "warp_perspective"
+    }
     fn description(&self) -> &str {
         "Apply a perspective (homography) warp using OpenCV imgproc. Useful for \
          document scanning and de-skewing. \
@@ -473,12 +556,21 @@ impl Tool for WarpPerspectiveTool {
          output_width: number, output_height: number, save_path?: string}."
     }
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
-        let image_path    = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
+        let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
-        let src_points    = args.get("src_points").ok_or("Missing 'src_points'")?;
-        let output_width  = args["output_width"].as_u64().ok_or("Missing 'output_width'")?;
-        let output_height = args["output_height"].as_u64().ok_or("Missing 'output_height'")?;
-        info!(op="warp_perspective", w=output_width, h=output_height, "[opencv]");
+        let src_points = args.get("src_points").ok_or("Missing 'src_points'")?;
+        let output_width = args["output_width"]
+            .as_u64()
+            .ok_or("Missing 'output_width'")?;
+        let output_height = args["output_height"]
+            .as_u64()
+            .ok_or("Missing 'output_height'")?;
+        info!(
+            op = "warp_perspective",
+            w = output_width,
+            h = output_height,
+            "[opencv]"
+        );
         let result = call_worker(&json!({
             "op":            "warp_perspective",
             "image_path":    image_path,
@@ -486,7 +578,8 @@ impl Tool for WarpPerspectiveTool {
             "output_width":  output_width,
             "output_height": output_height,
             "save_path":     args["save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -497,7 +590,9 @@ pub struct OpenCvPipelineTool;
 
 #[async_trait]
 impl Tool for OpenCvPipelineTool {
-    fn name(&self) -> &str { "opencv_pipeline" }
+    fn name(&self) -> &str {
+        "opencv_pipeline"
+    }
     fn description(&self) -> &str {
         "Run a sequence of OpenCV operations on an image in a single call. \
          Each step's output feeds the next. \
@@ -511,13 +606,18 @@ impl Tool for OpenCvPipelineTool {
         let image_path = args["image_path"].as_str().ok_or("Missing 'image_path'")?;
         validate_image_path(image_path)?;
         let steps = args.get("steps").ok_or("Missing 'steps' array")?;
-        info!(op="opencv_pipeline", steps=steps.as_array().map(|a| a.len()).unwrap_or(0), "[opencv]");
+        info!(
+            op = "opencv_pipeline",
+            steps = steps.as_array().map(|a| a.len()).unwrap_or(0),
+            "[opencv]"
+        );
         let result = call_worker(&json!({
             "op":              "pipeline",
             "image_path":      image_path,
             "steps":           steps,
             "final_save_path": args["final_save_path"],
-        })).await?;
+        }))
+        .await?;
         Ok(ToolResult::json(&result))
     }
 }
@@ -526,10 +626,10 @@ impl Tool for OpenCvPipelineTool {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CvOpRequest {
-    pub op:         String,
+    pub op: String,
     pub image_path: String,
     #[serde(flatten)]
-    pub params:     Value,
+    pub params: Value,
 }
 
 #[tauri::command]
@@ -550,11 +650,11 @@ pub async fn opencv_available() -> Result<bool, String> {
 
 #[tauri::command]
 pub async fn opencv_detect_faces(
-    image_path:    String,
-    scale_factor:  Option<f64>,
+    image_path: String,
+    scale_factor: Option<f64>,
     min_neighbors: Option<u64>,
-    draw_overlay:  Option<bool>,
-    save_path:     Option<String>,
+    draw_overlay: Option<bool>,
+    save_path: Option<String>,
 ) -> Result<Value, String> {
     validate_image_path(&image_path)?;
     call_worker(&json!({
@@ -564,15 +664,16 @@ pub async fn opencv_detect_faces(
         "min_neighbors": min_neighbors.unwrap_or(5),
         "draw_overlay":  draw_overlay.unwrap_or(true),
         "save_path":     save_path,
-    })).await
+    }))
+    .await
 }
 
 #[tauri::command]
 pub async fn opencv_detect_edges(
-    image_path:  String,
-    threshold1:  Option<f64>,
-    threshold2:  Option<f64>,
-    save_path:   Option<String>,
+    image_path: String,
+    threshold1: Option<f64>,
+    threshold2: Option<f64>,
+    save_path: Option<String>,
 ) -> Result<Value, String> {
     validate_image_path(&image_path)?;
     call_worker(&json!({
@@ -581,13 +682,14 @@ pub async fn opencv_detect_edges(
         "threshold1": threshold1.unwrap_or(100.0),
         "threshold2": threshold2.unwrap_or(200.0),
         "save_path":  save_path,
-    })).await
+    }))
+    .await
 }
 
 #[tauri::command]
 pub async fn opencv_pipeline_cmd(
-    image_path:      String,
-    steps:           Value,
+    image_path: String,
+    steps: Value,
     final_save_path: Option<String>,
 ) -> Result<Value, String> {
     validate_image_path(&image_path)?;
@@ -596,5 +698,6 @@ pub async fn opencv_pipeline_cmd(
         "image_path":      image_path,
         "steps":           steps,
         "final_save_path": final_save_path,
-    })).await
+    }))
+    .await
 }

@@ -14,9 +14,9 @@ use tracing::info;
 /// `user_confirmed` MUST be `true`; the function returns an error otherwise
 /// to prevent accidental background downloads.
 pub async fn fetch_model(
-    name:           &str,
-    url:            &str,
-    cache:          &Path,
+    name: &str,
+    url: &str,
+    cache: &Path,
     user_confirmed: bool,
 ) -> Result<std::path::PathBuf> {
     if !user_confirmed {
@@ -35,9 +35,9 @@ pub async fn fetch_model(
     tokio::fs::create_dir_all(cache).await?;
     info!("downloading model {name} from {url}");
 
-    let client   = reqwest::Client::new();
+    let client = reqwest::Client::new();
     let response = client.get(url).send().await?;
-    let status   = response.status();
+    let status = response.status();
     if !status.is_success() {
         return Err(anyhow::anyhow!("download failed: HTTP {status} for {url}"));
     }

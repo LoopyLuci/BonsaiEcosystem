@@ -19,12 +19,12 @@ pub fn render_rich_block(
     data: Option<Vec<ChartDataPoint>>,
 ) -> Result<String, String> {
     match block_type.as_str() {
-        "mermaid"    => Ok(render_mermaid(&content)),
-        "bar_chart"  => Ok(render_bar_chart(data.as_deref().unwrap_or(&[]))),
+        "mermaid" => Ok(render_mermaid(&content)),
+        "bar_chart" => Ok(render_bar_chart(data.as_deref().unwrap_or(&[]))),
         "line_chart" => Ok(render_line_chart(data.as_deref().unwrap_or(&[]))),
-        "pie_chart"  => Ok(render_pie_chart(data.as_deref().unwrap_or(&[]))),
-        "math"       => Ok(render_math(&content)),
-        _            => Err(format!("Unknown block type: {block_type}")),
+        "pie_chart" => Ok(render_pie_chart(data.as_deref().unwrap_or(&[]))),
+        "math" => Ok(render_math(&content)),
+        _ => Err(format!("Unknown block type: {block_type}")),
     }
 }
 
@@ -52,13 +52,19 @@ fn render_mermaid(source: &str) -> String {
                 (None, clean_node(rhs))
             };
             if !src.is_empty() && !dst.is_empty() {
-                if !nodes.contains(&src) { nodes.push(src.clone()); }
-                if !nodes.contains(&dst) { nodes.push(dst.clone()); }
+                if !nodes.contains(&src) {
+                    nodes.push(src.clone());
+                }
+                if !nodes.contains(&dst) {
+                    nodes.push(dst.clone());
+                }
                 edges.push((src, dst, label));
             }
         } else {
             let n = clean_node(line);
-            if !n.is_empty() && !nodes.contains(&n) { nodes.push(n); }
+            if !n.is_empty() && !nodes.contains(&n) {
+                nodes.push(n);
+            }
         }
     }
 
@@ -102,12 +108,18 @@ fn render_mermaid(source: &str) -> String {
     svg.push_str(defs);
 
     for (src, dst, label) in &edges {
-        if let (Some(&(x1, y1)), Some(&(x2, y2))) = (cx_map.get(src.as_str()), cx_map.get(dst.as_str())) {
+        if let (Some(&(x1, y1)), Some(&(x2, y2))) =
+            (cx_map.get(src.as_str()), cx_map.get(dst.as_str()))
+        {
             let mx = (x1 + x2) / 2;
             let my = (y1 + y2) / 2;
             let _ = write!(svg, "<line class=\"me\" x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" marker-end=\"url(#arr)\"/>");
             if let Some(lbl) = label {
-                let _ = write!(svg, "<text class=\"ml\" x=\"{mx}\" y=\"{my}\">{}</text>", escape_xml(lbl));
+                let _ = write!(
+                    svg,
+                    "<text class=\"ml\" x=\"{mx}\" y=\"{my}\">{}</text>",
+                    escape_xml(lbl)
+                );
             }
         }
     }
@@ -119,7 +131,11 @@ fn render_mermaid(source: &str) -> String {
             svg,
             "<rect class=\"mn\" x=\"{x}\" y=\"{y}\" width=\"{node_w}\" height=\"{node_h}\" rx=\"6\"/>",
         );
-        let _ = write!(svg, "<text class=\"mt\" x=\"{cx}\" y=\"{cy}\">{}</text>", escape_xml(node));
+        let _ = write!(
+            svg,
+            "<text class=\"mt\" x=\"{cx}\" y=\"{cy}\">{}</text>",
+            escape_xml(node)
+        );
     }
 
     svg.push_str("</svg>");
@@ -136,8 +152,14 @@ fn clean_node(s: &str) -> String {
 // ── Bar Chart ─────────────────────────────────────────────────────────────────
 
 fn render_bar_chart(data: &[ChartDataPoint]) -> String {
-    if data.is_empty() { return empty_svg("No data"); }
-    let max_val = data.iter().map(|d| d.value).fold(f64::MIN, f64::max).max(1.0);
+    if data.is_empty() {
+        return empty_svg("No data");
+    }
+    let max_val = data
+        .iter()
+        .map(|d| d.value)
+        .fold(f64::MIN, f64::max)
+        .max(1.0);
     let bar_w = 40u32;
     let gap = 20u32;
     let chart_h = 200u32;
@@ -147,7 +169,8 @@ fn render_bar_chart(data: &[ChartDataPoint]) -> String {
     let svg_w = pad_l + (bar_w + gap) * data.len() as u32 + gap;
     let svg_h = chart_h + pad_t + pad_b;
 
-    let mut svg = format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{svg_w}\" height=\"{svg_h}\">");
+    let mut svg =
+        format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{svg_w}\" height=\"{svg_h}\">");
     svg.push_str("<style>text{font:11px sans-serif;fill:#e2e8f0}</style>");
 
     for (i, pt) in data.iter().enumerate() {
@@ -156,8 +179,18 @@ fn render_bar_chart(data: &[ChartDataPoint]) -> String {
         let y = pad_t + chart_h - bar_h;
         let lx = x + bar_w / 2;
         let _ = write!(svg, "<rect x=\"{x}\" y=\"{y}\" width=\"{bar_w}\" height=\"{bar_h}\" fill=\"#38bdf8\" rx=\"3\"/>");
-        let _ = write!(svg, "<text x=\"{lx}\" y=\"{}\" text-anchor=\"middle\">{}</text>", pad_t + chart_h + 15, escape_xml(&pt.label));
-        let _ = write!(svg, "<text x=\"{lx}\" y=\"{}\" text-anchor=\"middle\">{:.1}</text>", y.saturating_sub(4), pt.value);
+        let _ = write!(
+            svg,
+            "<text x=\"{lx}\" y=\"{}\" text-anchor=\"middle\">{}</text>",
+            pad_t + chart_h + 15,
+            escape_xml(&pt.label)
+        );
+        let _ = write!(
+            svg,
+            "<text x=\"{lx}\" y=\"{}\" text-anchor=\"middle\">{:.1}</text>",
+            y.saturating_sub(4),
+            pt.value
+        );
     }
 
     svg.push_str("</svg>");
@@ -167,8 +200,14 @@ fn render_bar_chart(data: &[ChartDataPoint]) -> String {
 // ── Line Chart ────────────────────────────────────────────────────────────────
 
 fn render_line_chart(data: &[ChartDataPoint]) -> String {
-    if data.is_empty() { return empty_svg("No data"); }
-    let max_val = data.iter().map(|d| d.value).fold(f64::MIN, f64::max).max(1.0);
+    if data.is_empty() {
+        return empty_svg("No data");
+    }
+    let max_val = data
+        .iter()
+        .map(|d| d.value)
+        .fold(f64::MIN, f64::max)
+        .max(1.0);
     let chart_w = 400u32;
     let chart_h = 200u32;
     let pad_l = 40u32;
@@ -178,23 +217,48 @@ fn render_line_chart(data: &[ChartDataPoint]) -> String {
     let svg_h = chart_h + pad_t + pad_b;
     let n = data.len().max(1);
 
-    let points: Vec<(u32, u32)> = data.iter().enumerate().map(|(i, pt)| {
-        let x = pad_l + (i as u32 * chart_w) / n as u32;
-        let y = pad_t + chart_h - ((pt.value / max_val) * chart_h as f64) as u32;
-        (x, y)
-    }).collect();
+    let points: Vec<(u32, u32)> = data
+        .iter()
+        .enumerate()
+        .map(|(i, pt)| {
+            let x = pad_l + (i as u32 * chart_w) / n as u32;
+            let y = pad_t + chart_h - ((pt.value / max_val) * chart_h as f64) as u32;
+            (x, y)
+        })
+        .collect();
 
-    let path = points.iter().enumerate().map(|(i, (x, y))| {
-        if i == 0 { format!("M{x},{y}") } else { format!("L{x},{y}") }
-    }).collect::<Vec<_>>().join(" ");
+    let path = points
+        .iter()
+        .enumerate()
+        .map(|(i, (x, y))| {
+            if i == 0 {
+                format!("M{x},{y}")
+            } else {
+                format!("L{x},{y}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
 
-    let mut svg = format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{svg_w}\" height=\"{svg_h}\">");
+    let mut svg =
+        format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{svg_w}\" height=\"{svg_h}\">");
     svg.push_str("<style>text{font:11px sans-serif;fill:#e2e8f0}</style>");
-    let _ = write!(svg, "<path d=\"{path}\" stroke=\"#38bdf8\" stroke-width=\"2\" fill=\"none\"/>");
+    let _ = write!(
+        svg,
+        "<path d=\"{path}\" stroke=\"#38bdf8\" stroke-width=\"2\" fill=\"none\"/>"
+    );
 
     for ((x, y), pt) in points.iter().zip(data.iter()) {
-        let _ = write!(svg, "<circle cx=\"{x}\" cy=\"{y}\" r=\"4\" fill=\"#38bdf8\"/>");
-        let _ = write!(svg, "<text x=\"{x}\" y=\"{}\" text-anchor=\"middle\">{}</text>", pad_t + chart_h + 15, escape_xml(&pt.label));
+        let _ = write!(
+            svg,
+            "<circle cx=\"{x}\" cy=\"{y}\" r=\"4\" fill=\"#38bdf8\"/>"
+        );
+        let _ = write!(
+            svg,
+            "<text x=\"{x}\" y=\"{}\" text-anchor=\"middle\">{}</text>",
+            pad_t + chart_h + 15,
+            escape_xml(&pt.label)
+        );
     }
 
     svg.push_str("</svg>");
@@ -204,16 +268,23 @@ fn render_line_chart(data: &[ChartDataPoint]) -> String {
 // ── Pie Chart ─────────────────────────────────────────────────────────────────
 
 fn render_pie_chart(data: &[ChartDataPoint]) -> String {
-    if data.is_empty() { return empty_svg("No data"); }
+    if data.is_empty() {
+        return empty_svg("No data");
+    }
     let total: f64 = data.iter().map(|d| d.value).sum();
-    if total == 0.0 { return empty_svg("All values zero"); }
+    if total == 0.0 {
+        return empty_svg("All values zero");
+    }
 
     let cx = 120.0f64;
     let cy = 120.0f64;
     let r = 100.0f64;
-    let colors = ["#38bdf8", "#818cf8", "#34d399", "#fb923c", "#f472b6", "#a3e635"];
+    let colors = [
+        "#38bdf8", "#818cf8", "#34d399", "#fb923c", "#f472b6", "#a3e635",
+    ];
 
-    let mut svg = String::from("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"300\" height=\"260\">");
+    let mut svg =
+        String::from("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"300\" height=\"260\">");
     svg.push_str("<style>text{font:11px sans-serif;fill:#e2e8f0}</style>");
 
     let mut angle = -std::f64::consts::FRAC_PI_2;
@@ -228,8 +299,17 @@ fn render_pie_chart(data: &[ChartDataPoint]) -> String {
         let color = colors[i % colors.len()];
         let _ = write!(svg, "<path d=\"M{cx},{cy} L{x1:.2},{y1:.2} A{r},{r} 0 {large},1 {x2:.2},{y2:.2} Z\" fill=\"{color}\"/>");
         let ly = 20 + i as u32 * 18;
-        let _ = write!(svg, "<rect x=\"245\" y=\"{ly}\" width=\"12\" height=\"12\" fill=\"{color}\"/>");
-        let _ = write!(svg, "<text x=\"261\" y=\"{}\">{} ({:.1}%)</text>", ly + 10, escape_xml(&pt.label), (pt.value / total) * 100.0);
+        let _ = write!(
+            svg,
+            "<rect x=\"245\" y=\"{ly}\" width=\"12\" height=\"12\" fill=\"{color}\"/>"
+        );
+        let _ = write!(
+            svg,
+            "<text x=\"261\" y=\"{}\">{} ({:.1}%)</text>",
+            ly + 10,
+            escape_xml(&pt.label),
+            (pt.value / total) * 100.0
+        );
     }
 
     svg.push_str("</svg>");

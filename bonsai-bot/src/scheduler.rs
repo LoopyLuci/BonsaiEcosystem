@@ -1,6 +1,6 @@
-use std::sync::Arc;
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
 
@@ -10,23 +10,25 @@ use crate::platforms::{InboundMessage, MessagingPlatform};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScheduledTask {
-    pub id:           String,
-    pub name:         String,
+    pub id: String,
+    pub name: String,
     /// Target platform name ("discord", "telegram", "email", "matrix", "system")
-    pub platform:     String,
+    pub platform: String,
     /// channel / chat_id to deliver to (empty string → broadcast to all)
-    pub platform_id:  String,
+    pub platform_id: String,
     /// user_id to attribute the synthetic message to
-    pub user_id:      String,
+    pub user_id: String,
     /// Text of the synthetic inbound message (e.g., "generate daily digest")
-    pub message:      String,
+    pub message: String,
     /// Run every N seconds
     pub interval_secs: u64,
     #[serde(default = "bool_true")]
-    pub enabled:      bool,
+    pub enabled: bool,
 }
 
-fn bool_true() -> bool { true }
+fn bool_true() -> bool {
+    true
+}
 
 // ── Scheduler state ───────────────────────────────────────────────────────────
 
@@ -47,14 +49,14 @@ impl Scheduler {
         } else {
             // Write a commented example file on first run
             let example = vec![ScheduledTask {
-                id:            "daily-digest".into(),
-                name:          "Daily Digest".into(),
-                platform:      "system".into(),
-                platform_id:   "".into(),
-                user_id:       "scheduler".into(),
-                message:       "generate a brief daily status summary".into(),
+                id: "daily-digest".into(),
+                name: "Daily Digest".into(),
+                platform: "system".into(),
+                platform_id: "".into(),
+                user_id: "scheduler".into(),
+                message: "generate a brief daily status summary".into(),
                 interval_secs: 86_400,
-                enabled:       false,
+                enabled: false,
             }];
             if let Ok(json) = serde_json::to_string_pretty(&example) {
                 let _ = std::fs::create_dir_all(path.parent().unwrap_or(&PathBuf::from(".")));
@@ -72,10 +74,14 @@ impl Scheduler {
         tx: mpsc::Sender<InboundMessage>,
         platforms: Arc<Vec<Arc<dyn MessagingPlatform>>>,
     ) {
-        for task in self.tasks.into_iter().filter(|t| t.enabled && t.interval_secs > 0) {
-            let tx2       = tx.clone();
+        for task in self
+            .tasks
+            .into_iter()
+            .filter(|t| t.enabled && t.interval_secs > 0)
+        {
+            let tx2 = tx.clone();
             let platforms2 = platforms.clone();
-            let task2     = task.clone();
+            let task2 = task.clone();
 
             tokio::spawn(async move {
                 // Stagger startup: wait one full interval before the first fire
@@ -85,7 +91,8 @@ impl Scheduler {
                     ticker.tick().await;
 
                     // If platform is "system" or empty, broadcast to the first available platform
-                    let target_platform = if task2.platform.is_empty() || task2.platform == "system" {
+                    let target_platform = if task2.platform.is_empty() || task2.platform == "system"
+                    {
                         platforms2.first().map(|p| p.name().to_string())
                     } else {
                         Some(task2.platform.clone())
@@ -93,17 +100,17 @@ impl Scheduler {
 
                     let platform_name = match target_platform {
                         Some(n) => n,
-                        None    => continue,
+                        None => continue,
                     };
 
                     let inbound = InboundMessage {
-                        platform:     platform_name,
-                        platform_id:  task2.platform_id.clone(),
-                        user_id:      task2.user_id.clone(),
+                        platform: platform_name,
+                        platform_id: task2.platform_id.clone(),
+                        user_id: task2.user_id.clone(),
                         display_name: format!("Scheduler:{}", task2.name),
-                        event_id:     format!("sched:{}:{}", task2.id, chrono::Utc::now().timestamp()),
-                        text:         task2.message.clone(),
-                        reply_to:     None,
+                        event_id: format!("sched:{}:{}", task2.id, chrono::Utc::now().timestamp()),
+                        text: task2.message.clone(),
+                        reply_to: None,
                     };
 
                     if tx2.try_send(inbound).is_err() {

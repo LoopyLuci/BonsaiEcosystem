@@ -105,7 +105,8 @@ impl AgentConnectHub {
     }
 
     pub fn list_sessions(&self) -> Vec<AgentConnectSession> {
-        let mut out: Vec<AgentConnectSession> = self.sessions.values().map(|r| r.session.clone()).collect();
+        let mut out: Vec<AgentConnectSession> =
+            self.sessions.values().map(|r| r.session.clone()).collect();
         out.sort_by_key(|s| std::cmp::Reverse(s.updated_at_ms));
         out
     }
@@ -117,7 +118,8 @@ impl AgentConnectHub {
         details: Value,
     ) -> Option<AgentConnectEvent> {
         let active_id = self.active_session_id.clone()?;
-        self.append_to_session(&active_id, event_type, summary, details).ok()
+        self.append_to_session(&active_id, event_type, summary, details)
+            .ok()
     }
 
     pub fn append_to_session(

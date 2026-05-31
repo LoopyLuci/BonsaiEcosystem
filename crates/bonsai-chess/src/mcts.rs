@@ -3,9 +3,9 @@
 //! Implements the AlphaZero-style MCTS with UCB exploration and
 //! neural-network-guided policy/value evaluation.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use crate::position::ChessPosition;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // ── Evaluator trait ───────────────────────────────────────────────────────────
 
@@ -23,7 +23,9 @@ pub struct MaterialEvaluator;
 impl BoardEvaluator for MaterialEvaluator {
     fn evaluate_policy(&self, pos: &ChessPosition) -> Vec<f32> {
         let n = pos.legal_moves_uci().len();
-        if n == 0 { return vec![]; }
+        if n == 0 {
+            return vec![];
+        }
         vec![1.0 / n as f32; n]
     }
     fn evaluate_value(&self, pos: &ChessPosition) -> f32 {
@@ -71,21 +73,23 @@ impl MctsNode {
         } else {
             self.total_value / self.visit_count as f32
         };
-        let u = c_puct * self.prior * (parent_visits as f32).sqrt()
-            / (1.0 + self.visit_count as f32);
+        let u =
+            c_puct * self.prior * (parent_visits as f32).sqrt() / (1.0 + self.visit_count as f32);
         q + u
     }
 
     /// Best child by visit count (final move selection).
     pub fn best_move_by_visits(&self) -> Option<&str> {
-        self.children.iter()
+        self.children
+            .iter()
             .max_by_key(|(_, n)| n.visit_count)
             .map(|(mv, _)| mv.as_str())
     }
 
     /// Best child by Q-value (used for evaluation games).
     pub fn best_move_by_value(&self) -> Option<&str> {
-        self.children.iter()
+        self.children
+            .iter()
             .filter(|(_, n)| n.visit_count > 0)
             .max_by(|(_, a), (_, b)| {
                 let qa = a.total_value / a.visit_count as f32;
@@ -97,7 +101,9 @@ impl MctsNode {
 
     /// Policy distribution over children weighted by visit count^(1/temperature).
     pub fn move_probabilities(&self, temperature: f32) -> Vec<(String, f32)> {
-        if self.children.is_empty() { return vec![]; }
+        if self.children.is_empty() {
+            return vec![];
+        }
 
         let total_visits: u32 = self.children.values().map(|c| c.visit_count).sum();
         if total_visits == 0 {
@@ -107,12 +113,19 @@ impl MctsNode {
 
         let raw: Vec<(String, f32)> = if temperature == 0.0 {
             // Greedy: pick only the most-visited
-            let max_v = self.children.values().map(|c| c.visit_count).max().unwrap_or(0);
-            self.children.iter()
+            let max_v = self
+                .children
+                .values()
+                .map(|c| c.visit_count)
+                .max()
+                .unwrap_or(0);
+            self.children
+                .iter()
                 .map(|(k, c)| (k.clone(), if c.visit_count == max_v { 1.0 } else { 0.0 }))
                 .collect()
         } else {
-            self.children.iter()
+            self.children
+                .iter()
                 .map(|(k, c)| {
                     let v = (c.visit_count as f32 / total_visits as f32).powf(1.0 / temperature);
                     (k.clone(), v)
@@ -159,15 +172,27 @@ impl Default for MctsConfig {
 impl MctsConfig {
     /// Fast config for training self-play (fewer sims for speed).
     pub fn training() -> Self {
-        Self { num_simulations: 200, temperature: 1.0, ..Default::default() }
+        Self {
+            num_simulations: 200,
+            temperature: 1.0,
+            ..Default::default()
+        }
     }
     /// Strong config for evaluation matches.
     pub fn strong() -> Self {
-        Self { num_simulations: 3200, temperature: 0.0, ..Default::default() }
+        Self {
+            num_simulations: 3200,
+            temperature: 0.0,
+            ..Default::default()
+        }
     }
     /// Quick config for real-time user games.
     pub fn interactive() -> Self {
-        Self { num_simulations: 400, temperature: 0.0, ..Default::default() }
+        Self {
+            num_simulations: 400,
+            temperature: 0.0,
+            ..Default::default()
+        }
     }
 }
 
@@ -219,12 +244,17 @@ pub fn search(
     for (i, mv) in legal.iter().enumerate() {
         let prior_raw = policy.get(i).copied().unwrap_or(1.0 / legal.len() as f32);
         let prior = if config.dirichlet_weight > 0.0 {
-            (1.0 - config.dirichlet_weight) * prior_raw
-                + config.dirichlet_weight * noise[i]
+            (1.0 - config.dirichlet_weight) * prior_raw + config.dirichlet_weight * noise[i]
         } else {
             prior_raw
         };
-        root.children.insert(mv.clone(), MctsNode { prior, ..Default::default() });
+        root.children.insert(
+            mv.clone(),
+            MctsNode {
+                prior,
+                ..Default::default()
+            },
+        );
     }
 
     // Run simulations
@@ -233,7 +263,8 @@ pub fn search(
     }
 
     let move_probs = root.move_probabilities(config.temperature);
-    let best_move = move_probs.iter()
+    let best_move = move_probs
+        .iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(m, _)| m.clone())
         .unwrap_or_default();
@@ -243,7 +274,12 @@ pub fn search(
         0.5
     };
 
-    SearchResult { best_move, value, move_probs, simulations: config.num_simulations }
+    SearchResult {
+        best_move,
+        value,
+        move_probs,
+        simulations: config.num_simulations,
+    }
 }
 
 /// Recursive simulation step. Returns value from the current player's perspective.
@@ -274,7 +310,13 @@ fn run_simulation(
             let policy = evaluator.evaluate_policy(position);
             for (i, mv) in legal.iter().enumerate() {
                 let prior = policy.get(i).copied().unwrap_or(1.0 / legal.len() as f32);
-                node.children.insert(mv.clone(), MctsNode { prior, ..Default::default() });
+                node.children.insert(
+                    mv.clone(),
+                    MctsNode {
+                        prior,
+                        ..Default::default()
+                    },
+                );
             }
         }
 
@@ -283,7 +325,9 @@ fn run_simulation(
 
     // Selection: pick best child by UCB
     let parent_visits = node.visit_count;
-    let best_mv = node.children.iter()
+    let best_mv = node
+        .children
+        .iter()
         .max_by(|(_, a), (_, b)| {
             a.ucb_score(parent_visits, config.c_puct)
                 .partial_cmp(&b.ucb_score(parent_visits, config.c_puct))
@@ -300,7 +344,11 @@ fn run_simulation(
             child.is_terminal = true;
             let r = child_pos.result().unwrap_or(0.5);
             // Flip for opponent perspective (position is after the move)
-            let v = if child_pos.side_to_move() == "white" { r } else { 1.0 - r };
+            let v = if child_pos.side_to_move() == "white" {
+                r
+            } else {
+                1.0 - r
+            };
             child.terminal_value = Some(v);
             child.visit_count += 1;
             child.total_value += v;
@@ -320,7 +368,9 @@ fn run_simulation(
 
 /// Generate Dirichlet noise for root exploration.
 fn dirichlet_noise(n: usize, alpha: f32) -> Vec<f32> {
-    if n == 0 { return vec![]; }
+    if n == 0 {
+        return vec![];
+    }
     // Approximate Dirichlet using Gamma samples
     let mut rng_vals: Vec<f32> = (0..n)
         .map(|_| {
@@ -330,7 +380,9 @@ fn dirichlet_noise(n: usize, alpha: f32) -> Vec<f32> {
         })
         .collect();
     let sum: f32 = rng_vals.iter().sum();
-    for v in &mut rng_vals { *v /= sum; }
+    for v in &mut rng_vals {
+        *v /= sum;
+    }
     rng_vals
 }
 
@@ -360,7 +412,9 @@ pub fn self_play_game(
 
     // Apply opening book moves
     for mv in opening_moves {
-        if pos.make_move_uci(mv).is_err() { break; }
+        if pos.make_move_uci(mv).is_err() {
+            break;
+        }
     }
 
     let mut move_count = 0;
@@ -371,7 +425,9 @@ pub fn self_play_game(
         search_config.temperature = temp;
 
         let result = search(&pos, evaluator, &search_config);
-        if result.best_move.is_empty() { break; }
+        if result.best_move.is_empty() {
+            break;
+        }
 
         examples.push(TrainingExample {
             fen: pos.to_fen(),
@@ -380,7 +436,9 @@ pub fn self_play_game(
             game_result: None,
         });
 
-        if pos.make_move_uci(&result.best_move).is_err() { break; }
+        if pos.make_move_uci(&result.best_move).is_err() {
+            break;
+        }
         move_count += 1;
     }
 
@@ -389,7 +447,11 @@ pub fn self_play_game(
     let _n = examples.len();
     for (i, ex) in examples.iter_mut().enumerate() {
         // Alternate perspective: even indices = white's perspective
-        let perspective = if i % 2 == 0 { final_result } else { 1.0 - final_result };
+        let perspective = if i % 2 == 0 {
+            final_result
+        } else {
+            1.0 - final_result
+        };
         ex.game_result = Some(perspective);
     }
 
@@ -405,11 +467,18 @@ mod tests {
     fn mcts_returns_legal_move() {
         let pos = ChessPosition::initial();
         let eval = MaterialEvaluator;
-        let config = MctsConfig { num_simulations: 50, ..Default::default() };
+        let config = MctsConfig {
+            num_simulations: 50,
+            ..Default::default()
+        };
         let result = search(&pos, &eval, &config);
         assert!(!result.best_move.is_empty());
         let legal = pos.legal_moves_uci();
-        assert!(legal.contains(&result.best_move), "best_move {} not in legal moves", result.best_move);
+        assert!(
+            legal.contains(&result.best_move),
+            "best_move {} not in legal moves",
+            result.best_move
+        );
     }
 
     #[test]

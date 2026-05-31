@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 
 use tracing::{info, warn};
 
@@ -17,7 +17,7 @@ pub struct KdbRetriever {
 #[derive(Debug, Clone)]
 pub struct RetrievedContext {
     pub module_name: String,
-    pub entries: Vec<(String, f32)>,  // (value, distance)
+    pub entries: Vec<(String, f32)>, // (value, distance)
 }
 
 impl KdbRetriever {
@@ -66,7 +66,10 @@ impl KdbRetriever {
     /// Retrieve top_k nearest entries from all loaded modules for the given query vector.
     pub fn retrieve(&self, query: &[f32]) -> Result<Vec<RetrievedContext>> {
         if query.len() != self.dim {
-            return Err(KdbError::DimMismatch { expected: self.dim, got: query.len() });
+            return Err(KdbError::DimMismatch {
+                expected: self.dim,
+                got: query.len(),
+            });
         }
         let modules = self.modules.read().unwrap();
         let mut results = Vec::new();
@@ -74,10 +77,9 @@ impl KdbRetriever {
         for (name, module) in modules.iter() {
             match module.index.search(query, self.top_k) {
                 Ok(hits) => {
-                    let entries = hits.into_iter()
-                        .filter_map(|(id, dist)| {
-                            module.values.get(id).map(|v| (v.clone(), dist))
-                        })
+                    let entries = hits
+                        .into_iter()
+                        .filter_map(|(id, dist)| module.values.get(id).map(|v| (v.clone(), dist)))
                         .collect();
                     results.push(RetrievedContext {
                         module_name: name.clone(),

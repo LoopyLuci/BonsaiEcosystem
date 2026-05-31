@@ -45,15 +45,11 @@ impl Default for LoopConfig {
             bonsai_adapter_path: String::new(),
             output_data_path: format!(
                 "{}/.bonsai/data/loop_generated.jsonl",
-                dirs::home_dir()
-                    .unwrap_or_default()
-                    .to_string_lossy()
+                dirs::home_dir().unwrap_or_default().to_string_lossy()
             ),
             output_adapter_path: format!(
                 "{}/.bonsai/adapters/bonsai-loop-latest",
-                dirs::home_dir()
-                    .unwrap_or_default()
-                    .to_string_lossy()
+                dirs::home_dir().unwrap_or_default().to_string_lossy()
             ),
             gpu_layers: 35,
             finetune_threshold: 50,
@@ -249,29 +245,24 @@ impl TrainingLoop {
                 s.last_tool_overlap_pct = comparison.tool_overlap_pct;
                 s.elapsed_secs = started_at.elapsed().as_secs();
             }
-            self.progress_tx.send(serde_json::json!({
-                "round": prompt_idx,
-                "gaps_found": comparison.gaps.len(),
-                "examples": examples_this_run,
-                "tool_overlap_pct": comparison.tool_overlap_pct,
-                "elapsed_secs": started_at.elapsed().as_secs()
-            })).ok();
+            self.progress_tx
+                .send(serde_json::json!({
+                    "round": prompt_idx,
+                    "gaps_found": comparison.gaps.len(),
+                    "examples": examples_this_run,
+                    "tool_overlap_pct": comparison.tool_overlap_pct,
+                    "elapsed_secs": started_at.elapsed().as_secs()
+                }))
+                .ok();
 
             // Only write training data when there are gaps to learn from
             if !comparison.gaps.is_empty() || !comparison.intent_match {
                 let example = TrainingExample {
                     instruction: prompt.clone(),
-                    output: comparison
-                        .reference_tools
-                        .join(", ")
-                        .to_string(),
+                    output: comparison.reference_tools.join(", ").to_string(),
                     bonsai_output: comparison.bonsai_tools.join(", "),
                     intent: None, // reference intent not available in ComparisonResult directly
-                    gaps: comparison
-                        .gaps
-                        .iter()
-                        .map(|g| g.gap_type.clone())
-                        .collect(),
+                    gaps: comparison.gaps.iter().map(|g| g.gap_type.clone()).collect(),
                 };
 
                 if let Err(e) = self.append_example(&config.output_data_path, &example) {

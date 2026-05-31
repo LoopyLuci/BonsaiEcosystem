@@ -14,7 +14,11 @@ struct EmbeddingIndex {
 }
 
 impl EmbeddingIndex {
-    fn new() -> Self { Self { entries: DashMap::new() } }
+    fn new() -> Self {
+        Self {
+            entries: DashMap::new(),
+        }
+    }
 
     fn upsert(&self, id: impl Into<String>, embedding: Vec<f32>) {
         let id = id.into();
@@ -22,7 +26,9 @@ impl EmbeddingIndex {
     }
 
     fn search(&self, query: &[f32], top_k: usize) -> Vec<(String, f32)> {
-        let mut scored: Vec<(String, f32)> = self.entries.iter()
+        let mut scored: Vec<(String, f32)> = self
+            .entries
+            .iter()
             .map(|e| {
                 let sim = cosine_similarity(query, &e.value().1);
                 (e.value().0.clone(), sim)
@@ -36,10 +42,18 @@ impl EmbeddingIndex {
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len().min(b.len());
-    let dot: f32 = a[..len].iter().zip(b[..len].iter()).map(|(x, y)| x * y).sum();
+    let dot: f32 = a[..len]
+        .iter()
+        .zip(b[..len].iter())
+        .map(|(x, y)| x * y)
+        .sum();
     let norm_a: f32 = a[..len].iter().map(|x| x * x).sum::<f32>().sqrt();
     let norm_b: f32 = b[..len].iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+    if norm_a == 0.0 || norm_b == 0.0 {
+        0.0
+    } else {
+        dot / (norm_a * norm_b)
+    }
 }
 
 // ── KnowledgeGraph ────────────────────────────────────────────────────────────
@@ -75,7 +89,10 @@ impl KnowledgeGraph {
         self.name_index.insert(entity.name.clone(), id.clone());
         // Update concept index
         let concept = format!("{:?}", entity.entity_type);
-        self.concept_index.entry(concept).or_default().push(id.clone());
+        self.concept_index
+            .entry(concept)
+            .or_default()
+            .push(id.clone());
         // Update embedding index
         if let Some(ref emb) = entity.embeddings {
             self.embedding_index.upsert(id.clone(), emb.clone());
@@ -95,7 +112,8 @@ impl KnowledgeGraph {
     }
 
     pub fn find_by_type(&self, entity_type: &EntityType) -> Vec<Entity> {
-        self.entities.iter()
+        self.entities
+            .iter()
             .filter(|e| &e.entity_type == entity_type)
             .map(|e| e.clone())
             .collect()
@@ -108,14 +126,17 @@ impl KnowledgeGraph {
                 .collect()
         } else {
             // Fallback: name substring search
-            self.entities.iter()
+            self.entities
+                .iter()
                 .filter(|e| e.name.to_lowercase().contains(&concept.to_lowercase()))
                 .map(|e| e.clone())
                 .collect()
         }
     }
 
-    pub fn entity_count(&self) -> usize { self.entities.len() }
+    pub fn entity_count(&self) -> usize {
+        self.entities.len()
+    }
 
     // ── Relations ─────────────────────────────────────────────────────────────
 
@@ -134,24 +155,34 @@ impl KnowledgeGraph {
     }
 
     pub fn relations_of(&self, entity_id: &EntityId) -> Vec<Relation> {
-        self.relations.iter()
+        self.relations
+            .iter()
             .filter(|r| &r.subject == entity_id)
             .map(|r| r.clone())
             .collect()
     }
 
-    pub fn find_by_predicate(&self, subject: &EntityId, predicate: &Predicate) -> Vec<RelationTarget> {
-        self.relations.iter()
+    pub fn find_by_predicate(
+        &self,
+        subject: &EntityId,
+        predicate: &Predicate,
+    ) -> Vec<RelationTarget> {
+        self.relations
+            .iter()
             .filter(|r| &r.subject == subject && &r.predicate == predicate)
             .map(|r| r.object.clone())
             .collect()
     }
 
-    pub fn relation_count(&self) -> usize { self.relations.len() }
+    pub fn relation_count(&self) -> usize {
+        self.relations.len()
+    }
 
     /// Transitive closure for a given predicate (Warshall's algorithm).
     pub fn transitive_closure(&self, predicate: &Predicate) -> Vec<Relation> {
-        let direct: Vec<Relation> = self.relations.iter()
+        let direct: Vec<Relation> = self
+            .relations
+            .iter()
             .filter(|r| &r.predicate == predicate)
             .map(|r| r.clone())
             .collect();
@@ -208,12 +239,18 @@ impl KnowledgeGraph {
         self.beliefs.iter().map(|b| b.clone()).collect()
     }
 
-    pub fn belief_count(&self) -> usize { self.beliefs.len() }
+    pub fn belief_count(&self) -> usize {
+        self.beliefs.len()
+    }
 
     // ── Semantic search ───────────────────────────────────────────────────────
 
     /// Search entities by embedding similarity. Returns empty if no embeddings exist.
-    pub fn semantic_search_entities(&self, query_embedding: &[f32], top_k: usize) -> Vec<SearchResult> {
+    pub fn semantic_search_entities(
+        &self,
+        query_embedding: &[f32],
+        top_k: usize,
+    ) -> Vec<SearchResult> {
         let hits = self.embedding_index.search(query_embedding, top_k);
         hits.into_iter()
             .filter_map(|(id, score)| {
@@ -233,16 +270,26 @@ impl KnowledgeGraph {
         for e in self.entities.iter() {
             if e.name.to_lowercase().contains(&q) {
                 let score = if e.name.to_lowercase() == q { 1.0 } else { 0.7 };
-                results.push(SearchResult { score, kind: SearchResultKind::Entity(e.clone()) });
+                results.push(SearchResult {
+                    score,
+                    kind: SearchResultKind::Entity(e.clone()),
+                });
             }
         }
         for b in self.beliefs.iter() {
             if b.statement.to_lowercase().contains(&q) {
-                results.push(SearchResult { score: 0.6, kind: SearchResultKind::Belief(b.clone()) });
+                results.push(SearchResult {
+                    score: 0.6,
+                    kind: SearchResultKind::Belief(b.clone()),
+                });
             }
         }
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(top_k);
         results
     }
@@ -258,7 +305,9 @@ impl KnowledgeGraph {
 }
 
 impl Default for KnowledgeGraph {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -288,8 +337,15 @@ mod tests {
         let g = KnowledgeGraph::new();
         let a = g.upsert_entity(Entity::new("Dog", EntityType::Concept));
         let b = g.upsert_entity(Entity::new("Animal", EntityType::Concept));
-        let rel = Relation::new(a.clone(), Predicate::IsA, RelationTarget::Entity(b.clone()),
-            ProvenanceSource::Derived { from_beliefs: vec![], rule: "test".into() });
+        let rel = Relation::new(
+            a.clone(),
+            Predicate::IsA,
+            RelationTarget::Entity(b.clone()),
+            ProvenanceSource::Derived {
+                from_beliefs: vec![],
+                rule: "test".into(),
+            },
+        );
         assert!(g.add_relation(rel).is_ok());
         let targets = g.find_by_predicate(&a, &Predicate::IsA);
         assert_eq!(targets.len(), 1);
@@ -301,9 +357,24 @@ mod tests {
         let x = g.upsert_entity(Entity::new("Poodle", EntityType::Concept));
         let y = g.upsert_entity(Entity::new("Dog", EntityType::Concept));
         let z = g.upsert_entity(Entity::new("Animal", EntityType::Concept));
-        let src = ProvenanceSource::Derived { from_beliefs: vec![], rule: "test".into() };
-        g.add_relation(Relation::new(x.clone(), Predicate::IsA, RelationTarget::Entity(y.clone()), src.clone())).unwrap();
-        g.add_relation(Relation::new(y.clone(), Predicate::IsA, RelationTarget::Entity(z.clone()), src)).unwrap();
+        let src = ProvenanceSource::Derived {
+            from_beliefs: vec![],
+            rule: "test".into(),
+        };
+        g.add_relation(Relation::new(
+            x.clone(),
+            Predicate::IsA,
+            RelationTarget::Entity(y.clone()),
+            src.clone(),
+        ))
+        .unwrap();
+        g.add_relation(Relation::new(
+            y.clone(),
+            Predicate::IsA,
+            RelationTarget::Entity(z.clone()),
+            src,
+        ))
+        .unwrap();
         let inferred = g.transitive_closure(&Predicate::IsA);
         // Should infer Poodle → Animal
         assert!(inferred.iter().any(|r| r.subject == x));

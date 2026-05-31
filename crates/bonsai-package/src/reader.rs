@@ -20,7 +20,8 @@ impl PackageReader {
         let mut archive = ZipArchive::new(file)?;
 
         let manifest: PackageManifest = {
-            let mut entry = archive.by_name("manifest.json")
+            let mut entry = archive
+                .by_name("manifest.json")
                 .map_err(|_| PackageError::NotFound("manifest.json".into()))?;
             let mut buf = String::new();
             entry.read_to_string(&mut buf)?;
@@ -36,7 +37,9 @@ impl PackageReader {
 
     /// Read a single entry as bytes.
     pub fn read_entry(&mut self, name: &str) -> Result<Vec<u8>> {
-        let mut entry = self.archive.by_name(name)
+        let mut entry = self
+            .archive
+            .by_name(name)
             .map_err(|_| PackageError::NotFound(name.into()))?;
         let mut buf = Vec::new();
         entry.read_to_end(&mut buf)?;
@@ -59,17 +62,19 @@ impl PackageReader {
 
         let names: Vec<String> = (0..self.archive.len())
             .filter_map(|i| {
-                self.archive.by_index(i).ok()
-                    .and_then(|e| {
-                        let n = e.name().to_owned();
-                        if n.starts_with(prefix) { Some(n) } else { None }
-                    })
+                self.archive.by_index(i).ok().and_then(|e| {
+                    let n = e.name().to_owned();
+                    if n.starts_with(prefix) { Some(n) } else { None }
+                })
             })
             .collect();
 
         let mut extracted = Vec::new();
         for name in names {
-            let rel = name.strip_prefix(prefix).unwrap_or(&name).trim_start_matches('/');
+            let rel = name
+                .strip_prefix(prefix)
+                .unwrap_or(&name)
+                .trim_start_matches('/');
             let dest = dest_dir.join(rel);
             self.extract_entry(&name, &dest)?;
             extracted.push(dest);

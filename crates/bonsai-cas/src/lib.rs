@@ -3,8 +3,8 @@
 //! Blobs ≤ INLINE_THRESHOLD bytes are stored inline in the DB for fast access.
 //! Larger blobs are written to `<blob_dir>/<key[0..2]>/<key>.bin`.
 
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tokio::sync::broadcast;
 
@@ -15,11 +15,15 @@ const INLINE_THRESHOLD: usize = 65_536; // 64 KiB
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CasEvent {
     /// A new object was inserted (key hex, mime type).
-    Inserted { key: String, mime: String, size: usize },
+    Inserted {
+        key: String,
+        mime: String,
+        size: usize,
+    },
     /// An already-present key was requested again (no data change, but caller re-put it).
-    Updated  { key: String },
+    Updated { key: String },
     /// An object was removed by GC (key hex).
-    Deleted  { key: String },
+    Deleted { key: String },
 }
 
 const WATCH_CAPACITY: usize = 256;
@@ -93,15 +97,21 @@ impl CasStore {
                 created_at INTEGER NOT NULL,
                 ref_count  INTEGER NOT NULL DEFAULT 0,
                 inline_data BLOB
-            )"
-        ).execute(&pool).await?;
+            )",
+        )
+        .execute(&pool)
+        .await?;
 
-        sqlx::query(
-            "CREATE INDEX IF NOT EXISTS idx_cas_mime ON cas_objects(mime_type)"
-        ).execute(&pool).await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_cas_mime ON cas_objects(mime_type)")
+            .execute(&pool)
+            .await?;
 
         let (watch_tx, _) = broadcast::channel(WATCH_CAPACITY);
-        Ok(Self { db: pool, blob_dir: blob_dir.to_path_buf(), watch_tx })
+        Ok(Self {
+            db: pool,
+            blob_dir: blob_dir.to_path_buf(),
+            watch_tx,
+        })
     }
 
     /// Store `data` with the given MIME type. Returns the content key.
@@ -111,12 +121,11 @@ impl CasStore {
         let hex = key.hex();
 
         // Already stored?
-        let exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM cas_objects WHERE key = ?)"
-        )
-        .bind(&hex)
-        .fetch_one(&self.db)
-        .await?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM cas_objects WHERE key = ?)")
+                .bind(&hex)
+                .fetch_one(&self.db)
+                .await?;
 
         if exists {
             let _ = self.watch_tx.send(CasEvent::Updated { key: hex.clone() });
@@ -131,7 +140,7 @@ impl CasStore {
         if data.len() <= INLINE_THRESHOLD {
             sqlx::query(
                 "INSERT INTO cas_objects (key, size, mime_type, created_at, inline_data)
-                 VALUES (?, ?, ?, ?, ?)"
+                 VALUES (?, ?, ?, ?, ?)",
             )
             .bind(&hex)
             .bind(data.len() as i64)
@@ -145,7 +154,7 @@ impl CasStore {
             self.write_blob_file(&hex, data).await?;
             sqlx::query(
                 "INSERT INTO cas_objects (key, size, mime_type, created_at, inline_data)
-                 VALUES (?, ?, ?, ?, NULL)"
+                 VALUES (?, ?, ?, ?, NULL)",
             )
             .bind(&hex)
             .bind(data.len() as i64)
@@ -155,7 +164,11 @@ impl CasStore {
             .await?;
         }
 
-        let _ = self.watch_tx.send(CasEvent::Inserted { key: hex, mime: mime.to_string(), size: data.len() });
+        let _ = self.watch_tx.send(CasEvent::Inserted {
+            key: hex,
+            mime: mime.to_string(),
+            size: data.len(),
+        });
         Ok(key)
     }
 
@@ -163,12 +176,11 @@ impl CasStore {
     pub async fn get(&self, key: &CasKey) -> Result<Option<Vec<u8>>, CasError> {
         let hex = key.hex();
 
-        let row: Option<(i64, Option<Vec<u8>>)> = sqlx::query_as(
-            "SELECT size, inline_data FROM cas_objects WHERE key = ?"
-        )
-        .bind(&hex)
-        .fetch_optional(&self.db)
-        .await?;
+        let row: Option<(i64, Option<Vec<u8>>)> =
+            sqlx::query_as("SELECT size, inline_data FROM cas_objects WHERE key = ?")
+                .bind(&hex)
+                .fetch_optional(&self.db)
+                .await?;
 
         match row {
             None => Ok(None),
@@ -188,12 +200,11 @@ impl CasStore {
     /// Check existence without fetching data.
     pub async fn exists(&self, key: &CasKey) -> Result<bool, CasError> {
         let hex = key.hex();
-        let exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM cas_objects WHERE key = ?)"
-        )
-        .bind(&hex)
-        .fetch_one(&self.db)
-        .await?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM cas_objects WHERE key = ?)")
+                .bind(&hex)
+                .fetch_one(&self.db)
+                .await?;
         Ok(exists)
     }
 
@@ -210,12 +221,10 @@ impl CasStore {
     /// Decrement reference count. If it reaches 0 the object becomes GC-eligible.
     pub async fn unpin(&self, key: &CasKey) -> Result<(), CasError> {
         let hex = key.hex();
-        sqlx::query(
-            "UPDATE cas_objects SET ref_count = MAX(0, ref_count - 1) WHERE key = ?"
-        )
-        .bind(&hex)
-        .execute(&self.db)
-        .await?;
+        sqlx::query("UPDATE cas_objects SET ref_count = MAX(0, ref_count - 1) WHERE key = ?")
+            .bind(&hex)
+            .execute(&self.db)
+            .await?;
         Ok(())
     }
 
@@ -223,7 +232,7 @@ impl CasStore {
     pub async fn gc(&self) -> Result<u64, CasError> {
         // Collect keys of large blobs before deleting DB rows
         let large_keys: Vec<String> = sqlx::query_scalar(
-            "SELECT key FROM cas_objects WHERE ref_count = 0 AND inline_data IS NULL"
+            "SELECT key FROM cas_objects WHERE ref_count = 0 AND inline_data IS NULL",
         )
         .fetch_all(&self.db)
         .await?;
@@ -250,19 +259,30 @@ impl CasStore {
         .fetch_all(&self.db)
         .await?;
 
-        Ok(rows.into_iter().map(|(key, size, mime_type, created_at, ref_count)| {
-            CasObjectMeta { key, size, mime_type, created_at, ref_count }
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(
+                |(key, size, mime_type, created_at, ref_count)| CasObjectMeta {
+                    key,
+                    size,
+                    mime_type,
+                    created_at,
+                    ref_count,
+                },
+            )
+            .collect())
     }
 
     /// Total storage: number of objects and byte count.
     pub async fn stats(&self) -> Result<CasStats, CasError> {
-        let (count, total_bytes): (i64, i64) = sqlx::query_as(
-            "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM cas_objects"
-        )
-        .fetch_one(&self.db)
-        .await?;
-        Ok(CasStats { object_count: count as u64, total_bytes: total_bytes as u64 })
+        let (count, total_bytes): (i64, i64) =
+            sqlx::query_as("SELECT COUNT(*), COALESCE(SUM(size), 0) FROM cas_objects")
+                .fetch_one(&self.db)
+                .await?;
+        Ok(CasStats {
+            object_count: count as u64,
+            total_bytes: total_bytes as u64,
+        })
     }
 
     /// Subscribe to CAS change events.  Call before any `put`/`gc` you want to observe.

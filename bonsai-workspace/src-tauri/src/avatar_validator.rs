@@ -1,14 +1,13 @@
 /// SVG sanitizer + 14-viseme rig completeness validator.
 /// Strips <script>, external refs, and on* event attrs.
 /// Verifies all data-viseme="0"..="13" paths exist.
-
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct AvatarRigReport {
-    pub valid:           bool,
+    pub valid: bool,
     pub missing_visemes: Vec<u8>,
-    pub warnings:        Vec<String>,
+    pub warnings: Vec<String>,
 }
 
 /// Strip dangerous constructs from raw SVG and return cleaned text.
@@ -40,7 +39,8 @@ pub fn sanitize_svg(raw: &str) -> Result<String, String> {
 
             // Strip <script> … </script> entirely
             if tag_name == "script" {
-                let close = raw[i..].find("</script>")
+                let close = raw[i..]
+                    .find("</script>")
                     .map(|p| i + p + 9)
                     .unwrap_or(bytes.len());
                 i = close;
@@ -72,19 +72,20 @@ fn strip_external_refs(tag: &str) -> String {
     // Replace href="http..." or xlink:href="http..." with href="#"
     let re_patterns = [
         ("href=\"http", "href=\"#"),
-        ("href='http",  "href='#"),
+        ("href='http", "href='#"),
         ("xlink:href=\"http", "xlink:href=\"#"),
-        ("xlink:href='http",  "xlink:href='#"),
+        ("xlink:href='http", "xlink:href='#"),
         // data: URIs with JS
         ("href=\"data:", "href=\"#"),
-        ("href='data:",  "href='#"),
+        ("href='data:", "href='#"),
     ];
     let mut s = tag.to_string();
     for (pat, rep) in &re_patterns {
         while let Some(pos) = s.find(pat) {
             // find end of attribute value
             let after = pos + pat.len();
-            let end = s[after..].find(|c| c == '"' || c == '\'')
+            let end = s[after..]
+                .find(|c| c == '"' || c == '\'')
                 .map(|p| after + p)
                 .unwrap_or(s.len());
             s.replace_range(pos..end, rep);
@@ -121,8 +122,12 @@ fn find_event_attr(s: &str) -> Option<usize> {
         {
             // Check that next chars are [a-z]+ then '='
             let mut j = i + 3;
-            while j < bytes.len() && bytes[j].is_ascii_alphabetic() { j += 1; }
-            if j < bytes.len() && bytes[j] == b'=' { return Some(i); }
+            while j < bytes.len() && bytes[j].is_ascii_alphabetic() {
+                j += 1;
+            }
+            if j < bytes.len() && bytes[j] == b'=' {
+                return Some(i);
+            }
         }
         i += 1;
     }
@@ -133,16 +138,24 @@ fn find_attr_end(s: &str, start: usize) -> usize {
     let bytes = s.as_bytes();
     let mut i = start + 1;
     // Skip past = and value
-    while i < bytes.len() && bytes[i] != b'=' { i += 1; }
-    if i >= bytes.len() { return i; }
+    while i < bytes.len() && bytes[i] != b'=' {
+        i += 1;
+    }
+    if i >= bytes.len() {
+        return i;
+    }
     i += 1; // skip '='
     if i < bytes.len() && (bytes[i] == b'"' || bytes[i] == b'\'') {
         let quote = bytes[i];
         i += 1;
-        while i < bytes.len() && bytes[i] != quote { i += 1; }
+        while i < bytes.len() && bytes[i] != quote {
+            i += 1;
+        }
         i += 1; // closing quote
     } else {
-        while i < bytes.len() && bytes[i] != b' ' && bytes[i] != b'>' { i += 1; }
+        while i < bytes.len() && bytes[i] != b' ' && bytes[i] != b'>' {
+            i += 1;
+        }
     }
     i
 }

@@ -7,7 +7,6 @@
 ///   - `list_fixes`                   — returns current KB for the UI
 ///   - `export_survival_training_data`— dumps KB→JSONL for fine-tuning
 ///   - `sync_watchdog_kb`             — merges fixes from the watchdog's separate DB
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -26,13 +25,10 @@ impl SurvivalState {
     pub fn new(db_path: &str) -> Self {
         let url = format!("sqlite://{db_path}?mode=rwc");
         let pool = tauri::async_runtime::block_on(async {
-            let p = SqlitePool::connect(&url)
-                .await
-                .unwrap_or_else(|_| {
-                    tauri::async_runtime::block_on(
-                        SqlitePool::connect("sqlite::memory:")
-                    ).expect("in-memory DB failed")
-                });
+            let p = SqlitePool::connect(&url).await.unwrap_or_else(|_| {
+                tauri::async_runtime::block_on(SqlitePool::connect("sqlite::memory:"))
+                    .expect("in-memory DB failed")
+            });
             sqlx::query(
                 "PRAGMA journal_mode = WAL;
                  CREATE TABLE IF NOT EXISTS fixes (
@@ -55,7 +51,9 @@ impl SurvivalState {
             p
         });
 
-        let state = Self { pool: Arc::new(pool) };
+        let state = Self {
+            pool: Arc::new(pool),
+        };
         tauri::async_runtime::block_on(seed_builtin_rules(&state.pool));
         state
     }
@@ -63,26 +61,60 @@ impl SurvivalState {
 
 async fn seed_builtin_rules(pool: &SqlitePool) {
     let seeds: &[(&str, &str, &str)] = &[
-        ("EADDRINUSE",                       "rule", "lsof -ti:11369 2>/dev/null | xargs -r kill -9 ; sleep 1"),
-        ("address already in use",           "rule", "lsof -ti:11369 2>/dev/null | xargs -r kill -9 ; sleep 1"),
-        ("Failed to bind socket",            "rule", "lsof -ti:11369 2>/dev/null | xargs -r kill -9"),
-        ("Cannot find module",               "rule", "npm install --prefix bonsai-workspace"),
-        ("toml parse error",                 "rule", "rm -f ~/.bonsai/bonsai-config.json"),
-        ("TOML parse error",                 "rule", "rm -f ~/.bonsai/bonsai-config.json"),
-        ("database disk image is malformed", "rule", "rm -f ~/.bonsai/bonsai.db"),
-        ("GPU: out of memory",               "rule", "echo CPU_FALLBACK"),
-        ("llama-server: exited",             "rule", "echo SIDECAR_RESTART"),
-        ("Failed to create CAS",             "rule", "mkdir -p ~/.bonsai/cas_blobs"),
-        ("no space left on device",          "rule", "find /tmp -name 'bonsai_*' -mmin +60 -delete"),
+        (
+            "EADDRINUSE",
+            "rule",
+            "lsof -ti:11369 2>/dev/null | xargs -r kill -9 ; sleep 1",
+        ),
+        (
+            "address already in use",
+            "rule",
+            "lsof -ti:11369 2>/dev/null | xargs -r kill -9 ; sleep 1",
+        ),
+        (
+            "Failed to bind socket",
+            "rule",
+            "lsof -ti:11369 2>/dev/null | xargs -r kill -9",
+        ),
+        (
+            "Cannot find module",
+            "rule",
+            "npm install --prefix bonsai-workspace",
+        ),
+        (
+            "toml parse error",
+            "rule",
+            "rm -f ~/.bonsai/bonsai-config.json",
+        ),
+        (
+            "TOML parse error",
+            "rule",
+            "rm -f ~/.bonsai/bonsai-config.json",
+        ),
+        (
+            "database disk image is malformed",
+            "rule",
+            "rm -f ~/.bonsai/bonsai.db",
+        ),
+        ("GPU: out of memory", "rule", "echo CPU_FALLBACK"),
+        ("llama-server: exited", "rule", "echo SIDECAR_RESTART"),
+        (
+            "Failed to create CAS",
+            "rule",
+            "mkdir -p ~/.bonsai/cas_blobs",
+        ),
+        (
+            "no space left on device",
+            "rule",
+            "find /tmp -name 'bonsai_*' -mmin +60 -delete",
+        ),
     ];
     for (pattern, stype, script) in seeds {
-        let exists: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM fixes WHERE error_pattern = ?"
-        )
-        .bind(pattern)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0);
+        let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fixes WHERE error_pattern = ?")
+            .bind(pattern)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
         if exists == 0 {
             sqlx::query(
                 "INSERT INTO fixes (error_pattern, solution_type, solution_script, confidence, created_by)
@@ -100,15 +132,15 @@ async fn seed_builtin_rules(pool: &SqlitePool) {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FixEntry {
-    pub id:              i64,
-    pub error_pattern:   String,
-    pub solution_type:   String,
+    pub id: i64,
+    pub error_pattern: String,
+    pub solution_type: String,
     pub solution_script: String,
-    pub confidence:      f64,
-    pub usage_count:     i64,
-    pub success_count:   i64,
-    pub created_by:      String,
-    pub verified:        bool,
+    pub confidence: f64,
+    pub usage_count: i64,
+    pub success_count: i64,
+    pub created_by: String,
+    pub verified: bool,
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────
@@ -145,16 +177,18 @@ pub async fn repair_error(
 #[command]
 pub async fn report_fix(
     error_pattern: String,
-    solution:      String,
-    created_by:    Option<String>,
-    state:         tauri::State<'_, SurvivalState>,
+    solution: String,
+    created_by: Option<String>,
+    state: tauri::State<'_, SurvivalState>,
 ) -> Result<i64, String> {
     let who = created_by.as_deref().unwrap_or("user");
     let result = sqlx::query(
         "INSERT INTO fixes (error_pattern, solution_type, solution_script, confidence, created_by)
-         VALUES (?, 'user', ?, 0.6, ?)"
+         VALUES (?, 'user', ?, 0.6, ?)",
     )
-    .bind(&error_pattern).bind(&solution).bind(who)
+    .bind(&error_pattern)
+    .bind(&solution)
+    .bind(who)
     .execute(state.pool.as_ref())
     .await
     .map_err(|e| e.to_string())?;
@@ -181,9 +215,10 @@ pub async fn ai_repair_error(
     let pattern = &error[..error.len().min(200)];
     sqlx::query(
         "INSERT INTO fixes (error_pattern, solution_type, solution_script, confidence, created_by)
-         VALUES (?, 'ai', ?, 0.7, 'bonsai')"
+         VALUES (?, 'ai', ?, 0.7, 'bonsai')",
     )
-    .bind(pattern).bind(&suggestion)
+    .bind(pattern)
+    .bind(&suggestion)
     .execute(state.pool.as_ref())
     .await
     .ok();
@@ -192,9 +227,7 @@ pub async fn ai_repair_error(
 
 /// Return the full KB for the SurvivalPanel UI.
 #[command]
-pub async fn list_fixes(
-    state: tauri::State<'_, SurvivalState>,
-) -> Result<Vec<FixEntry>, String> {
+pub async fn list_fixes(state: tauri::State<'_, SurvivalState>) -> Result<Vec<FixEntry>, String> {
     fetch_all(&state.pool).await.map_err(|e| e.to_string())
 }
 
@@ -202,7 +235,7 @@ pub async fn list_fixes(
 #[command]
 pub async fn export_survival_training_data(
     output_path: String,
-    state:       tauri::State<'_, SurvivalState>,
+    state: tauri::State<'_, SurvivalState>,
 ) -> Result<usize, String> {
     let entries = fetch_all(&state.pool).await.map_err(|e| e.to_string())?;
     let examples: Vec<serde_json::Value> = entries
@@ -217,7 +250,11 @@ pub async fn export_survival_training_data(
         }))
         .collect();
     let count = examples.len();
-    let jsonl = examples.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n");
+    let jsonl = examples
+        .iter()
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
     std::fs::write(&output_path, jsonl).map_err(|e| e.to_string())?;
     info!("[survival] exported {count} training examples → {output_path}");
     Ok(count)
@@ -226,9 +263,7 @@ pub async fn export_survival_training_data(
 /// Merge successful fixes from the watchdog's SQLite KB into the app KB.
 /// Called at startup to absorb repairs the watchdog discovered during recovery.
 #[command]
-pub async fn sync_watchdog_kb(
-    state: tauri::State<'_, SurvivalState>,
-) -> Result<usize, String> {
+pub async fn sync_watchdog_kb(state: tauri::State<'_, SurvivalState>) -> Result<usize, String> {
     let wdb_path = dirs::home_dir()
         .unwrap_or_default()
         .join(".bonsai/survival_kb.db");
@@ -241,7 +276,7 @@ pub async fn sync_watchdog_kb(
 
     let rows = sqlx::query(
         "SELECT error_pattern, solution_type, solution_script, confidence, created_by
-         FROM fixes WHERE success_count > 0"
+         FROM fixes WHERE success_count > 0",
     )
     .fetch_all(&wpool)
     .await
@@ -249,16 +284,17 @@ pub async fn sync_watchdog_kb(
 
     let mut merged = 0usize;
     for row in &rows {
-        let pattern: String  = row.try_get(0).unwrap_or_default();
-        let stype:   String  = row.try_get(1).unwrap_or_default();
-        let script:  String  = row.try_get(2).unwrap_or_default();
-        let conf:    f64     = row.try_get(3).unwrap_or(0.5);
-        let who:     String  = row.try_get(4).unwrap_or_default();
+        let pattern: String = row.try_get(0).unwrap_or_default();
+        let stype: String = row.try_get(1).unwrap_or_default();
+        let script: String = row.try_get(2).unwrap_or_default();
+        let conf: f64 = row.try_get(3).unwrap_or(0.5);
+        let who: String = row.try_get(4).unwrap_or_default();
 
         let exists: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM fixes WHERE error_pattern=? AND solution_script=?"
+            "SELECT COUNT(*) FROM fixes WHERE error_pattern=? AND solution_script=?",
         )
-        .bind(&pattern).bind(&script)
+        .bind(&pattern)
+        .bind(&script)
         .fetch_one(state.pool.as_ref())
         .await
         .unwrap_or(1); // default to 1 (exists) on error, so we don't double-insert
@@ -297,29 +333,36 @@ async fn fetch_all(pool: &SqlitePool) -> sqlx::Result<Vec<FixEntry>> {
     let rows = sqlx::query(
         "SELECT id, error_pattern, solution_type, solution_script, confidence,
                 usage_count, success_count, created_by, verified
-         FROM fixes ORDER BY success_count DESC, confidence DESC"
+         FROM fixes ORDER BY success_count DESC, confidence DESC",
     )
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.into_iter().map(|r| FixEntry {
-        id:              r.try_get(0).unwrap_or(0),
-        error_pattern:   r.try_get(1).unwrap_or_default(),
-        solution_type:   r.try_get(2).unwrap_or_default(),
-        solution_script: r.try_get(3).unwrap_or_default(),
-        confidence:      r.try_get(4).unwrap_or(0.0),
-        usage_count:     r.try_get(5).unwrap_or(0),
-        success_count:   r.try_get(6).unwrap_or(0),
-        created_by:      r.try_get(7).unwrap_or_default(),
-        verified:        r.try_get::<i64, _>(8).unwrap_or(0) != 0,
-    }).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| FixEntry {
+            id: r.try_get(0).unwrap_or(0),
+            error_pattern: r.try_get(1).unwrap_or_default(),
+            solution_type: r.try_get(2).unwrap_or_default(),
+            solution_script: r.try_get(3).unwrap_or_default(),
+            confidence: r.try_get(4).unwrap_or(0.0),
+            usage_count: r.try_get(5).unwrap_or(0),
+            success_count: r.try_get(6).unwrap_or(0),
+            created_by: r.try_get(7).unwrap_or_default(),
+            verified: r.try_get::<i64, _>(8).unwrap_or(0) != 0,
+        })
+        .collect())
 }
 
 fn run_script(script: &str) -> bool {
     let result = if cfg!(target_os = "windows") {
-        std::process::Command::new("cmd").args(["/C", script]).output()
+        std::process::Command::new("cmd")
+            .args(["/C", script])
+            .output()
     } else {
-        std::process::Command::new("sh").args(["-c", script]).output()
+        std::process::Command::new("sh")
+            .args(["-c", script])
+            .output()
     };
     result.map(|o| o.status.success()).unwrap_or(false)
 }

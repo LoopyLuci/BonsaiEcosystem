@@ -3,8 +3,8 @@
 //! Captures `Snapshot`s of VM state at call boundaries and supports
 //! `:rewind N` (restore to N calls ago) and `:replay N` (re-execute from snapshot N).
 
-use std::collections::HashMap;
 use crate::vm::{SylvaValue, VmError};
+use std::collections::HashMap;
 
 // ── Snapshot ──────────────────────────────────────────────────────────────────
 
@@ -62,7 +62,12 @@ impl Debugger {
     }
 
     /// Push a new snapshot into the ring buffer.
-    pub fn push_snapshot(&mut self, label: impl Into<String>, globals: HashMap<String, SylvaValue>, source: Option<String>) {
+    pub fn push_snapshot(
+        &mut self,
+        label: impl Into<String>,
+        globals: HashMap<String, SylvaValue>,
+        source: Option<String>,
+    ) {
         let snap = Snapshot {
             seq: self.total,
             label: label.into(),
@@ -186,7 +191,7 @@ mod tests {
             dbg.push_snapshot(format!("c{i}"), globals(i), None);
         }
         assert_eq!(dbg.len(), 4); // capacity capped
-        // Most recent should be i=6
+                                  // Most recent should be i=6
         let g = dbg.rewind(0).unwrap();
         assert_eq!(g["x"], SylvaValue::Int(6));
         // Oldest in ring should be i=3

@@ -1,13 +1,13 @@
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, params};
-use uuid::Uuid;
 use chrono::Utc;
+use rusqlite::{Connection, params};
 use tracing::info;
+use uuid::Uuid;
 
-use crate::{KdbError, Result};
 use crate::module::ModuleManifest;
+use crate::{KdbError, Result};
 
 /// Persistent registry of all known knowledge modules.
 pub struct KdbStore {
@@ -21,7 +21,8 @@ impl KdbStore {
         let db_path = base_dir.join("kdb.sqlite");
         let conn = Connection::open(&db_path)?;
 
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS modules (
                 id          TEXT PRIMARY KEY,
                 name        TEXT NOT NULL UNIQUE,
@@ -35,9 +36,13 @@ impl KdbStore {
                 blake3_index  TEXT NOT NULL,
                 blake3_values TEXT NOT NULL
             );
-        ")?;
+        ",
+        )?;
 
-        Ok(KdbStore { conn, base_dir: base_dir.to_path_buf() })
+        Ok(KdbStore {
+            conn,
+            base_dir: base_dir.to_path_buf(),
+        })
     }
 
     pub fn register_module(&self, manifest: &ModuleManifest, dir: &Path) -> Result<()> {
@@ -64,7 +69,8 @@ impl KdbStore {
     }
 
     pub fn unregister_module(&self, name: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM modules WHERE name = ?1", params![name])?;
+        self.conn
+            .execute("DELETE FROM modules WHERE name = ?1", params![name])?;
         Ok(())
     }
 
@@ -90,7 +96,19 @@ impl KdbStore {
 
         let mut result = Vec::new();
         for row in rows {
-            let (id, name, version, domain, description, dim, entry_count, _dir, created_at, blake3_index, blake3_values) = row?;
+            let (
+                id,
+                name,
+                version,
+                domain,
+                description,
+                dim,
+                entry_count,
+                _dir,
+                created_at,
+                blake3_index,
+                blake3_values,
+            ) = row?;
             result.push(ModuleManifest {
                 id: Uuid::parse_str(&id).map_err(|e| KdbError::Invalid(e.to_string()))?,
                 name,
@@ -101,7 +119,8 @@ impl KdbStore {
                 entry_count: entry_count as usize,
                 distance: bonsai_hnsw::Distance::Cosine,
                 created_at: chrono::DateTime::parse_from_rfc3339(&created_at)
-                    .map_err(|e| KdbError::Invalid(e.to_string()))?.with_timezone(&Utc),
+                    .map_err(|e| KdbError::Invalid(e.to_string()))?
+                    .with_timezone(&Utc),
                 blake3_index,
                 blake3_values,
             });

@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
 use sysinfo::System;
+use tokio::sync::RwLock;
 
 use crate::gpu_telemetry::GpuTelemetry;
 

@@ -7,25 +7,36 @@ use serde_json::{json, Value};
 use sqlx::{Row, SqlitePool};
 
 use crate::tool_core::{
-    ToolContext, ToolError, ToolOutput, ToolPolicyHint, ToolRegistry, ToolResult,
-    RetryPolicy, SideEffectProfile,
+    RetryPolicy, SideEffectProfile, ToolContext, ToolError, ToolOutput, ToolPolicyHint,
+    ToolRegistry, ToolResult,
 };
 
 fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
 }
 
 // ── Shell helpers (platform-safe) ─────────────────────────────────────────────
 
 #[cfg(windows)]
-fn shell_cmd() -> &'static str { "cmd" }
+fn shell_cmd() -> &'static str {
+    "cmd"
+}
 #[cfg(not(windows))]
-fn shell_cmd() -> &'static str { "sh" }
+fn shell_cmd() -> &'static str {
+    "sh"
+}
 
 #[cfg(windows)]
-fn shell_flag() -> &'static str { "/c" }
+fn shell_flag() -> &'static str {
+    "/c"
+}
 #[cfg(not(windows))]
-fn shell_flag() -> &'static str { "-c" }
+fn shell_flag() -> &'static str {
+    "-c"
+}
 
 /// Strip characters that could break shell comment boundaries or inject commands
 /// when passed as a skill arg. This is defence-in-depth; the arg is always
@@ -39,22 +50,26 @@ fn sanitize_skill_args(s: &str) -> String {
 fn new_id() -> String {
     use rand::distributions::Alphanumeric;
     use rand::Rng;
-    rand::thread_rng().sample_iter(&Alphanumeric).take(16).map(char::from).collect()
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect()
 }
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSkillRow {
-    pub id:          String,
-    pub name:        String,
+    pub id: String,
+    pub name: String,
     pub description: String,
-    pub kind:        String,   // "shell" | "sequence"
-    pub body:        String,
-    pub tags:        String,   // JSON array of strings
-    pub enabled:     bool,
-    pub created_at:  i64,
-    pub updated_at:  i64,
+    pub kind: String, // "shell" | "sequence"
+    pub body: String,
+    pub tags: String, // JSON array of strings
+    pub enabled: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 impl UserSkillRow {
@@ -66,10 +81,10 @@ impl UserSkillRow {
 // ── UserSkillTool — wraps a row as a Tool trait object ────────────────────────
 
 pub struct UserSkillTool {
-    row:          UserSkillRow,
-    static_name:  &'static str,
-    static_desc:  &'static str,
-    static_tags:  &'static [&'static str],
+    row: UserSkillRow,
+    static_name: &'static str,
+    static_desc: &'static str,
+    static_tags: &'static [&'static str],
 }
 
 impl UserSkillTool {
@@ -83,14 +98,23 @@ impl UserSkillTool {
             .collect();
         let static_tags: &'static [&'static str] = Box::leak(leaked_tags.into_boxed_slice());
 
-        Self { row, static_name, static_desc, static_tags }
+        Self {
+            row,
+            static_name,
+            static_desc,
+            static_tags,
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl crate::tool_core::Tool for UserSkillTool {
-    fn name(&self) -> &'static str { self.static_name }
-    fn description(&self) -> &'static str { self.static_desc }
+    fn name(&self) -> &'static str {
+        self.static_name
+    }
+    fn description(&self) -> &'static str {
+        self.static_desc
+    }
 
     fn schema(&self) -> Value {
         json!({
@@ -121,9 +145,13 @@ impl crate::tool_core::Tool for UserSkillTool {
         }
     }
 
-    fn tags(&self) -> &'static [&'static str] { self.static_tags }
+    fn tags(&self) -> &'static [&'static str] {
+        self.static_tags
+    }
 
-    fn retry_policy(&self) -> RetryPolicy { RetryPolicy::none() }
+    fn retry_policy(&self) -> RetryPolicy {
+        RetryPolicy::none()
+    }
 
     async fn execute(&self, args: &Value, _ctx: &ToolContext) -> ToolResult {
         match self.row.kind.as_str() {
@@ -160,13 +188,15 @@ impl crate::tool_core::Tool for UserSkillTool {
                     Ok(Err(e)) => Err(ToolError::Internal {
                         message: format!("Failed to spawn shell: {e}"),
                     }),
-                    Err(_) => Err(ToolError::Timeout { duration_ms: 30_000 }),
+                    Err(_) => Err(ToolError::Timeout {
+                        duration_ms: 30_000,
+                    }),
                 }
             }
             "sequence" => {
                 // Parse body as JSON array of steps and return the definition.
-                let steps: Vec<Value> = serde_json::from_str(&self.row.body)
-                    .unwrap_or_else(|_| vec![]);
+                let steps: Vec<Value> =
+                    serde_json::from_str(&self.row.body).unwrap_or_else(|_| vec![]);
                 Ok(ToolOutput::Complete(json!({
                     "steps": steps,
                     "_note": "Sequence skill definition returned. A sequencer will execute these steps."
@@ -206,12 +236,11 @@ impl UserSkillStore {
         .map_err(|e| format!("user_skills migrate: {e}"))?;
 
         // Check if migration 100 (user_skills) is already applied
-        let exists: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version = 100",
-        )
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(0);
+        let exists: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM schema_migrations WHERE version = 100")
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(0);
 
         if exists == 0 {
             sqlx::query(
@@ -269,8 +298,16 @@ impl UserSkillStore {
 
     pub async fn upsert(&self, row: &UserSkillRow) -> Result<(), String> {
         let ts = now();
-        let id = if row.id.is_empty() { new_id() } else { row.id.clone() };
-        let created_at = if row.created_at == 0 { ts } else { row.created_at };
+        let id = if row.id.is_empty() {
+            new_id()
+        } else {
+            row.id.clone()
+        };
+        let created_at = if row.created_at == 0 {
+            ts
+        } else {
+            row.created_at
+        };
 
         sqlx::query(
             "INSERT INTO user_skills (id,name,description,kind,body,tags,enabled,created_at,updated_at)
@@ -322,15 +359,14 @@ impl UserSkillStore {
 
 fn row_to_skill(r: &sqlx::sqlite::SqliteRow) -> UserSkillRow {
     UserSkillRow {
-        id:          r.get("id"),
-        name:        r.get("name"),
+        id: r.get("id"),
+        name: r.get("name"),
         description: r.get("description"),
-        kind:        r.get("kind"),
-        body:        r.get("body"),
-        tags:        r.get("tags"),
-        enabled:     r.get::<i64, _>("enabled") != 0,
-        created_at:  r.get("created_at"),
-        updated_at:  r.get("updated_at"),
+        kind: r.get("kind"),
+        body: r.get("body"),
+        tags: r.get("tags"),
+        enabled: r.get::<i64, _>("enabled") != 0,
+        created_at: r.get("created_at"),
+        updated_at: r.get("updated_at"),
     }
 }
-

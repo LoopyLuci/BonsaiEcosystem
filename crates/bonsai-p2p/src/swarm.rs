@@ -20,12 +20,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use futures::StreamExt as _;
 use libp2p::{
-    identify, kad,
-    noise,
+    identify, kad, noise,
     request_response::{self, cbor, OutboundRequestId, ProtocolSupport},
     swarm::{NetworkBehaviour, SwarmEvent},
-    tcp, yamux,
-    Multiaddr, PeerId, StreamProtocol, SwarmBuilder,
+    tcp, yamux, Multiaddr, PeerId, StreamProtocol, SwarmBuilder,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
@@ -49,24 +47,24 @@ pub struct SwarmChunkReq {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SwarmChunkResp {
     pub gsn: u64,
-    pub ok:  bool,
+    pub ok: bool,
 }
 
 // ── Combined swarm behaviour ──────────────────────────────────────────────────
 
 #[derive(NetworkBehaviour)]
 struct BonsaiBehaviour {
-    kad:      kad::Behaviour<kad::store::MemoryStore>,
+    kad: kad::Behaviour<kad::store::MemoryStore>,
     identify: identify::Behaviour,
-    rr:       cbor::Behaviour<SwarmChunkReq, SwarmChunkResp>,
+    rr: cbor::Behaviour<SwarmChunkReq, SwarmChunkResp>,
 }
 
 // ── Commands sent from lane → swarm task ─────────────────────────────────────
 
 enum SwarmCmd {
     SendChunk {
-        peer:  PeerId,
-        req:   SwarmChunkReq,
+        peer: PeerId,
+        req: SwarmChunkReq,
         reply: oneshot::Sender<Result<SwarmChunkResp, String>>,
     },
     Dial(Multiaddr),
@@ -76,10 +74,10 @@ enum SwarmCmd {
 // ── SwarmLane ─────────────────────────────────────────────────────────────────
 
 pub struct SwarmLane {
-    name:    String,
+    name: String,
     peer_id: PeerId,
-    cmd_tx:  mpsc::UnboundedSender<SwarmCmd>,
-    health:  Arc<Mutex<LaneHealth>>,
+    cmd_tx: mpsc::UnboundedSender<SwarmCmd>,
+    health: Arc<Mutex<LaneHealth>>,
 }
 
 impl SwarmLane {
@@ -128,11 +126,11 @@ impl SwarmLane {
 
         let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<SwarmCmd>();
         let health = Arc::new(Mutex::new(LaneHealth {
-            rtt_ms:        200.0,
+            rtt_ms: 200.0,
             bandwidth_bps: 5_000_000,
-            in_flight:     0,
-            available:     false,
-            loss_rate:     0.0,
+            in_flight: 0,
+            available: false,
+            loss_rate: 0.0,
         }));
         let health2 = health.clone();
 
@@ -224,33 +222,48 @@ impl SwarmLane {
 fn extract_peer_id(addr: &Multiaddr) -> Option<PeerId> {
     use libp2p::multiaddr::Protocol;
     addr.iter().find_map(|p| {
-        if let Protocol::P2p(h) = p { Some(h) } else { None }
+        if let Protocol::P2p(h) = p {
+            Some(h)
+        } else {
+            None
+        }
     })
 }
 
 #[async_trait]
 impl TransportLane for SwarmLane {
-    fn name(&self) -> &str { &self.name }
-    fn kind(&self) -> LaneKind { LaneKind::Swarm }
-    fn health(&self) -> LaneHealth { self.health.lock().unwrap().clone() }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn kind(&self) -> LaneKind {
+        LaneKind::Swarm
+    }
+    fn health(&self) -> LaneHealth {
+        self.health.lock().unwrap().clone()
+    }
 
     async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
-        let data = bincode::serialize(chunk)
-            .map_err(|e| TransferError::Other(e.to_string()))?;
+        let data = bincode::serialize(chunk).map_err(|e| TransferError::Other(e.to_string()))?;
         let req = SwarmChunkReq { data };
         let (reply_tx, reply_rx) = oneshot::channel();
-        self.cmd_tx.send(SwarmCmd::SendChunk {
-            peer:  self.peer_id,
-            req,
-            reply: reply_tx,
-        }).map_err(|_| TransferError::Other(format!("{}: swarm task closed", self.name)))?;
+        self.cmd_tx
+            .send(SwarmCmd::SendChunk {
+                peer: self.peer_id,
+                req,
+                reply: reply_tx,
+            })
+            .map_err(|_| TransferError::Other(format!("{}: swarm task closed", self.name)))?;
 
-        let resp = reply_rx.await
+        let resp = reply_rx
+            .await
             .map_err(|_| TransferError::Other(format!("{}: swarm reply dropped", self.name)))?
             .map_err(|e| TransferError::LaneFailed(self.name.clone(), e))?;
 
         if !resp.ok {
-            return Err(TransferError::LaneFailed(self.name.clone(), "remote rejected chunk".into()));
+            return Err(TransferError::LaneFailed(
+                self.name.clone(),
+                "remote rejected chunk".into(),
+            ));
         }
         Ok(())
     }
@@ -265,7 +278,9 @@ impl TransportLane for SwarmLane {
     }
 
     async fn ping(&self) -> Option<Duration> {
-        Some(Duration::from_millis(self.health.lock().unwrap().rtt_ms as u64))
+        Some(Duration::from_millis(
+            self.health.lock().unwrap().rtt_ms as u64,
+        ))
     }
 
     async fn close(&self) {

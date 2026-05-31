@@ -1,5 +1,5 @@
-use std::sync::{Arc, Mutex};
 use anyhow::{anyhow, Result};
+use std::sync::{Arc, Mutex};
 use wasmtime::{Engine, Linker, Module, Store, Val};
 
 /// Result of executing a compiled skill.
@@ -32,28 +32,32 @@ pub fn execute_skill(wasm_bytes: &[u8], args: &serde_json::Value) -> Result<Skil
 
     // Provide the `bonsai_log(ptr, len)` host import.
     // The skeleton calls this with whatever ptr/len was passed to invoke.
-    linker.func_wrap("env", "bonsai_log", move |mut caller: wasmtime::Caller<'_, ()>, ptr: i32, len: i32| {
-        if let Some(mem) = caller.get_export("memory").and_then(|e| e.into_memory()) {
-            let data = mem.data(&caller);
-            if let (Ok(start), Ok(end)) = (
-                usize::try_from(ptr),
-                usize::try_from(ptr.saturating_add(len)),
-            ) {
-                if end <= data.len() {
-                    if let Ok(s) = std::str::from_utf8(&data[start..end]) {
-                        if let Ok(mut guard) = log_buf_clone.lock() {
-                            guard.push(s.to_string());
+    linker.func_wrap(
+        "env",
+        "bonsai_log",
+        move |mut caller: wasmtime::Caller<'_, ()>, ptr: i32, len: i32| {
+            if let Some(mem) = caller.get_export("memory").and_then(|e| e.into_memory()) {
+                let data = mem.data(&caller);
+                if let (Ok(start), Ok(end)) = (
+                    usize::try_from(ptr),
+                    usize::try_from(ptr.saturating_add(len)),
+                ) {
+                    if end <= data.len() {
+                        if let Ok(s) = std::str::from_utf8(&data[start..end]) {
+                            if let Ok(mut guard) = log_buf_clone.lock() {
+                                guard.push(s.to_string());
+                            }
+                            return;
                         }
-                        return;
                     }
                 }
             }
-        }
-        // Skeleton mode: no memory accessible — log a placeholder.
-        if let Ok(mut guard) = log_buf_clone.lock() {
-            guard.push(format!("bonsai_log({ptr}, {len})"));
-        }
-    })?;
+            // Skeleton mode: no memory accessible — log a placeholder.
+            if let Ok(mut guard) = log_buf_clone.lock() {
+                guard.push(format!("bonsai_log({ptr}, {len})"));
+            }
+        },
+    )?;
 
     let mut store = Store::new(&engine, ());
     let instance = linker.instantiate(&mut store, &module)?;
@@ -75,7 +79,10 @@ pub fn execute_skill(wasm_bytes: &[u8], args: &serde_json::Value) -> Result<Skil
     let return_code = invoke.call(&mut store, (ptr, len))?;
 
     let log_output = log_buf.lock().unwrap().clone();
-    Ok(SkillResult { return_code, log_output })
+    Ok(SkillResult {
+        return_code,
+        log_output,
+    })
 }
 
 /// Write serialised `args` into WASM linear memory via an `alloc(len) -> ptr` export.

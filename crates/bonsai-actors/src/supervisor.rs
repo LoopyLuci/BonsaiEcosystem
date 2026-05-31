@@ -12,8 +12,7 @@ const MAX_BACKOFF_MS: u64 = 30_000;
 
 /// Factory type: a closure that produces a new future representing the actor.
 /// Must be `Send + Sync` so the supervisor can call it from any thread.
-pub type ActorFactory =
-    Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
+pub type ActorFactory = Box<dyn Fn() -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 
 /// Descriptor for one supervised task.
 pub struct ChildSpec {

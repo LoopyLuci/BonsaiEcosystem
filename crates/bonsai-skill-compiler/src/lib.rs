@@ -9,8 +9,8 @@ pub mod parser;
 pub mod security;
 pub mod wasm_gen;
 
-pub use parser::{BonsaiExtension, SkillMetadata};
 pub use extractor::Rule;
+pub use parser::{BonsaiExtension, SkillMetadata};
 
 // ── Output types ──────────────────────────────────────────────────────────────
 
@@ -80,12 +80,18 @@ pub async fn compile_skill_with_override(
 }
 
 /// Compile a skill directly from a SKILL.md string (useful for network installs).
-pub async fn compile_skill_from_str(content: &str, base_dir: Option<&Path>) -> Result<CompiledSkill> {
+pub async fn compile_skill_from_str(
+    content: &str,
+    base_dir: Option<&Path>,
+) -> Result<CompiledSkill> {
     let (metadata, body) = parser::parse_skill_md_str(content)?;
     compile_inner(metadata, body, base_dir.unwrap_or(Path::new("."))).await
 }
 
-async fn compile_skill_inner(skill_dir: &Path, allow_concerns: Option<bool>) -> Result<CompiledSkill> {
+async fn compile_skill_inner(
+    skill_dir: &Path,
+    allow_concerns: Option<bool>,
+) -> Result<CompiledSkill> {
     let (metadata, body) = parser::parse_skill_md(skill_dir)?;
     let compiled = compile_inner(metadata, body, skill_dir).await?;
 
@@ -99,7 +105,11 @@ async fn compile_skill_inner(skill_dir: &Path, allow_concerns: Option<bool>) -> 
     Ok(compiled)
 }
 
-async fn compile_inner(metadata: SkillMetadata, body: String, _dir: &Path) -> Result<CompiledSkill> {
+async fn compile_inner(
+    metadata: SkillMetadata,
+    body: String,
+    _dir: &Path,
+) -> Result<CompiledSkill> {
     // 1. Security scan
     let security_report = security::scan_skill(&body, _dir)?;
 
@@ -204,7 +214,13 @@ pub fn verify_skill_integrity(compiled: &CompiledSkill) -> bool {
 fn slugify(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())
@@ -239,7 +255,10 @@ tags: [demo, test]
             .expect("compile should succeed");
 
         assert!(!compiled.wasm_bytes.is_empty(), "wasm must be non-empty");
-        assert!(compiled.security_report.passed, "sample skill should pass security scan");
+        assert!(
+            compiled.security_report.passed,
+            "sample skill should pass security scan"
+        );
         assert_eq!(compiled.rules.len(), 3);
         assert!(verify_skill_integrity(&compiled));
     }

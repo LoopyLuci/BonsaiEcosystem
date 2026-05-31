@@ -6,24 +6,27 @@
 //!   bonsai-transfer-core    (ECF-RG chunked send, transfer status)
 //!   bonsai-mailbox          (agent-to-agent signed message delivery)
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use tauri::State;
 use tokio::sync::Mutex;
 
+use bonsai_mailbox::{AgentMailbox, MailEnvelope};
+use bonsai_transfer_core::{
+    lane::InProcessLane,
+    scheduler::EcfRgScheduler,
+    transfer::{
+        Transfer, TransferState as CoreTransferState, TransferStatus, DEFAULT_CHUNK_SIZE,
+        MAX_CHUNK_SIZE,
+    },
+};
 use bonsai_transfer_crypto::{
     identity::BonsaiIdentity,
     kdf::{generate_phrase, kdf_phrase_to_seed, ARGON2_PARAMS_TEST},
 };
 use bonsai_transfer_store::EncryptedStore;
-use bonsai_mailbox::{AgentMailbox, MailEnvelope};
-use bonsai_transfer_core::{
-    transfer::{Transfer, TransferStatus, TransferState as CoreTransferState, DEFAULT_CHUNK_SIZE, MAX_CHUNK_SIZE},
-    lane::InProcessLane,
-    scheduler::EcfRgScheduler,
-};
 
 // ── Managed state types ───────────────────────────────────────────────────────
 
@@ -75,13 +78,14 @@ pub struct TransferStatusDto {
 impl From<&TransferStatus> for TransferStatusDto {
     fn from(s: &TransferStatus) -> Self {
         let state_str = match &s.state {
-            CoreTransferState::Pending   => "pending",
-            CoreTransferState::Active    => "active",
-            CoreTransferState::Paused    => "paused",
-            CoreTransferState::Complete  => "complete",
+            CoreTransferState::Pending => "pending",
+            CoreTransferState::Active => "active",
+            CoreTransferState::Paused => "paused",
+            CoreTransferState::Complete => "complete",
             CoreTransferState::Failed(_) => "failed",
             CoreTransferState::Cancelled => "cancelled",
-        }.to_string();
+        }
+        .to_string();
         Self {
             id: s.id.to_string(),
             direction: format!("{:?}", s.direction).to_lowercase(),
@@ -139,7 +143,11 @@ pub async fn transfer_create_identity(
 ) -> Result<IdentityDto, String> {
     // Use test-speed Argon2 params so the UI doesn't block for 3+ seconds.
     // In production builds swap None → Some(ARGON2_PARAMS_TEST) only in tests.
-    let passphrase_opt = if passphrase.is_empty() { None } else { Some(passphrase.as_str()) };
+    let passphrase_opt = if passphrase.is_empty() {
+        None
+    } else {
+        Some(passphrase.as_str())
+    };
     let seed = kdf_phrase_to_seed(&phrase, passphrase_opt, Some(ARGON2_PARAMS_TEST))
         .map_err(|e| e.to_string())?;
 
@@ -202,9 +210,7 @@ pub async fn transfer_get_identity(
 
 /// Returns true if the encrypted store file exists on disk.
 #[tauri::command]
-pub async fn transfer_has_stored_identity(
-    ts: State<'_, TransferState>,
-) -> Result<bool, String> {
+pub async fn transfer_has_stored_identity(ts: State<'_, TransferState>) -> Result<bool, String> {
     Ok(EncryptedStore::default_path().exists())
 }
 
@@ -226,7 +232,9 @@ pub async fn transfer_send_message(
 
     // Deliver locally (both agents on same node — typical for dev/test)
     let payload = text.into_bytes();
-    ts.mailbox.send_to(identity, &to_fingerprint, &topic, payload).await
+    ts.mailbox
+        .send_to(identity, &to_fingerprint, &topic, payload)
+        .await
         .map_err(|e| e.to_string())?;
 
     Ok(format!("sent:{sender_id}→{to_fingerprint}"))
@@ -253,9 +261,7 @@ pub async fn transfer_poll_inbox(
 
 /// Get the number of registered agents in the local mailbox hub.
 #[tauri::command]
-pub async fn transfer_mailbox_agent_count(
-    ts: State<'_, TransferState>,
-) -> Result<usize, String> {
+pub async fn transfer_mailbox_agent_count(ts: State<'_, TransferState>) -> Result<usize, String> {
     Ok(ts.mailbox.agent_count())
 }
 
@@ -270,7 +276,8 @@ pub async fn transfer_send_file_loopback(
     ts: State<'_, TransferState>,
 ) -> Result<TransferStatusDto, String> {
     let path = PathBuf::from(&file_path);
-    let data = tokio::fs::read(&path).await
+    let data = tokio::fs::read(&path)
+        .await
         .map_err(|e| format!("read {file_path}: {e}"))?;
 
     let guard = ts.identity.lock().await;
@@ -299,10 +306,15 @@ pub async fn transfer_send_file_loopback(
     }
     let scheduler = Arc::new(tokio::sync::Mutex::new(sched));
 
-    let cs = chunk_size.unwrap_or(DEFAULT_CHUNK_SIZE).min(MAX_CHUNK_SIZE).max(1);
+    let cs = chunk_size
+        .unwrap_or(DEFAULT_CHUNK_SIZE)
+        .min(MAX_CHUNK_SIZE)
+        .max(1);
 
     let transfer = Transfer::new();
-    let handle = transfer.send_data(data.clone(), session_key, scheduler, lanes, cs, None).await
+    let handle = transfer
+        .send_data(data.clone(), session_key, scheduler, lanes, cs, None)
+        .await
         .map_err(|e| e.to_string())?;
 
     // Give the spawned task a moment to complete
@@ -325,7 +337,10 @@ pub async fn transfer_send_file_loopback(
     };
 
     let dto = TransferStatusDto::from(&status);
-    ts.transfers.lock().await.insert(handle.id.to_string(), status);
+    ts.transfers
+        .lock()
+        .await
+        .insert(handle.id.to_string(), status);
     Ok(dto)
 }
 
@@ -350,8 +365,7 @@ pub async fn transfer_store_put(
 ) -> Result<(), String> {
     let raw_key = blake3::derive_key("bonsai-store-v1", format!("{passphrase}:{key}").as_bytes());
     let name = hex::encode(&raw_key[..8]);
-    let path = EncryptedStore::default_path()
-        .with_file_name(format!("{name}.bin"));
+    let path = EncryptedStore::default_path().with_file_name(format!("{name}.bin"));
     let store = EncryptedStore::open(path, &raw_key);
     store.save(&value).map_err(|e| e.to_string())
 }
@@ -364,9 +378,13 @@ pub async fn transfer_store_get(
 ) -> Result<Option<serde_json::Value>, String> {
     let raw_key = blake3::derive_key("bonsai-store-v1", format!("{passphrase}:{key}").as_bytes());
     let name = hex::encode(&raw_key[..8]);
-    let path = EncryptedStore::default_path()
-        .with_file_name(format!("{name}.bin"));
+    let path = EncryptedStore::default_path().with_file_name(format!("{name}.bin"));
     let store = EncryptedStore::open(&path, &raw_key);
-    if !store.exists() { return Ok(None); }
-    store.load::<serde_json::Value>().map(Some).map_err(|e| e.to_string())
+    if !store.exists() {
+        return Ok(None);
+    }
+    store
+        .load::<serde_json::Value>()
+        .map(Some)
+        .map_err(|e| e.to_string())
 }

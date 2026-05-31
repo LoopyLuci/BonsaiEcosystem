@@ -1,4 +1,13 @@
-#![allow(clippy::single_component_path_imports, clippy::manual_clamp, clippy::result_large_err, clippy::redundant_closure, clippy::unnecessary_cast, clippy::doc_lazy_continuation, clippy::manual_is_multiple_of, clippy::useless_conversion)]
+#![allow(
+    clippy::single_component_path_imports,
+    clippy::manual_clamp,
+    clippy::result_large_err,
+    clippy::redundant_closure,
+    clippy::unnecessary_cast,
+    clippy::doc_lazy_continuation,
+    clippy::manual_is_multiple_of,
+    clippy::useless_conversion
+)]
 
 //! bonsai-daemon — headless Bonsai service.
 //!
@@ -21,14 +30,13 @@
 //!   `daemon_port`   — decimal TCP port
 //!   `daemon_token`  — 64-char hex token
 
+pub mod binary_swap;
+mod checkpoint_impl;
+mod health_monitor;
+mod panic_hook;
 mod rpc;
 mod state;
-mod panic_hook;
-mod health_monitor;
-mod checkpoint_impl;
-pub mod binary_swap;
 
-use std::sync::Arc;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -39,13 +47,14 @@ use axum::{
     Router,
 };
 use rand::RngCore;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{info, warn};
 
-use bonsai_actors::supervisor::{Supervisor, ChildSpec};
+use bonsai_actors::supervisor::{ChildSpec, Supervisor};
 use bonsai_cas::CasStore;
-use bonsai_skills;
 use bonsai_skill_compiler;
+use bonsai_skills;
 use state::DaemonState;
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -53,8 +62,10 @@ use state::DaemonState;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env()
-            .add_directive("bonsai_daemon=info".parse()?))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("bonsai_daemon=info".parse()?),
+        )
         .init();
 
     panic_hook::install_panic_hook();
@@ -71,27 +82,36 @@ async fn main() -> anyhow::Result<()> {
     tokio::fs::create_dir_all(&base).await?;
 
     // Open CAS store for checkpointing
-    let cas = Arc::new(
-        CasStore::open(
-            &base.join("cas.db"),
-            &base.join("cas-blobs"),
-        ).await?
-    );
+    let cas = Arc::new(CasStore::open(&base.join("cas.db"), &base.join("cas-blobs")).await?);
 
     // Build shared daemon state (passes CAS so creator can store output blobs)
     let daemon_state = Arc::new(DaemonState::new(token.clone(), cas.clone()));
 
     // Register generative tools with the creator orchestrator.
     {
-        use bonsai_creator::{image::FluxDiTTool, video::SvdVideoTool, three_d::Trellis3DTool,
-                             audio::{MusicGenTool, BarkTtsTool}, gaussian::GaussianSplattingTool};
+        use bonsai_creator::{
+            audio::{BarkTtsTool, MusicGenTool},
+            gaussian::GaussianSplattingTool,
+            image::FluxDiTTool,
+            three_d::Trellis3DTool,
+            video::SvdVideoTool,
+        };
         let c = &daemon_state.creator;
-        c.register("image",   Arc::new(FluxDiTTool::new(cas.clone()))).await;
-        c.register("video",   Arc::new(SvdVideoTool::new(cas.clone()))).await;
-        c.register("3d",      Arc::new(Trellis3DTool::new(cas.clone()))).await;
-        c.register("audio",   Arc::new(MusicGenTool::new(cas.clone()))).await;
-        c.register("tts",     Arc::new(BarkTtsTool::new(cas.clone()))).await;
-        c.register("gaussian",Arc::new(GaussianSplattingTool::new(cas.clone()))).await;
+        c.register("image", Arc::new(FluxDiTTool::new(cas.clone())))
+            .await;
+        c.register("video", Arc::new(SvdVideoTool::new(cas.clone())))
+            .await;
+        c.register("3d", Arc::new(Trellis3DTool::new(cas.clone())))
+            .await;
+        c.register("audio", Arc::new(MusicGenTool::new(cas.clone())))
+            .await;
+        c.register("tts", Arc::new(BarkTtsTool::new(cas.clone())))
+            .await;
+        c.register(
+            "gaussian",
+            Arc::new(GaussianSplattingTool::new(cas.clone())),
+        )
+        .await;
     }
 
     // Load initial skills from compiled_skills_dir() and start the file watcher.
@@ -106,14 +126,12 @@ async fn main() -> anyhow::Result<()> {
     // Spawn health monitor under a one-for-one supervisor
     {
         let state_clone = daemon_state.clone();
-        let cas_clone   = cas.clone();
-        let specs = vec![
-            ChildSpec::new("health-monitor", move || {
-                let s = state_clone.clone();
-                let c = cas_clone.clone();
-                async move { health_monitor::run_health_monitor(s, c).await }
-            }),
-        ];
+        let cas_clone = cas.clone();
+        let specs = vec![ChildSpec::new("health-monitor", move || {
+            let s = state_clone.clone();
+            let c = cas_clone.clone();
+            async move { health_monitor::run_health_monitor(s, c).await }
+        })];
         tokio::spawn(Supervisor::run(specs));
     }
 
@@ -121,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let port = listener.local_addr()?.port();
 
-    tokio::fs::write(base.join("daemon_port"),  port.to_string()).await?;
+    tokio::fs::write(base.join("daemon_port"), port.to_string()).await?;
     tokio::fs::write(base.join("daemon_token"), &token).await?;
 
     info!("bonsai-daemon listening on 127.0.0.1:{port}");
@@ -150,7 +168,10 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<DaemonState>) {
     while let Some(msg_result) = socket.recv().await {
         let msg = match msg_result {
             Ok(m) => m,
-            Err(e) => { warn!("ws recv error: {e}"); break; }
+            Err(e) => {
+                warn!("ws recv error: {e}");
+                break;
+            }
         };
 
         let text = match msg {
@@ -169,26 +190,32 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<DaemonState>) {
             let provided = req["token"].as_str().unwrap_or("");
             if provided == state.token {
                 authenticated = true;
-                let _ = socket.send(Message::Text(
-                    r#"{"type":"auth_ok"}"#.to_string().into()
-                )).await;
+                let _ = socket
+                    .send(Message::Text(r#"{"type":"auth_ok"}"#.to_string().into()))
+                    .await;
             } else {
-                let _ = socket.send(Message::Text(
-                    r#"{"type":"auth_fail","reason":"invalid token"}"#.to_string().into()
-                )).await;
+                let _ = socket
+                    .send(Message::Text(
+                        r#"{"type":"auth_fail","reason":"invalid token"}"#.to_string().into(),
+                    ))
+                    .await;
             }
             continue;
         }
 
         if !authenticated {
-            let _ = socket.send(Message::Text(
-                r#"{"type":"auth_fail","reason":"not authenticated"}"#.to_string().into()
-            )).await;
+            let _ = socket
+                .send(Message::Text(
+                    r#"{"type":"auth_fail","reason":"not authenticated"}"#
+                        .to_string()
+                        .into(),
+                ))
+                .await;
             continue;
         }
 
         // ── JSON-RPC dispatch ─────────────────────────────────────────────────
-        let id     = req.get("id").cloned().unwrap_or(serde_json::Value::Null);
+        let id = req.get("id").cloned().unwrap_or(serde_json::Value::Null);
         let method = req["method"].as_str().unwrap_or("").to_string();
         let params = req["params"].clone();
 
@@ -207,7 +234,11 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<DaemonState>) {
             }),
         };
 
-        if socket.send(Message::Text(response.to_string().into())).await.is_err() {
+        if socket
+            .send(Message::Text(response.to_string().into()))
+            .await
+            .is_err()
+        {
             break;
         }
     }

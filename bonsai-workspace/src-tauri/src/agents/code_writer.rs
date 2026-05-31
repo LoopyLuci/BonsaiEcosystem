@@ -12,7 +12,7 @@ pub struct CodeWriter;
 
 /// POST a chat-completions request to the local llama-server slot.
 async fn call_model(model_url: &str, prompt: &str) -> Result<String, BonsaiError> {
-    let url  = format!("{}/v1/chat/completions", model_url.trim_end_matches('/'));
+    let url = format!("{}/v1/chat/completions", model_url.trim_end_matches('/'));
     let body = json!({
         "messages": [
             {
@@ -43,11 +43,15 @@ async fn call_model(model_url: &str, prompt: &str) -> Result<String, BonsaiError
 
     if !resp.status().is_success() {
         let status = resp.status();
-        let text   = resp.text().await.unwrap_or_default();
-        return Err(BonsaiError::Network(format!("model returned {status}: {text}")));
+        let text = resp.text().await.unwrap_or_default();
+        return Err(BonsaiError::Network(format!(
+            "model returned {status}: {text}"
+        )));
     }
 
-    let json: serde_json::Value = resp.json().await
+    let json: serde_json::Value = resp
+        .json()
+        .await
         .map_err(|e| BonsaiError::Serde(e.to_string()))?;
 
     json["choices"][0]["message"]["content"]
@@ -59,7 +63,7 @@ async fn call_model(model_url: &str, prompt: &str) -> Result<String, BonsaiError
 // ── Code block extraction ─────────────────────────────────────────────────────
 
 struct ExtractedFile {
-    path:    String,
+    path: String,
     content: String,
 }
 
@@ -67,17 +71,23 @@ struct ExtractedFile {
 /// Recognises `// path: <file>` or `# path: <file>` as the first line.
 fn extract_files(text: &str) -> Vec<ExtractedFile> {
     let mut files = Vec::new();
-    let mut rest  = text;
+    let mut rest = text;
 
     while let Some(fence_start) = rest.find("```") {
         // Skip opening fence + optional language tag
         let after_fence = &rest[fence_start + 3..];
-        let block_start  = after_fence.find('\n').map(|i| i + 1).unwrap_or(after_fence.len());
-        let block_body   = &after_fence[block_start..];
+        let block_start = after_fence
+            .find('\n')
+            .map(|i| i + 1)
+            .unwrap_or(after_fence.len());
+        let block_body = &after_fence[block_start..];
 
         let fence_end = match block_body.find("\n```") {
             Some(i) => i,
-            None    => { rest = &rest[fence_start + 3..]; continue; }
+            None => {
+                rest = &rest[fence_start + 3..];
+                continue;
+            }
         };
         let block = &block_body[..fence_end];
 
@@ -86,7 +96,10 @@ fn extract_files(text: &str) -> Vec<ExtractedFile> {
 
         // Extract file path from first line comment
         let first_line = block.lines().next().unwrap_or("").trim();
-        let path = if let Some(p) = first_line.strip_prefix("// path:").or_else(|| first_line.strip_prefix("# path:")) {
+        let path = if let Some(p) = first_line
+            .strip_prefix("// path:")
+            .or_else(|| first_line.strip_prefix("# path:"))
+        {
             p.trim().to_owned()
         } else {
             continue; // no path annotation — skip
@@ -132,9 +145,9 @@ fn atomic_write(path: &std::path::Path, content: &str) -> Result<(), BonsaiError
 impl Agent for CodeWriter {
     fn metadata(&self) -> AgentMetadata {
         AgentMetadata {
-            id:           "code-writer".into(),
-            name:         "Code Writer".into(),
-            description:  "Generates and writes code files based on user descriptions.".into(),
+            id: "code-writer".into(),
+            name: "Code Writer".into(),
+            description: "Generates and writes code files based on user descriptions.".into(),
             capabilities: vec![
                 AgentCapability::TextGeneration,
                 AgentCapability::CodeEditing,
@@ -165,7 +178,7 @@ impl Agent for CodeWriter {
                 Ok(()) => {
                     tracing::info!("[code-writer] wrote {}", file.path);
                     actions.push(AgentAction {
-                        kind:    "write_file".into(),
+                        kind: "write_file".into(),
                         payload: json!({
                             "path":  file.path,
                             "bytes": file.content.len(),
@@ -175,7 +188,7 @@ impl Agent for CodeWriter {
                 Err(e) => {
                     tracing::warn!("[code-writer] failed to write {}: {e}", file.path);
                     actions.push(AgentAction {
-                        kind:    "write_file_error".into(),
+                        kind: "write_file_error".into(),
                         payload: json!({
                             "path":  file.path,
                             "error": e.to_string(),
@@ -191,12 +204,16 @@ impl Agent for CodeWriter {
             format!(
                 "Wrote {} file(s): {}",
                 extracted.len(),
-                extracted.iter().map(|f| f.path.as_str()).collect::<Vec<_>>().join(", ")
+                extracted
+                    .iter()
+                    .map(|f| f.path.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )
         };
 
         Ok(AgentOutput {
-            content:  summary,
+            content: summary,
             actions,
             metadata: Some(json!({ "raw_model_output": raw })),
         })

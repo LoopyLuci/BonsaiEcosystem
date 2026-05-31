@@ -6,9 +6,8 @@ pub mod ops;
 pub mod parser;
 
 pub use ops::{
-    IrModule, IrFunction, IrParam, IrType, IrOp, IrLit, IrPattern,
-    IrTypeDef, IrTypeDefKind, IrProof,
-    EffectType, BinOpKind, UnOpKind, EffectHandler,
-    Modality, DeviceTarget, DataFrameOpKind, ArrayOpKind,
+    ArrayOpKind, BinOpKind, DataFrameOpKind, DeviceTarget, EffectHandler, EffectType, IrFunction,
+    IrLit, IrModule, IrOp, IrParam, IrPattern, IrProof, IrType, IrTypeDef, IrTypeDefKind, Modality,
+    UnOpKind,
 };
 pub use parser::{parse, parse_expr, ParseError, ParseResult};

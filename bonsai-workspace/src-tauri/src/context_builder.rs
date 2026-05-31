@@ -12,10 +12,13 @@ use serde_json::{json, Value};
 /// - Non-ASCII chars (CJK, emoji): ~1 char/token
 /// - Non-alphanumeric, non-space (punctuation, operators): ~2 chars/token
 pub fn estimate_tokens(text: &str) -> usize {
-    if text.is_empty() { return 0; }
+    if text.is_empty() {
+        return 0;
+    }
     let char_count: usize = text.chars().count();
-    let non_ascii:  usize = text.chars().filter(|c| !c.is_ascii()).count();
-    let punct:      usize = text.chars()
+    let non_ascii: usize = text.chars().filter(|c| !c.is_ascii()).count();
+    let punct: usize = text
+        .chars()
         .filter(|c| !c.is_alphanumeric() && !c.is_whitespace())
         .count();
     let ascii_text = char_count.saturating_sub(non_ascii).saturating_sub(punct);
@@ -25,11 +28,11 @@ pub fn estimate_tokens(text: &str) -> usize {
 /// Token budget allocation across context slots.
 #[derive(Debug, Clone)]
 pub struct TokenBudget {
-    pub total:        usize,
-    pub system:       usize,
-    pub history:      usize,
-    pub memory:       usize,
-    pub workspace:    usize,
+    pub total: usize,
+    pub system: usize,
+    pub history: usize,
+    pub memory: usize,
+    pub workspace: usize,
     pub tool_results: usize,
 }
 
@@ -37,11 +40,11 @@ impl TokenBudget {
     /// Default budget for a standard 200k-token context window model.
     pub fn default_200k() -> Self {
         Self {
-            total:        180_000, // leave 20k headroom for completion
-            system:        4_000,
-            history:      60_000,
-            memory:        8_000,
-            workspace:    16_000,
+            total: 180_000, // leave 20k headroom for completion
+            system: 4_000,
+            history: 60_000,
+            memory: 8_000,
+            workspace: 16_000,
             tool_results: 32_000,
         }
     }
@@ -49,12 +52,12 @@ impl TokenBudget {
     /// Compact budget for a 32k-token context window.
     pub fn compact_32k() -> Self {
         Self {
-            total:        28_000,
-            system:        2_000,
-            history:      12_000,
-            memory:        2_000,
-            workspace:     4_000,
-            tool_results:  8_000,
+            total: 28_000,
+            system: 2_000,
+            history: 12_000,
+            memory: 2_000,
+            workspace: 4_000,
+            tool_results: 8_000,
         }
     }
 
@@ -65,10 +68,10 @@ impl TokenBudget {
 
     pub fn slot_limit(&self, slot: ContextSlot) -> usize {
         match slot {
-            ContextSlot::System      => self.system,
-            ContextSlot::History     => self.history,
-            ContextSlot::Memory      => self.memory,
-            ContextSlot::Workspace   => self.workspace,
+            ContextSlot::System => self.system,
+            ContextSlot::History => self.history,
+            ContextSlot::Memory => self.memory,
+            ContextSlot::Workspace => self.workspace,
             ContextSlot::ToolResults => self.tool_results,
         }
     }
@@ -87,9 +90,9 @@ pub enum ContextSlot {
 
 #[derive(Debug, Clone)]
 pub struct ContextItem {
-    pub slot:    ContextSlot,
+    pub slot: ContextSlot,
     pub content: String,
-    pub score:   f32,   // higher = more relevant; used for rank-selection pruning
+    pub score: f32, // higher = more relevant; used for rank-selection pruning
 }
 
 impl ContextItem {
@@ -102,12 +105,15 @@ impl ContextItem {
 
 pub struct ContextBuilder {
     budget: TokenBudget,
-    items:  Vec<ContextItem>,
+    items: Vec<ContextItem>,
 }
 
 impl ContextBuilder {
     pub fn new(budget: TokenBudget) -> Self {
-        Self { budget, items: Vec::new() }
+        Self {
+            budget,
+            items: Vec::new(),
+        }
     }
 
     pub fn with_default_budget() -> Self {
@@ -116,27 +122,47 @@ impl ContextBuilder {
 
     /// Add a system prompt fragment.
     pub fn add_system(&mut self, content: impl Into<String>, score: f32) {
-        self.items.push(ContextItem { slot: ContextSlot::System, content: content.into(), score });
+        self.items.push(ContextItem {
+            slot: ContextSlot::System,
+            content: content.into(),
+            score,
+        });
     }
 
     /// Add a history message (role + content JSON).
     pub fn add_history(&mut self, content: impl Into<String>, score: f32) {
-        self.items.push(ContextItem { slot: ContextSlot::History, content: content.into(), score });
+        self.items.push(ContextItem {
+            slot: ContextSlot::History,
+            content: content.into(),
+            score,
+        });
     }
 
     /// Add a memory snippet.
     pub fn add_memory(&mut self, content: impl Into<String>, score: f32) {
-        self.items.push(ContextItem { slot: ContextSlot::Memory, content: content.into(), score });
+        self.items.push(ContextItem {
+            slot: ContextSlot::Memory,
+            content: content.into(),
+            score,
+        });
     }
 
     /// Add a workspace snapshot card (file tree, recent edits, etc.).
     pub fn add_workspace(&mut self, content: impl Into<String>, score: f32) {
-        self.items.push(ContextItem { slot: ContextSlot::Workspace, content: content.into(), score });
+        self.items.push(ContextItem {
+            slot: ContextSlot::Workspace,
+            content: content.into(),
+            score,
+        });
     }
 
     /// Add a tool result.
     pub fn add_tool_result(&mut self, content: impl Into<String>, score: f32) {
-        self.items.push(ContextItem { slot: ContextSlot::ToolResults, content: content.into(), score });
+        self.items.push(ContextItem {
+            slot: ContextSlot::ToolResults,
+            content: content.into(),
+            score,
+        });
     }
 
     /// Build the final context, pruning low-scoring items to fit within budget.
@@ -146,23 +172,23 @@ impl ContextBuilder {
     pub fn build(mut self) -> BuiltContext {
         // Sort each slot's items by score descending
         self.items.sort_by(|a, b| {
-            b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let mut selected: Vec<ContextItem> = Vec::new();
-        let mut slot_used = [0usize; 5];  // indexed by slot ordinal
+        let mut slot_used = [0usize; 5]; // indexed by slot ordinal
         let mut total_used = 0usize;
 
         for item in self.items {
             let slot_ord = slot_ordinal(item.slot);
-            let cost     = item.token_cost();
+            let cost = item.token_cost();
             let slot_cap = self.budget.slot_limit(item.slot);
 
-            if slot_used[slot_ord] + cost <= slot_cap
-                && total_used + cost <= self.budget.total
-            {
+            if slot_used[slot_ord] + cost <= slot_cap && total_used + cost <= self.budget.total {
                 slot_used[slot_ord] += cost;
-                total_used          += cost;
+                total_used += cost;
                 selected.push(item);
             }
             // Items that don't fit are silently dropped (low-score items are dropped first)
@@ -177,10 +203,10 @@ impl ContextBuilder {
 
 fn slot_ordinal(slot: ContextSlot) -> usize {
     match slot {
-        ContextSlot::System      => 0,
-        ContextSlot::History     => 1,
-        ContextSlot::Memory      => 2,
-        ContextSlot::Workspace   => 3,
+        ContextSlot::System => 0,
+        ContextSlot::History => 1,
+        ContextSlot::Memory => 2,
+        ContextSlot::Workspace => 3,
         ContextSlot::ToolResults => 4,
     }
 }
@@ -188,14 +214,15 @@ fn slot_ordinal(slot: ContextSlot) -> usize {
 // ── BuiltContext ──────────────────────────────────────────────────────────────
 
 pub struct BuiltContext {
-    pub items:        Vec<ContextItem>,
+    pub items: Vec<ContextItem>,
     pub total_tokens: usize,
 }
 
 impl BuiltContext {
     /// Collect all items in a slot as a combined string (for injection into prompts).
     pub fn slot_content(&self, slot: ContextSlot) -> String {
-        self.items.iter()
+        self.items
+            .iter()
             .filter(|i| i.slot == slot)
             .map(|i| i.content.as_str())
             .collect::<Vec<_>>()
@@ -215,8 +242,12 @@ impl BuiltContext {
         let workspace = self.slot_content(ContextSlot::Workspace);
         if !memory.is_empty() || !workspace.is_empty() {
             let mut parts = Vec::new();
-            if !memory.is_empty()    { parts.push(format!("## Memory\n{memory}"));       }
-            if !workspace.is_empty() { parts.push(format!("## Workspace\n{workspace}")); }
+            if !memory.is_empty() {
+                parts.push(format!("## Memory\n{memory}"));
+            }
+            if !workspace.is_empty() {
+                parts.push(format!("## Workspace\n{workspace}"));
+            }
             msgs.push(json!({ "role": "system", "content": parts.join("\n\n") }));
         }
 
@@ -245,14 +276,14 @@ impl BuiltContext {
 /// Keeps the most recent messages (they have the highest context relevance).
 /// If the newest message is itself over budget, it is still included (never drop turn N).
 pub fn prune_history(messages: &[Value], max_tokens: usize) -> Vec<Value> {
-    let mut used   = 0usize;
+    let mut used = 0usize;
     let mut result = Vec::new();
 
     for msg in messages.iter().rev() {
         let text = msg["content"].as_str().unwrap_or("");
         let cost = estimate_tokens(text);
         if used + cost <= max_tokens || result.is_empty() {
-            used   += cost;
+            used += cost;
             result.push(msg.clone());
         } else {
             break;
@@ -305,13 +336,22 @@ mod tests {
         let ctx = builder.build();
         let mem = ctx.slot_content(ContextSlot::Memory);
         assert!(mem.contains("short"), "small item should survive");
-        assert!(!mem.contains(&"a".repeat(100)), "large item should be dropped");
+        assert!(
+            !mem.contains(&"a".repeat(100)),
+            "large item should be dropped"
+        );
     }
 
     #[test]
     fn builder_respects_total_budget() {
-        let budget = TokenBudget { total: 10, system: 5, history: 5,
-                                   memory: 5, workspace: 5, tool_results: 5 };
+        let budget = TokenBudget {
+            total: 10,
+            system: 5,
+            history: 5,
+            memory: 5,
+            workspace: 5,
+            tool_results: 5,
+        };
         let mut builder = ContextBuilder::new(budget);
         // Each item is ~5 tokens (20 chars)
         builder.add_system("x".repeat(20), 1.0);
@@ -362,7 +402,7 @@ mod tests {
         builder.add_system("You are a helpful assistant.", 1.0);
         builder.add_memory("User prefers dark mode.", 0.8);
 
-        let ctx  = builder.build();
+        let ctx = builder.build();
         let msgs = ctx.to_messages();
         assert!(!msgs.is_empty());
         assert_eq!(msgs[0]["role"], "system");

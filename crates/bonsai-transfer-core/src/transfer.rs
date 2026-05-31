@@ -1,15 +1,15 @@
 //! High-level Transfer — orchestrates chunking, encrypting, scheduling, and sending.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
-use tokio::sync::mpsc;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use bonsai_transfer_crypto::{session::SessionKey, cipher::encrypt_chunk};
-use crate::gsn::GsnAllocator;
-use crate::scheduler::EcfRgScheduler;
-use crate::lane::TransportLane;
 use crate::error::TransferResult;
+use crate::gsn::GsnAllocator;
+use crate::lane::TransportLane;
+use crate::scheduler::EcfRgScheduler;
+use bonsai_transfer_crypto::{cipher::encrypt_chunk, session::SessionKey};
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use uuid::Uuid;
 
 /// Default chunk size: 256 KiB. Balances per-chunk overhead vs. memory use.
 pub const DEFAULT_CHUNK_SIZE: usize = 256 * 1024;
@@ -52,7 +52,9 @@ pub enum TransferState {
 
 impl TransferStatus {
     pub fn progress(&self) -> f32 {
-        if self.total_bytes == 0 { return 0.0; }
+        if self.total_bytes == 0 {
+            return 0.0;
+        }
         (self.transferred_bytes as f64 / self.total_bytes as f64) as f32
     }
 }
@@ -82,7 +84,9 @@ impl TransferHandle {
     }
 
     pub fn progress(&self) -> f32 {
-        if self.total_bytes == 0 { return 0.0; }
+        if self.total_bytes == 0 {
+            return 0.0;
+        }
         self.bytes_sent() as f32 / self.total_bytes as f32
     }
 }
@@ -96,7 +100,10 @@ pub struct Transfer {
 
 impl Transfer {
     pub fn new() -> Self {
-        Self { id: Uuid::new_v4(), gsn: GsnAllocator::new() }
+        Self {
+            id: Uuid::new_v4(),
+            gsn: GsnAllocator::new(),
+        }
     }
 
     /// Send `data` in chunks across the given lanes using the session key.
@@ -202,5 +209,7 @@ impl Transfer {
 }
 
 impl Default for Transfer {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

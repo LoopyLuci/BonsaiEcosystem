@@ -1,4 +1,10 @@
-#![allow(clippy::unnecessary_map_or, clippy::derivable_impls, clippy::self_assignment, clippy::result_large_err, clippy::get_first)]
+#![allow(
+    clippy::unnecessary_map_or,
+    clippy::derivable_impls,
+    clippy::self_assignment,
+    clippy::result_large_err,
+    clippy::get_first
+)]
 
 //! bonsai-sylva — Native Sylva language interpreter.
 //!
@@ -14,13 +20,13 @@
 //! The VM is designed to be embedded in `SylvaRuntime` (Tauri backend) to replace
 //! the Lua VM. It exposes the same `bonsai.tool(name, args)` interface.
 
-pub mod lexer;
 pub mod ast;
-pub mod parser;
-pub mod vm;
-pub mod stdlib;
 pub mod debugger;
+pub mod lexer;
+pub mod parser;
+pub mod stdlib;
+pub mod vm;
 
-pub use vm::{SylvaVm, SylvaValue, VmError, VmResult};
-pub use debugger::{Debugger, Snapshot, RewindError};
+pub use debugger::{Debugger, RewindError, Snapshot};
 pub use parser::ParseError;
+pub use vm::{SylvaValue, SylvaVm, VmError, VmResult};

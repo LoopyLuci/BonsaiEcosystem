@@ -9,6 +9,7 @@
 //! fast follow-up requests.  The worker prints `BONSAI_MUSIC_PORT=<port>` on stdout line 1 then
 //! accepts one long-lived TCP connection.
 
+use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -16,12 +17,11 @@ use tokio::net::TcpStream;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
-use std::sync::Arc;
 
 // ── Persistent worker handle ──────────────────────────────────────────────────
 
 struct WorkerHandle {
-    conn:  TcpStream,
+    conn: TcpStream,
     req_id: u64,
 }
 
@@ -39,25 +39,37 @@ fn worker_binary_path() -> Option<std::path::PathBuf> {
         } else {
             "bonsai-music-worker"
         });
-        if sibling.exists() { return Some(sibling); }
+        if sibling.exists() {
+            return Some(sibling);
+        }
     }
     // 2. Workspace target/debug (dev workflow — Cargo places workspace binaries here)
-    let bin_name = if cfg!(target_os = "windows") { "bonsai-music-worker.exe" } else { "bonsai-music-worker" };
+    let bin_name = if cfg!(target_os = "windows") {
+        "bonsai-music-worker.exe"
+    } else {
+        "bonsai-music-worker"
+    };
     // Walk up from CARGO_MANIFEST_DIR until we find a target/ dir (handles workspace layout)
     let mut dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for _ in 0..4 {
         for profile in &["debug", "release"] {
             let candidate = dir.join("target").join(profile).join(bin_name);
-            if candidate.exists() { return Some(candidate); }
+            if candidate.exists() {
+                return Some(candidate);
+            }
         }
-        if !dir.pop() { break; }
+        if !dir.pop() {
+            break;
+        }
     }
     None
 }
 
 async fn ensure_worker() -> Option<()> {
     let mut guard = worker_cell().lock().await;
-    if guard.is_some() { return Some(()); }
+    if guard.is_some() {
+        return Some(());
+    }
 
     let bin = worker_binary_path()?;
     let mut child = Command::new(&bin)
@@ -79,16 +91,23 @@ async fn ensure_worker() -> Option<()> {
             }
         }
         None
-    }).await.ok()??;
+    })
+    .await
+    .ok()??;
 
     let conn = tokio::time::timeout(
         Duration::from_secs(3),
-        TcpStream::connect(("127.0.0.1", port))
-    ).await.ok()?.ok()?;
+        TcpStream::connect(("127.0.0.1", port)),
+    )
+    .await
+    .ok()?
+    .ok()?;
 
     info!(port, "[music] worker connected");
     // Detach child (runs independently; will exit when connection closes)
-    tokio::spawn(async move { let _ = child.wait().await; });
+    tokio::spawn(async move {
+        let _ = child.wait().await;
+    });
 
     *guard = Some(WorkerHandle { conn, req_id: 0 });
     Some(())
@@ -124,7 +143,8 @@ pub async fn generate_wav(prompt: &str, duration_secs: f32) -> Vec<u8> {
                 let mut wav = vec![0u8; byte_len];
                 reader.read_exact(&mut wav).await?;
                 Ok::<Vec<u8>, std::io::Error>(wav)
-            }.await;
+            }
+            .await;
 
             match result {
                 Ok(wav) if !wav.is_empty() => {
@@ -144,9 +164,9 @@ pub async fn generate_wav(prompt: &str, duration_secs: f32) -> Vec<u8> {
     // Fallback: inline synthesis
     info!("[music] generating inline (no worker binary)");
     let prompt_owned = prompt.to_string();
-    tokio::task::spawn_blocking(move || {
-        inline_generate_wav(&prompt_owned, duration_secs)
-    }).await.unwrap_or_default()
+    tokio::task::spawn_blocking(move || inline_generate_wav(&prompt_owned, duration_secs))
+        .await
+        .unwrap_or_default()
 }
 
 // ── Inline synthesizer (mirrors bonsai-music-worker) ─────────────────────────
@@ -159,9 +179,13 @@ fn inline_generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
     let mut mix = vec![0.0f32; n];
 
     let lower = prompt.to_lowercase();
-    let bpm = if lower.contains("slow") || lower.contains("ambient") { 70.0f32 }
-              else if lower.contains("fast") || lower.contains("energetic") { 140.0 }
-              else { 100.0 };
+    let bpm = if lower.contains("slow") || lower.contains("ambient") {
+        70.0f32
+    } else if lower.contains("fast") || lower.contains("energetic") {
+        140.0
+    } else {
+        100.0
+    };
     let minor = lower.contains("minor") || lower.contains("sad") || lower.contains("dark");
     let scale: &[f32] = if minor {
         &[0.0, 2.0, 3.0, 5.0, 7.0, 8.0, 10.0]
@@ -175,11 +199,17 @@ fn inline_generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
     let semitone_ratio = |s: f32| 2.0f32.powf(s / 12.0);
     let adsr = |t: f32, dur: f32, a: f32, d: f32, s: f32, r: f32| {
         let rs = dur - r;
-        if t < a { t / a }
-        else if t < a + d { 1.0 - (1.0 - s) * ((t - a) / d) }
-        else if t < rs { s }
-        else if t < dur { s * (1.0 - (t - rs) / r) }
-        else { 0.0 }
+        if t < a {
+            t / a
+        } else if t < a + d {
+            1.0 - (1.0 - s) * ((t - a) / d)
+        } else if t < rs {
+            s
+        } else if t < dur {
+            s * (1.0 - (t - rs) / r)
+        } else {
+            0.0
+        }
     };
 
     // Bass
@@ -205,7 +235,11 @@ fn inline_generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
             let t = i as f32 / sr as f32;
             let ci = ((t / cd) as usize) % chord_roots.len();
             let r = chord_roots[ci];
-            let degs = [r % scale.len(), (r + 2) % scale.len(), (r + 4) % scale.len()];
+            let degs = [
+                r % scale.len(),
+                (r + 2) % scale.len(),
+                (r + 4) % scale.len(),
+            ];
             let env = adsr(t % cd, cd * 0.95, 0.08, 0.2, 0.7, 0.3);
             let mut s = 0.0f32;
             for (k, &d) in degs.iter().enumerate() {
@@ -240,7 +274,9 @@ fn inline_generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
             let beat_pos = (t / beat_dur) % 4.0;
             // Kick on 1 & 3
             if beat_pos < 0.05 || (beat_pos > 1.95 && beat_pos < 2.05) {
-                mix[i] += (2.0 * PI * beat_t * 60.0 * (-beat_t * 20.0).exp()).sin() * (-beat_t * 8.0).exp() * 0.4;
+                mix[i] += (2.0 * PI * beat_t * 60.0 * (-beat_t * 20.0).exp()).sin()
+                    * (-beat_t * 8.0).exp()
+                    * 0.4;
             }
             // Snare on 2 & 4
             if (beat_pos > 0.95 && beat_pos < 1.05) || beat_pos > 2.95 {
@@ -259,8 +295,12 @@ fn inline_generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
     let fade = (sr as f32 * 0.05) as usize;
     for i in 0..n {
         mix[i] = mix[i].clamp(-0.95, 0.95);
-        if i < fade { mix[i] *= i as f32 / fade as f32; }
-        if i > n.saturating_sub(fade) { mix[i] *= (n - i) as f32 / fade as f32; }
+        if i < fade {
+            mix[i] *= i as f32 / fade as f32;
+        }
+        if i > n.saturating_sub(fade) {
+            mix[i] *= (n - i) as f32 / fade as f32;
+        }
     }
 
     encode_wav_f32_inline(&mix, sr)
@@ -274,14 +314,16 @@ fn encode_wav_f32_inline(samples: &[f32], sr: u32) -> Vec<u8> {
     out.extend_from_slice(b"WAVE");
     out.extend_from_slice(b"fmt ");
     out.extend_from_slice(&16u32.to_le_bytes());
-    out.extend_from_slice(&3u16.to_le_bytes());  // IEEE float
-    out.extend_from_slice(&1u16.to_le_bytes());  // mono
+    out.extend_from_slice(&3u16.to_le_bytes()); // IEEE float
+    out.extend_from_slice(&1u16.to_le_bytes()); // mono
     out.extend_from_slice(&sr.to_le_bytes());
     out.extend_from_slice(&(sr * 4).to_le_bytes());
     out.extend_from_slice(&4u16.to_le_bytes());
     out.extend_from_slice(&32u16.to_le_bytes());
     out.extend_from_slice(b"data");
     out.extend_from_slice(&data_len.to_le_bytes());
-    for &s in samples { out.extend_from_slice(&s.to_le_bytes()); }
+    for &s in samples {
+        out.extend_from_slice(&s.to_le_bytes());
+    }
     out
 }

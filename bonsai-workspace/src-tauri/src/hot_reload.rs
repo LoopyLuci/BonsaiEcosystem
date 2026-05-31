@@ -14,9 +14,9 @@
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-use tracing::{error, info};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_notification::NotificationExt;
+use tracing::{error, info};
 
 use std::sync::Arc;
 
@@ -30,8 +30,8 @@ const DRAIN_GRACE: Duration = Duration::from_secs(5);
 #[derive(Clone, serde::Serialize)]
 struct ModelReloadedPayload {
     model_id: String,
-    path:     String,
-    status:   String,
+    path: String,
+    status: String,
 }
 
 /// Spawn the background watcher.  Call once from `lib.rs` setup after the
@@ -52,7 +52,9 @@ async fn watch_loop(app: AppHandle, orchestrator: Arc<ModelOrchestrator>, path: 
     loop {
         tokio::time::sleep(POLL_INTERVAL).await;
 
-        let Ok(meta) = std::fs::metadata(&path) else { continue };
+        let Ok(meta) = std::fs::metadata(&path) else {
+            continue;
+        };
         let Ok(mtime) = meta.modified() else { continue };
 
         if last_mtime.map_or(true, |prev| mtime > prev) {
@@ -102,7 +104,8 @@ async fn watch_loop(app: AppHandle, orchestrator: Arc<ModelOrchestrator>, path: 
                     );
 
                     // System-tray notification
-                    let _ = app.notification()
+                    let _ = app
+                        .notification()
                         .builder()
                         .title("🧠 BonsAI Updated")
                         .body("A new brain update is live. BonsAI just got smarter!")

@@ -6,56 +6,58 @@
 //! Uses ReAct-style prompting so ANY model (including those without native function-
 //! calling support) can invoke tools by outputting `<tool_call>...</tool_call>` tags.
 
+use bonsai_capability_registry::EffectRow;
+use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
-use regex::RegexBuilder;
-use bonsai_capability_registry::EffectRow;
-pub mod demo_streaming;
 pub mod ai_code_tools;
-pub mod data_science_tools;
-pub mod security_tools;
 pub mod creative_ext_tools;
+pub mod data_science_tools;
+pub mod demo_streaming;
+pub mod security_tools;
 pub mod web_ext_tools;
 
 // ── Tool schema types ─────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ToolArg {
-    pub name:        String,
+    pub name: String,
     #[serde(rename = "type")]
-    pub arg_type:    String,
+    pub arg_type: String,
     pub description: String,
     #[serde(default = "default_true")]
-    pub required:    bool,
+    pub required: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ToolDef {
-    pub name:              String,
-    pub description:       String,
-    pub args:              Vec<ToolArg>,
+    pub name: String,
+    pub description: String,
+    pub args: Vec<ToolArg>,
     /// true = show HITL approval card before executing
     pub requires_approval: bool,
-    pub is_custom:         bool,
+    pub is_custom: bool,
     /// Path to custom script (non-null for is_custom = true)
-    pub script_path:       Option<String>,
+    pub script_path: Option<String>,
     /// Trigger phrases useful for capability indexing/search
     #[serde(default)]
-    pub trigger_phrases:   Vec<String>,
+    pub trigger_phrases: Vec<String>,
     /// Tags describing capability (tool, io, model, gpu, safety, etc.)
     #[serde(default)]
-    pub capability_tags:   Vec<String>,
+    pub capability_tags: Vec<String>,
     /// Example invocations or JSON examples
     #[serde(default)]
-    pub examples:          Vec<serde_json::Value>,
+    pub examples: Vec<serde_json::Value>,
     /// If this tool requires a particular model or runtime component
-    pub requires_model:    Option<String>,
+    pub requires_model: Option<String>,
     /// Declared effects (FileIO, NetworkIO, ShellExec, etc.)
     #[serde(default)]
-    pub effect_row:        EffectRow,
+    pub effect_row: EffectRow,
 }
 
 // ── Built-in tools ────────────────────────────────────────────────────────────
@@ -304,44 +306,52 @@ pub fn built_in_tools() -> Vec<ToolDef> {
 
 #[derive(Deserialize)]
 struct CustomToolManifest {
-    name:               String,
-    description:        String,
+    name: String,
+    description: String,
     #[serde(default)]
-    args:               Vec<ToolArg>,
-    script:             String,
-    requires_approval:  Option<bool>,
+    args: Vec<ToolArg>,
+    script: String,
+    requires_approval: Option<bool>,
 }
 
 /// Load custom tool manifests from `{workspace}/bonsai-tools/*.json`.
 /// Each JSON file should contain a `CustomToolManifest`.
 pub fn load_custom_tools(workspace_path: &Path) -> Vec<ToolDef> {
     let tools_dir = workspace_path.join("bonsai-tools");
-    if !tools_dir.exists() { return vec![]; }
+    if !tools_dir.exists() {
+        return vec![];
+    }
 
     let mut tools = Vec::new();
-    let Ok(entries) = std::fs::read_dir(&tools_dir) else { return vec![] };
+    let Ok(entries) = std::fs::read_dir(&tools_dir) else {
+        return vec![];
+    };
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("json") { continue; }
-        let Ok(content) = std::fs::read_to_string(&path) else { continue };
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
         let Ok(manifest) = serde_json::from_str::<CustomToolManifest>(&content) else {
             tracing::warn!(path=%path.display(), "[tools] Failed to parse manifest");
             continue;
         };
         let script_path = tools_dir.join(&manifest.script);
         tools.push(ToolDef {
-            name:              manifest.name,
-            description:       manifest.description,
-            args:              manifest.args,
+            name: manifest.name,
+            description: manifest.description,
+            args: manifest.args,
             requires_approval: manifest.requires_approval.unwrap_or(true),
-            is_custom:         true,
-            script_path:       Some(script_path.to_string_lossy().into_owned()),
-            trigger_phrases:   vec![],
-            capability_tags:   vec!["tool".into()],
-            examples:          vec![],
-            requires_model:    None,
-            effect_row:        EffectRow::default(),
+            is_custom: true,
+            script_path: Some(script_path.to_string_lossy().into_owned()),
+            trigger_phrases: vec![],
+            capability_tags: vec!["tool".into()],
+            examples: vec![],
+            requires_model: None,
+            effect_row: EffectRow::default(),
         });
     }
     tools
@@ -352,22 +362,26 @@ pub fn load_custom_tools(workspace_path: &Path) -> Vec<ToolDef> {
 /// becomes automatically available to every model via tag-based tool calling.
 fn bridge_def_to_tool_def(b: crate::tool_core::ReactBridgeDef) -> ToolDef {
     ToolDef {
-        name:              b.name,
-        description:       b.description,
-        args:              b.args.into_iter().map(|a| ToolArg {
-            name:        a.name,
-            arg_type:    a.arg_type,
-            description: a.description,
-            required:    a.required,
-        }).collect(),
+        name: b.name,
+        description: b.description,
+        args: b
+            .args
+            .into_iter()
+            .map(|a| ToolArg {
+                name: a.name,
+                arg_type: a.arg_type,
+                description: a.description,
+                required: a.required,
+            })
+            .collect(),
         requires_approval: b.requires_approval,
-        is_custom:         false,
-        script_path:       None,
-        trigger_phrases:   vec![],
-        capability_tags:   vec!["tool".into()],
-        examples:          vec![],
-        requires_model:    None,
-        effect_row:        EffectRow::default(),
+        is_custom: false,
+        script_path: None,
+        trigger_phrases: vec![],
+        capability_tags: vec!["tool".into()],
+        examples: vec![],
+        requires_model: None,
+        effect_row: EffectRow::default(),
     }
 }
 
@@ -390,7 +404,7 @@ pub fn all_tools_with_registry(
 /// to the ReAct loop without any additional hardcoding.
 pub fn all_tools_full(
     workspace_path: Option<&str>,
-    core_registry:  Option<&crate::tool_core::ToolRegistry>,
+    core_registry: Option<&crate::tool_core::ToolRegistry>,
     state_registry: Option<&crate::tool_registry::ToolRegistryState>,
 ) -> Vec<ToolDef> {
     let mut tools = built_in_tools();
@@ -417,7 +431,8 @@ pub fn all_tools_full(
         let existing: std::collections::HashSet<String> =
             tools.iter().map(|t| t.name.clone()).collect();
         tools.extend(
-            state.to_tool_defs()
+            state
+                .to_tool_defs()
                 .into_iter()
                 .filter(|d| !existing.contains(&d.name)),
         );
@@ -429,7 +444,8 @@ pub fn all_tools_full(
 /// Find the first tool in `tools` whose capability_tags contain `tag`, or whose
 /// trigger_phrases contain `phrase`.  Returns the tool name if found.
 pub fn find_tool_by_tag<'a>(tools: &'a [ToolDef], tag: &str) -> Option<&'a str> {
-    tools.iter()
+    tools
+        .iter()
         .find(|t| t.capability_tags.iter().any(|ct| ct == tag))
         .map(|t| t.name.as_str())
 }
@@ -437,8 +453,13 @@ pub fn find_tool_by_tag<'a>(tools: &'a [ToolDef], tag: &str) -> Option<&'a str> 
 /// Find the first tool whose trigger_phrases include `phrase` (case-insensitive substring).
 pub fn find_tool_by_trigger<'a>(tools: &'a [ToolDef], phrase: &str) -> Option<&'a str> {
     let lower = phrase.to_lowercase();
-    tools.iter()
-        .find(|t| t.trigger_phrases.iter().any(|p| p.to_lowercase().contains(&lower)))
+    tools
+        .iter()
+        .find(|t| {
+            t.trigger_phrases
+                .iter()
+                .any(|p| p.to_lowercase().contains(&lower))
+        })
         .map(|t| t.name.as_str())
 }
 
@@ -453,17 +474,25 @@ fn workspace_snapshot(root: &str) -> String {
 }
 
 fn snapshot_dir(path: &std::path::Path, depth: usize, max_depth: usize, out: &mut Vec<String>) {
-    if depth > max_depth { return; }
-    let Ok(entries) = std::fs::read_dir(path) else { return };
+    if depth > max_depth {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return;
+    };
     let mut sorted: Vec<_> = entries.flatten().collect();
     sorted.sort_by_key(|e| e.file_name());
     for entry in sorted {
-        if out.len() >= 80 { break; }
+        if out.len() >= 80 {
+            break;
+        }
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') || matches!(
-            name.as_str(),
-            "node_modules" | "target" | "dist" | "__pycache__" | ".git" | ".svelte-kit"
-        ) {
+        if name.starts_with('.')
+            || matches!(
+                name.as_str(),
+                "node_modules" | "target" | "dist" | "__pycache__" | ".git" | ".svelte-kit"
+            )
+        {
             continue;
         }
         let indent = "  ".repeat(depth);
@@ -482,12 +511,20 @@ pub fn system_prompt(tools: &[ToolDef], workspace_path: Option<&str>) -> String 
     system_prompt_for(tools, workspace_path, None)
 }
 
-pub fn system_prompt_for(tools: &[ToolDef], workspace_path: Option<&str>, user_prompt: Option<&str>) -> String {
+pub fn system_prompt_for(
+    tools: &[ToolDef],
+    workspace_path: Option<&str>,
+    user_prompt: Option<&str>,
+) -> String {
     let domain_hint = user_prompt
         .map(|p| crate::critic::TaskDomain::classify(p))
         .and_then(|d| {
             let h = d.system_hint();
-            if h.is_empty() { None } else { Some(h) }
+            if h.is_empty() {
+                None
+            } else {
+                Some(h)
+            }
         });
 
     let mut s = String::from(
@@ -524,7 +561,10 @@ pub fn system_prompt_for(tools: &[ToolDef], workspace_path: Option<&str>, user_p
             s.push_str("**Arguments:**\n");
             for arg in &tool.args {
                 let req = if arg.required { "required" } else { "optional" };
-                s.push_str(&format!("- `{}` ({}, {}): {}\n", arg.name, arg.arg_type, req, arg.description));
+                s.push_str(&format!(
+                    "- `{}` ({}, {}): {}\n",
+                    arg.name, arg.arg_type, req, arg.description
+                ));
             }
         }
         s.push('\n');
@@ -566,7 +606,7 @@ pub fn system_prompt_for(tools: &[ToolDef], workspace_path: Option<&str>, user_p
          - If you do NOT need any tools, respond normally without any tool_call tags.\n\n"
     );
 
-        s.push_str(
+    s.push_str(
            "## Tool and skill discovery protocol\n\n\
             - If the user asks about tools, skills, capabilities, or what you can do, answer using the tool registry above.\n\
             - Treat each custom tool (is_custom=true) as a workspace skill and include it in capability summaries.\n\
@@ -639,7 +679,9 @@ fn find_tag_end(haystack: &str, start_idx: usize) -> Option<usize> {
 fn parse_json_tool_call(json_str: &str) -> Option<ToolCall> {
     let parsed = serde_json::from_str::<serde_json::Value>(json_str)
         .or_else(|_| serde_json::from_str::<serde_json::Value>(&json_str.replace('\\', "\\\\")));
-    let Ok(v) = parsed else { return None; };
+    let Ok(v) = parsed else {
+        return None;
+    };
     let tool = v["tool"].as_str().unwrap_or("").to_string();
     if tool.is_empty() {
         return None;
@@ -749,12 +791,18 @@ pub fn parse_tool_calls(response: &str) -> ParsedToolCalls {
 
     while let Some(rel_open) = lower[search..].find("<tool_call") {
         let open_start = search + rel_open;
-        let Some(open_end) = find_tag_end(&lower, open_start) else { break };
+        let Some(open_end) = find_tag_end(&lower, open_start) else {
+            break;
+        };
 
         let after_open = open_end + 1;
-        let Some(rel_close) = lower[after_open..].find("</tool_call") else { break };
+        let Some(rel_close) = lower[after_open..].find("</tool_call") else {
+            break;
+        };
         let close_start = after_open + rel_close;
-        let Some(close_end) = find_tag_end(&lower, close_start) else { break };
+        let Some(close_end) = find_tag_end(&lower, close_start) else {
+            break;
+        };
 
         let payload = cleaned[after_open..close_start].trim();
         if payload.is_empty() {
@@ -858,7 +906,10 @@ fn resolve_path(raw_path: &str, workspace_path: Option<&str>) -> String {
     }
 }
 
-fn resolve_directory_arg(args: &serde_json::Value, workspace_path: Option<&str>) -> Result<String, String> {
+fn resolve_directory_arg(
+    args: &serde_json::Value,
+    workspace_path: Option<&str>,
+) -> Result<String, String> {
     if let Some(path) = args["path"].as_str() {
         if !path.trim().is_empty() {
             return Ok(resolve_path(path, workspace_path));
@@ -1028,7 +1079,9 @@ pub async fn execute_built_in(
                 return Err(format!("list_all_files error: path does not exist: {path}"));
             }
             if !root.is_dir() {
-                return Err(format!("list_all_files error: path is not a directory: {path}"));
+                return Err(format!(
+                    "list_all_files error: path is not a directory: {path}"
+                ));
             }
 
             let include_hidden = args["include_hidden"].as_bool().unwrap_or(false);
@@ -1099,7 +1152,7 @@ pub async fn execute_built_in(
         }
 
         "search_files" => {
-            let path  = resolve_directory_arg(args, workspace_path)?;
+            let path = resolve_directory_arg(args, workspace_path)?;
             let query = args["query"].as_str().ok_or("Missing 'query' arg")?;
             let needle = query.to_lowercase();
             let mut results = Vec::new();
@@ -1111,28 +1164,61 @@ pub async fn execute_built_in(
                 .filter(|e| !e.file_type().is_dir())
             {
                 // Skip binary-ish files
-                let ext = entry.path().extension().and_then(|e| e.to_str()).unwrap_or("");
-                if matches!(ext, "png"|"jpg"|"jpeg"|"gif"|"ico"|"woff"|"woff2"|"ttf"|"eot"|"pdf"|"exe"|"dll"|"so"|"dylib"|"bin"|"gguf") {
+                let ext = entry
+                    .path()
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                if matches!(
+                    ext,
+                    "png"
+                        | "jpg"
+                        | "jpeg"
+                        | "gif"
+                        | "ico"
+                        | "woff"
+                        | "woff2"
+                        | "ttf"
+                        | "eot"
+                        | "pdf"
+                        | "exe"
+                        | "dll"
+                        | "so"
+                        | "dylib"
+                        | "bin"
+                        | "gguf"
+                ) {
                     continue;
                 }
-                let Ok(content) = std::fs::read_to_string(entry.path()) else { continue };
+                let Ok(content) = std::fs::read_to_string(entry.path()) else {
+                    continue;
+                };
                 for (i, line) in content.lines().enumerate() {
                     if line.to_lowercase().contains(&needle) {
                         results.push(format!(
                             "{}:{}: {}",
-                            entry.path().display(), i + 1,
+                            entry.path().display(),
+                            i + 1,
                             line.trim()
                         ));
-                        if results.len() >= 60 { break; }
+                        if results.len() >= 60 {
+                            break;
+                        }
                     }
                 }
-                if results.len() >= 60 { break; }
+                if results.len() >= 60 {
+                    break;
+                }
             }
 
             if results.is_empty() {
                 Ok(format!("No matches found for '{query}'"))
             } else {
-                Ok(truncate_output(format!("{} matches:\n{}", results.len(), results.join("\n"))))
+                Ok(truncate_output(format!(
+                    "{} matches:\n{}",
+                    results.len(),
+                    results.join("\n")
+                )))
             }
         }
 
@@ -1161,12 +1247,36 @@ pub async fn execute_built_in(
                 .filter(|e| !e.file_type().is_dir())
             {
                 // Skip binary-ish files.
-                let ext = entry.path().extension().and_then(|e| e.to_str()).unwrap_or("");
-                if matches!(ext, "png"|"jpg"|"jpeg"|"gif"|"ico"|"woff"|"woff2"|"ttf"|"eot"|"pdf"|"exe"|"dll"|"so"|"dylib"|"bin"|"gguf") {
+                let ext = entry
+                    .path()
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                if matches!(
+                    ext,
+                    "png"
+                        | "jpg"
+                        | "jpeg"
+                        | "gif"
+                        | "ico"
+                        | "woff"
+                        | "woff2"
+                        | "ttf"
+                        | "eot"
+                        | "pdf"
+                        | "exe"
+                        | "dll"
+                        | "so"
+                        | "dylib"
+                        | "bin"
+                        | "gguf"
+                ) {
                     continue;
                 }
 
-                let Ok(content) = std::fs::read_to_string(entry.path()) else { continue };
+                let Ok(content) = std::fs::read_to_string(entry.path()) else {
+                    continue;
+                };
                 for (i, line) in content.lines().enumerate() {
                     if regex.is_match(line) {
                         results.push(format!(
@@ -1198,22 +1308,27 @@ pub async fn execute_built_in(
         }
 
         "write_file" => {
-            let path    = args["path"].as_str().ok_or("Missing 'path' arg")?;
+            let path = args["path"].as_str().ok_or("Missing 'path' arg")?;
             let content = args["content"].as_str().ok_or("Missing 'content' arg")?;
             if let Some(parent) = std::path::Path::new(path).parent() {
                 std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
-            crate::atomic_write(std::path::Path::new(path), content.as_bytes()).map_err(|e| format!("write_file error: {e}"))?;
+            crate::atomic_write(std::path::Path::new(path), content.as_bytes())
+                .map_err(|e| format!("write_file error: {e}"))?;
             Ok(format!("✅ Written: {path}"))
         }
 
         "edit_file" => {
             let path = args["path"].as_str().ok_or("Missing 'path' arg")?;
-            let old_string = args["old_string"].as_str().ok_or("Missing 'old_string' arg")?;
-            let new_string = args["new_string"].as_str().ok_or("Missing 'new_string' arg")?;
+            let old_string = args["old_string"]
+                .as_str()
+                .ok_or("Missing 'old_string' arg")?;
+            let new_string = args["new_string"]
+                .as_str()
+                .ok_or("Missing 'new_string' arg")?;
 
-            let content = std::fs::read_to_string(path)
-                .map_err(|e| format!("edit_file read error: {e}"))?;
+            let content =
+                std::fs::read_to_string(path).map_err(|e| format!("edit_file read error: {e}"))?;
 
             let matches = content.match_indices(old_string).count();
             if matches == 0 {
@@ -1224,7 +1339,8 @@ pub async fn execute_built_in(
             }
 
             let updated = content.replacen(old_string, new_string, 1);
-            crate::atomic_write(std::path::Path::new(path), updated.as_bytes()).map_err(|e| format!("edit_file write error: {e}"))?;
+            crate::atomic_write(std::path::Path::new(path), updated.as_bytes())
+                .map_err(|e| format!("edit_file write error: {e}"))?;
             Ok(format!("✅ Edited: {path}"))
         }
 
@@ -1249,21 +1365,34 @@ pub async fn execute_built_in(
             use sysinfo::{Disks, System};
             let mut sys = System::new_all();
             sys.refresh_all();
-            let cpu_model   = sys.cpus().first().map(|c| c.brand().to_string()).unwrap_or_default();
+            let cpu_model = sys
+                .cpus()
+                .first()
+                .map(|c| c.brand().to_string())
+                .unwrap_or_default();
             let cpu_logical = sys.cpus().len();
             let cpu_physical = System::physical_core_count(&sys).unwrap_or(cpu_logical);
             let mem_total_gb = (sys.total_memory() as f64 / 1_073_741_824.0 * 10.0).round() / 10.0;
-            let mem_avail_gb = (sys.available_memory() as f64 / 1_073_741_824.0 * 10.0).round() / 10.0;
-            let os_name     = System::name().unwrap_or_else(|| "Unknown".into());
-            let os_version  = System::os_version().unwrap_or_default();
-            let hostname    = System::host_name().unwrap_or_default();
-            let arch        = std::env::consts::ARCH;
-            let disks       = Disks::new_with_refreshed_list();
-            let disk_summary: Vec<String> = disks.iter().map(|d| {
-                let total = d.total_space() as f64 / 1_073_741_824.0;
-                let avail = d.available_space() as f64 / 1_073_741_824.0;
-                format!("{} {:.0}GB total / {:.0}GB free", d.mount_point().display(), total, avail)
-            }).collect();
+            let mem_avail_gb =
+                (sys.available_memory() as f64 / 1_073_741_824.0 * 10.0).round() / 10.0;
+            let os_name = System::name().unwrap_or_else(|| "Unknown".into());
+            let os_version = System::os_version().unwrap_or_default();
+            let hostname = System::host_name().unwrap_or_default();
+            let arch = std::env::consts::ARCH;
+            let disks = Disks::new_with_refreshed_list();
+            let disk_summary: Vec<String> = disks
+                .iter()
+                .map(|d| {
+                    let total = d.total_space() as f64 / 1_073_741_824.0;
+                    let avail = d.available_space() as f64 / 1_073_741_824.0;
+                    format!(
+                        "{} {:.0}GB total / {:.0}GB free",
+                        d.mount_point().display(),
+                        total,
+                        avail
+                    )
+                })
+                .collect();
             Ok(serde_json::to_string_pretty(&serde_json::json!({
                 "os": format!("{os_name} {os_version}"),
                 "architecture": arch,
@@ -1273,7 +1402,8 @@ pub async fn execute_built_in(
                 "ram_total_gb": mem_total_gb,
                 "ram_available_gb": mem_avail_gb,
                 "disks": disk_summary,
-            })).unwrap_or_default())
+            }))
+            .unwrap_or_default())
         }
 
         "run_command" => {
@@ -1285,7 +1415,8 @@ pub async fn execute_built_in(
                 if is_specs_alias(raw) {
                     let specs_script = "$os=Get-CimInstance Win32_OperatingSystem; $cpu=Get-CimInstance Win32_Processor | Select-Object -First 1; $cs=Get-CimInstance Win32_ComputerSystem; $gpu=Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name; [PSCustomObject]@{ComputerName=$env:COMPUTERNAME;OS=$os.Caption;OSVersion=$os.Version;CPU=$cpu.Name;Cores=$cpu.NumberOfCores;LogicalProcessors=$cpu.NumberOfLogicalProcessors;RAM_GB=[math]::Round($cs.TotalPhysicalMemory/1GB,2);GPU=($gpu -join '; ')} | ConvertTo-Json -Compress";
                     let mut c = std::process::Command::new("powershell");
-                    c.args(["-NoProfile", "-Command", specs_script]).creation_flags(0x0800_0000);
+                    c.args(["-NoProfile", "-Command", specs_script])
+                        .creation_flags(0x0800_0000);
                     c.output()
                 } else {
                     let mut c = std::process::Command::new("cmd");
@@ -1321,12 +1452,16 @@ pub async fn execute_built_in(
 
         "generate_music" => {
             let prompt = args["prompt"].as_str().unwrap_or("ambient music");
-            let duration = args["duration"].as_f64().map(|d| d as f32).unwrap_or(10.0).clamp(1.0, 60.0);
+            let duration = args["duration"]
+                .as_f64()
+                .map(|d| d as f32)
+                .unwrap_or(10.0)
+                .clamp(1.0, 60.0);
             let wav = crate::music_engine::generate_wav(prompt, duration).await;
             if wav.is_empty() {
                 return Err("Music generation failed — no samples produced".into());
             }
-            use base64::{Engine as _, engine::general_purpose::STANDARD};
+            use base64::{engine::general_purpose::STANDARD, Engine as _};
             let data_uri = format!("data:audio/wav;base64,{}", STANDARD.encode(&wav));
             Ok(data_uri)
         }
@@ -1348,33 +1483,75 @@ pub async fn execute_custom(script_path: &str, args: &serde_json::Value) -> Resu
         {
             use std::os::windows::process::CommandExt;
             let mut c: std::process::Command = match ext {
-                "py"       => { let mut c = std::process::Command::new("python"); c.args([script_path, &args_json]); c },
-                "js"       => { let mut c = std::process::Command::new("node"); c.args([script_path, &args_json]); c },
-                "ts"       => { let mut c = std::process::Command::new("npx"); c.args(["ts-node", script_path, &args_json]); c },
-                "sh"       => { let mut c = std::process::Command::new("sh"); c.args([script_path, &args_json]); c },
-                "ps1"      => { let mut c = std::process::Command::new("powershell"); c.args(["-File", script_path, &args_json]); c },
-                "rb"       => { let mut c = std::process::Command::new("ruby"); c.args([script_path, &args_json]); c },
-                "exe" | "" => { let mut c = std::process::Command::new(script_path); c.arg(&args_json); c },
-                _          => return Err(format!("Unsupported script extension: .{ext}")),
+                "py" => {
+                    let mut c = std::process::Command::new("python");
+                    c.args([script_path, &args_json]);
+                    c
+                }
+                "js" => {
+                    let mut c = std::process::Command::new("node");
+                    c.args([script_path, &args_json]);
+                    c
+                }
+                "ts" => {
+                    let mut c = std::process::Command::new("npx");
+                    c.args(["ts-node", script_path, &args_json]);
+                    c
+                }
+                "sh" => {
+                    let mut c = std::process::Command::new("sh");
+                    c.args([script_path, &args_json]);
+                    c
+                }
+                "ps1" => {
+                    let mut c = std::process::Command::new("powershell");
+                    c.args(["-File", script_path, &args_json]);
+                    c
+                }
+                "rb" => {
+                    let mut c = std::process::Command::new("ruby");
+                    c.args([script_path, &args_json]);
+                    c
+                }
+                "exe" | "" => {
+                    let mut c = std::process::Command::new(script_path);
+                    c.arg(&args_json);
+                    c
+                }
+                _ => return Err(format!("Unsupported script extension: .{ext}")),
             };
             c.creation_flags(0x0800_0000);
             c.output()
         }
         #[cfg(not(windows))]
         match ext {
-            "py"       => std::process::Command::new("python").args([script_path, &args_json]).output(),
-            "js"       => std::process::Command::new("node").args([script_path, &args_json]).output(),
-            "ts"       => std::process::Command::new("npx").args(["ts-node", script_path, &args_json]).output(),
-            "sh"       => std::process::Command::new("sh").args([script_path, &args_json]).output(),
-            "ps1"      => std::process::Command::new("powershell").args(["-File", script_path, &args_json]).output(),
-            "rb"       => std::process::Command::new("ruby").args([script_path, &args_json]).output(),
-            "exe" | "" => std::process::Command::new(script_path).arg(&args_json).output(),
-            _          => return Err(format!("Unsupported script extension: .{ext}")),
+            "py" => std::process::Command::new("python")
+                .args([script_path, &args_json])
+                .output(),
+            "js" => std::process::Command::new("node")
+                .args([script_path, &args_json])
+                .output(),
+            "ts" => std::process::Command::new("npx")
+                .args(["ts-node", script_path, &args_json])
+                .output(),
+            "sh" => std::process::Command::new("sh")
+                .args([script_path, &args_json])
+                .output(),
+            "ps1" => std::process::Command::new("powershell")
+                .args(["-File", script_path, &args_json])
+                .output(),
+            "rb" => std::process::Command::new("ruby")
+                .args([script_path, &args_json])
+                .output(),
+            "exe" | "" => std::process::Command::new(script_path)
+                .arg(&args_json)
+                .output(),
+            _ => return Err(format!("Unsupported script extension: .{ext}")),
         }
     };
 
     match output {
-        Err(e)  => Err(format!("Script launch failed: {e}")),
+        Err(e) => Err(format!("Script launch failed: {e}")),
         Ok(out) => {
             if !out.status.success() {
                 let err = String::from_utf8_lossy(&out.stderr);
@@ -1444,7 +1621,10 @@ The tool call is:
         let parsed = parse_tool_calls(response);
         assert_eq!(parsed.calls.len(), 1);
         assert_eq!(parsed.calls[0].tool, "read_file");
-        assert_eq!(parsed.calls[0].args["path"], "Z:\\Projects\\BonsaiTest\\Hello.txt");
+        assert_eq!(
+            parsed.calls[0].args["path"],
+            "Z:\\Projects\\BonsaiTest\\Hello.txt"
+        );
     }
 
     #[test]

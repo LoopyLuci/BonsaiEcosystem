@@ -1,7 +1,7 @@
 //! N-dimensional array type.
 
-use serde::{Deserialize, Serialize};
 use crate::error::ArrayError;
+use serde::{Deserialize, Serialize};
 
 /// Rank-polymorphic N-dimensional array of `f64`.
 ///
@@ -10,7 +10,7 @@ use crate::error::ArrayError;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NdArray {
     pub shape: Vec<usize>,
-    pub data:  Vec<f64>,
+    pub data: Vec<f64>,
 }
 
 impl NdArray {
@@ -18,13 +18,19 @@ impl NdArray {
 
     /// Scalar value.
     pub fn scalar(v: f64) -> Self {
-        Self { shape: vec![], data: vec![v] }
+        Self {
+            shape: vec![],
+            data: vec![v],
+        }
     }
 
     /// 1-D vector.
     pub fn vector(data: Vec<f64>) -> Self {
         let n = data.len();
-        Self { shape: vec![n], data }
+        Self {
+            shape: vec![n],
+            data,
+        }
     }
 
     /// Create from shape + flat data (row-major).
@@ -32,7 +38,10 @@ impl NdArray {
         let expected: usize = shape.iter().product();
         let expected = expected.max(1); // empty shape → 1 element (scalar)
         if data.len() != expected {
-            return Err(ArrayError::LengthError { left: shape, right: vec![data.len()] });
+            return Err(ArrayError::LengthError {
+                left: shape,
+                right: vec![data.len()],
+            });
         }
         Ok(Self { shape, data })
     }
@@ -45,19 +54,34 @@ impl NdArray {
         for i in 0..n {
             data.push(self.data[i % self.data.len()]);
         }
-        Self { shape: new_shape, data }
+        Self {
+            shape: new_shape,
+            data,
+        }
     }
 
     // ── Inspection ───────────────────────────────────────────────────────────
 
-    pub fn rank(&self) -> usize { self.shape.len() }
-    pub fn len(&self) -> usize { self.data.len() }
-    pub fn is_empty(&self) -> bool { self.data.is_empty() }
+    pub fn rank(&self) -> usize {
+        self.shape.len()
+    }
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 
-    pub fn is_scalar(&self) -> bool { self.shape.is_empty() }
+    pub fn is_scalar(&self) -> bool {
+        self.shape.is_empty()
+    }
 
     pub fn scalar_val(&self) -> Option<f64> {
-        if self.is_scalar() { self.data.first().copied() } else { None }
+        if self.is_scalar() {
+            self.data.first().copied()
+        } else {
+            None
+        }
     }
 
     // ── Indexing ─────────────────────────────────────────────────────────────
@@ -76,18 +100,25 @@ impl NdArray {
 
     /// Reverse along the last axis.
     pub fn reverse(&self) -> Self {
-        if self.shape.is_empty() { return self.clone(); }
+        if self.shape.is_empty() {
+            return self.clone();
+        }
         let cols = *self.shape.last().unwrap();
         let mut out = self.data.clone();
         for chunk in out.chunks_mut(cols) {
             chunk.reverse();
         }
-        Self { shape: self.shape.clone(), data: out }
+        Self {
+            shape: self.shape.clone(),
+            data: out,
+        }
     }
 
     /// Transpose (reverses axis order).
     pub fn transpose(&self) -> Self {
-        if self.rank() < 2 { return self.clone(); }
+        if self.rank() < 2 {
+            return self.clone();
+        }
         if self.rank() == 2 {
             let rows = self.shape[0];
             let cols = self.shape[1];
@@ -97,7 +128,10 @@ impl NdArray {
                     out[c * rows + r] = self.data[r * cols + c];
                 }
             }
-            return Self { shape: vec![cols, rows], data: out };
+            return Self {
+                shape: vec![cols, rows],
+                data: out,
+            };
         }
         // General: reverse shape, rearrange data
         let mut new_shape = self.shape.clone();
@@ -116,12 +150,17 @@ impl NdArray {
             let _ = rank; // suppress warning
             out[new_flat] = self.data[flat];
         }
-        Self { shape: new_shape, data: out }
+        Self {
+            shape: new_shape,
+            data: out,
+        }
     }
 
     /// Take first `n` elements along the first axis. Negative = from end.
     pub fn take(&self, n: i64) -> Result<Self, ArrayError> {
-        if self.shape.is_empty() { return Ok(self.clone()); }
+        if self.shape.is_empty() {
+            return Ok(self.clone());
+        }
         let axis_len = self.shape[0] as i64;
         let n = n.clamp(-axis_len, axis_len);
         let (start, count) = if n >= 0 {
@@ -133,12 +172,17 @@ impl NdArray {
         let data: Vec<f64> = self.data[start * sub_len..(start + count) * sub_len].to_vec();
         let mut new_shape = self.shape.clone();
         new_shape[0] = count;
-        Ok(Self { shape: new_shape, data })
+        Ok(Self {
+            shape: new_shape,
+            data,
+        })
     }
 
     /// Drop first `n` elements along the first axis. Negative = from end.
     pub fn drop(&self, n: i64) -> Result<Self, ArrayError> {
-        if self.shape.is_empty() { return Ok(self.clone()); }
+        if self.shape.is_empty() {
+            return Ok(self.clone());
+        }
         let axis_len = self.shape[0] as i64;
         let remaining = (axis_len - n.abs()).max(0) as i64;
         let from_end = n < 0;
@@ -148,20 +192,32 @@ impl NdArray {
             .ok();
         // Drop n from front or back
         let keep = remaining;
-        if from_end { self.take(keep) } else { self.take(-keep) }
+        if from_end {
+            self.take(keep)
+        } else {
+            self.take(-keep)
+        }
     }
 
     // ── Grade (argsort) ───────────────────────────────────────────────────────
 
     pub fn grade_up(&self) -> Self {
         let mut indices: Vec<usize> = (0..self.data.len()).collect();
-        indices.sort_by(|&a, &b| self.data[a].partial_cmp(&self.data[b]).unwrap_or(std::cmp::Ordering::Equal));
+        indices.sort_by(|&a, &b| {
+            self.data[a]
+                .partial_cmp(&self.data[b])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Self::vector(indices.iter().map(|&i| i as f64).collect())
     }
 
     pub fn grade_down(&self) -> Self {
         let mut indices: Vec<usize> = (0..self.data.len()).collect();
-        indices.sort_by(|&a, &b| self.data[b].partial_cmp(&self.data[a]).unwrap_or(std::cmp::Ordering::Equal));
+        indices.sort_by(|&a, &b| {
+            self.data[b]
+                .partial_cmp(&self.data[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Self::vector(indices.iter().map(|&i| i as f64).collect())
     }
 
@@ -171,7 +227,10 @@ impl NdArray {
     pub fn catenate(&self, other: &NdArray) -> Result<Self, ArrayError> {
         // Both must be compatible in all axes except the first
         if self.rank() != other.rank() {
-            return Err(ArrayError::RankError { expected: self.rank(), got: other.rank() });
+            return Err(ArrayError::RankError {
+                expected: self.rank(),
+                got: other.rank(),
+            });
         }
         if self.rank() > 1 {
             let ok = self.shape[1..] == other.shape[1..];
@@ -190,7 +249,10 @@ impl NdArray {
             return Ok(Self::vector(data));
         }
         new_shape[0] += other.shape[0];
-        Ok(Self { shape: new_shape, data })
+        Ok(Self {
+            shape: new_shape,
+            data,
+        })
     }
 }
 
@@ -229,7 +291,9 @@ impl std::fmt::Display for NdArray {
         // Matrix: newline-separated rows
         let cols = self.shape[self.rank() - 1];
         for (i, chunk) in self.data.chunks(cols).enumerate() {
-            if i > 0 { writeln!(f)?; }
+            if i > 0 {
+                writeln!(f)?;
+            }
             let parts: Vec<String> = chunk.iter().map(|v| format!("{v:>10}")).collect();
             write!(f, "{}", parts.join(""))?;
         }
@@ -253,7 +317,7 @@ mod tests {
 
     #[test]
     fn transpose_2d() {
-        let m = NdArray::from_shape_data(vec![2, 3], vec![1.0,2.0,3.0,4.0,5.0,6.0]).unwrap();
+        let m = NdArray::from_shape_data(vec![2, 3], vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
         let t = m.transpose();
         assert_eq!(t.shape, vec![3, 2]);
         assert_eq!(t.data[0], 1.0);

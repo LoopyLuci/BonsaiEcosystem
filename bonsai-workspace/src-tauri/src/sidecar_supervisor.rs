@@ -6,8 +6,8 @@
 //! so it can react to Ready / Crashed transitions without spawning a separate
 //! health-poll future per slot.
 
-use std::time::Duration;
 use reqwest::Client;
+use std::time::Duration;
 use tokio::sync::watch;
 
 /// Current health state of a supervised sidecar process.
@@ -24,26 +24,26 @@ pub enum SidecarStatus {
 /// Configuration passed to [`SidecarSupervisor::start`].
 pub struct SidecarConfig {
     /// HTTP base URL of the sidecar (`http://127.0.0.1:{port}`).
-    pub base_url:           String,
+    pub base_url: String,
     /// Path to probe for health (`/health` or `/v1/models`).
-    pub health_path:        String,
+    pub health_path: String,
     /// Maximum total time to wait for the first successful health probe.
-    pub load_timeout:       Duration,
+    pub load_timeout: Duration,
     /// Interval between consecutive health probes during startup.
-    pub poll_interval:      Duration,
+    pub poll_interval: Duration,
     /// Log file for stderr capture (already opened by the orchestrator).
     /// Supply `None` to discard stderr.
-    pub log_path:           Option<std::path::PathBuf>,
+    pub log_path: Option<std::path::PathBuf>,
 }
 
 impl Default for SidecarConfig {
     fn default() -> Self {
         Self {
-            base_url:      "http://127.0.0.1:8080".into(),
-            health_path:   "/health".into(),
-            load_timeout:  Duration::from_secs(300),
+            base_url: "http://127.0.0.1:8080".into(),
+            health_path: "/health".into(),
+            load_timeout: Duration::from_secs(300),
             poll_interval: Duration::from_millis(500),
-            log_path:      None,
+            log_path: None,
         }
     }
 }
@@ -62,35 +62,32 @@ impl SidecarSupervisor {
     /// Returns a supervisor whose `status_rx` will transition from
     /// `Loading → Ready` or `Loading → Crashed`.
     pub fn start(child: std::process::Child, cfg: SidecarConfig) -> Self {
-        let (tx, rx)  = watch::channel(SidecarStatus::Loading);
+        let (tx, rx) = watch::channel(SidecarStatus::Loading);
         let supervisor = Self {
             status_tx: tx.clone(),
             status_rx: rx,
-            child:     std::sync::Mutex::new(Some(child)),
+            child: std::sync::Mutex::new(Some(child)),
         };
 
         // Background task: probe health until ready or timeout
-        let base_url     = cfg.base_url.clone();
-        let health_path  = cfg.health_path.clone();
+        let base_url = cfg.base_url.clone();
+        let health_path = cfg.health_path.clone();
         let poll_interval = cfg.poll_interval;
-        let load_timeout  = cfg.load_timeout;
+        let load_timeout = cfg.load_timeout;
 
         tokio::spawn(async move {
-            let client    = Client::builder()
+            let client = Client::builder()
                 .timeout(Duration::from_secs(5))
                 .build()
                 .unwrap_or_default();
-            let url       = format!("{}{}", base_url.trim_end_matches('/'), health_path);
-            let deadline  = tokio::time::Instant::now() + load_timeout;
+            let url = format!("{}{}", base_url.trim_end_matches('/'), health_path);
+            let deadline = tokio::time::Instant::now() + load_timeout;
 
             loop {
                 if tokio::time::Instant::now() >= deadline {
                     let _ = tx.send(SidecarStatus::Crashed {
-                        code:   None,
-                        detail: format!(
-                            "health probe timed out after {}s",
-                            load_timeout.as_secs()
-                        ),
+                        code: None,
+                        detail: format!("health probe timed out after {}s", load_timeout.as_secs()),
                     });
                     return;
                 }

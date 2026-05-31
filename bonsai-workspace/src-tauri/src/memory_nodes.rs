@@ -11,8 +11,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, SqlitePool};
 use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{Row, SqlitePool};
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -39,26 +39,26 @@ pub enum NodeType {
 impl NodeType {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Chat          => "chat",
-            Self::ToolCall      => "tool_call",
-            Self::CodeEdit      => "code_edit",
-            Self::Terminal      => "terminal",
-            Self::SurvivalFix   => "survival_fix",
-            Self::ModelReload   => "model_reload",
+            Self::Chat => "chat",
+            Self::ToolCall => "tool_call",
+            Self::CodeEdit => "code_edit",
+            Self::Terminal => "terminal",
+            Self::SurvivalFix => "survival_fix",
+            Self::ModelReload => "model_reload",
             Self::TrainingCycle => "training_cycle",
-            Self::Custom(s)     => s.as_str(),
+            Self::Custom(s) => s.as_str(),
         }
     }
     pub fn from_str(s: &str) -> Self {
         match s {
-            "chat"           => Self::Chat,
-            "tool_call"      => Self::ToolCall,
-            "code_edit"      => Self::CodeEdit,
-            "terminal"       => Self::Terminal,
-            "survival_fix"   => Self::SurvivalFix,
-            "model_reload"   => Self::ModelReload,
+            "chat" => Self::Chat,
+            "tool_call" => Self::ToolCall,
+            "code_edit" => Self::CodeEdit,
+            "terminal" => Self::Terminal,
+            "survival_fix" => Self::SurvivalFix,
+            "model_reload" => Self::ModelReload,
             "training_cycle" => Self::TrainingCycle,
-            other            => Self::Custom(other.to_string()),
+            other => Self::Custom(other.to_string()),
         }
     }
 }
@@ -67,16 +67,16 @@ impl NodeType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryNode {
-    pub id:           String,
+    pub id: String,
     pub timestamp_ms: i64,
-    pub node_type:    NodeType,
+    pub node_type: NodeType,
     /// "user" | "assistant" | "tool" | "system"
-    pub source:       String,
-    pub content:      String,
+    pub source: String,
+    pub content: String,
     /// Comma-separated in DB; Vec<String> in Rust.
-    pub tags:         Vec<String>,
+    pub tags: Vec<String>,
     /// Base64-encoded f32 vector, stored only if embeddings are enabled.
-    pub embedding:    Option<Vec<u8>>,
+    pub embedding: Option<Vec<u8>>,
     /// True once the daemon has consolidated this node.
     pub consolidated: bool,
 }
@@ -84,13 +84,13 @@ pub struct MemoryNode {
 impl MemoryNode {
     pub fn new(node_type: NodeType, source: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
-            id:           uuid::Uuid::new_v4().to_string(),
+            id: uuid::Uuid::new_v4().to_string(),
             timestamp_ms: now_ms(),
             node_type,
-            source:       source.into(),
-            content:      content.into(),
-            tags:         Vec::new(),
-            embedding:    None,
+            source: source.into(),
+            content: content.into(),
+            tags: Vec::new(),
+            embedding: None,
             consolidated: false,
         }
     }
@@ -143,7 +143,7 @@ impl MemoryNodeStore {
             );
             CREATE INDEX IF NOT EXISTS idx_mn_timestamp ON memory_nodes(timestamp_ms);
             CREATE INDEX IF NOT EXISTS idx_mn_consolidated ON memory_nodes(consolidated);
-            CREATE INDEX IF NOT EXISTS idx_mn_type ON memory_nodes(node_type);"
+            CREATE INDEX IF NOT EXISTS idx_mn_type ON memory_nodes(node_type);",
         )
         .execute(&self.pool)
         .await?;
@@ -154,7 +154,7 @@ impl MemoryNodeStore {
         sqlx::query(
             "INSERT OR IGNORE INTO memory_nodes
              (id, timestamp_ms, node_type, source, content, tags, embedding, consolidated)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&node.id)
         .bind(node.timestamp_ms)
@@ -184,25 +184,32 @@ impl MemoryNodeStore {
              FROM memory_nodes
              WHERE timestamp_ms >= ? AND consolidated = 0
              ORDER BY timestamp_ms ASC
-             LIMIT 2000"
+             LIMIT 2000",
         )
         .bind(midnight_ms)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| MemoryNode {
-            id:           r.get("id"),
-            timestamp_ms: r.get("timestamp_ms"),
-            node_type:    NodeType::from_str(r.get::<&str, _>("node_type")),
-            source:       r.get("source"),
-            content:      r.get("content"),
-            tags:         {
-                let raw: &str = r.get("tags");
-                if raw.is_empty() { vec![] } else { raw.split(',').map(str::to_string).collect() }
-            },
-            embedding:    r.get("embedding"),
-            consolidated: r.get::<i64, _>("consolidated") != 0,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| MemoryNode {
+                id: r.get("id"),
+                timestamp_ms: r.get("timestamp_ms"),
+                node_type: NodeType::from_str(r.get::<&str, _>("node_type")),
+                source: r.get("source"),
+                content: r.get("content"),
+                tags: {
+                    let raw: &str = r.get("tags");
+                    if raw.is_empty() {
+                        vec![]
+                    } else {
+                        raw.split(',').map(str::to_string).collect()
+                    }
+                },
+                embedding: r.get("embedding"),
+                consolidated: r.get::<i64, _>("consolidated") != 0,
+            })
+            .collect())
     }
 
     /// Mark a batch of nodes as consolidated.
@@ -221,50 +228,64 @@ impl MemoryNodeStore {
         let pattern = format!("%{}%", tag);
         let rows = sqlx::query(
             "SELECT id, timestamp_ms, node_type, source, content, tags, embedding, consolidated
-             FROM memory_nodes WHERE tags LIKE ? ORDER BY timestamp_ms DESC LIMIT 500"
+             FROM memory_nodes WHERE tags LIKE ? ORDER BY timestamp_ms DESC LIMIT 500",
         )
         .bind(&pattern)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| MemoryNode {
-            id:           r.get("id"),
-            timestamp_ms: r.get("timestamp_ms"),
-            node_type:    NodeType::from_str(r.get::<&str, _>("node_type")),
-            source:       r.get("source"),
-            content:      r.get("content"),
-            tags:         {
-                let raw: &str = r.get("tags");
-                if raw.is_empty() { vec![] } else { raw.split(',').map(str::to_string).collect() }
-            },
-            embedding:    r.get("embedding"),
-            consolidated: r.get::<i64, _>("consolidated") != 0,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| MemoryNode {
+                id: r.get("id"),
+                timestamp_ms: r.get("timestamp_ms"),
+                node_type: NodeType::from_str(r.get::<&str, _>("node_type")),
+                source: r.get("source"),
+                content: r.get("content"),
+                tags: {
+                    let raw: &str = r.get("tags");
+                    if raw.is_empty() {
+                        vec![]
+                    } else {
+                        raw.split(',').map(str::to_string).collect()
+                    }
+                },
+                embedding: r.get("embedding"),
+                consolidated: r.get::<i64, _>("consolidated") != 0,
+            })
+            .collect())
     }
 
     /// Recent N nodes regardless of consolidation status.
     pub async fn recent(&self, limit: i64) -> Result<Vec<MemoryNode>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT id, timestamp_ms, node_type, source, content, tags, embedding, consolidated
-             FROM memory_nodes ORDER BY timestamp_ms DESC LIMIT ?"
+             FROM memory_nodes ORDER BY timestamp_ms DESC LIMIT ?",
         )
         .bind(limit)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| MemoryNode {
-            id:           r.get("id"),
-            timestamp_ms: r.get("timestamp_ms"),
-            node_type:    NodeType::from_str(r.get::<&str, _>("node_type")),
-            source:       r.get("source"),
-            content:      r.get("content"),
-            tags:         {
-                let raw: &str = r.get("tags");
-                if raw.is_empty() { vec![] } else { raw.split(',').map(str::to_string).collect() }
-            },
-            embedding:    r.get("embedding"),
-            consolidated: r.get::<i64, _>("consolidated") != 0,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| MemoryNode {
+                id: r.get("id"),
+                timestamp_ms: r.get("timestamp_ms"),
+                node_type: NodeType::from_str(r.get::<&str, _>("node_type")),
+                source: r.get("source"),
+                content: r.get("content"),
+                tags: {
+                    let raw: &str = r.get("tags");
+                    if raw.is_empty() {
+                        vec![]
+                    } else {
+                        raw.split(',').map(str::to_string).collect()
+                    }
+                },
+                embedding: r.get("embedding"),
+                consolidated: r.get::<i64, _>("consolidated") != 0,
+            })
+            .collect())
     }
 
     /// Count pending (unconsolidated) nodes.

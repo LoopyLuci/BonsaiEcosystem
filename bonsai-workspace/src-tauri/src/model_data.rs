@@ -27,19 +27,19 @@ pub enum ModelSource {
     },
     /// Any OpenAI-compatible HTTP endpoint (OpenAI, Anthropic, Groq, Ollama, etc.).
     OpenAICompatible {
-        base_url:             String,
-        model_id:             String,
+        base_url: String,
+        model_id: String,
         /// Human-readable provider name shown in the UI.
-        provider_name:        String,
+        provider_name: String,
         /// Key name in `SecretsStore` — we never store the raw key here.
-        api_key_secret_name:  Option<String>,
+        api_key_secret_name: Option<String>,
     },
 }
 
 impl ModelSource {
     pub fn source_type(&self) -> &'static str {
         match self {
-            Self::LocalGguf { .. }        => "local_gguf",
+            Self::LocalGguf { .. } => "local_gguf",
             Self::OpenAICompatible { .. } => "openai_compatible",
         }
     }
@@ -128,12 +128,24 @@ impl PromptFormat {
         if a.contains("llama") && (n.contains("llama-3") || n.contains("llama3")) {
             return Self::Llama3;
         }
-        if a.contains("mistral") || a.contains("mixtral") { return Self::Mistral; }
-        if a.contains("gemma")   { return Self::Gemma; }
-        if a.contains("phi")     { return Self::Phi3; }
-        if a.contains("qwen")    { return Self::Qwen2; }
-        if a.contains("deepseek") || n.contains("deepseek") { return Self::DeepSeek; }
-        if n.contains("command-r") || n.contains("command_r") { return Self::CommandR; }
+        if a.contains("mistral") || a.contains("mixtral") {
+            return Self::Mistral;
+        }
+        if a.contains("gemma") {
+            return Self::Gemma;
+        }
+        if a.contains("phi") {
+            return Self::Phi3;
+        }
+        if a.contains("qwen") {
+            return Self::Qwen2;
+        }
+        if a.contains("deepseek") || n.contains("deepseek") {
+            return Self::DeepSeek;
+        }
+        if n.contains("command-r") || n.contains("command_r") {
+            return Self::CommandR;
+        }
         // Modern llama.cpp serves everything via the OpenAI /v1/chat/completions format.
         Self::OpenAIMessages
     }
@@ -143,48 +155,48 @@ impl PromptFormat {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelCapabilities {
     /// Maximum total tokens in a single context (input + output).
-    pub context_window:     u32,
+    pub context_window: u32,
     /// Maximum tokens the model can generate in one completion.
-    pub max_output_tokens:  u32,
+    pub max_output_tokens: u32,
 
     // Input modalities
-    pub accepts_images:     bool,
-    pub accepts_audio:      bool,
-    pub accepts_documents:  bool,
+    pub accepts_images: bool,
+    pub accepts_audio: bool,
+    pub accepts_documents: bool,
 
     // Output capabilities
-    pub tool_calling:       ToolCallingSupport,
+    pub tool_calling: ToolCallingSupport,
     /// Guaranteed valid JSON output mode (e.g. `response_format: json_object`).
-    pub json_mode:          bool,
+    pub json_mode: bool,
     /// Schema-constrained structured output (OpenAI `response_format: json_schema`).
-    pub structured_output:  bool,
-    pub streaming:          bool,
+    pub structured_output: bool,
+    pub streaming: bool,
 
     // Reasoning
     /// Extended thinking / scratchpad reasoning (Claude 3.7+, o1-style).
-    pub extended_thinking:  bool,
+    pub extended_thinking: bool,
 
     /// Ordered list of qualitative strengths, most prominent first.
-    pub strengths:          Vec<ModelStrength>,
+    pub strengths: Vec<ModelStrength>,
 
-    pub tier:               ModelTier,
+    pub tier: ModelTier,
 }
 
 impl Default for ModelCapabilities {
     fn default() -> Self {
         Self {
-            context_window:    4096,
+            context_window: 4096,
             max_output_tokens: 2048,
-            accepts_images:    false,
-            accepts_audio:     false,
+            accepts_images: false,
+            accepts_audio: false,
             accepts_documents: false,
-            tool_calling:      ToolCallingSupport::None,
-            json_mode:         false,
+            tool_calling: ToolCallingSupport::None,
+            json_mode: false,
             structured_output: false,
-            streaming:         true,
+            streaming: true,
             extended_thinking: false,
-            strengths:         vec![],
-            tier:              ModelTier::Capable,
+            strengths: vec![],
+            tier: ModelTier::Capable,
         }
     }
 }
@@ -201,17 +213,17 @@ impl ModelCapabilities {
 /// All fields override the orchestrator's hardcoded defaults when set.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InferenceProfile {
-    pub temperature:          f32,
-    pub top_p:                Option<f32>,
-    pub top_k:                Option<u32>,
-    pub min_p:                Option<f32>,
-    pub repeat_penalty:       Option<f32>,
-    pub presence_penalty:     Option<f32>,
-    pub frequency_penalty:    Option<f32>,
+    pub temperature: f32,
+    pub top_p: Option<f32>,
+    pub top_k: Option<u32>,
+    pub min_p: Option<f32>,
+    pub repeat_penalty: Option<f32>,
+    pub presence_penalty: Option<f32>,
+    pub frequency_penalty: Option<f32>,
     /// Default max completion tokens; can be overridden per-request.
-    pub max_tokens:           u32,
+    pub max_tokens: u32,
     /// Extra stop sequences beyond the model's built-in ones.
-    pub stop_sequences:       Vec<String>,
+    pub stop_sequences: Vec<String>,
     /// Text prepended to every system prompt sent to this model.
     pub system_prompt_prefix: Option<String>,
     /// Text appended to every system prompt sent to this model.
@@ -221,15 +233,15 @@ pub struct InferenceProfile {
 impl Default for InferenceProfile {
     fn default() -> Self {
         Self {
-            temperature:          0.7,
-            top_p:                None,
-            top_k:                None,
-            min_p:                None,
-            repeat_penalty:       None,
-            presence_penalty:     None,
-            frequency_penalty:    None,
-            max_tokens:           2048,
-            stop_sequences:       vec![],
+            temperature: 0.7,
+            top_p: None,
+            top_k: None,
+            min_p: None,
+            repeat_penalty: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            max_tokens: 2048,
+            stop_sequences: vec![],
             system_prompt_prefix: None,
             system_prompt_suffix: None,
         }
@@ -258,22 +270,22 @@ pub enum AffinityLevel {
 pub struct SkillAffinity {
     /// Matches a tool/skill ID registered in `ToolRegistry`.
     pub skill_id: String,
-    pub level:    AffinityLevel,
+    pub level: AffinityLevel,
     /// Optional explanation — surfaced in the UI and generator output.
-    pub note:     Option<String>,
+    pub note: Option<String>,
 }
 
 // ── Hardware Info (local models only) ─────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalFileInfo {
-    pub path:              String,
-    pub file_size_bytes:   u64,
-    pub ram_required_mb:   u64,
-    pub quant_label:       String,
+    pub path: String,
+    pub file_size_bytes: u64,
+    pub ram_required_mb: u64,
+    pub quant_label: String,
     /// Explicit GPU layer override. None = let orchestrator decide.
     /// -1 = all layers on GPU, 0 = CPU only.
-    pub gpu_layers:        Option<i32>,
+    pub gpu_layers: Option<i32>,
 }
 
 // ── Core ModelData ────────────────────────────────────────────────────────────
@@ -282,12 +294,12 @@ pub struct LocalFileInfo {
 pub struct ModelData {
     // ── Identity ──────────────────────────────────────────────────────────────
     /// Stable UUID — primary key in the database.
-    pub id:          String,
-    pub name:        String,
+    pub id: String,
+    pub name: String,
     /// e.g. "Llama 3", "Qwen 2.5", "Claude 3.5 Sonnet"
-    pub family:      Option<String>,
+    pub family: Option<String>,
     /// e.g. "3.1-8B-Instruct", "2.5-Coder-32B"
-    pub version:     Option<String>,
+    pub version: Option<String>,
     /// 1–3 sentence description of what this model is and what it excels at.
     pub description: String,
 
@@ -295,26 +307,26 @@ pub struct ModelData {
     pub source: ModelSource,
 
     // ── Rich Metadata ─────────────────────────────────────────────────────────
-    pub capabilities:     ModelCapabilities,
-    pub inference:        InferenceProfile,
+    pub capabilities: ModelCapabilities,
+    pub inference: InferenceProfile,
     #[serde(default)]
-    pub inference_mode:   InferenceMode,
-    pub prompt_format:    PromptFormat,
+    pub inference_mode: InferenceMode,
+    pub prompt_format: PromptFormat,
     pub skill_affinities: Vec<SkillAffinity>,
 
     // ── Provenance ────────────────────────────────────────────────────────────
-    pub authors:          Vec<String>,
-    pub organization:     Option<String>,
-    pub license:          Option<String>,
-    pub homepage_url:     Option<String>,
+    pub authors: Vec<String>,
+    pub organization: Option<String>,
+    pub license: Option<String>,
+    pub homepage_url: Option<String>,
     /// Approximate training data cutoff, e.g. "2024-10".
-    pub training_cutoff:  Option<String>,
-    pub parameter_count:  Option<u64>,
-    pub architecture:     Option<String>,
+    pub training_cutoff: Option<String>,
+    pub parameter_count: Option<u64>,
+    pub architecture: Option<String>,
     /// User-defined searchable tags.
-    pub tags:             Vec<String>,
+    pub tags: Vec<String>,
     /// Free-form notes visible in the UI.
-    pub notes:            String,
+    pub notes: String,
 
     // ── Hardware (local models only) ──────────────────────────────────────────
     pub local_file: Option<LocalFileInfo>,
@@ -343,41 +355,45 @@ impl ModelData {
             ToolCallingSupport::None
         };
         Self {
-            id:           uuid::Uuid::new_v4().to_string(),
-            name:         info.name.clone(),
-            family:       None,
-            version:      None,
-            description:  String::new(),
+            id: uuid::Uuid::new_v4().to_string(),
+            name: info.name.clone(),
+            family: None,
+            version: None,
+            description: String::new(),
             source: ModelSource::LocalGguf {
-                path:        info.path.display().to_string(),
+                path: info.path.display().to_string(),
                 registry_id: Some(info.id.clone()),
             },
             capabilities: ModelCapabilities {
-                context_window:   info.context_length,
+                context_window: info.context_length,
                 max_output_tokens: (info.context_length / 4).max(512),
-                tool_calling:     tool_support,
-                streaming:        true,
+                tool_calling: tool_support,
+                streaming: true,
                 ..Default::default()
             },
-            inference:        InferenceProfile::default(),
+            inference: InferenceProfile::default(),
             inference_mode,
-            prompt_format:    prompt_fmt,
+            prompt_format: prompt_fmt,
             skill_affinities: vec![],
-            authors:          vec![],
-            organization:     None,
-            license:          None,
-            homepage_url:     None,
-            training_cutoff:  None,
-            parameter_count:  if info.parameter_count > 0 { Some(info.parameter_count) } else { None },
-            architecture:     Some(info.architecture.clone()),
-            tags:             vec![info.quant_label.clone()],
-            notes:            String::new(),
+            authors: vec![],
+            organization: None,
+            license: None,
+            homepage_url: None,
+            training_cutoff: None,
+            parameter_count: if info.parameter_count > 0 {
+                Some(info.parameter_count)
+            } else {
+                None
+            },
+            architecture: Some(info.architecture.clone()),
+            tags: vec![info.quant_label.clone()],
+            notes: String::new(),
             local_file: Some(LocalFileInfo {
-                path:            info.path.display().to_string(),
+                path: info.path.display().to_string(),
                 file_size_bytes: info.file_size_bytes,
                 ram_required_mb: info.ram_required_mb,
-                quant_label:     info.quant_label.clone(),
-                gpu_layers:      None,
+                quant_label: info.quant_label.clone(),
+                gpu_layers: None,
             }),
             created_at: now,
             updated_at: now,
@@ -393,35 +409,35 @@ impl ModelData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelDataSummary {
-    pub id:           String,
-    pub name:         String,
-    pub family:       Option<String>,
-    pub description:  String,
-    pub source_type:  String,
-    pub tier:         ModelTier,
-    pub strengths:    Vec<ModelStrength>,
+    pub id: String,
+    pub name: String,
+    pub family: Option<String>,
+    pub description: String,
+    pub source_type: String,
+    pub tier: ModelTier,
+    pub strengths: Vec<ModelStrength>,
     pub context_window: u32,
     pub tool_calling: ToolCallingSupport,
     pub inference_mode: InferenceMode,
-    pub tags:         Vec<String>,
-    pub updated_at:   i64,
+    pub tags: Vec<String>,
+    pub updated_at: i64,
 }
 
 impl From<&ModelData> for ModelDataSummary {
     fn from(d: &ModelData) -> Self {
         Self {
-            id:             d.id.clone(),
-            name:           d.name.clone(),
-            family:         d.family.clone(),
-            description:    d.description.clone(),
-            source_type:    d.source.source_type().to_string(),
-            tier:           d.capabilities.tier.clone(),
-            strengths:      d.capabilities.strengths.clone(),
+            id: d.id.clone(),
+            name: d.name.clone(),
+            family: d.family.clone(),
+            description: d.description.clone(),
+            source_type: d.source.source_type().to_string(),
+            tier: d.capabilities.tier.clone(),
+            strengths: d.capabilities.strengths.clone(),
             context_window: d.capabilities.context_window,
-            tool_calling:   d.capabilities.tool_calling.clone(),
+            tool_calling: d.capabilities.tool_calling.clone(),
             inference_mode: d.inference_mode.clone(),
-            tags:           d.tags.clone(),
-            updated_at:     d.updated_at,
+            tags: d.tags.clone(),
+            updated_at: d.updated_at,
         }
     }
 }
@@ -435,5 +451,9 @@ pub enum GenerateModelDataInput {
     /// Auto-generate from a model already in the local registry.
     FromRegistry { registry_id: String },
     /// Auto-generate for a cloud/API model by provider + model ID.
-    FromProvider  { provider: String, model_id: String, base_url: Option<String> },
+    FromProvider {
+        provider: String,
+        model_id: String,
+        base_url: Option<String>,
+    },
 }

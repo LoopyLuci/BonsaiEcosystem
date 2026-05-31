@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use bonsai_package::{
-    PackageReader, PackageWriter,
-    manifest::{PackageManifest, BaseModelInfo},
-};
 use crate::kdb_state::KdbAppState;
+use bonsai_package::{
+    manifest::{BaseModelInfo, PackageManifest},
+    PackageReader, PackageWriter,
+};
 
 // ── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -172,5 +172,7 @@ pub async fn package_verify(path: String) -> Result<bool, String> {
     if expected.is_empty() {
         return Ok(true); // no hash to verify
     }
-    reader.verify_entry(&base_path, &expected).map_err(|e| e.to_string())
+    reader
+        .verify_entry(&base_path, &expected)
+        .map_err(|e| e.to_string())
 }

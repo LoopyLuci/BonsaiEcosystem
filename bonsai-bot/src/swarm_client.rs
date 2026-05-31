@@ -1,7 +1,7 @@
-use std::sync::Arc;
-use std::time::Duration;
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::sync::Arc;
+use std::time::Duration;
 
 use crate::config::SwarmPeer;
 use crate::platforms::InboundMessage;
@@ -9,7 +9,7 @@ use crate::platforms::InboundMessage;
 // ── Swarm client ──────────────────────────────────────────────────────────────
 
 pub struct SwarmClient {
-    http:  Client,
+    http: Client,
     peers: Vec<SwarmPeer>,
 }
 
@@ -23,14 +23,18 @@ impl SwarmClient {
     }
 
     /// Returns true if the client has any configured peers.
-    pub fn has_peers(&self) -> bool { !self.peers.is_empty() }
+    pub fn has_peers(&self) -> bool {
+        !self.peers.is_empty()
+    }
 
     /// Check a single peer's /health endpoint.
     pub async fn peer_healthy(&self, peer: &SwarmPeer) -> bool {
         let url = format!("{}/health", peer.admin_url);
-        self.http.get(&url)
+        self.http
+            .get(&url)
             .header("authorization", format!("Bearer {}", peer.token))
-            .send().await
+            .send()
+            .await
             .map(|r| r.status().is_success())
             .unwrap_or(false)
     }
@@ -42,11 +46,18 @@ impl SwarmClient {
 
         // Keyword-matched peers first
         for peer in &self.peers {
-            if peer.route_keywords.iter().any(|kw| text_lower.contains(&kw.to_lowercase())) {
+            if peer
+                .route_keywords
+                .iter()
+                .any(|kw| text_lower.contains(&kw.to_lowercase()))
+            {
                 if self.peer_healthy(peer).await {
                     return Some(peer);
                 }
-                tracing::warn!("[swarm] peer '{}' matched keywords but is unhealthy", peer.name);
+                tracing::warn!(
+                    "[swarm] peer '{}' matched keywords but is unhealthy",
+                    peer.name
+                );
             }
         }
         None
@@ -66,12 +77,15 @@ impl SwarmClient {
             }
         });
 
-        self.http.post(&url)
+        self.http
+            .post(&url)
             .header("authorization", format!("Bearer {}", peer.token))
             .json(&body)
-            .send().await
+            .send()
+            .await
             .map_err(|e| e.to_string())?
-            .json::<Value>().await
+            .json::<Value>()
+            .await
             .map_err(|e| e.to_string())
     }
 

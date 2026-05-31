@@ -141,6 +141,9 @@ mod cross_training;
 mod expanded_tools;
 mod cluster_credits_commands;
 mod fabric_commands;
+mod extensions_commands;
+mod swarm_commands;
+mod terminal_launcher;
 mod gpu_controller;
 mod mcp_server;
 mod micro_bonsai;
@@ -1431,6 +1434,12 @@ pub fn run() {
             // ── Cluster Credits & Device Rental Marketplace ───────────────────
             app.manage(cluster_credits_commands::ClusterState::new());
 
+            // ── Hierarchical Swarm Orchestrator ───────────────────────────────
+            app.manage(swarm_commands::SwarmState::new());
+
+            // ── Extensions System ─────────────────────────────────────────────
+            app.manage(extensions_commands::ExtensionsState::new());
+
             // ── Start Copilot Orchestrator (local REST control) ─────────────
             {
                 let ah = app_handle.clone();
@@ -2406,6 +2415,40 @@ pub fn run() {
             cluster_credits_commands::earnings_history,
             cluster_credits_commands::spending_history,
             cluster_credits_commands::list_task_profiles,
+            terminal_launcher::launch_bonsai_terminal,
+            terminal_launcher::bti_available,
+            // ── Swarm Commander ──────────────────────────────────────────────
+            swarm_commands::create_swarm,
+            swarm_commands::list_swarms,
+            swarm_commands::get_swarm,
+            swarm_commands::pause_swarm,
+            swarm_commands::resume_swarm,
+            swarm_commands::swarm_cancel,
+            swarm_commands::get_swarm_hierarchy,
+            swarm_commands::spawn_agent_node,
+            swarm_commands::pause_agent,
+            swarm_commands::resume_agent,
+            swarm_commands::stop_agent,
+            swarm_commands::get_swarm_ledger,
+            swarm_commands::register_agent_capabilities,
+            swarm_commands::query_agent_capabilities,
+            swarm_commands::list_agent_profiles,
+            swarm_commands::get_swarm_dag,
+            // ── Extensions System ─────────────────────────────────────────────
+            extensions_commands::ext_install_from_github,
+            extensions_commands::ext_install_from_path,
+            extensions_commands::ext_uninstall,
+            extensions_commands::ext_set_enabled,
+            extensions_commands::ext_set_config,
+            extensions_commands::ext_reset_config,
+            extensions_commands::ext_allow_finding,
+            extensions_commands::ext_rescan,
+            extensions_commands::ext_get_security_report,
+            extensions_commands::ext_list_installed,
+            extensions_commands::ext_list_all,
+            extensions_commands::ext_get_detail,
+            extensions_commands::ext_preview_scan,
+            extensions_commands::ext_rate,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

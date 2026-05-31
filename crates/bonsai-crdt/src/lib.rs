@@ -3,8 +3,8 @@
 //! All types implement `merge()` which is commutative, associative, and idempotent.
 //! Safe for concurrent use when wrapped in `Arc<RwLock<T>>` or `DashMap`.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 // ── G-Counter (grow-only counter) ─────────────────────────────────────────────
@@ -17,7 +17,9 @@ pub struct GCounter {
 }
 
 impl GCounter {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn increment(&mut self, node_id: impl Into<String>) {
         let entry = self.counts.entry(node_id.into()).or_insert(0);
@@ -54,7 +56,9 @@ pub struct PNCounter {
 }
 
 impl PNCounter {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn increment(&mut self, node_id: impl Into<String> + Clone) {
         self.pos.increment(node_id);
@@ -99,18 +103,32 @@ impl<T: Clone + Serialize + serde::de::DeserializeOwned> Serialize for LwwRegist
 impl<'de, T: Clone + Serialize + serde::de::DeserializeOwned> Deserialize<'de> for LwwRegister<T> {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         #[derive(Deserialize)]
-        struct Raw<V> { value: V, timestamp: u64, origin: String }
+        struct Raw<V> {
+            value: V,
+            timestamp: u64,
+            origin: String,
+        }
         let raw = Raw::<T>::deserialize(d)?;
-        Ok(LwwRegister { value: raw.value, timestamp: raw.timestamp, origin: raw.origin })
+        Ok(LwwRegister {
+            value: raw.value,
+            timestamp: raw.timestamp,
+            origin: raw.origin,
+        })
     }
 }
 
 impl<T: Clone> LwwRegister<T> {
     pub fn new(initial: T) -> Self {
-        Self { value: initial, timestamp: 0, origin: String::new() }
+        Self {
+            value: initial,
+            timestamp: 0,
+            origin: String::new(),
+        }
     }
 
-    pub fn get(&self) -> &T { &self.value }
+    pub fn get(&self) -> &T {
+        &self.value
+    }
 
     pub fn set(&mut self, value: T, timestamp: u64, origin: impl Into<String>) {
         let origin = origin.into();
@@ -148,18 +166,28 @@ pub struct OrSet<T> {
 
 impl<T> Default for OrSet<T> {
     fn default() -> Self {
-        Self { entries: HashMap::new(), tombstones: std::collections::HashSet::new(), _phantom: Default::default() }
+        Self {
+            entries: HashMap::new(),
+            tombstones: std::collections::HashSet::new(),
+            _phantom: Default::default(),
+        }
     }
 }
 
 impl<T> OrSet<T>
-where T: std::hash::Hash + Eq + Clone + std::fmt::Display
+where
+    T: std::hash::Hash + Eq + Clone + std::fmt::Display,
 {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add(&mut self, value: T) -> Uuid {
         let tag = Uuid::new_v4();
-        self.entries.entry(value.to_string()).or_default().insert(tag);
+        self.entries
+            .entry(value.to_string())
+            .or_default()
+            .insert(tag);
         tag
     }
 
@@ -181,7 +209,8 @@ where T: std::hash::Hash + Eq + Clone + std::fmt::Display
 
     /// Collect all live elements.
     pub fn elements(&self) -> Vec<String> {
-        self.entries.iter()
+        self.entries
+            .iter()
             .filter(|(_, tags)| tags.iter().any(|t| !self.tombstones.contains(t)))
             .map(|(k, _)| k.clone())
             .collect()
@@ -189,7 +218,10 @@ where T: std::hash::Hash + Eq + Clone + std::fmt::Display
 
     pub fn merge(&mut self, other: &OrSet<T>) {
         for (value, tags) in &other.entries {
-            self.entries.entry(value.clone()).or_default().extend(tags.iter().copied());
+            self.entries
+                .entry(value.clone())
+                .or_default()
+                .extend(tags.iter().copied());
         }
         self.tombstones.extend(other.tombstones.iter().copied());
     }
@@ -207,17 +239,25 @@ pub struct TwoPhaseSet<T> {
 }
 
 impl<T> Default for TwoPhaseSet<T>
-where T: std::hash::Hash + Eq + Clone + std::fmt::Display
+where
+    T: std::hash::Hash + Eq + Clone + std::fmt::Display,
 {
     fn default() -> Self {
-        Self { added: std::collections::HashSet::new(), removed: std::collections::HashSet::new(), _phantom: std::marker::PhantomData }
+        Self {
+            added: std::collections::HashSet::new(),
+            removed: std::collections::HashSet::new(),
+            _phantom: std::marker::PhantomData,
+        }
     }
 }
 
 impl<T> TwoPhaseSet<T>
-where T: std::hash::Hash + Eq + Clone + std::fmt::Display
+where
+    T: std::hash::Hash + Eq + Clone + std::fmt::Display,
 {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add(&mut self, value: T) {
         if !self.removed.contains(&value.to_string()) {
@@ -254,7 +294,9 @@ pub struct VClock {
 }
 
 impl VClock {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn tick(&mut self, node_id: impl Into<String>) {
         *self.clock.entry(node_id.into()).or_insert(0) += 1;
@@ -278,7 +320,9 @@ impl VClock {
     pub fn merge(&mut self, other: &VClock) {
         for (k, &v) in &other.clock {
             let entry = self.clock.entry(k.clone()).or_insert(0);
-            if v > *entry { *entry = v; }
+            if v > *entry {
+                *entry = v;
+            }
         }
     }
 }
@@ -321,7 +365,7 @@ mod tests {
         a.add("item".to_string());
         let mut b = a.clone();
         b.remove(&"item".to_string()); // b removes
-        // a still has the item — merge: add-wins
+                                       // a still has the item — merge: add-wins
         a.merge(&b);
         // Since b's remove tombstoned all of a's original tags,
         // but a never tombstoned — after merge a sees the tombstone.

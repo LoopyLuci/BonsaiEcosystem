@@ -3,27 +3,33 @@ use std::sync::Arc;
 
 #[derive(Default)]
 pub struct Metrics {
-    pub messages_inbound:       AtomicU64,
-    pub messages_processed:     AtomicU64,
-    pub messages_queued_full:   AtomicU64,
-    pub buddy_requests:         AtomicU64,
-    pub buddy_errors:           AtomicU64,
-    pub buddy_circuit_opens:    AtomicU64,
-    pub sanitize_rejected_too_long:       AtomicU64,
-    pub sanitize_rejected_protocol:       AtomicU64,
-    pub dedup_hits:             AtomicU64,
-    pub rate_limit_hits:        AtomicU64,
-    pub allowlist_denials:      AtomicU64,
-    pub confirms_created:       AtomicU64,
-    pub confirms_resolved:      AtomicU64,
-    pub confirms_expired:       AtomicU64,
+    pub messages_inbound: AtomicU64,
+    pub messages_processed: AtomicU64,
+    pub messages_queued_full: AtomicU64,
+    pub buddy_requests: AtomicU64,
+    pub buddy_errors: AtomicU64,
+    pub buddy_circuit_opens: AtomicU64,
+    pub sanitize_rejected_too_long: AtomicU64,
+    pub sanitize_rejected_protocol: AtomicU64,
+    pub dedup_hits: AtomicU64,
+    pub rate_limit_hits: AtomicU64,
+    pub allowlist_denials: AtomicU64,
+    pub confirms_created: AtomicU64,
+    pub confirms_resolved: AtomicU64,
+    pub confirms_expired: AtomicU64,
 }
 
 impl Metrics {
     pub fn sanitize_rejected(&self, reason: &str) {
         match reason {
-            "too_long"          => { self.sanitize_rejected_too_long.fetch_add(1, Ordering::Relaxed); }
-            "protocol_boundary" => { self.sanitize_rejected_protocol.fetch_add(1, Ordering::Relaxed); }
+            "too_long" => {
+                self.sanitize_rejected_too_long
+                    .fetch_add(1, Ordering::Relaxed);
+            }
+            "protocol_boundary" => {
+                self.sanitize_rejected_protocol
+                    .fetch_add(1, Ordering::Relaxed);
+            }
             _ => {}
         }
     }

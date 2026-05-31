@@ -13,22 +13,22 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserProfile {
-    pub id:           String,
+    pub id: String,
     pub display_name: String,
     /// Hex-encoded public key (placeholder).
-    pub pub_key_hex:  String,
+    pub pub_key_hex: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
-    pub token:      String,
+    pub token: String,
     pub profile_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workspace {
-    pub id:    String,
-    pub name:  String,
+    pub id: String,
+    pub name: String,
     pub owner: String,
     /// Access grants: (grantee_pub_hex, permissions_bitmask)
     pub grants: Vec<(String, u8)>,
@@ -38,16 +38,16 @@ pub struct Workspace {
 
 pub struct AuthState {
     pub active_session: RwLock<Option<Session>>,
-    pub profiles:       RwLock<Vec<UserProfile>>,
-    pub workspaces:     RwLock<Vec<Workspace>>,
+    pub profiles: RwLock<Vec<UserProfile>>,
+    pub workspaces: RwLock<Vec<Workspace>>,
 }
 
 impl AuthState {
     pub fn new() -> Self {
         Self {
             active_session: RwLock::new(None),
-            profiles:       RwLock::new(vec![]),
-            workspaces:     RwLock::new(vec![]),
+            profiles: RwLock::new(vec![]),
+            workspaces: RwLock::new(vec![]),
         }
     }
 }
@@ -73,9 +73,9 @@ pub async fn create_profile(
     display_name: String,
 ) -> Result<UserProfile, String> {
     let profile = UserProfile {
-        id:           Uuid::new_v4().to_string(),
+        id: Uuid::new_v4().to_string(),
         display_name: display_name.clone(),
-        pub_key_hex:  derive_pub_key(&passphrase),
+        pub_key_hex: derive_pub_key(&passphrase),
     };
     state.profiles.write().await.push(profile.clone());
     Ok(profile)
@@ -88,14 +88,16 @@ pub async fn unlock_profile(
     passphrase: String,
 ) -> Result<String, String> {
     let profiles = state.profiles.read().await;
-    let profile = profiles.iter().find(|p| p.id == profile_id)
+    let profile = profiles
+        .iter()
+        .find(|p| p.id == profile_id)
         .ok_or("profile not found")?;
     if !verify_passphrase(profile, &passphrase) {
         return Err("wrong passphrase".into());
     }
     drop(profiles);
     let session = Session {
-        token:      Uuid::new_v4().to_string(),
+        token: Uuid::new_v4().to_string(),
         profile_id: profile_id.clone(),
     };
     let pid = session.profile_id.clone();
@@ -116,11 +118,15 @@ pub async fn create_workspace(
 ) -> Result<Workspace, String> {
     let owner = {
         let guard = state.active_session.read().await;
-        guard.as_ref().ok_or("no active session")?.profile_id.clone()
+        guard
+            .as_ref()
+            .ok_or("no active session")?
+            .profile_id
+            .clone()
     };
     let ws = Workspace {
-        id:     Uuid::new_v4().to_string(),
-        name:   name.clone(),
+        id: Uuid::new_v4().to_string(),
+        name: name.clone(),
         owner,
         grants: vec![],
     };
@@ -137,11 +143,17 @@ pub async fn share_workspace(
 ) -> Result<(), String> {
     let owner = {
         let guard = state.active_session.read().await;
-        guard.as_ref().ok_or("no active session")?.profile_id.clone()
+        guard
+            .as_ref()
+            .ok_or("no active session")?
+            .profile_id
+            .clone()
     };
 
     let mut workspaces = state.workspaces.write().await;
-    let ws = workspaces.iter_mut().find(|w| w.id == workspace_id)
+    let ws = workspaces
+        .iter_mut()
+        .find(|w| w.id == workspace_id)
         .ok_or("workspace not found")?;
     if ws.owner != owner {
         return Err("not workspace owner".into());

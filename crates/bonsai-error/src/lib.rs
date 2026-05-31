@@ -52,7 +52,13 @@ pub struct BonsaiError {
 
 impl BonsaiError {
     pub fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
-        Self { kind, message: message.into(), source: None, context: Vec::new(), recovery_hint: None }
+        Self {
+            kind,
+            message: message.into(),
+            source: None,
+            context: Vec::new(),
+            recovery_hint: None,
+        }
     }
 
     pub fn internal(message: impl Into<String>) -> Self {
@@ -86,12 +92,21 @@ impl BonsaiError {
         self
     }
 
-    pub fn kind(&self) -> &ErrorKind { &self.kind }
-    pub fn message(&self) -> &str { &self.message }
-    pub fn recovery_hint(&self) -> Option<&str> { self.recovery_hint.as_deref() }
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
+    }
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+    pub fn recovery_hint(&self) -> Option<&str> {
+        self.recovery_hint.as_deref()
+    }
 
     pub fn is_transient(&self) -> bool {
-        matches!(self.kind, ErrorKind::Timeout | ErrorKind::Network | ErrorKind::ResourceExhausted)
+        matches!(
+            self.kind,
+            ErrorKind::Timeout | ErrorKind::Network | ErrorKind::ResourceExhausted
+        )
     }
 }
 
@@ -120,7 +135,9 @@ impl fmt::Display for BonsaiError {
 
 impl std::error::Error for BonsaiError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.as_ref().map(|e| e.as_ref() as &(dyn std::error::Error + 'static))
+        self.source
+            .as_ref()
+            .map(|e| e.as_ref() as &(dyn std::error::Error + 'static))
     }
 }
 
@@ -133,11 +150,15 @@ impl From<std::io::Error> for BonsaiError {
 }
 
 impl From<String> for BonsaiError {
-    fn from(s: String) -> Self { Self::internal(s) }
+    fn from(s: String) -> Self {
+        Self::internal(s)
+    }
 }
 
 impl From<&str> for BonsaiError {
-    fn from(s: &str) -> Self { Self::internal(s) }
+    fn from(s: &str) -> Self {
+        Self::internal(s)
+    }
 }
 
 // ── Result alias ──────────────────────────────────────────────────────────────

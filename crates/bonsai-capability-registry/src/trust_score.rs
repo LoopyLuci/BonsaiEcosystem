@@ -15,9 +15,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 // ── Gate constants ────────────────────────────────────────────────────────────
 
-pub const GATE_DEV:             u8 = 0;
-pub const GATE_STAGING:         u8 = 74;
-pub const GATE_PRODUCTION:      u8 = 95;
+pub const GATE_DEV: u8 = 0;
+pub const GATE_STAGING: u8 = 74;
+pub const GATE_PRODUCTION: u8 = 95;
 pub const GATE_SAFETY_CRITICAL: u8 = 100;
 
 // ── Trust score ───────────────────────────────────────────────────────────────
@@ -38,13 +38,17 @@ pub struct TrustScore {
 impl TrustScore {
     /// Construct a baseline score for a newly registered, unverified capability.
     pub fn baseline() -> Self {
-        Self { baseline: 74, verification_bonus: 0, capability_penalty: 0, violations: 0 }
+        Self {
+            baseline: 74,
+            verification_bonus: 0,
+            capability_penalty: 0,
+            violations: 0,
+        }
     }
 
     /// Compute the final 0–100 score.
     pub fn score(&self) -> u8 {
-        let raw = (self.baseline as i16)
-            + (self.verification_bonus as i16)
+        let raw = (self.baseline as i16) + (self.verification_bonus as i16)
             - (self.capability_penalty as i16)
             - (self.violations as i16 * 2);
         raw.clamp(0, 100) as u8
@@ -77,7 +81,9 @@ impl TrustScore {
 }
 
 impl Default for TrustScore {
-    fn default() -> Self { Self::baseline() }
+    fn default() -> Self {
+        Self::baseline()
+    }
 }
 
 // ── Deployment gate check ─────────────────────────────────────────────────────
@@ -93,9 +99,9 @@ pub enum DeploymentGate {
 impl DeploymentGate {
     pub fn threshold(&self) -> u8 {
         match self {
-            Self::Dev            => GATE_DEV,
-            Self::Staging        => GATE_STAGING,
-            Self::Production     => GATE_PRODUCTION,
+            Self::Dev => GATE_DEV,
+            Self::Staging => GATE_STAGING,
+            Self::Production => GATE_PRODUCTION,
             Self::SafetyCritical => GATE_SAFETY_CRITICAL,
         }
     }
@@ -135,11 +141,17 @@ impl DeploymentGate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GateResult {
     Pass,
-    Fail { required: u8, actual: u8, reason: String },
+    Fail {
+        required: u8,
+        actual: u8,
+        reason: String,
+    },
 }
 
 impl GateResult {
-    pub fn is_pass(&self) -> bool { matches!(self, Self::Pass) }
+    pub fn is_pass(&self) -> bool {
+        matches!(self, Self::Pass)
+    }
 }
 
 // ── Proof token ───────────────────────────────────────────────────────────────
@@ -170,7 +182,11 @@ pub struct ProofToken {
 impl ProofToken {
     /// Create a new token from raw proof bytes.
     /// `proposition` is a human-readable statement string.
-    pub fn new(proof_bytes: &[u8], proposition: impl Into<String>, capability: Option<String>) -> Self {
+    pub fn new(
+        proof_bytes: &[u8],
+        proposition: impl Into<String>,
+        capability: Option<String>,
+    ) -> Self {
         let hash = blake3::hash(proof_bytes);
         Self {
             proof_hash: hex_encode(hash.as_bytes()),
@@ -214,7 +230,10 @@ impl ProofToken {
 }
 
 fn unix_now() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -230,19 +249,19 @@ pub fn effect_penalty(effects: &[BonsaiEffect]) -> u8 {
     let mut penalty: u8 = 0;
     for e in effects {
         penalty = penalty.saturating_add(match e {
-            BonsaiEffect::ShellExec    => 10,
-            BonsaiEffect::Spawn        => 8,
-            BonsaiEffect::NetworkIO    => 5,
-            BonsaiEffect::FileIO       => 4,
+            BonsaiEffect::ShellExec => 10,
+            BonsaiEffect::Spawn => 8,
+            BonsaiEffect::NetworkIO => 5,
+            BonsaiEffect::FileIO => 4,
             BonsaiEffect::WriteUserData => 4,
             BonsaiEffect::VideoCapture => 3,
             BonsaiEffect::AudioCapture => 3,
-            BonsaiEffect::GpuAccess    => 2,
+            BonsaiEffect::GpuAccess => 2,
             BonsaiEffect::ModelInference => 1,
             BonsaiEffect::ReadUserData => 1,
-            BonsaiEffect::Crypto       => 2,
-            BonsaiEffect::Telemetry    => 0,
-            BonsaiEffect::Custom(_)    => 3,
+            BonsaiEffect::Crypto => 2,
+            BonsaiEffect::Telemetry => 0,
+            BonsaiEffect::Custom(_) => 3,
         });
     }
     penalty.min(30)
@@ -272,7 +291,7 @@ mod tests {
         assert_eq!(s.score(), 94);
         assert!(!s.passes_gate(GATE_PRODUCTION)); // < 95
         s.add_proof_bonus(); // capped at +20 → still 94
-        // Need to manually reach 95
+                             // Need to manually reach 95
         s.verification_bonus = 21; // override for test
         assert!(s.passes_gate(GATE_PRODUCTION));
     }

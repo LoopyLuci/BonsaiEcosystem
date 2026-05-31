@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use bonsai_crdt::{GCounter, LwwRegister, OrSet, VClock};
 use bonsai_actors::{Actor, ActorContext, ActorRef, ActorSystem};
+use bonsai_crdt::{GCounter, LwwRegister, OrSet, VClock};
 
-use crate::mcts::{MctsConfig, TrainingExample, self_play_game};
+use crate::mcts::{self_play_game, MctsConfig, TrainingExample};
 use crate::network::NetworkEvaluator;
 
 // ── GameRecord ────────────────────────────────────────────────────────────────
@@ -38,7 +38,11 @@ impl std::fmt::Display for GameRecord {
 }
 
 impl GameRecord {
-    pub fn new(node_id: impl Into<String>, examples: &[TrainingExample], winner: Option<&str>) -> Self {
+    pub fn new(
+        node_id: impl Into<String>,
+        examples: &[TrainingExample],
+        winner: Option<&str>,
+    ) -> Self {
         let examples_json = serde_json::to_string(examples).unwrap_or_default();
         Self {
             id: Uuid::new_v4(),
@@ -61,22 +65,26 @@ impl GameRecord {
     /// Convert to DPO (direct preference optimisation) pairs for language model fine-tuning.
     pub fn to_dpo_pairs(&self) -> Vec<DpoPair> {
         let examples = self.to_training_examples();
-        examples.iter().enumerate().filter_map(|(i, ex)| {
-            // Best move = highest MCTS probability
-            let best_move = ex.move_probs.iter()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(m, _)| m.clone())?;
-            let value = ex.game_result.unwrap_or(0.0);
-            let chosen = format!(
-                "Position {}: best move {} (value estimate {:.2})",
-                i, best_move, value
-            );
-            let rejected = format!(
-                "Position {}: random move (value estimate {:.2})",
-                i, -value
-            );
-            Some(DpoPair { chosen, rejected })
-        }).collect()
+        examples
+            .iter()
+            .enumerate()
+            .filter_map(|(i, ex)| {
+                // Best move = highest MCTS probability
+                let best_move = ex
+                    .move_probs
+                    .iter()
+                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(m, _)| m.clone())?;
+                let value = ex.game_result.unwrap_or(0.0);
+                let chosen = format!(
+                    "Position {}: best move {} (value estimate {:.2})",
+                    i, best_move, value
+                );
+                let rejected =
+                    format!("Position {}: random move (value estimate {:.2})", i, -value);
+                Some(DpoPair { chosen, rejected })
+            })
+            .collect()
     }
 }
 
@@ -167,13 +175,23 @@ impl DistributedSelfPlayWorker {
         let result = tokio::task::spawn_blocking(move || {
             let evaluator = NetworkEvaluator::load_default();
             self_play_game(&evaluator, &cfg, &[])
-        }).await;
+        })
+        .await;
 
         if let Ok(examples) = result {
             // Determine winner from last game_result
-            let winner = examples.last()
+            let winner = examples
+                .last()
                 .and_then(|ex| ex.game_result)
-                .map(|r| if r > 0.0 { "white" } else if r < 0.0 { "black" } else { "" })
+                .map(|r| {
+                    if r > 0.0 {
+                        "white"
+                    } else if r < 0.0 {
+                        "black"
+                    } else {
+                        ""
+                    }
+                })
                 .filter(|s| !s.is_empty());
 
             let record = GameRecord::new(&node_id, &examples, winner);
@@ -258,8 +276,13 @@ impl PeerSyncManager {
             interval.tick().await;
             // Request our state, then push to peers
             let (tx, rx) = tokio::sync::oneshot::channel();
-            if self.worker_tx.send(SelfPlayMsg::GetState(tx)).is_err() { break; }
-            let our_state = match rx.await { Ok(s) => s, Err(_) => break };
+            if self.worker_tx.send(SelfPlayMsg::GetState(tx)).is_err() {
+                break;
+            }
+            let our_state = match rx.await {
+                Ok(s) => s,
+                Err(_) => break,
+            };
 
             let peers = self.peers.read().await.clone();
             // In a real deployment each peer_url receives a POST with our_state.
@@ -282,7 +305,11 @@ pub struct DistributedSelfPlayEngine {
 }
 
 impl DistributedSelfPlayEngine {
-    pub fn start(system: &Arc<ActorSystem>, node_id: impl Into<String> + Clone, mcts_sims: u32) -> Self {
+    pub fn start(
+        system: &Arc<ActorSystem>,
+        node_id: impl Into<String> + Clone,
+        mcts_sims: u32,
+    ) -> Self {
         let worker_actor = DistributedSelfPlayWorker::new(node_id.clone(), mcts_sims);
         let state_arc = worker_actor.state.clone();
         let worker = system.spawn(worker_actor);
@@ -299,7 +326,8 @@ impl DistributedSelfPlayEngine {
     pub async fn get_state(&self) -> DistributedSelfPlayState {
         let (tx, rx) = tokio::sync::oneshot::channel();
         if self.worker.send(SelfPlayMsg::GetState(tx)).is_ok() {
-            rx.await.unwrap_or_else(|_| DistributedSelfPlayState::new(100))
+            rx.await
+                .unwrap_or_else(|_| DistributedSelfPlayState::new(100))
         } else {
             self.state_arc.read().await.clone()
         }

@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+use zip::CompressionMethod;
 use zip::ZipWriter;
 use zip::write::FileOptions;
-use zip::CompressionMethod;
 
 use crate::manifest::PackageManifest;
 use crate::{PackageError, Result};
@@ -59,7 +59,8 @@ impl PackageWriter {
     /// Add a directory tree recursively.
     pub fn add_dir(&mut self, src_dir: &Path, prefix: &str) -> Result<()> {
         for entry in walkdir(src_dir)? {
-            let rel = entry.strip_prefix(src_dir)
+            let rel = entry
+                .strip_prefix(src_dir)
                 .map_err(|e| PackageError::Invalid(e.to_string()))?;
             let entry_path = format!("{}/{}", prefix, rel.to_string_lossy().replace('\\', "/"));
             self.add_file(&entry, &entry_path)?;
@@ -70,7 +71,8 @@ impl PackageWriter {
     /// Finalize: write manifest.json and seal the ZIP.
     pub fn finish(mut self) -> Result<PathBuf> {
         let manifest_json = serde_json::to_vec_pretty(&self.manifest)?;
-        self.zip.start_file("manifest.json", Self::store_options())?;
+        self.zip
+            .start_file("manifest.json", Self::store_options())?;
         self.zip.write_all(&manifest_json)?;
 
         let provenance = serde_json::json!({
@@ -79,7 +81,8 @@ impl PackageWriter {
             "bkp_version": self.manifest.bkp_version,
         });
         let prov_bytes = serde_json::to_vec_pretty(&provenance)?;
-        self.zip.start_file("provenance.json", Self::store_options())?;
+        self.zip
+            .start_file("provenance.json", Self::store_options())?;
         self.zip.write_all(&prov_bytes)?;
 
         self.zip.finish()?;

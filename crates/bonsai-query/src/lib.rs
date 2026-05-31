@@ -3,7 +3,7 @@
 pub mod datalog;
 pub mod sql;
 
-pub use datalog::{Db as DatalogDb, Rule, Atom, Term};
+pub use datalog::{Atom, Db as DatalogDb, Rule, Term};
 pub use sql::{SqlEngine, SqlError, SqlResult};
 
 use std::sync::Arc;
@@ -36,29 +36,48 @@ impl CapabilityQuery {
     }
 
     /// Primitive search: token presence in trigger_phrases, name, or description.
-    pub async fn search(&self, query: &str, categories: Option<&[String]>, top_k: usize) -> Vec<ScoredCapability> {
+    pub async fn search(
+        &self,
+        query: &str,
+        categories: Option<&[String]>,
+        top_k: usize,
+    ) -> Vec<ScoredCapability> {
         let q = query.to_lowercase();
         let m = self.registry.get_manifest().await;
         let mut out: Vec<ScoredCapability> = Vec::new();
         for (cat, list) in m.capabilities.iter() {
             if let Some(cats) = categories {
-                if !cats.contains(cat) { continue; }
+                if !cats.contains(cat) {
+                    continue;
+                }
             }
             for entry in list.iter() {
                 let mut score = 0f32;
-                if entry.name.to_lowercase().contains(&q) { score += 2.0; }
-                if entry.description.as_ref().map(|d| d.to_lowercase().contains(&q)).unwrap_or(false) { score += 1.0; }
+                if entry.name.to_lowercase().contains(&q) {
+                    score += 2.0;
+                }
+                if entry
+                    .description
+                    .as_ref()
+                    .map(|d| d.to_lowercase().contains(&q))
+                    .unwrap_or(false)
+                {
+                    score += 1.0;
+                }
                 for t in entry.trigger_phrases.iter() {
                     if t.to_lowercase().contains(&q) {
                         score += 3.0;
                     }
                 }
                 if score > 0.0 {
-                    out.push(ScoredCapability { entry: entry.clone(), score });
+                    out.push(ScoredCapability {
+                        entry: entry.clone(),
+                        score,
+                    });
                 }
             }
         }
-        out.sort_by(|a,b| b.score.partial_cmp(&a.score).unwrap());
+        out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
         out.truncate(top_k);
         out
     }

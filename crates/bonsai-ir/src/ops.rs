@@ -3,19 +3,31 @@
 //! `IrOp` is the typed expression language. `IrFunction` and `IrModule` are
 //! the compilation units. The effect system in `effects.rs` is the effect type.
 
-use serde::{Deserialize, Serialize};
 use crate::effects::BonsaiEffect;
+use serde::{Deserialize, Serialize};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /// Graded modality — how many times a value is used.
 /// ZERO = erased (type-level only), ONE = linear (consumed once), MANY = unrestricted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum Modality { #[default] Many, One, Zero }
+pub enum Modality {
+    #[default]
+    Many,
+    One,
+    Zero,
+}
 
 /// Compute device target for a function or operation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum DeviceTarget { #[default] Cpu, Gpu, Fpga, Tpu, Auto }
+pub enum DeviceTarget {
+    #[default]
+    Cpu,
+    Gpu,
+    Fpga,
+    Tpu,
+    Auto,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IrType {
@@ -31,9 +43,16 @@ pub enum IrType {
     Result(Box<IrType>, Box<IrType>),
     Tuple(Vec<IrType>),
     /// Function type with graded modality on arguments.
-    Fn { params: Vec<IrType>, ret: Box<IrType>, modality: Modality },
+    Fn {
+        params: Vec<IrType>,
+        ret: Box<IrType>,
+        modality: Modality,
+    },
     /// Monadic effect wrapper.
-    Effect { inner: Box<IrType>, effect_type: EffectType },
+    Effect {
+        inner: Box<IrType>,
+        effect_type: EffectType,
+    },
     /// Named struct/enum defined in an `IrModule`.
     Named(String),
     /// A typed actor reference — can receive messages of type `msg`.
@@ -62,7 +81,10 @@ pub enum IrPattern {
     Bind(String),
     Lit(IrLit),
     Tuple(Vec<IrPattern>),
-    Variant { name: String, fields: Vec<IrPattern> },
+    Variant {
+        name: String,
+        fields: Vec<IrPattern>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,12 +149,25 @@ pub enum IrOp {
     // ── Algebraic data ────────────────────────────────────────────────────────
     Tuple(Vec<IrOp>),
     Array(Vec<IrOp>),
-    FieldAccess { expr: Box<IrOp>, field: String },
-    IndexAccess { expr: Box<IrOp>, index: Box<IrOp> },
+    FieldAccess {
+        expr: Box<IrOp>,
+        field: String,
+    },
+    IndexAccess {
+        expr: Box<IrOp>,
+        index: Box<IrOp>,
+    },
 
     // ── Primitives ────────────────────────────────────────────────────────────
-    BinOp { op: BinOpKind, lhs: Box<IrOp>, rhs: Box<IrOp> },
-    UnOp { op: UnOpKind, expr: Box<IrOp> },
+    BinOp {
+        op: BinOpKind,
+        lhs: Box<IrOp>,
+        rhs: Box<IrOp>,
+    },
+    UnOp {
+        op: UnOpKind,
+        expr: Box<IrOp>,
+    },
 
     // ── Effects ───────────────────────────────────────────────────────────────
     /// Lift a `BonsaiEffect` into the IR — the computation *performs* this effect
@@ -152,63 +187,87 @@ pub enum IrOp {
 
     // ── Actor concurrency (Aether layer) ─────────────────────────────────────
     /// Spawn a new actor with an initial message of type `msg_ty`.
-    Spawn { actor_ty: IrType, init_msg: Box<IrOp> },
+    Spawn {
+        actor_ty: IrType,
+        init_msg: Box<IrOp>,
+    },
     /// Send a message to an actor reference (fire-and-forget).
-    Send { actor_ref: Box<IrOp>, msg: Box<IrOp> },
+    Send {
+        actor_ref: Box<IrOp>,
+        msg: Box<IrOp>,
+    },
     /// Receive the next message from the current actor's mailbox.
-    Receive { msg_ty: IrType },
+    Receive {
+        msg_ty: IrType,
+    },
     /// Synchronous ask: send `msg` and await a reply of `reply_ty`.
-    Ask { actor_ref: Box<IrOp>, msg: Box<IrOp>, reply_ty: IrType },
+    Ask {
+        actor_ref: Box<IrOp>,
+        msg: Box<IrOp>,
+        reply_ty: IrType,
+    },
 
     // ── Device annotation (UniIR targeting) ──────────────────────────────────
     /// Annotate an expression with a compute-device target.
-    DeviceAnnotation { target: DeviceTarget, expr: Box<IrOp> },
+    DeviceAnnotation {
+        target: DeviceTarget,
+        expr: Box<IrOp>,
+    },
 
     // ── SQL ───────────────────────────────────────────────────────────────────
     /// Execute a SQL query string with positional bind parameters.
-    SqlQuery { query: String, params: Vec<IrOp> },
+    SqlQuery {
+        query: String,
+        params: Vec<IrOp>,
+    },
 
     // ── DataFrame ops (Polars) ────────────────────────────────────────────────
-    DataFrameOp { op: DataFrameOpKind, args: Vec<IrOp> },
+    DataFrameOp {
+        op: DataFrameOpKind,
+        args: Vec<IrOp>,
+    },
 
     // ── Array language ops (APL/J) ────────────────────────────────────────────
-    ArrayOp { op: ArrayOpKind, args: Vec<IrOp> },
+    ArrayOp {
+        op: ArrayOpKind,
+        args: Vec<IrOp>,
+    },
 }
 
 /// DataFrame operations (mirrors Polars lazy API).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DataFrameOpKind {
-    LoadCsv,           // args: [path_str]
-    LoadJson,          // args: [path_str]
-    Filter,            // args: [df, predicate_expr]
-    Select,            // args: [df, col_name...]
-    GroupBy,           // args: [df, col_name]
-    Agg,               // args: [grouped_df, agg_fn]
-    Join,              // args: [df_left, df_right, on_col]
-    Sort,              // args: [df, col_name, descending_bool]
-    WithColumn,        // args: [df, name_str, expr]
-    Collect,           // args: [lazy_df]
-    ToJson,            // args: [df]
+    LoadCsv,    // args: [path_str]
+    LoadJson,   // args: [path_str]
+    Filter,     // args: [df, predicate_expr]
+    Select,     // args: [df, col_name...]
+    GroupBy,    // args: [df, col_name]
+    Agg,        // args: [grouped_df, agg_fn]
+    Join,       // args: [df_left, df_right, on_col]
+    Sort,       // args: [df, col_name, descending_bool]
+    WithColumn, // args: [df, name_str, expr]
+    Collect,    // args: [lazy_df]
+    ToJson,     // args: [df]
 }
 
 /// Array/APL operations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ArrayOpKind {
-    Shape,             // monadic: shape of array
-    Reshape,           // dyadic: reshape lhs to shape rhs
-    Rank,              // monadic: rank (number of dimensions)
-    Reduce,            // dyadic: f/ a  (reduce with function)
-    Scan,              // dyadic: f\ a  (prefix scan)
-    OuterProduct,      // triadic: f∘.  (outer product)
-    InnerProduct,      // triadic: f.g  (inner product)
-    Rotate,            // dyadic: n⌽a
-    Take,              // dyadic: n↑a
-    Drop,              // dyadic: n↓a
-    Iota,              // monadic: ⍳n
-    Ravel,             // monadic: ,a (flatten to vector)
-    Transpose,         // monadic: ⍉a
-    Enclose,           // monadic: ⊂a
-    Each,              // dyadic: f¨ a
+    Shape,        // monadic: shape of array
+    Reshape,      // dyadic: reshape lhs to shape rhs
+    Rank,         // monadic: rank (number of dimensions)
+    Reduce,       // dyadic: f/ a  (reduce with function)
+    Scan,         // dyadic: f\ a  (prefix scan)
+    OuterProduct, // triadic: f∘.  (outer product)
+    InnerProduct, // triadic: f.g  (inner product)
+    Rotate,       // dyadic: n⌽a
+    Take,         // dyadic: n↑a
+    Drop,         // dyadic: n↓a
+    Iota,         // monadic: ⍳n
+    Ravel,        // monadic: ,a (flatten to vector)
+    Transpose,    // monadic: ⍉a
+    Enclose,      // monadic: ⊂a
+    Each,         // dyadic: f¨ a
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -221,16 +280,33 @@ pub struct EffectHandler {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BinOpKind {
-    Add, Sub, Mul, Div, Rem,
-    Eq, Ne, Lt, Le, Gt, Ge,
-    And, Or,
-    BitAnd, BitOr, BitXor, Shl, Shr,
-    Concat,  // string/array concatenation
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
+    Concat, // string/array concatenation
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum UnOpKind {
-    Neg, Not, Ref, Deref,
+    Neg,
+    Not,
+    Ref,
+    Deref,
 }
 
 // ── Function and module ───────────────────────────────────────────────────────
@@ -272,8 +348,12 @@ pub struct IrTypeDef {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IrTypeDefKind {
-    Struct { fields: Vec<(String, IrType)> },
-    Enum { variants: Vec<(String, Option<IrType>)> },
+    Struct {
+        fields: Vec<(String, IrType)>,
+    },
+    Enum {
+        variants: Vec<(String, Option<IrType>)>,
+    },
     Alias(IrType),
 }
 
@@ -305,7 +385,8 @@ impl IrModule {
     }
 
     pub fn exported_fns(&self) -> Vec<&IrFunction> {
-        self.functions.iter()
+        self.functions
+            .iter()
             .filter(|f| self.exports.contains(&f.name))
             .collect()
     }
@@ -314,58 +395,108 @@ impl IrModule {
 // ── Builder helpers ───────────────────────────────────────────────────────────
 
 impl IrOp {
-    pub fn lit_i64(n: i64) -> Self { Self::Lit(IrLit::I64(n)) }
-    pub fn lit_str(s: impl Into<String>) -> Self { Self::Lit(IrLit::Str(s.into())) }
-    pub fn lit_bool(b: bool) -> Self { Self::Lit(IrLit::Bool(b)) }
-    pub fn unit() -> Self { Self::Lit(IrLit::Unit) }
-    pub fn var(name: impl Into<String>) -> Self { Self::Var(name.into()) }
+    pub fn lit_i64(n: i64) -> Self {
+        Self::Lit(IrLit::I64(n))
+    }
+    pub fn lit_str(s: impl Into<String>) -> Self {
+        Self::Lit(IrLit::Str(s.into()))
+    }
+    pub fn lit_bool(b: bool) -> Self {
+        Self::Lit(IrLit::Bool(b))
+    }
+    pub fn unit() -> Self {
+        Self::Lit(IrLit::Unit)
+    }
+    pub fn var(name: impl Into<String>) -> Self {
+        Self::Var(name.into())
+    }
 
     pub fn block(ops: impl IntoIterator<Item = IrOp>) -> Self {
         let v: Vec<IrOp> = ops.into_iter().collect();
-        if v.len() == 1 { v.into_iter().next().unwrap() } else { Self::Block(v) }
+        if v.len() == 1 {
+            v.into_iter().next().unwrap()
+        } else {
+            Self::Block(v)
+        }
     }
 
     pub fn if_(cond: IrOp, then: IrOp, else_: IrOp) -> Self {
-        Self::If { cond: Box::new(cond), then: Box::new(then), else_: Box::new(else_) }
+        Self::If {
+            cond: Box::new(cond),
+            then: Box::new(then),
+            else_: Box::new(else_),
+        }
     }
 
     pub fn apply(func: IrOp, args: Vec<IrOp>) -> Self {
-        Self::Apply { func: Box::new(func), args }
+        Self::Apply {
+            func: Box::new(func),
+            args,
+        }
     }
 
     pub fn tool_call(name: impl Into<String>, args: IrOp) -> Self {
-        Self::ToolCall { tool_name: name.into(), args: Box::new(args) }
+        Self::ToolCall {
+            tool_name: name.into(),
+            args: Box::new(args),
+        }
     }
 
     pub fn spawn(actor_ty: IrType, init_msg: IrOp) -> Self {
-        Self::Spawn { actor_ty, init_msg: Box::new(init_msg) }
+        Self::Spawn {
+            actor_ty,
+            init_msg: Box::new(init_msg),
+        }
     }
 
     pub fn send(actor_ref: IrOp, msg: IrOp) -> Self {
-        Self::Send { actor_ref: Box::new(actor_ref), msg: Box::new(msg) }
+        Self::Send {
+            actor_ref: Box::new(actor_ref),
+            msg: Box::new(msg),
+        }
     }
 
     pub fn on_device(target: DeviceTarget, expr: IrOp) -> Self {
-        Self::DeviceAnnotation { target, expr: Box::new(expr) }
+        Self::DeviceAnnotation {
+            target,
+            expr: Box::new(expr),
+        }
     }
 
     pub fn sql(query: impl Into<String>, params: Vec<IrOp>) -> Self {
-        Self::SqlQuery { query: query.into(), params }
+        Self::SqlQuery {
+            query: query.into(),
+            params,
+        }
     }
 }
 
 impl IrType {
     /// Unrestricted function type (most common case).
     pub fn fun(params: Vec<IrType>, ret: IrType) -> Self {
-        Self::Fn { params, ret: Box::new(ret), modality: Modality::Many }
+        Self::Fn {
+            params,
+            ret: Box::new(ret),
+            modality: Modality::Many,
+        }
     }
     /// Linear function type (consumes argument exactly once).
     pub fn linear_fun(params: Vec<IrType>, ret: IrType) -> Self {
-        Self::Fn { params, ret: Box::new(ret), modality: Modality::One }
+        Self::Fn {
+            params,
+            ret: Box::new(ret),
+            modality: Modality::One,
+        }
     }
-    pub fn actor_ref(msg_ty: IrType) -> Self { Self::ActorRef(Box::new(msg_ty)) }
-    pub fn array_of(elem: IrType) -> Self { Self::Array(Box::new(elem)) }
-    pub fn ndarray_of(elem: IrType) -> Self { Self::NDArray(Box::new(elem)) }
+    pub fn actor_ref(msg_ty: IrType) -> Self {
+        Self::ActorRef(Box::new(msg_ty))
+    }
+    pub fn array_of(elem: IrType) -> Self {
+        Self::Array(Box::new(elem))
+    }
+    pub fn ndarray_of(elem: IrType) -> Self {
+        Self::NDArray(Box::new(elem))
+    }
 }
 
 #[cfg(test)]
@@ -377,8 +508,16 @@ mod tests {
         let f = IrFunction {
             name: "add".into(),
             params: vec![
-                IrParam { name: "a".into(), ty: IrType::I64, default: None },
-                IrParam { name: "b".into(), ty: IrType::I64, default: None },
+                IrParam {
+                    name: "a".into(),
+                    ty: IrType::I64,
+                    default: None,
+                },
+                IrParam {
+                    name: "b".into(),
+                    ty: IrType::I64,
+                    default: None,
+                },
             ],
             ret: IrType::I64,
             body: IrOp::BinOp {

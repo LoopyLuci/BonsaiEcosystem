@@ -25,11 +25,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::{
-    Router,
     extract::State,
     http::{HeaderMap, StatusCode},
-    response::{Json, IntoResponse},
+    response::{IntoResponse, Json},
     routing::{get, post},
+    Router,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -43,38 +43,48 @@ use crate::tool_core::ToolRegistry;
 #[derive(Debug, Deserialize)]
 struct JsonRpcRequest {
     jsonrpc: String,
-    id:      Option<Value>,
-    method:  String,
-    params:  Option<Value>,
+    id: Option<Value>,
+    method: String,
+    params: Option<Value>,
 }
 
 #[derive(Debug, Serialize)]
 struct JsonRpcResponse {
     jsonrpc: &'static str,
-    id:      Value,
+    id: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
-    result:  Option<Value>,
+    result: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    error:   Option<JsonRpcError>,
+    error: Option<JsonRpcError>,
 }
 
 #[derive(Debug, Serialize)]
 struct JsonRpcError {
-    code:    i32,
+    code: i32,
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data:    Option<Value>,
+    data: Option<Value>,
 }
 
 impl JsonRpcResponse {
     fn ok(id: Value, result: Value) -> Self {
-        Self { jsonrpc: "2.0", id, result: Some(result), error: None }
+        Self {
+            jsonrpc: "2.0",
+            id,
+            result: Some(result),
+            error: None,
+        }
     }
     fn err(id: Value, code: i32, message: impl Into<String>) -> Self {
         Self {
-            jsonrpc: "2.0", id,
+            jsonrpc: "2.0",
+            id,
             result: None,
-            error: Some(JsonRpcError { code, message: message.into(), data: None }),
+            error: Some(JsonRpcError {
+                code,
+                message: message.into(),
+                data: None,
+            }),
         }
     }
 }
@@ -220,17 +230,17 @@ async fn handle_mcp(
             .map(|t| t == state.auth_token)
             .unwrap_or(false);
         if !ok {
-            let resp = JsonRpcResponse::err(
-                req.id.unwrap_or(Value::Null),
-                -32001,
-                "Unauthorized",
-            );
+            let resp = JsonRpcResponse::err(req.id.unwrap_or(Value::Null), -32001, "Unauthorized");
             return (StatusCode::UNAUTHORIZED, Json(json!(resp)));
         }
     }
 
     if req.jsonrpc != "2.0" {
-        let resp = JsonRpcResponse::err(Value::Null, -32600, "Invalid Request: jsonrpc must be '2.0'");
+        let resp = JsonRpcResponse::err(
+            Value::Null,
+            -32600,
+            "Invalid Request: jsonrpc must be '2.0'",
+        );
         return (StatusCode::OK, Json(json!(resp)));
     }
 
@@ -239,28 +249,22 @@ async fn handle_mcp(
     let result = dispatch(&state, &req.method, &params).await;
 
     let resp = match result {
-        Ok(v)  => JsonRpcResponse::ok(id, v),
+        Ok(v) => JsonRpcResponse::ok(id, v),
         Err((code, msg)) => JsonRpcResponse::err(id, code, msg),
     };
     (StatusCode::OK, Json(json!(resp)))
 }
 
-async fn dispatch(
-    state: &McpState,
-    method: &str,
-    params: &Value,
-) -> Result<Value, (i32, String)> {
+async fn dispatch(state: &McpState, method: &str, params: &Value) -> Result<Value, (i32, String)> {
     match method {
-        "initialize" => {
-            Ok(json!({
-                "protocolVersion": MCP_VERSION,
-                "capabilities": server_capabilities(),
-                "serverInfo": {
-                    "name":    SERVER_NAME,
-                    "version": SERVER_VERSION,
-                }
-            }))
-        }
+        "initialize" => Ok(json!({
+            "protocolVersion": MCP_VERSION,
+            "capabilities": server_capabilities(),
+            "serverInfo": {
+                "name":    SERVER_NAME,
+                "version": SERVER_VERSION,
+            }
+        })),
 
         "ping" => Ok(json!({})),
 
@@ -272,13 +276,15 @@ async fn dispatch(
         }
 
         "tools/call" => {
-            let tool_name = params.get("name")
+            let tool_name = params
+                .get("name")
                 .and_then(|v| v.as_str())
                 .ok_or((-32602, "Missing 'name' param".to_string()))?;
             let args = params.get("arguments").cloned().unwrap_or(Value::Null);
 
             let reg = state.registry.read().await;
-            let tool = reg.get(tool_name)
+            let tool = reg
+                .get(tool_name)
                 .ok_or((-32601, format!("Tool '{tool_name}' not found")))?;
 
             let ctx = default_tool_context();
@@ -318,7 +324,8 @@ async fn dispatch(
         }
 
         "resources/read" => {
-            let uri = params.get("uri")
+            let uri = params
+                .get("uri")
                 .and_then(|v| v.as_str())
                 .ok_or((-32602, "Missing 'uri' param".to_string()))?;
 
@@ -335,7 +342,9 @@ async fn dispatch(
                     }))
                 }
                 "bonsai://memory" => {
-                    let content = state.memory_path.as_ref()
+                    let content = state
+                        .memory_path
+                        .as_ref()
                         .as_ref()
                         .and_then(|p| std::fs::read_to_string(p).ok())
                         .unwrap_or_default();
@@ -352,12 +361,11 @@ async fn dispatch(
         }
 
         // ── prompts ───────────────────────────────────────────────────────────
-        "prompts/list" => {
-            Ok(json!({ "prompts": builtin_prompts() }))
-        }
+        "prompts/list" => Ok(json!({ "prompts": builtin_prompts() })),
 
         "prompts/get" => {
-            let name = params.get("name")
+            let name = params
+                .get("name")
                 .and_then(|v| v.as_str())
                 .ok_or((-32602, "Missing 'name' param".to_string()))?;
             let args = params.get("arguments").cloned().unwrap_or(json!({}));
@@ -384,42 +392,68 @@ async fn health() -> impl IntoResponse {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn default_tool_context() -> crate::tool_core::ToolContext {
-    use std::sync::{Arc, atomic::AtomicBool};
+    use std::sync::{atomic::AtomicBool, Arc};
     crate::tool_core::ToolContext {
         workspace_path: None,
-        profile_id:     "mcp".into(),
-        session_id:     "mcp-session".into(),
-        turn_id:        uuid_short(),
-        call_depth:     0,
-        cancel:         Arc::new(AtomicBool::new(false)),
-        secrets:        Arc::new(crate::secrets_store::SecretsStore::new()),
+        profile_id: "mcp".into(),
+        session_id: "mcp-session".into(),
+        turn_id: uuid_short(),
+        call_depth: 0,
+        cancel: Arc::new(AtomicBool::new(false)),
+        secrets: Arc::new(crate::secrets_store::SecretsStore::new()),
     }
 }
 
 fn uuid_short() -> String {
     use rand::distributions::Alphanumeric;
     use rand::Rng;
-    rand::thread_rng().sample_iter(&Alphanumeric).take(12).map(char::from).collect()
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(12)
+        .map(char::from)
+        .collect()
 }
 
 fn workspace_tree(root: &str, max_depth: usize, max_entries: usize) -> String {
     let mut lines = Vec::new();
-    tree_dir(std::path::Path::new(root), 0, max_depth, &mut lines, max_entries);
+    tree_dir(
+        std::path::Path::new(root),
+        0,
+        max_depth,
+        &mut lines,
+        max_entries,
+    );
     lines.join("\n")
 }
 
-fn tree_dir(path: &std::path::Path, depth: usize, max_depth: usize, out: &mut Vec<String>, limit: usize) {
-    if depth > max_depth || out.len() >= limit { return; }
-    let Ok(entries) = std::fs::read_dir(path) else { return };
+fn tree_dir(
+    path: &std::path::Path,
+    depth: usize,
+    max_depth: usize,
+    out: &mut Vec<String>,
+    limit: usize,
+) {
+    if depth > max_depth || out.len() >= limit {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return;
+    };
     let mut sorted: Vec<_> = entries.flatten().collect();
     sorted.sort_by_key(|e| e.file_name());
     for entry in sorted {
-        if out.len() >= limit { break; }
+        if out.len() >= limit {
+            break;
+        }
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') || matches!(
-            name.as_str(),
-            "node_modules" | "target" | "dist" | "__pycache__" | ".git" | ".svelte-kit"
-        ) { continue; }
+        if name.starts_with('.')
+            || matches!(
+                name.as_str(),
+                "node_modules" | "target" | "dist" | "__pycache__" | ".git" | ".svelte-kit"
+            )
+        {
+            continue;
+        }
         let indent = "  ".repeat(depth);
         let ep = entry.path();
         if ep.is_dir() {
@@ -441,34 +475,41 @@ pub struct McpServerHandle {
 /// The registry is shared — tool registrations made after startup are
 /// immediately visible to MCP clients without restart.
 pub async fn start(
-    registry:       Arc<RwLock<ToolRegistry>>,
+    registry: Arc<RwLock<ToolRegistry>>,
     workspace_root: Option<String>,
-    memory_path:    Option<std::path::PathBuf>,
-    auth_token:     String,
+    memory_path: Option<std::path::PathBuf>,
+    auth_token: String,
     preferred_port: u16,
 ) -> Result<McpServerHandle, String> {
     let state = McpState {
         registry,
         workspace_root: Arc::new(workspace_root),
-        memory_path:    Arc::new(memory_path),
+        memory_path: Arc::new(memory_path),
         auth_token,
     };
 
     let app = Router::new()
-        .route("/mcp",        post(handle_mcp))
+        .route("/mcp", post(handle_mcp))
         .route("/mcp/health", get(health))
         .with_state(state);
 
     // Try preferred port, fall back to OS-assigned
-    let addr: SocketAddr = format!("127.0.0.1:{preferred_port}").parse()
+    let addr: SocketAddr = format!("127.0.0.1:{preferred_port}")
+        .parse()
         .map_err(|e| format!("Invalid MCP address: {e}"))?;
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| format!("[mcp] Failed to bind port {preferred_port}: {e}"))?;
 
-    let port = listener.local_addr().map(|a| a.port()).unwrap_or(preferred_port);
-    info!(port, "[mcp] MCP server listening — connect via Claude Desktop, Cursor, or any MCP client");
+    let port = listener
+        .local_addr()
+        .map(|a| a.port())
+        .unwrap_or(preferred_port);
+    info!(
+        port,
+        "[mcp] MCP server listening — connect via Claude Desktop, Cursor, or any MCP client"
+    );
 
     tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {

@@ -36,14 +36,17 @@ pub fn atomic_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
         use std::os::windows::ffi::OsStrExt;
 
         fn to_wide(p: &Path) -> Vec<u16> {
-            p.as_os_str().encode_wide().chain(std::iter::once(0)).collect()
+            p.as_os_str()
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect()
         }
 
         let src_w = to_wide(src);
         let dst_w = to_wide(dst);
 
         const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
-        const MOVEFILE_WRITE_THROUGH: u32    = 0x8;
+        const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
 
         let ok = unsafe {
             windows_move_file_ex(
@@ -73,11 +76,7 @@ pub fn reexec_self() -> std::io::Result<std::convert::Infallible> {
 
 #[cfg(windows)]
 extern "system" {
-    fn MoveFileExW(
-        lpExistingFileName: *const u16,
-        lpNewFileName: *const u16,
-        dwFlags: u32,
-    ) -> i32;
+    fn MoveFileExW(lpExistingFileName: *const u16, lpNewFileName: *const u16, dwFlags: u32) -> i32;
 }
 
 #[cfg(windows)]

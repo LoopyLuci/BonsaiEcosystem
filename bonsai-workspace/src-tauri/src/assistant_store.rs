@@ -1,75 +1,82 @@
-use sqlx::{Row, SqlitePool};
 use serde::{Deserialize, Serialize};
+use sqlx::{Row, SqlitePool};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
 }
 
 fn uuid() -> String {
     use rand::distributions::Alphanumeric;
     use rand::Rng;
-    rand::thread_rng().sample_iter(&Alphanumeric).take(16).map(char::from).collect()
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect()
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssistantProfile {
-    pub id:               String,
-    pub name:             String,
-    pub persona_id:       Option<String>,
-    pub avatar_id:        Option<String>,
-    pub tts_voice:        String,
-    pub tts_speed:        f64,
-    pub tts_pitch:        f64,
-    pub tts_enabled:      bool,
-    pub wake_word:        Option<String>,
+    pub id: String,
+    pub name: String,
+    pub persona_id: Option<String>,
+    pub avatar_id: Option<String>,
+    pub tts_voice: String,
+    pub tts_speed: f64,
+    pub tts_pitch: f64,
+    pub tts_enabled: bool,
+    pub wake_word: Option<String>,
     pub tool_permissions: String,
-    pub system_prompt:    String,
-    pub model_id:         Option<String>,
-    pub is_active:        bool,
-    pub created_at:       i64,
-    pub updated_at:       i64,
+    pub system_prompt: String,
+    pub model_id: Option<String>,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AvatarAsset {
-    pub id:            String,
-    pub name:          String,
-    pub asset_type:    String,
-    pub asset_data:    Option<String>,
-    pub file_path:     Option<String>,
+    pub id: String,
+    pub name: String,
+    pub asset_type: String,
+    pub asset_data: Option<String>,
+    pub file_path: Option<String>,
     pub thumbnail_svg: Option<String>,
-    pub validated:     bool,
-    pub created_at:    i64,
-    pub updated_at:    i64,
+    pub validated: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssistantSession {
-    pub id:         String,
+    pub id: String,
     pub profile_id: Option<String>,
-    pub title:      String,
+    pub title: String,
     pub created_at: i64,
     pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssistantMessage {
-    pub id:              String,
-    pub session_id:      String,
-    pub role:            String,
-    pub content:         String,
-    pub tool_name:       Option<String>,
-    pub tool_result:     Option<String>,
+    pub id: String,
+    pub session_id: String,
+    pub role: String,
+    pub content: String,
+    pub tool_name: Option<String>,
+    pub tool_result: Option<String>,
     pub tts_synthesized: bool,
-    pub created_at:      i64,
+    pub created_at: i64,
     #[serde(default)]
-    pub tool_call_id:    Option<String>,
+    pub tool_call_id: Option<String>,
     /// Embedded game state for inline board rendering in chat.
     #[serde(default)]
-    pub game_state:      Option<crate::games::ChatGameState>,
+    pub game_state: Option<crate::games::ChatGameState>,
 }
 
 // ── AssistantStore ────────────────────────────────────────────────────────────
@@ -133,8 +140,11 @@ impl AssistantStore {
             )",
         ]).await?;
 
-        self.apply_migration(3, "assistant_sessions", &[
-            "CREATE TABLE IF NOT EXISTS assistant_sessions (
+        self.apply_migration(
+            3,
+            "assistant_sessions",
+            &[
+                "CREATE TABLE IF NOT EXISTS assistant_sessions (
                 id         TEXT PRIMARY KEY,
                 profile_id TEXT,
                 title      TEXT NOT NULL DEFAULT 'New conversation',
@@ -142,12 +152,17 @@ impl AssistantStore {
                 updated_at INTEGER NOT NULL,
                 FOREIGN KEY(profile_id) REFERENCES assistant_profiles(id) ON DELETE CASCADE
             )",
-            "CREATE INDEX IF NOT EXISTS idx_asst_sessions_profile
+                "CREATE INDEX IF NOT EXISTS idx_asst_sessions_profile
                 ON assistant_sessions(profile_id, updated_at DESC)",
-        ]).await?;
+            ],
+        )
+        .await?;
 
-        self.apply_migration(4, "assistant_messages", &[
-            "CREATE TABLE IF NOT EXISTS assistant_messages (
+        self.apply_migration(
+            4,
+            "assistant_messages",
+            &[
+                "CREATE TABLE IF NOT EXISTS assistant_messages (
                 id              TEXT PRIMARY KEY,
                 session_id      TEXT NOT NULL,
                 role            TEXT NOT NULL CHECK(role IN ('user','assistant','tool')),
@@ -158,12 +173,16 @@ impl AssistantStore {
                 created_at      INTEGER NOT NULL,
                 FOREIGN KEY(session_id) REFERENCES assistant_sessions(id) ON DELETE CASCADE
             )",
-            "CREATE INDEX IF NOT EXISTS idx_asst_msgs_session
+                "CREATE INDEX IF NOT EXISTS idx_asst_msgs_session
                 ON assistant_messages(session_id, created_at)",
-        ]).await?;
+            ],
+        )
+        .await?;
 
-        self.apply_migration(5, "backup_registry", &[
-            "CREATE TABLE IF NOT EXISTS backup_registry (
+        self.apply_migration(
+            5,
+            "backup_registry",
+            &["CREATE TABLE IF NOT EXISTS backup_registry (
                 id         TEXT PRIMARY KEY,
                 filename   TEXT NOT NULL,
                 file_path  TEXT NOT NULL,
@@ -172,11 +191,14 @@ impl AssistantStore {
                 checksum   TEXT,
                 encrypted  INTEGER NOT NULL DEFAULT 0,
                 created_at INTEGER NOT NULL
-            )",
-        ]).await?;
+            )"],
+        )
+        .await?;
 
-        self.apply_migration(6, "mcp_servers", &[
-            "CREATE TABLE IF NOT EXISTS mcp_servers (
+        self.apply_migration(
+            6,
+            "mcp_servers",
+            &["CREATE TABLE IF NOT EXISTS mcp_servers (
                 id         TEXT PRIMARY KEY,
                 name       TEXT NOT NULL,
                 command    TEXT NOT NULL,
@@ -185,12 +207,17 @@ impl AssistantStore {
                 enabled    INTEGER NOT NULL DEFAULT 1,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL
-            )",
-        ]).await?;
+            )"],
+        )
+        .await?;
 
-        self.apply_migration(7, "assistant_messages_tool_call_id", &[
-            "ALTER TABLE assistant_messages ADD COLUMN tool_call_id TEXT",
-        ]).await.ok(); // ok() — ALTER TABLE fails gracefully if column already exists
+        self.apply_migration(
+            7,
+            "assistant_messages_tool_call_id",
+            &["ALTER TABLE assistant_messages ADD COLUMN tool_call_id TEXT"],
+        )
+        .await
+        .ok(); // ok() — ALTER TABLE fails gracefully if column already exists
 
         // Seed default profile if none exists
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assistant_profiles")
@@ -217,16 +244,22 @@ impl AssistantStore {
         Ok(())
     }
 
-    async fn apply_migration(&self, version: i64, description: &str, stmts: &[&str]) -> Result<(), String> {
-        let exists: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version = ?",
-        )
-        .bind(version)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(0);
+    async fn apply_migration(
+        &self,
+        version: i64,
+        description: &str,
+        stmts: &[&str],
+    ) -> Result<(), String> {
+        let exists: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM schema_migrations WHERE version = ?")
+                .bind(version)
+                .fetch_one(&self.pool)
+                .await
+                .unwrap_or(0);
 
-        if exists > 0 { return Ok(()); }
+        if exists > 0 {
+            return Ok(());
+        }
 
         for stmt in stmts {
             sqlx::query(stmt)
@@ -238,7 +271,9 @@ impl AssistantStore {
         sqlx::query(
             "INSERT INTO schema_migrations (version, applied_at, description) VALUES (?,?,?)",
         )
-        .bind(version).bind(now()).bind(description)
+        .bind(version)
+        .bind(now())
+        .bind(description)
         .execute(&self.pool)
         .await
         .map_err(|e| format!("record migration {version}: {e}"))?;
@@ -274,9 +309,15 @@ impl AssistantStore {
         Ok(row.as_ref().map(row_to_profile))
     }
 
-    pub async fn upsert_profile(&self, mut p: AssistantProfile) -> Result<AssistantProfile, String> {
+    pub async fn upsert_profile(
+        &self,
+        mut p: AssistantProfile,
+    ) -> Result<AssistantProfile, String> {
         let ts = now();
-        if p.id.is_empty() { p.id = uuid(); p.created_at = ts; }
+        if p.id.is_empty() {
+            p.id = uuid();
+            p.created_at = ts;
+        }
         p.updated_at = ts;
 
         sqlx::query(
@@ -293,10 +334,21 @@ impl AssistantStore {
                model_id=excluded.model_id, is_active=excluded.is_active,
                updated_at=excluded.updated_at",
         )
-        .bind(&p.id).bind(&p.name).bind(&p.persona_id).bind(&p.avatar_id)
-        .bind(&p.tts_voice).bind(p.tts_speed).bind(p.tts_pitch).bind(p.tts_enabled as i64)
-        .bind(&p.wake_word).bind(&p.tool_permissions).bind(&p.system_prompt)
-        .bind(&p.model_id).bind(p.is_active as i64).bind(p.created_at).bind(p.updated_at)
+        .bind(&p.id)
+        .bind(&p.name)
+        .bind(&p.persona_id)
+        .bind(&p.avatar_id)
+        .bind(&p.tts_voice)
+        .bind(p.tts_speed)
+        .bind(p.tts_pitch)
+        .bind(p.tts_enabled as i64)
+        .bind(&p.wake_word)
+        .bind(&p.tool_permissions)
+        .bind(&p.system_prompt)
+        .bind(&p.model_id)
+        .bind(p.is_active as i64)
+        .bind(p.created_at)
+        .bind(p.updated_at)
         .execute(&self.pool)
         .await
         .map_err(|e| format!("upsert_profile: {e}"))?;
@@ -306,17 +358,24 @@ impl AssistantStore {
 
     pub async fn delete_profile(&self, id: &str) -> Result<(), String> {
         sqlx::query("DELETE FROM assistant_profiles WHERE id = ?")
-            .bind(id).execute(&self.pool).await
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| format!("delete_profile: {e}"))?;
         Ok(())
     }
 
     pub async fn set_active_profile(&self, id: &str) -> Result<(), String> {
         sqlx::query("UPDATE assistant_profiles SET is_active = 0, updated_at = ?")
-            .bind(now()).execute(&self.pool).await
+            .bind(now())
+            .execute(&self.pool)
+            .await
             .map_err(|e| format!("deactivate profiles: {e}"))?;
         sqlx::query("UPDATE assistant_profiles SET is_active = 1, updated_at = ? WHERE id = ?")
-            .bind(now()).bind(id).execute(&self.pool).await
+            .bind(now())
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| format!("activate profile: {e}"))?;
         Ok(())
     }
@@ -337,7 +396,10 @@ impl AssistantStore {
 
     pub async fn upsert_avatar(&self, mut a: AvatarAsset) -> Result<AvatarAsset, String> {
         let ts = now();
-        if a.id.is_empty() { a.id = uuid(); a.created_at = ts; }
+        if a.id.is_empty() {
+            a.id = uuid();
+            a.created_at = ts;
+        }
         a.updated_at = ts;
 
         sqlx::query(
@@ -350,9 +412,15 @@ impl AssistantStore {
                thumbnail_svg=excluded.thumbnail_svg, validated=excluded.validated,
                updated_at=excluded.updated_at",
         )
-        .bind(&a.id).bind(&a.name).bind(&a.asset_type).bind(&a.asset_data)
-        .bind(&a.file_path).bind(&a.thumbnail_svg).bind(a.validated as i64)
-        .bind(a.created_at).bind(a.updated_at)
+        .bind(&a.id)
+        .bind(&a.name)
+        .bind(&a.asset_type)
+        .bind(&a.asset_data)
+        .bind(&a.file_path)
+        .bind(&a.thumbnail_svg)
+        .bind(a.validated as i64)
+        .bind(a.created_at)
+        .bind(a.updated_at)
         .execute(&self.pool)
         .await
         .map_err(|e| format!("upsert_avatar: {e}"))?;
@@ -362,14 +430,19 @@ impl AssistantStore {
 
     pub async fn delete_avatar(&self, id: &str) -> Result<(), String> {
         sqlx::query("DELETE FROM avatar_assets WHERE id = ?")
-            .bind(id).execute(&self.pool).await
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| format!("delete_avatar: {e}"))?;
         Ok(())
     }
 
     // ── Session CRUD ──────────────────────────────────────────────────────────
 
-    pub async fn list_sessions(&self, profile_id: Option<&str>) -> Result<Vec<AssistantSession>, String> {
+    pub async fn list_sessions(
+        &self,
+        profile_id: Option<&str>,
+    ) -> Result<Vec<AssistantSession>, String> {
         let rows = if let Some(pid) = profile_id {
             sqlx::query(
                 "SELECT id,profile_id,title,created_at,updated_at
@@ -391,7 +464,11 @@ impl AssistantStore {
         Ok(rows.iter().map(row_to_session).collect())
     }
 
-    pub async fn create_session(&self, profile_id: Option<&str>, title: &str) -> Result<AssistantSession, String> {
+    pub async fn create_session(
+        &self,
+        profile_id: Option<&str>,
+        title: &str,
+    ) -> Result<AssistantSession, String> {
         let ts = now();
         let id = uuid();
         sqlx::query(
@@ -402,19 +479,30 @@ impl AssistantStore {
         .await
         .map_err(|e| format!("create_session: {e}"))?;
 
-        Ok(AssistantSession { id, profile_id: profile_id.map(String::from), title: title.to_string(), created_at: ts, updated_at: ts })
+        Ok(AssistantSession {
+            id,
+            profile_id: profile_id.map(String::from),
+            title: title.to_string(),
+            created_at: ts,
+            updated_at: ts,
+        })
     }
 
     pub async fn touch_session(&self, id: &str) -> Result<(), String> {
         sqlx::query("UPDATE assistant_sessions SET updated_at = ? WHERE id = ?")
-            .bind(now()).bind(id).execute(&self.pool).await
+            .bind(now())
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| format!("touch_session: {e}"))?;
         Ok(())
     }
 
     pub async fn delete_session(&self, id: &str) -> Result<(), String> {
         sqlx::query("DELETE FROM assistant_sessions WHERE id = ?")
-            .bind(id).execute(&self.pool).await
+            .bind(id)
+            .execute(&self.pool)
+            .await
             .map_err(|e| format!("delete_session: {e}"))?;
         Ok(())
     }
@@ -436,8 +524,12 @@ impl AssistantStore {
 
     pub async fn append_message(&self, msg: AssistantMessage) -> Result<AssistantMessage, String> {
         let mut m = msg;
-        if m.id.is_empty() { m.id = uuid(); }
-        if m.created_at == 0 { m.created_at = now(); }
+        if m.id.is_empty() {
+            m.id = uuid();
+        }
+        if m.created_at == 0 {
+            m.created_at = now();
+        }
 
         sqlx::query(
             "INSERT INTO assistant_messages
@@ -460,13 +552,19 @@ impl AssistantStore {
 
     pub async fn profile_exists(&self, id: &str) -> Result<bool, String> {
         let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assistant_profiles WHERE id = ?")
-            .bind(id).fetch_one(&self.pool).await.map_err(|e| e.to_string())?;
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(n > 0)
     }
 
     pub async fn session_exists(&self, id: &str) -> Result<bool, String> {
         let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM assistant_sessions WHERE id = ?")
-            .bind(id).fetch_one(&self.pool).await.map_err(|e| e.to_string())?;
+            .bind(id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(n > 0)
     }
 
@@ -481,29 +579,41 @@ impl AssistantStore {
     }
 
     pub async fn delete_all_sessions(&self) -> Result<(), String> {
-        sqlx::query("DELETE FROM assistant_messages").execute(&self.pool).await.map_err(|e| e.to_string())?;
-        sqlx::query("DELETE FROM assistant_sessions").execute(&self.pool).await.map_err(|e| e.to_string())?;
+        sqlx::query("DELETE FROM assistant_messages")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
+        sqlx::query("DELETE FROM assistant_sessions")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub async fn delete_all_profiles(&self) -> Result<(), String> {
-        sqlx::query("DELETE FROM assistant_profiles").execute(&self.pool).await.map_err(|e| e.to_string())?;
+        sqlx::query("DELETE FROM assistant_profiles")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub async fn delete_all_avatars(&self) -> Result<(), String> {
-        sqlx::query("DELETE FROM avatar_assets").execute(&self.pool).await.map_err(|e| e.to_string())?;
+        sqlx::query("DELETE FROM avatar_assets")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub async fn register_backup(
         &self,
-        filename:   &str,
-        file_path:  &str,
+        filename: &str,
+        file_path: &str,
         size_bytes: i64,
-        includes:   &str,
-        checksum:   &str,
-        encrypted:  bool,
+        includes: &str,
+        checksum: &str,
+        encrypted: bool,
     ) -> Result<(), String> {
         let id = uuid();
         let ts = now();
@@ -525,34 +635,45 @@ impl AssistantStore {
                SELECT id FROM backup_registry ORDER BY created_at DESC LIMIT -1 OFFSET ?
              )",
         )
-        .bind(keep).execute(&self.pool).await.map_err(|e| format!("rotate_backups: {e}"))?;
+        .bind(keep)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("rotate_backups: {e}"))?;
         Ok(())
     }
 
-    pub async fn list_backups_raw(&self) -> Result<Vec<crate::assistant_backup::BackupEntry>, String> {
+    pub async fn list_backups_raw(
+        &self,
+    ) -> Result<Vec<crate::assistant_backup::BackupEntry>, String> {
         let rows = sqlx::query(
             "SELECT id,filename,file_path,size_bytes,includes,checksum,encrypted,created_at
              FROM backup_registry ORDER BY created_at DESC",
         )
-        .fetch_all(&self.pool).await.map_err(|e| format!("list_backups: {e}"))?;
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| format!("list_backups: {e}"))?;
 
-        Ok(rows.iter().map(|r| {
-            let includes_raw: String = r.get("includes");
-            let includes = serde_json::from_str::<Vec<String>>(&includes_raw).unwrap_or_default();
-            let file_path: String = r.get("file_path");
-            let valid = std::path::Path::new(&file_path).exists().then_some(true);
-            crate::assistant_backup::BackupEntry {
-                id:         r.get("id"),
-                filename:   r.get("filename"),
-                file_path,
-                size_bytes: r.get("size_bytes"),
-                includes,
-                checksum:   r.get("checksum"),
-                encrypted:  r.get::<i64,_>("encrypted") != 0,
-                created_at: r.get("created_at"),
-                valid,
-            }
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| {
+                let includes_raw: String = r.get("includes");
+                let includes =
+                    serde_json::from_str::<Vec<String>>(&includes_raw).unwrap_or_default();
+                let file_path: String = r.get("file_path");
+                let valid = std::path::Path::new(&file_path).exists().then_some(true);
+                crate::assistant_backup::BackupEntry {
+                    id: r.get("id"),
+                    filename: r.get("filename"),
+                    file_path,
+                    size_bytes: r.get("size_bytes"),
+                    includes,
+                    checksum: r.get("checksum"),
+                    encrypted: r.get::<i64, _>("encrypted") != 0,
+                    created_at: r.get("created_at"),
+                    valid,
+                }
+            })
+            .collect())
     }
 
     pub async fn delete_backup_entry(&self, id: &str) -> Result<(), String> {
@@ -577,7 +698,9 @@ impl AssistantStore {
 
     // ── MCP server CRUD ───────────────────────────────────────────────────────
 
-    pub async fn list_mcp_servers(&self) -> Result<Vec<crate::mcp_bridge::McpServerConfig>, String> {
+    pub async fn list_mcp_servers(
+        &self,
+    ) -> Result<Vec<crate::mcp_bridge::McpServerConfig>, String> {
         let rows = sqlx::query(
             "SELECT id,name,command,args,namespace,enabled FROM mcp_servers ORDER BY created_at",
         )
@@ -585,23 +708,29 @@ impl AssistantStore {
         .await
         .map_err(|e| format!("list_mcp_servers: {e}"))?;
 
-        Ok(rows.iter().map(|r| {
-            let args_json: String = r.get("args");
-            let args: Vec<String> = serde_json::from_str(&args_json).unwrap_or_default();
-            crate::mcp_bridge::McpServerConfig {
-                id:        r.get("id"),
-                name:      r.get("name"),
-                command:   r.get("command"),
-                args,
-                namespace: r.get("namespace"),
-                enabled:   r.get::<i64, _>("enabled") != 0,
-            }
-        }).collect())
+        Ok(rows
+            .iter()
+            .map(|r| {
+                let args_json: String = r.get("args");
+                let args: Vec<String> = serde_json::from_str(&args_json).unwrap_or_default();
+                crate::mcp_bridge::McpServerConfig {
+                    id: r.get("id"),
+                    name: r.get("name"),
+                    command: r.get("command"),
+                    args,
+                    namespace: r.get("namespace"),
+                    enabled: r.get::<i64, _>("enabled") != 0,
+                }
+            })
+            .collect())
     }
 
-    pub async fn upsert_mcp_server(&self, cfg: &crate::mcp_bridge::McpServerConfig) -> Result<(), String> {
-        let args_json = serde_json::to_string(&cfg.args)
-            .map_err(|e| format!("serialize args: {e}"))?;
+    pub async fn upsert_mcp_server(
+        &self,
+        cfg: &crate::mcp_bridge::McpServerConfig,
+    ) -> Result<(), String> {
+        let args_json =
+            serde_json::to_string(&cfg.args).map_err(|e| format!("serialize args: {e}"))?;
         let ts = now();
         sqlx::query(
             "INSERT INTO mcp_servers (id,name,command,args,namespace,enabled,created_at,updated_at)
@@ -632,43 +761,43 @@ impl AssistantStore {
 
 fn row_to_profile(r: &sqlx::sqlite::SqliteRow) -> AssistantProfile {
     AssistantProfile {
-        id:               r.get("id"),
-        name:             r.get("name"),
-        persona_id:       r.get("persona_id"),
-        avatar_id:        r.get("avatar_id"),
-        tts_voice:        r.get("tts_voice"),
-        tts_speed:        r.get("tts_speed"),
-        tts_pitch:        r.get("tts_pitch"),
-        tts_enabled:      r.get::<i64, _>("tts_enabled") != 0,
-        wake_word:        r.get("wake_word"),
+        id: r.get("id"),
+        name: r.get("name"),
+        persona_id: r.get("persona_id"),
+        avatar_id: r.get("avatar_id"),
+        tts_voice: r.get("tts_voice"),
+        tts_speed: r.get("tts_speed"),
+        tts_pitch: r.get("tts_pitch"),
+        tts_enabled: r.get::<i64, _>("tts_enabled") != 0,
+        wake_word: r.get("wake_word"),
         tool_permissions: r.get("tool_permissions"),
-        system_prompt:    r.get("system_prompt"),
-        model_id:         r.get("model_id"),
-        is_active:        r.get::<i64, _>("is_active") != 0,
-        created_at:       r.get("created_at"),
-        updated_at:       r.get("updated_at"),
+        system_prompt: r.get("system_prompt"),
+        model_id: r.get("model_id"),
+        is_active: r.get::<i64, _>("is_active") != 0,
+        created_at: r.get("created_at"),
+        updated_at: r.get("updated_at"),
     }
 }
 
 fn row_to_avatar(r: &sqlx::sqlite::SqliteRow) -> AvatarAsset {
     AvatarAsset {
-        id:            r.get("id"),
-        name:          r.get("name"),
-        asset_type:    r.get("asset_type"),
-        asset_data:    r.get("asset_data"),
-        file_path:     r.get("file_path"),
+        id: r.get("id"),
+        name: r.get("name"),
+        asset_type: r.get("asset_type"),
+        asset_data: r.get("asset_data"),
+        file_path: r.get("file_path"),
         thumbnail_svg: r.get("thumbnail_svg"),
-        validated:     r.get::<i64, _>("validated") != 0,
-        created_at:    r.get("created_at"),
-        updated_at:    r.get("updated_at"),
+        validated: r.get::<i64, _>("validated") != 0,
+        created_at: r.get("created_at"),
+        updated_at: r.get("updated_at"),
     }
 }
 
 fn row_to_session(r: &sqlx::sqlite::SqliteRow) -> AssistantSession {
     AssistantSession {
-        id:         r.get("id"),
+        id: r.get("id"),
         profile_id: r.get("profile_id"),
-        title:      r.get("title"),
+        title: r.get("title"),
         created_at: r.get("created_at"),
         updated_at: r.get("updated_at"),
     }
@@ -676,16 +805,19 @@ fn row_to_session(r: &sqlx::sqlite::SqliteRow) -> AssistantSession {
 
 fn row_to_message(r: &sqlx::sqlite::SqliteRow) -> AssistantMessage {
     AssistantMessage {
-        id:              r.get("id"),
-        session_id:      r.get("session_id"),
-        role:            r.get("role"),
-        content:         r.get("content"),
-        tool_name:       r.get("tool_name"),
-        tool_result:     r.get("tool_result"),
+        id: r.get("id"),
+        session_id: r.get("session_id"),
+        role: r.get("role"),
+        content: r.get("content"),
+        tool_name: r.get("tool_name"),
+        tool_result: r.get("tool_result"),
         tts_synthesized: r.get::<i64, _>("tts_synthesized") != 0,
-        created_at:      r.get("created_at"),
-        tool_call_id:    r.try_get("tool_call_id").ok().flatten(),
-        game_state:      r.try_get::<Option<String>, _>("game_state").ok().flatten()
+        created_at: r.get("created_at"),
+        tool_call_id: r.try_get("tool_call_id").ok().flatten(),
+        game_state: r
+            .try_get::<Option<String>, _>("game_state")
+            .ok()
+            .flatten()
             .and_then(|s| serde_json::from_str(&s).ok()),
     }
 }

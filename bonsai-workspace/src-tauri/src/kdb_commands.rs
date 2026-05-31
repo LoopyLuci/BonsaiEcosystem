@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use bonsai_kdb::module::ModuleInfo;
 use crate::kdb_state::KdbAppState;
+use bonsai_kdb::module::ModuleInfo;
 
 // ── Shared DTOs ──────────────────────────────────────────────────────────────
 
@@ -41,9 +41,7 @@ pub struct RetrievedContextDto {
 
 /// List all knowledge modules registered in the KDB store.
 #[tauri::command]
-pub async fn kdb_list_modules(
-    state: State<'_, KdbAppState>,
-) -> Result<Vec<ModuleInfoDto>, String> {
+pub async fn kdb_list_modules(state: State<'_, KdbAppState>) -> Result<Vec<ModuleInfoDto>, String> {
     let store = state.store.lock().await;
     let manifests = store.list_modules().map_err(|e| e.to_string())?;
     Ok(manifests
@@ -68,7 +66,11 @@ pub async fn kdb_list_loaded_modules(
     state: State<'_, KdbAppState>,
 ) -> Result<Vec<ModuleInfoDto>, String> {
     let retriever = state.retriever.read().await;
-    Ok(retriever.list_modules().into_iter().map(Into::into).collect())
+    Ok(retriever
+        .list_modules()
+        .into_iter()
+        .map(Into::into)
+        .collect())
 }
 
 /// Load a module from disk into the live retriever.  The module must already
@@ -129,9 +131,7 @@ pub async fn kdb_retrieve(
 
 /// Format retrieved context as a system-prompt prefix string.
 #[tauri::command]
-pub async fn kdb_format_context(
-    state: State<'_, KdbAppState>,
-) -> Result<String, String> {
+pub async fn kdb_format_context(state: State<'_, KdbAppState>) -> Result<String, String> {
     let retriever = state.retriever.read().await;
     if retriever.is_empty() {
         return Ok(String::new());
@@ -154,5 +154,7 @@ pub async fn kdb_delete_module(
         retriever.unload_module(&module_name);
     }
     let store = state.store.lock().await;
-    store.unregister_module(&module_name).map_err(|e| e.to_string())
+    store
+        .unregister_module(&module_name)
+        .map_err(|e| e.to_string())
 }

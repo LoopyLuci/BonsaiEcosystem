@@ -32,12 +32,12 @@ use crate::unified_training_collector::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompetencyRegression {
-    pub competency_id:   String,
+    pub competency_id: String,
     pub competency_name: String,
-    pub previous_score:  f32,
-    pub new_score:       f32,
-    pub regression:      f32,  // positive = degraded
-    pub failed_prompts:  Vec<String>,
+    pub previous_score: f32,
+    pub new_score: f32,
+    pub regression: f32, // positive = degraded
+    pub failed_prompts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,17 +45,17 @@ pub struct CompetencyRegression {
 pub enum ForgettingStatus {
     Safe,
     Regression {
-        regressions:       Vec<CompetencyRegression>,
-        remedial_count:    usize,
+        regressions: Vec<CompetencyRegression>,
+        remedial_count: usize,
     },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForgettingReport {
-    pub status:      ForgettingStatus,
-    pub checked_at:  i64,
+    pub status: ForgettingStatus,
+    pub checked_at: i64,
     pub total_prompts: u32,
-    pub passed:      u32,
+    pub passed: u32,
     pub overall_score: f32,
 }
 
@@ -66,7 +66,7 @@ pub struct ForgettingReport {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompetencyBaseline {
     /// Per-competency-id score from the most recent successful adapter.
-    pub scores:     HashMap<String, f32>,
+    pub scores: HashMap<String, f32>,
     pub adapter_id: String,
     pub recorded_at: i64,
 }
@@ -118,23 +118,33 @@ impl RemedialTrainer {
 
         for original_prompt in &regression.failed_prompts {
             // 1. Generate the ideal response using higher temperature/top-p
-            let ideal = match self.orchestrator.infer_simple(
-                &format!("Provide the best possible response to: {original_prompt}"),
-                512, "remedial"
-            ).await {
+            let ideal = match self
+                .orchestrator
+                .infer_simple(
+                    &format!("Provide the best possible response to: {original_prompt}"),
+                    512,
+                    "remedial",
+                )
+                .await
+            {
                 Ok((text, _)) => text,
                 Err(_) => continue,
             };
 
             // 2. Generate a "bad" response to form the DPO rejected side
-            let bad = match self.orchestrator.infer_simple(
-                &format!(
-                    "Generate a POOR quality response to the following that misses the point, \
+            let bad = match self
+                .orchestrator
+                .infer_simple(
+                    &format!(
+                        "Generate a POOR quality response to the following that misses the point, \
                      is too vague, or makes a factual error. Response only, no explanation.\n\
                      Prompt: {original_prompt}"
-                ),
-                256, "remedial"
-            ).await {
+                    ),
+                    256,
+                    "remedial",
+                )
+                .await
+            {
                 Ok((text, _)) => text,
                 Err(_) => format!("I don't know how to answer that."),
             };
@@ -149,12 +159,19 @@ impl RemedialTrainer {
             ));
 
             // 4. Varied prompt forms to improve generalisation
-            let variants = self.generate_variants(original_prompt, variants_per_prompt).await;
+            let variants = self
+                .generate_variants(original_prompt, variants_per_prompt)
+                .await;
             for variant in variants {
-                let variant_ideal = match self.orchestrator.infer_simple(
-                    &format!("Provide the best possible response to: {variant}"),
-                    512, "remedial"
-                ).await {
+                let variant_ideal = match self
+                    .orchestrator
+                    .infer_simple(
+                        &format!("Provide the best possible response to: {variant}"),
+                        512,
+                        "remedial",
+                    )
+                    .await
+                {
                     Ok((text, _)) => text,
                     Err(_) => continue,
                 };
@@ -168,8 +185,11 @@ impl RemedialTrainer {
             }
         }
 
-        info!("[forgetting] generated {} remedial examples for regression in '{}'",
-            examples.len(), regression.competency_name);
+        info!(
+            "[forgetting] generated {} remedial examples for regression in '{}'",
+            examples.len(),
+            regression.competency_name
+        );
         examples
     }
 
@@ -181,8 +201,13 @@ impl RemedialTrainer {
              different wording, perspective, or slight difficulty variation. \
              Output one per line, no numbering.\n\nOriginal: {prompt}"
         );
-        match self.orchestrator.infer_simple(&system, 300, "remedial").await {
-            Ok((text, _)) => text.lines()
+        match self
+            .orchestrator
+            .infer_simple(&system, 300, "remedial")
+            .await
+        {
+            Ok((text, _)) => text
+                .lines()
                 .map(|l| l.trim().to_string())
                 .filter(|l| !l.is_empty() && l.len() > 10)
                 .take(n)
@@ -207,27 +232,31 @@ fn make_remedial_example(
 
     let output = if let Some(rej) = rejected {
         TrainingOutput::PreferencePair {
-            chosen:   chosen.to_string(),
+            chosen: chosen.to_string(),
             rejected: rej.to_string(),
         }
     } else {
-        TrainingOutput::Text { content: chosen.to_string() }
+        TrainingOutput::Text {
+            content: chosen.to_string(),
+        }
     };
 
     UnifiedTrainingExample {
-        id:                  uuid::Uuid::new_v4().to_string(),
-        target_model:        ModelRole::Primary,
+        id: uuid::Uuid::new_v4().to_string(),
+        target_model: ModelRole::Primary,
         suitable_strategies: strategies,
-        input:               TrainingInput::Prompt { text: prompt.to_string() },
-        expected_output:     output,
-        source:              TrainingSource::SelfPlay,
-        quality_score:       priority,
+        input: TrainingInput::Prompt {
+            text: prompt.to_string(),
+        },
+        expected_output: output,
+        source: TrainingSource::SelfPlay,
+        quality_score: priority,
         priority,
-        timestamp:           chrono::Utc::now().timestamp_micros(),
-        dimensions:          vec![classify_domain(prompt)],
-        used:                false,
-        use_count:           0,
-        metadata:            serde_json::json!({
+        timestamp: chrono::Utc::now().timestamp_micros(),
+        dimensions: vec![classify_domain(prompt)],
+        used: false,
+        use_count: 0,
+        metadata: serde_json::json!({
             "source": "forgetting_prevention",
             "competency_id": competency_id,
         }),
@@ -239,26 +268,23 @@ fn make_remedial_example(
 // ══════════════════════════════════════════════════════════════════════════════
 
 pub struct ForgettingPrevention {
-    harness:          Arc<EvaluationHarness>,
+    harness: Arc<EvaluationHarness>,
     remedial_trainer: RemedialTrainer,
-    core_problems:    Vec<BenchmarkProblem>,
+    core_problems: Vec<BenchmarkProblem>,
     /// Maximum allowed regression per competency before triggering remediation.
-    max_regression:   f32,
-    baseline:         RwLock<Option<CompetencyBaseline>>,
+    max_regression: f32,
+    baseline: RwLock<Option<CompetencyBaseline>>,
 }
 
 impl ForgettingPrevention {
-    pub fn new(
-        harness:      Arc<EvaluationHarness>,
-        orchestrator: Arc<ModelOrchestrator>,
-    ) -> Arc<Self> {
+    pub fn new(harness: Arc<EvaluationHarness>, orchestrator: Arc<ModelOrchestrator>) -> Arc<Self> {
         let baseline = CompetencyBaseline::load();
         Arc::new(Self {
             harness,
             remedial_trainer: RemedialTrainer::new(orchestrator),
-            core_problems:    core_competency_set(),
-            max_regression:   0.02, // 2 % max allowed regression per competency
-            baseline:         RwLock::new(baseline),
+            core_problems: core_competency_set(),
+            max_regression: 0.02, // 2 % max allowed regression per competency
+            baseline: RwLock::new(baseline),
         })
     }
 
@@ -268,10 +294,15 @@ impl ForgettingPrevention {
         let (safety_ok, bench_results) = self.harness.run_core_check().await;
         let total: u32 = bench_results.iter().map(|r| r.total).sum();
         let passed_total: u32 = bench_results.iter().map(|r| r.passed).sum();
-        let overall = if total > 0 { passed_total as f32 / total as f32 } else { 0.0 };
+        let overall = if total > 0 {
+            passed_total as f32 / total as f32
+        } else {
+            0.0
+        };
 
         // Build per-competency score map from benchmark results
-        let current_scores: HashMap<String, f32> = bench_results.iter()
+        let current_scores: HashMap<String, f32> = bench_results
+            .iter()
             .map(|r| (r.dimension.clone(), r.score))
             .collect();
 
@@ -296,21 +327,27 @@ impl ForgettingPrevention {
         let mut regressions: Vec<CompetencyRegression> = Vec::new();
 
         for (competency_id, &current) in &current_scores {
-            let previous = baseline.scores.get(competency_id).copied().unwrap_or(current);
+            let previous = baseline
+                .scores
+                .get(competency_id)
+                .copied()
+                .unwrap_or(current);
             let regression = previous - current;
             if regression > self.max_regression {
                 // Find which prompts failed for this competency
-                let failed_prompts: Vec<String> = self.core_problems.iter()
+                let failed_prompts: Vec<String> = self
+                    .core_problems
+                    .iter()
                     .filter(|p| &p.dimension == competency_id)
                     .map(|p| p.prompt.clone())
                     .take(5) // limit to 5 representative examples
                     .collect();
 
                 regressions.push(CompetencyRegression {
-                    competency_id:   competency_id.clone(),
+                    competency_id: competency_id.clone(),
                     competency_name: competency_id.replace('_', " "),
-                    previous_score:  previous,
-                    new_score:       current,
+                    previous_score: previous,
+                    new_score: current,
                     regression,
                     failed_prompts,
                 });
@@ -328,10 +365,18 @@ impl ForgettingPrevention {
                 overall_score: overall,
             }
         } else {
-            warn!("[forgetting] {} regressions detected for adapter {}", regressions.len(), adapter_id);
+            warn!(
+                "[forgetting] {} regressions detected for adapter {}",
+                regressions.len(),
+                adapter_id
+            );
             for r in &regressions {
-                warn!("  [{adapter_id}] {} regressed {:.1}% → {:.1}%",
-                    r.competency_name, r.previous_score * 100.0, r.new_score * 100.0);
+                warn!(
+                    "  [{adapter_id}] {} regressed {:.1}% → {:.1}%",
+                    r.competency_name,
+                    r.previous_score * 100.0,
+                    r.new_score * 100.0
+                );
             }
             let cnt = regressions.len();
             ForgettingReport {
@@ -348,10 +393,7 @@ impl ForgettingPrevention {
     }
 
     /// Generate remedial training examples for all regressions in a report.
-    pub async fn remediate(
-        &self,
-        report: &ForgettingReport,
-    ) -> Vec<UnifiedTrainingExample> {
+    pub async fn remediate(&self, report: &ForgettingReport) -> Vec<UnifiedTrainingExample> {
         let regressions = match &report.status {
             ForgettingStatus::Regression { regressions, .. } => regressions,
             ForgettingStatus::Safe => return vec![],
@@ -379,14 +421,17 @@ impl ForgettingPrevention {
             ));
         }
 
-        info!("[forgetting] total remedial examples generated: {}", all_examples.len());
+        info!(
+            "[forgetting] total remedial examples generated: {}",
+            all_examples.len()
+        );
         all_examples
     }
 
     async fn update_baseline(&self, adapter_id: &str, scores: &HashMap<String, f32>) {
         let baseline = CompetencyBaseline {
-            scores:      scores.clone(),
-            adapter_id:  adapter_id.to_string(),
+            scores: scores.clone(),
+            adapter_id: adapter_id.to_string(),
             recorded_at: chrono::Utc::now().timestamp_micros(),
         };
         baseline.save();

@@ -1,10 +1,8 @@
-use tauri::State;
 use serde_json::json;
+use tauri::State;
 
 #[tauri::command]
-pub async fn get_capability_summary(
-    state: State<'_, crate::AppState>,
-) -> Result<String, String> {
+pub async fn get_capability_summary(state: State<'_, crate::AppState>) -> Result<String, String> {
     let summary = state.capability_registry.get_manifest().await.summary;
     Ok(summary)
 }
@@ -26,8 +24,9 @@ pub async fn query_capabilities(
     let top = top_k.unwrap_or(6);
     let q = bonsai_query::CapabilityQuery::new(state.capability_registry.clone());
     let scored = q.search(&query, None, top).await;
-    let arr: Vec<serde_json::Value> = scored.into_iter().map(|s| {
-        json!({ "entry": s.entry, "score": s.score })
-    }).collect();
+    let arr: Vec<serde_json::Value> = scored
+        .into_iter()
+        .map(|s| json!({ "entry": s.entry, "score": s.score }))
+        .collect();
     Ok(serde_json::Value::Array(arr))
 }

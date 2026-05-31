@@ -10,9 +10,9 @@
 //! 2. Spawn `isabelle process -T <theory>`.
 //! 3. Parse stdout for "*** ERROR" / "Finished" patterns.
 
+use serde::{Deserialize, Serialize};
 use std::io::Write as _;
 use std::process::{Command, Stdio};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -59,19 +59,27 @@ pub struct IsabelleSidecar {
 }
 
 impl Default for IsabelleSidecar {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IsabelleSidecar {
     pub fn new() -> Self {
-        Self { isabelle_path: Self::find_isabelle() }
+        Self {
+            isabelle_path: Self::find_isabelle(),
+        }
     }
 
     pub fn with_path(path: impl Into<std::path::PathBuf>) -> Self {
-        Self { isabelle_path: Some(path.into()) }
+        Self {
+            isabelle_path: Some(path.into()),
+        }
     }
 
-    pub fn isabelle_available() -> bool { Self::find_isabelle().is_some() }
+    pub fn isabelle_available() -> bool {
+        Self::find_isabelle().is_some()
+    }
 
     fn find_isabelle() -> Option<std::path::PathBuf> {
         let names = if cfg!(windows) {
@@ -80,23 +88,33 @@ impl IsabelleSidecar {
             vec!["isabelle"]
         };
         for name in names {
-            if let Some(p) = which(name) { return Some(p); }
+            if let Some(p) = which(name) {
+                return Some(p);
+            }
         }
         // Check common installation paths
         let common = if cfg!(windows) {
             vec![r"C:\Isabelle\bin\isabelle.exe"]
         } else {
-            vec!["/usr/local/Isabelle/bin/isabelle", "/opt/Isabelle/bin/isabelle"]
+            vec![
+                "/usr/local/Isabelle/bin/isabelle",
+                "/opt/Isabelle/bin/isabelle",
+            ]
         };
         for path in common {
             let p = std::path::Path::new(path);
-            if p.exists() { return Some(p.to_path_buf()); }
+            if p.exists() {
+                return Some(p.to_path_buf());
+            }
         }
         None
     }
 
     pub fn verify(&self, req: &IsabelleRequest) -> IsabelleResult<IsabelleResponse> {
-        let isabelle = self.isabelle_path.as_ref().ok_or(IsabelleError::BinaryNotFound)?;
+        let isabelle = self
+            .isabelle_path
+            .as_ref()
+            .ok_or(IsabelleError::BinaryNotFound)?;
 
         let dir = tempfile_dir()?;
         let theory_path = dir.join(format!("{}.thy", req.theory_name));
@@ -125,20 +143,20 @@ impl IsabelleSidecar {
 
         let mut cmd = Command::new(isabelle);
         cmd.arg("process")
-            .arg("-T").arg(theory_path.to_str().unwrap_or(""))
-            .stdout(Stdio::piped()).stderr(Stdio::piped());
+            .arg("-T")
+            .arg(theory_path.to_str().unwrap_or(""))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
         let timeout = req.timeout_secs.unwrap_or(120);
-        let out = run_with_timeout(cmd, timeout)
-            .map_err(IsabelleError::Other)?;
+        let out = run_with_timeout(cmd, timeout).map_err(IsabelleError::Other)?;
 
         let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
         let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
         let combined = format!("{stdout}\n{stderr}");
 
-        let success = out.status.success()
-            && !combined.contains("*** ERROR")
-            && !combined.contains("FAILED");
+        let success =
+            out.status.success() && !combined.contains("*** ERROR") && !combined.contains("FAILED");
 
         let diagnostics = parse_isabelle_diagnostics(&combined);
 
@@ -146,16 +164,29 @@ impl IsabelleSidecar {
             return Err(IsabelleError::VerificationFailed(combined));
         }
 
-        Ok(IsabelleResponse { success, diagnostics, stdout, stderr })
+        Ok(IsabelleResponse {
+            success,
+            diagnostics,
+            stdout,
+            stderr,
+        })
     }
 }
 
 fn parse_isabelle_diagnostics(output: &str) -> Vec<IsabelleDiagnostic> {
-    output.lines()
+    output
+        .lines()
         .filter(|l| l.starts_with("*** ERROR") || l.starts_with("*** WARNING"))
         .map(|l| {
-            let severity = if l.contains("ERROR") { "error" } else { "warning" };
-            IsabelleDiagnostic { severity: severity.into(), message: l.trim_start_matches("*** ").to_string() }
+            let severity = if l.contains("ERROR") {
+                "error"
+            } else {
+                "warning"
+            };
+            IsabelleDiagnostic {
+                severity: severity.into(),
+                message: l.trim_start_matches("*** ").to_string(),
+            }
         })
         .collect()
 }

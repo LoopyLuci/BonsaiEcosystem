@@ -8,8 +8,8 @@
 //! *window state* that drives it.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -26,10 +26,17 @@ use crate::predictive_engine::PredictedAction;
 pub type WindowId = String;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq)]
-pub struct Rect { pub x: i32, pub y: i32, pub w: u32, pub h: u32 }
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub w: u32,
+    pub h: u32,
+}
 
 impl Rect {
-    pub fn new(x: i32, y: i32, w: u32, h: u32) -> Self { Self { x, y, w, h } }
+    pub fn new(x: i32, y: i32, w: u32, h: u32) -> Self {
+        Self { x, y, w, h }
+    }
 
     pub fn intersects(&self, other: &Rect) -> bool {
         self.x < other.x + other.w as i32
@@ -38,11 +45,18 @@ impl Rect {
             && self.y + self.h as i32 > other.y
     }
 
-    pub fn area(&self) -> u64 { self.w as u64 * self.h as u64 }
+    pub fn area(&self) -> u64 {
+        self.w as u64 * self.h as u64
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PanelPosition { Top, Bottom, Left, Right }
+pub enum PanelPosition {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 2 — Window types
@@ -119,13 +133,31 @@ pub struct TrayIcon {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
 pub enum PanelWidget {
-    AppLauncher { pinned_apps: Vec<String> },
-    SystemTray { icons: Vec<TrayIcon> },
-    Clock { format: String, show_seconds: bool },
-    WorkspaceSwitcher { count: u32, active: u32 },
-    AIAssistant { session_id: String },
-    PredictiveBar { suggestions: Vec<PredictedAction> },
-    ResourceMonitor { show_cpu: bool, show_gpu: bool, show_ram: bool },
+    AppLauncher {
+        pinned_apps: Vec<String>,
+    },
+    SystemTray {
+        icons: Vec<TrayIcon>,
+    },
+    Clock {
+        format: String,
+        show_seconds: bool,
+    },
+    WorkspaceSwitcher {
+        count: u32,
+        active: u32,
+    },
+    AIAssistant {
+        session_id: String,
+    },
+    PredictiveBar {
+        suggestions: Vec<PredictedAction>,
+    },
+    ResourceMonitor {
+        show_cpu: bool,
+        show_gpu: bool,
+        show_ram: bool,
+    },
     Separator,
 }
 
@@ -146,13 +178,24 @@ impl DesktopPanel {
             id: Uuid::new_v4().to_string(),
             position: PanelPosition::Bottom,
             widgets: vec![
-                PanelWidget::AppLauncher { pinned_apps: vec![] },
+                PanelWidget::AppLauncher {
+                    pinned_apps: vec![],
+                },
                 PanelWidget::Separator,
-                PanelWidget::PredictiveBar { suggestions: vec![] },
+                PanelWidget::PredictiveBar {
+                    suggestions: vec![],
+                },
                 PanelWidget::Separator,
-                PanelWidget::ResourceMonitor { show_cpu: true, show_gpu: true, show_ram: true },
+                PanelWidget::ResourceMonitor {
+                    show_cpu: true,
+                    show_gpu: true,
+                    show_ram: true,
+                },
                 PanelWidget::SystemTray { icons: vec![] },
-                PanelWidget::Clock { format: "%H:%M".into(), show_seconds: false },
+                PanelWidget::Clock {
+                    format: "%H:%M".into(),
+                    show_seconds: false,
+                },
             ],
             auto_hide: false,
             height_px: 48,
@@ -169,17 +212,40 @@ impl DesktopPanel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
 pub enum Wallpaper {
-    SolidColor { color: String },
-    Image { path: String, scale_mode: ScaleMode },
-    Gradient { from: String, to: String, angle_deg: u32 },
-    AnimatedShader { shader_id: String, fps: u32 },
+    SolidColor {
+        color: String,
+    },
+    Image {
+        path: String,
+        scale_mode: ScaleMode,
+    },
+    Gradient {
+        from: String,
+        to: String,
+        angle_deg: u32,
+    },
+    AnimatedShader {
+        shader_id: String,
+        fps: u32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ScaleMode { Fill, Fit, Center, Tile }
+pub enum ScaleMode {
+    Fill,
+    Fit,
+    Center,
+    Tile,
+}
 
 impl Default for Wallpaper {
-    fn default() -> Self { Self::Gradient { from: "#0f0f23".into(), to: "#1a1040".into(), angle_deg: 135 } }
+    fn default() -> Self {
+        Self::Gradient {
+            from: "#0f0f23".into(),
+            to: "#1a1040".into(),
+            angle_deg: 135,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -201,7 +267,11 @@ struct DamageTracker {
 }
 
 impl DamageTracker {
-    fn new() -> Self { Self { dirty_rects: RwLock::new(Vec::new()) } }
+    fn new() -> Self {
+        Self {
+            dirty_rects: RwLock::new(Vec::new()),
+        }
+    }
 
     async fn mark_dirty(&self, rect: Rect) {
         let mut dirty = self.dirty_rects.write().await;
@@ -236,7 +306,14 @@ pub struct DisplayConfig {
 }
 
 impl Default for DisplayConfig {
-    fn default() -> Self { Self { width: 1920, height: 1080, scale_factor: 1.0, refresh_hz: 60 } }
+    fn default() -> Self {
+        Self {
+            width: 1920,
+            height: 1080,
+            scale_factor: 1.0,
+            refresh_hz: 60,
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,7 +367,9 @@ impl OmniDesktop {
         if let Some(win) = removed {
             self.damage.mark_dirty(win.bounds).await;
             let mut focused = self.focused_window.write().await;
-            if focused.as_deref() == Some(id) { *focused = None; }
+            if focused.as_deref() == Some(id) {
+                *focused = None;
+            }
         }
     }
 
@@ -301,9 +380,13 @@ impl OmniDesktop {
                 win.z_order = self.z_counter.fetch_add(1, Ordering::Relaxed);
                 win.last_focused_at = chrono::Utc::now().timestamp_micros();
                 Some(win.bounds)
-            } else { None }
+            } else {
+                None
+            }
         };
-        if let Some(b) = bounds { self.damage.mark_dirty(b).await; }
+        if let Some(b) = bounds {
+            self.damage.mark_dirty(b).await;
+        }
         *self.focused_window.write().await = Some(id.to_string());
     }
 
@@ -314,21 +397,33 @@ impl OmniDesktop {
                 let old = win.bounds;
                 win.bounds = new_bounds;
                 Some(old)
-            } else { None }
+            } else {
+                None
+            }
         };
         if let Some(old) = old_bounds {
             self.damage.mark_dirty(old).await;
             self.damage.mark_dirty(new_bounds).await;
             true
-        } else { false }
+        } else {
+            false
+        }
     }
 
     pub async fn minimize_window(&self, id: &str) -> bool {
         let bounds = {
             let mut windows = self.windows.write().await;
-            windows.get_mut(id).map(|w| { w.is_minimized = true; w.bounds })
+            windows.get_mut(id).map(|w| {
+                w.is_minimized = true;
+                w.bounds
+            })
         };
-        if let Some(b) = bounds { self.damage.mark_dirty(b).await; true } else { false }
+        if let Some(b) = bounds {
+            self.damage.mark_dirty(b).await;
+            true
+        } else {
+            false
+        }
     }
 
     pub async fn maximize_window(&self, id: &str) -> bool {
@@ -342,18 +437,31 @@ impl OmniDesktop {
                 win.is_maximized = true;
                 win.is_minimized = false;
                 true
-            } else { false }
+            } else {
+                false
+            }
         };
-        if ok { self.damage.mark_dirty(full).await; }
+        if ok {
+            self.damage.mark_dirty(full).await;
+        }
         ok
     }
 
     pub async fn restore_window(&self, id: &str) -> bool {
         let bounds = {
             let mut windows = self.windows.write().await;
-            windows.get_mut(id).map(|w| { w.is_minimized = false; w.is_maximized = false; w.bounds })
+            windows.get_mut(id).map(|w| {
+                w.is_minimized = false;
+                w.is_maximized = false;
+                w.bounds
+            })
         };
-        if let Some(b) = bounds { self.damage.mark_dirty(b).await; true } else { false }
+        if let Some(b) = bounds {
+            self.damage.mark_dirty(b).await;
+            true
+        } else {
+            false
+        }
     }
 
     // ── Layout engine ────────────────────────────────────────────────────────
@@ -361,7 +469,11 @@ impl OmniDesktop {
     /// AI-driven auto-layout based on visible window count
     pub async fn auto_layout(&self) -> WindowLayout {
         let workspace = self.active_workspace.load(Ordering::Relaxed);
-        let count = self.windows.read().await.values()
+        let count = self
+            .windows
+            .read()
+            .await
+            .values()
             .filter(|w| !w.is_minimized && w.workspace == workspace)
             .count();
         match count {
@@ -378,19 +490,28 @@ impl OmniDesktop {
         let workspace = self.active_workspace.load(Ordering::Relaxed);
         let panel_h = {
             let panels = self.panels.read().await;
-            panels.iter().filter(|p| matches!(p.position, PanelPosition::Bottom))
-                .map(|p| p.height_px).sum::<u32>()
+            panels
+                .iter()
+                .filter(|p| matches!(p.position, PanelPosition::Bottom))
+                .map(|p| p.height_px)
+                .sum::<u32>()
         };
         let w = display.width;
         let h = display.height.saturating_sub(panel_h);
 
-        let ids: Vec<WindowId> = self.windows.read().await.values()
+        let ids: Vec<WindowId> = self
+            .windows
+            .read()
+            .await
+            .values()
             .filter(|win| !win.is_minimized && win.workspace == workspace)
             .map(|win| win.id.clone())
             .collect();
 
         let n = ids.len() as u32;
-        if n == 0 { return; }
+        if n == 0 {
+            return;
+        }
 
         match layout {
             WindowLayout::Maximized => {
@@ -401,13 +522,15 @@ impl OmniDesktop {
             WindowLayout::SplitHorizontal => {
                 for (i, id) in ids.iter().enumerate() {
                     let half = w / 2;
-                    self.move_window(id, Rect::new((i as u32 * half) as i32, 0, half, h)).await;
+                    self.move_window(id, Rect::new((i as u32 * half) as i32, 0, half, h))
+                        .await;
                 }
             }
             WindowLayout::SplitVertical => {
                 for (i, id) in ids.iter().enumerate() {
                     let half = h / 2;
-                    self.move_window(id, Rect::new(0, (i as u32 * half) as i32, w, half)).await;
+                    self.move_window(id, Rect::new(0, (i as u32 * half) as i32, w, half))
+                        .await;
                 }
             }
             WindowLayout::Grid { cols } => {
@@ -418,7 +541,8 @@ impl OmniDesktop {
                 for (i, id) in ids.iter().enumerate() {
                     let col = i as u32 % cols;
                     let row = i as u32 / cols;
-                    self.move_window(id, Rect::new((col * cw) as i32, (row * ch) as i32, cw, ch)).await;
+                    self.move_window(id, Rect::new((col * cw) as i32, (row * ch) as i32, cw, ch))
+                        .await;
                 }
             }
             WindowLayout::Tiled => {
@@ -427,9 +551,17 @@ impl OmniDesktop {
                     let main_w = (w as f32 * 0.6) as u32;
                     self.move_window(first, Rect::new(0, 0, main_w, h)).await;
                     let side_w = w - main_w;
-                    let side_h = if rest.is_empty() { h } else { h / rest.len() as u32 };
+                    let side_h = if rest.is_empty() {
+                        h
+                    } else {
+                        h / rest.len() as u32
+                    };
                     for (i, id) in rest.iter().enumerate() {
-                        self.move_window(id, Rect::new(main_w as i32, (i as u32 * side_h) as i32, side_w, side_h)).await;
+                        self.move_window(
+                            id,
+                            Rect::new(main_w as i32, (i as u32 * side_h) as i32, side_w, side_h),
+                        )
+                        .await;
                     }
                 }
             }
@@ -449,7 +581,9 @@ impl OmniDesktop {
     pub async fn set_wallpaper(&self, wallpaper: Wallpaper) {
         let display = self.display.read().await;
         *self.wallpaper.write().await = wallpaper;
-        self.damage.mark_dirty(Rect::new(0, 0, display.width, display.height)).await;
+        self.damage
+            .mark_dirty(Rect::new(0, 0, display.width, display.height))
+            .await;
     }
 
     // ── Panel management ─────────────────────────────────────────────────────
@@ -465,7 +599,9 @@ impl OmniDesktop {
         if let Some(panel) = panels.iter_mut().find(|p| p.id == panel_id) {
             panel.widgets.push(widget);
             true
-        } else { false }
+        } else {
+            false
+        }
     }
 
     // ── Frame metadata ───────────────────────────────────────────────────────
@@ -493,7 +629,10 @@ impl OmniDesktop {
 pub struct OpenWindowRequest {
     pub title: String,
     pub app_id: String,
-    pub x: i32, pub y: i32, pub w: u32, pub h: u32,
+    pub x: i32,
+    pub y: i32,
+    pub w: u32,
+    pub h: u32,
 }
 
 #[tauri::command]
@@ -508,9 +647,14 @@ pub async fn omni_window_open(
     state: tauri::State<'_, crate::AppState>,
     req: OpenWindowRequest,
 ) -> Result<WindowId, String> {
-    Ok(state.omni_desktop.open_window(
-        &req.title, &req.app_id, Rect::new(req.x, req.y, req.w, req.h),
-    ).await)
+    Ok(state
+        .omni_desktop
+        .open_window(
+            &req.title,
+            &req.app_id,
+            Rect::new(req.x, req.y, req.w, req.h),
+        )
+        .await)
 }
 
 #[tauri::command]
@@ -535,9 +679,15 @@ pub async fn omni_window_focus(
 pub async fn omni_window_move(
     state: tauri::State<'_, crate::AppState>,
     window_id: String,
-    x: i32, y: i32, w: u32, h: u32,
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
 ) -> Result<bool, String> {
-    Ok(state.omni_desktop.move_window(&window_id, Rect::new(x, y, w, h)).await)
+    Ok(state
+        .omni_desktop
+        .move_window(&window_id, Rect::new(x, y, w, h))
+        .await)
 }
 
 #[tauri::command]
@@ -631,13 +781,18 @@ mod tests {
     use super::*;
 
     fn make_gpu() -> Arc<GpuLayer> {
-        Arc::new(GpuLayer::new(&crate::gpu_layer::GpuInfo { has_vulkan: false, has_directml: false }))
+        Arc::new(GpuLayer::new(&crate::gpu_layer::GpuInfo {
+            has_vulkan: false,
+            has_directml: false,
+        }))
     }
 
     #[tokio::test]
     async fn open_and_close_window() {
         let desk = OmniDesktop::new(make_gpu());
-        let id = desk.open_window("Test", "test-app", Rect::new(0, 0, 800, 600)).await;
+        let id = desk
+            .open_window("Test", "test-app", Rect::new(0, 0, 800, 600))
+            .await;
         assert!(desk.windows.read().await.contains_key(&id));
         desk.close_window(&id).await;
         assert!(!desk.windows.read().await.contains_key(&id));
@@ -646,15 +801,18 @@ mod tests {
     #[tokio::test]
     async fn auto_layout_single() {
         let desk = OmniDesktop::new(make_gpu());
-        desk.open_window("A", "app-a", Rect::new(0, 0, 400, 300)).await;
+        desk.open_window("A", "app-a", Rect::new(0, 0, 400, 300))
+            .await;
         assert_eq!(desk.auto_layout().await, WindowLayout::Maximized);
     }
 
     #[tokio::test]
     async fn auto_layout_two() {
         let desk = OmniDesktop::new(make_gpu());
-        desk.open_window("A", "app-a", Rect::new(0, 0, 400, 300)).await;
-        desk.open_window("B", "app-b", Rect::new(400, 0, 400, 300)).await;
+        desk.open_window("A", "app-a", Rect::new(0, 0, 400, 300))
+            .await;
+        desk.open_window("B", "app-b", Rect::new(400, 0, 400, 300))
+            .await;
         assert_eq!(desk.auto_layout().await, WindowLayout::SplitHorizontal);
     }
 

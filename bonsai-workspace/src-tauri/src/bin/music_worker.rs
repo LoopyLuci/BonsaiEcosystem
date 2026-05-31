@@ -1,5 +1,12 @@
-#![allow(clippy::needless_range_loop, clippy::manual_clamp, clippy::useless_format, clippy::needless_borrow, clippy::manual_unwrap_or)]
+#![allow(
+    clippy::needless_range_loop,
+    clippy::manual_clamp,
+    clippy::useless_format,
+    clippy::needless_borrow,
+    clippy::manual_unwrap_or
+)]
 
+use std::f32::consts::PI;
 /// bonsai-music-worker — persistent music synthesis sidecar.
 ///
 /// Protocol (stdin → stdout):
@@ -10,7 +17,6 @@
 /// then accepts a single long-lived connection for the lifetime of the process.
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::net::TcpListener;
-use std::f32::consts::PI;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -27,10 +33,16 @@ fn main() {
     let mut line = String::new();
     while reader.read_line(&mut line).unwrap_or(0) > 0 {
         let trimmed = line.trim();
-        if trimmed.is_empty() { line.clear(); continue; }
+        if trimmed.is_empty() {
+            line.clear();
+            continue;
+        }
 
         let parts: Vec<&str> = trimmed.splitn(3, '|').collect();
-        if parts.len() < 3 { line.clear(); continue; }
+        if parts.len() < 3 {
+            line.clear();
+            continue;
+        }
 
         let id = parts[0];
         let duration: f32 = parts[1].parse::<f32>().unwrap_or(8.0).clamp(0.5, 60.0);
@@ -38,9 +50,15 @@ fn main() {
 
         let wav = generate_wav(prompt, duration);
         let header = format!("OK {id}|{}\n", wav.len());
-        if writer.write_all(header.as_bytes()).is_err() { break; }
-        if writer.write_all(&wav).is_err() { break; }
-        if writer.flush().is_err() { break; }
+        if writer.write_all(header.as_bytes()).is_err() {
+            break;
+        }
+        if writer.write_all(&wav).is_err() {
+            break;
+        }
+        if writer.flush().is_err() {
+            break;
+        }
         line.clear();
     }
 }
@@ -48,12 +66,12 @@ fn main() {
 // ── Synthesis ──────────────────────────────────────────────────────────────────
 
 struct SynthParams {
-    bpm:         f32,
-    root_hz:     f32,
-    scale:       Vec<f32>,  // semitone offsets
-    brightness:  f32,       // 0 = dark, 1 = bright
-    has_drums:   bool,
-    reverb_mix:  f32,
+    bpm: f32,
+    root_hz: f32,
+    scale: Vec<f32>, // semitone offsets
+    brightness: f32, // 0 = dark, 1 = bright
+    has_drums: bool,
+    reverb_mix: f32,
 }
 
 fn parse_prompt(prompt: &str) -> SynthParams {
@@ -71,17 +89,30 @@ fn parse_prompt(prompt: &str) -> SynthParams {
     };
 
     // Root note
-    let root_hz = if lower.contains(" a ") || lower.contains("in a") { 440.0 }
-    else if lower.contains(" b ") || lower.contains("in b") { 493.88 }
-    else if lower.contains(" c ") || lower.contains("in c") { 261.63 }
-    else if lower.contains(" d ") || lower.contains("in d") { 293.66 }
-    else if lower.contains(" e ") || lower.contains("in e") { 329.63 }
-    else if lower.contains(" f ") || lower.contains("in f") { 349.23 }
-    else if lower.contains(" g ") || lower.contains("in g") { 392.00 }
-    else { 220.0 };
+    let root_hz = if lower.contains(" a ") || lower.contains("in a") {
+        440.0
+    } else if lower.contains(" b ") || lower.contains("in b") {
+        493.88
+    } else if lower.contains(" c ") || lower.contains("in c") {
+        261.63
+    } else if lower.contains(" d ") || lower.contains("in d") {
+        293.66
+    } else if lower.contains(" e ") || lower.contains("in e") {
+        329.63
+    } else if lower.contains(" f ") || lower.contains("in f") {
+        349.23
+    } else if lower.contains(" g ") || lower.contains("in g") {
+        392.00
+    } else {
+        220.0
+    };
 
     // Scale
-    let scale = if lower.contains("minor") || lower.contains("sad") || lower.contains("dark") || lower.contains("melanchol") {
+    let scale = if lower.contains("minor")
+        || lower.contains("sad")
+        || lower.contains("dark")
+        || lower.contains("melanchol")
+    {
         vec![0.0, 2.0, 3.0, 5.0, 7.0, 8.0, 10.0] // natural minor
     } else if lower.contains("pentatonic") {
         vec![0.0, 2.0, 4.0, 7.0, 9.0]
@@ -93,23 +124,41 @@ fn parse_prompt(prompt: &str) -> SynthParams {
         vec![0.0, 2.0, 4.0, 5.0, 7.0, 9.0, 11.0] // major
     };
 
-    let brightness = if lower.contains("dark") || lower.contains("deep") { 0.2 }
-        else if lower.contains("bright") || lower.contains("airy") { 0.9 }
-        else { 0.5 };
+    let brightness = if lower.contains("dark") || lower.contains("deep") {
+        0.2
+    } else if lower.contains("bright") || lower.contains("airy") {
+        0.9
+    } else {
+        0.5
+    };
 
-    let has_drums = !(lower.contains("ambient") || lower.contains("classical") || lower.contains("piano solo"));
+    let has_drums =
+        !(lower.contains("ambient") || lower.contains("classical") || lower.contains("piano solo"));
 
-    let reverb_mix = if lower.contains("reverb") || lower.contains("ambient") || lower.contains("space") { 0.4 }
-        else { 0.15 };
+    let reverb_mix =
+        if lower.contains("reverb") || lower.contains("ambient") || lower.contains("space") {
+            0.4
+        } else {
+            0.15
+        };
 
-    SynthParams { bpm, root_hz, scale, brightness, has_drums, reverb_mix }
+    SynthParams {
+        bpm,
+        root_hz,
+        scale,
+        brightness,
+        has_drums,
+        reverb_mix,
+    }
 }
 
 fn extract_bpm(text: &str) -> Option<f32> {
     let re = text.find("bpm")?;
     let before = text[..re].trim_end();
-    let start = before.rfind(|c: char| !c.is_ascii_digit() && c != '.')
-        .map(|i| i + 1).unwrap_or(0);
+    let start = before
+        .rfind(|c: char| !c.is_ascii_digit() && c != '.')
+        .map(|i| i + 1)
+        .unwrap_or(0);
     before[start..].parse().ok()
 }
 
@@ -132,9 +181,19 @@ fn adsr(t: f32, duration: f32, attack: f32, decay: f32, sustain: f32, release: f
     }
 }
 
-fn sine(phase: f32) -> f32 { (2.0 * PI * phase).sin() }
-fn saw(phase: f32)    -> f32 { 2.0 * (phase - phase.floor()) - 1.0 }
-fn square(phase: f32) -> f32 { if (phase % 1.0) < 0.5 { 1.0 } else { -1.0 } }
+fn sine(phase: f32) -> f32 {
+    (2.0 * PI * phase).sin()
+}
+fn saw(phase: f32) -> f32 {
+    2.0 * (phase - phase.floor()) - 1.0
+}
+fn square(phase: f32) -> f32 {
+    if (phase % 1.0) < 0.5 {
+        1.0
+    } else {
+        -1.0
+    }
+}
 
 /// Blend waveforms based on brightness: sine → saw → square.
 fn osc(phase: f32, brightness: f32) -> f32 {
@@ -172,7 +231,9 @@ fn generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
             let s = (sine(phase) * 0.7 + sine(phase * 2.0) * 0.2) * env * 0.35;
             mix[i] += s;
             phase += freq / sr as f32;
-            if phase >= 1.0 { phase -= 1.0; }
+            if phase >= 1.0 {
+                phase -= 1.0;
+            }
         }
     }
 
@@ -188,13 +249,21 @@ fn generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
             let chord_t = t % chord_dur;
             let env = adsr(chord_t, chord_dur * 0.95, 0.08, 0.2, 0.7, 0.3);
             // Triad: root + 3rd + 5th
-            let degrees = [root_deg, (root_deg + 2) % scale.len(), (root_deg + 4) % scale.len(), (root_deg + 6) % scale.len()];
+            let degrees = [
+                root_deg,
+                (root_deg + 2) % scale.len(),
+                (root_deg + 4) % scale.len(),
+                (root_deg + 6) % scale.len(),
+            ];
             let mut s = 0.0f32;
             for (k, &deg) in degrees.iter().enumerate() {
-                let freq = p.root_hz * semitone_to_ratio(scale[deg]) * if k < 2 { 1.0 } else { 2.0 };
+                let freq =
+                    p.root_hz * semitone_to_ratio(scale[deg]) * if k < 2 { 1.0 } else { 2.0 };
                 s += osc(phases[k], p.brightness);
                 phases[k] += freq / sr as f32;
-                if phases[k] >= 1.0 { phases[k] -= 1.0; }
+                if phases[k] >= 1.0 {
+                    phases[k] -= 1.0;
+                }
             }
             mix[i] += s * env * 0.12;
         }
@@ -214,7 +283,9 @@ fn generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
             let env = adsr(note_t, mel_note_dur * 0.85, 0.005, 0.05, 0.6, 0.1);
             mix[i] += osc(phase, p.brightness) * env * 0.18;
             phase += freq / sr as f32;
-            if phase >= 1.0 { phase -= 1.0; }
+            if phase >= 1.0 {
+                phase -= 1.0;
+            }
         }
     }
 
@@ -225,7 +296,7 @@ fn generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
         for i in 0..n {
             let t = i as f32 / sr as f32;
             let beat_pos = (t / beat_dur) % 4.0;
-            let beat_t   = t % beat_dur;
+            let beat_t = t % beat_dur;
 
             // Kick on beats 1 and 3
             if beat_t < 0.003 && (beat_pos < 0.05 || (beat_pos > 1.95 && beat_pos < 2.05)) {
@@ -243,7 +314,8 @@ fn generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
             }
             if snare_noise > 0.001 {
                 let noise = fastrand::f32() * 2.0 - 1.0;
-                mix[i] += (noise * 0.3 + sine(snare_noise * 200.0) * 0.1) * (-beat_t * 18.0).exp() * 0.3;
+                mix[i] +=
+                    (noise * 0.3 + sine(snare_noise * 200.0) * 0.1) * (-beat_t * 18.0).exp() * 0.3;
                 snare_noise *= 0.9998;
             }
 
@@ -287,7 +359,9 @@ fn generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
     for i in 0..fade_len.min(n) {
         let t = i as f32 / fade_len as f32;
         mix[i] *= t;
-        if n > fade_len { mix[n - 1 - i] *= t; }
+        if n > fade_len {
+            mix[n - 1 - i] *= t;
+        }
     }
 
     encode_wav_f32(&mix, sr)
@@ -303,14 +377,14 @@ fn encode_wav_f32(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     out.extend_from_slice(b"WAVE");
     // fmt chunk (IEEE float, 1 channel)
     out.extend_from_slice(b"fmt ");
-    out.extend_from_slice(&16u32.to_le_bytes());   // chunk size
-    out.extend_from_slice(&3u16.to_le_bytes());    // PCM float
-    out.extend_from_slice(&1u16.to_le_bytes());    // mono
+    out.extend_from_slice(&16u32.to_le_bytes()); // chunk size
+    out.extend_from_slice(&3u16.to_le_bytes()); // PCM float
+    out.extend_from_slice(&1u16.to_le_bytes()); // mono
     out.extend_from_slice(&sample_rate.to_le_bytes());
     out.extend_from_slice(&(sample_rate * 4).to_le_bytes()); // byte rate
-    out.extend_from_slice(&4u16.to_le_bytes());    // block align
-    out.extend_from_slice(&32u16.to_le_bytes());   // bits per sample
-    // data chunk
+    out.extend_from_slice(&4u16.to_le_bytes()); // block align
+    out.extend_from_slice(&32u16.to_le_bytes()); // bits per sample
+                                                 // data chunk
     out.extend_from_slice(b"data");
     out.extend_from_slice(&data_len.to_le_bytes());
     for &s in samples {

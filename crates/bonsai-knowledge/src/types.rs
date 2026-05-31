@@ -1,9 +1,9 @@
 //! Core knowledge representation types.
 
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use bonsai_verify::Term;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use uuid::Uuid;
 
 // ── IDs ───────────────────────────────────────────────────────────────────────
 
@@ -11,9 +11,15 @@ pub type EntityId = String;
 pub type RelationId = String;
 pub type BeliefId = String;
 
-pub fn new_entity_id() -> EntityId { Uuid::new_v4().to_string() }
-pub fn new_relation_id() -> RelationId { Uuid::new_v4().to_string() }
-pub fn new_belief_id() -> BeliefId { Uuid::new_v4().to_string() }
+pub fn new_entity_id() -> EntityId {
+    Uuid::new_v4().to_string()
+}
+pub fn new_relation_id() -> RelationId {
+    Uuid::new_v4().to_string()
+}
+pub fn new_belief_id() -> BeliefId {
+    Uuid::new_v4().to_string()
+}
 
 // ── EntityType ────────────────────────────────────────────────────────────────
 
@@ -121,13 +127,33 @@ impl std::fmt::Display for Predicate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProvenanceSource {
-    UserStatement { session_id: String },
-    ModelInference { model_id: String, adapter_id: Option<String> },
-    ToolExecution { tool_name: String, result_hash: String },
-    DeductiveProof { proof_id: String, kernel_version: String },
-    ExternalDocument { document_hash: String, source_url: Option<String> },
-    Observation { timestamp: i64, observer: String },
-    Derived { from_beliefs: Vec<BeliefId>, rule: String },
+    UserStatement {
+        session_id: String,
+    },
+    ModelInference {
+        model_id: String,
+        adapter_id: Option<String>,
+    },
+    ToolExecution {
+        tool_name: String,
+        result_hash: String,
+    },
+    DeductiveProof {
+        proof_id: String,
+        kernel_version: String,
+    },
+    ExternalDocument {
+        document_hash: String,
+        source_url: Option<String>,
+    },
+    Observation {
+        timestamp: i64,
+        observer: String,
+    },
+    Derived {
+        from_beliefs: Vec<BeliefId>,
+        rule: String,
+    },
 }
 
 // ── RelationTarget ────────────────────────────────────────────────────────────
@@ -180,7 +206,10 @@ impl Relation {
         }
     }
 
-    pub fn with_confidence(mut self, c: f32) -> Self { self.confidence = c; self }
+    pub fn with_confidence(mut self, c: f32) -> Self {
+        self.confidence = c;
+        self
+    }
 }
 
 // ── Evidence & Belief ─────────────────────────────────────────────────────────

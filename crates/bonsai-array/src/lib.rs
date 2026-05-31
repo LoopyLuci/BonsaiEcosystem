@@ -18,10 +18,10 @@
 //!   - Outer product: ∘.f
 
 pub mod array;
-pub mod ops;
-pub mod eval;
 pub mod error;
+pub mod eval;
+pub mod ops;
 
 pub use array::NdArray;
-pub use eval::{AplEval, EvalResult};
 pub use error::ArrayError;
+pub use eval::{AplEval, EvalResult};

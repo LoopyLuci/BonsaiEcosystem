@@ -9,10 +9,10 @@
 //! - Remote delivery: serialized + encrypted over a `RelayClient`.
 //! - Inbox: bounded buffer — callers `recv()` asynchronously.
 
+pub mod envelope;
 pub mod error;
 pub mod mailbox;
-pub mod envelope;
 
+pub use envelope::{AgentId, MailEnvelope};
 pub use error::{MailboxError, MailboxResult};
 pub use mailbox::AgentMailbox;
-pub use envelope::{MailEnvelope, AgentId};

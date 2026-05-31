@@ -34,14 +34,19 @@ use crate::tool_registry::{Tool, ToolResult};
 fn find_depth_model() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("DEPTH_MODEL_PATH") {
         let pb = PathBuf::from(&p);
-        if pb.exists() { return Some(pb); }
+        if pb.exists() {
+            return Some(pb);
+        }
     }
     let candidates = [
-        dirs::home_dir().unwrap_or_default()
+        dirs::home_dir()
+            .unwrap_or_default()
             .join(".bonsai/models/depth/Depth-Anything-V2-Small-F16.gguf"),
-        dirs::home_dir().unwrap_or_default()
+        dirs::home_dir()
+            .unwrap_or_default()
             .join(".bonsai/models/depth/Depth-Anything-V2-Base-F16.gguf"),
-        dirs::data_local_dir().unwrap_or_default()
+        dirs::data_local_dir()
+            .unwrap_or_default()
             .join("com.bonsai.workspace/sidecars/depth/Depth-Anything-V2-Small-F16.gguf"),
         PathBuf::from("sidecars/depth/Depth-Anything-V2-Small-F16.gguf"),
     ];
@@ -50,13 +55,17 @@ fn find_depth_model() -> Option<PathBuf> {
 
 fn find_depth_worker() -> Option<PathBuf> {
     let candidates = [
-        dirs::home_dir().unwrap_or_default().join(".bonsai/sidecars/depth_worker.py"),
+        dirs::home_dir()
+            .unwrap_or_default()
+            .join(".bonsai/sidecars/depth_worker.py"),
         PathBuf::from("sidecars/depth_worker.py"),
     ];
     candidates.into_iter().find(|p| p.exists())
 }
 
-pub fn is_available() -> bool { find_depth_model().is_some() }
+pub fn is_available() -> bool {
+    find_depth_model().is_some()
+}
 
 // ── Depth result ──────────────────────────────────────────────────────────────
 
@@ -66,13 +75,13 @@ pub struct DepthResult {
     /// `None` when only the VLM description path was used.
     pub depth_map_b64: Option<String>,
     /// Natural-language depth description from the vision model.
-    pub description:   String,
+    pub description: String,
     /// Objects/regions estimated as nearest to camera.
-    pub near_objects:  Vec<String>,
+    pub near_objects: Vec<String>,
     /// Objects/regions estimated as furthest from camera.
-    pub far_objects:   Vec<String>,
+    pub far_objects: Vec<String>,
     /// Model variant used.
-    pub model:         String,
+    pub model: String,
 }
 
 // ── Worker-based depth estimation ─────────────────────────────────────────────
@@ -84,18 +93,20 @@ struct DepthWorkerRequest<'a> {
 }
 
 async fn run_depth_worker(image_path: &str, model_path: &PathBuf) -> Result<DepthResult, String> {
-    let worker = find_depth_worker()
-        .ok_or("depth_worker.py not found. Place it in ~/.bonsai/sidecars/")?;
+    let worker =
+        find_depth_worker().ok_or("depth_worker.py not found. Place it in ~/.bonsai/sidecars/")?;
 
     let python = which_python()?;
     let payload = serde_json::to_string(&DepthWorkerRequest {
         image_path,
         output_png: true,
-    }).map_err(|e| e.to_string())?;
+    })
+    .map_err(|e| e.to_string())?;
 
     let mut child = tokio::process::Command::new(&python)
         .arg(&worker)
-        .arg("--model").arg(model_path)
+        .arg("--model")
+        .arg(model_path)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -104,7 +115,9 @@ async fn run_depth_worker(image_path: &str, model_path: &PathBuf) -> Result<Dept
         .map_err(|e| format!("Failed to start depth_worker: {e}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(payload.as_bytes()).await
+        stdin
+            .write_all(payload.as_bytes())
+            .await
             .map_err(|e| format!("stdin write: {e}"))?;
     }
 
@@ -123,14 +136,28 @@ async fn run_depth_worker(image_path: &str, model_path: &PathBuf) -> Result<Dept
 
     Ok(DepthResult {
         depth_map_b64: json["depth_map_b64"].as_str().map(|s| s.to_string()),
-        description:   json["description"].as_str().unwrap_or("Depth estimation complete").to_string(),
-        near_objects:  json["near_objects"].as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        description: json["description"]
+            .as_str()
+            .unwrap_or("Depth estimation complete")
+            .to_string(),
+        near_objects: json["near_objects"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        far_objects:   json["far_objects"].as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        far_objects: json["far_objects"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        model:         model_path.file_name()
+        model: model_path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("depth-anything-v2")
             .to_string(),
@@ -143,12 +170,19 @@ async fn run_vlm_depth_description(
     image_path: &str,
     orchestrator_url: &str,
 ) -> Result<DepthResult, String> {
-    let image_bytes = tokio::fs::read(image_path).await
+    let image_bytes = tokio::fs::read(image_path)
+        .await
         .map_err(|e| format!("Cannot read image: {e}"))?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
     let ext = std::path::Path::new(image_path)
-        .extension().and_then(|e| e.to_str()).unwrap_or("jpeg");
-    let mime = match ext { "png" => "image/png", "webp" => "image/webp", _ => "image/jpeg" };
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("jpeg");
+    let mime = match ext {
+        "png" => "image/png",
+        "webp" => "image/webp",
+        _ => "image/jpeg",
+    };
 
     let payload = serde_json::json!({
         "messages": [{
@@ -172,21 +206,26 @@ async fn run_vlm_depth_description(
 
     let body: Value = resp.json().await.map_err(|e| e.to_string())?;
     let description = body["choices"][0]["message"]["content"]
-        .as_str().unwrap_or("").to_string();
+        .as_str()
+        .unwrap_or("")
+        .to_string();
 
     Ok(DepthResult {
         depth_map_b64: None,
         description,
-        near_objects:  vec![],
-        far_objects:   vec![],
-        model:         "vlm-fallback".into(),
+        near_objects: vec![],
+        far_objects: vec![],
+        model: "vlm-fallback".into(),
     })
 }
 
 fn which_python() -> Result<PathBuf, String> {
     for c in &["python3", "python"] {
-        if std::process::Command::new(c).arg("--version").output()
-            .map(|o| o.status.success()).unwrap_or(false)
+        if std::process::Command::new(c)
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
         {
             return Ok(PathBuf::from(c));
         }
@@ -201,12 +240,16 @@ pub struct DepthEstimationTool {
 }
 
 impl DepthEstimationTool {
-    pub fn new() -> Self { Self { _marker: () } }
+    pub fn new() -> Self {
+        Self { _marker: () }
+    }
 }
 
 #[async_trait]
 impl Tool for DepthEstimationTool {
-    fn name(&self) -> &str { "estimate_depth" }
+    fn name(&self) -> &str {
+        "estimate_depth"
+    }
 
     fn description(&self) -> &str {
         "Estimate monocular depth from an image using Depth-Anything-V2. \
@@ -215,7 +258,8 @@ impl Tool for DepthEstimationTool {
     }
 
     async fn run(&self, args: &Value) -> Result<ToolResult, String> {
-        let image_path = args["image_path"].as_str()
+        let image_path = args["image_path"]
+            .as_str()
             .ok_or("Missing 'image_path' argument")?;
 
         if !std::path::Path::new(image_path).exists() {
@@ -225,7 +269,8 @@ impl Tool for DepthEstimationTool {
         let model = find_depth_model().ok_or_else(|| {
             "Depth-Anything-V2 model not found. \
              Download from huggingface.co/Acly/Depth-Anything-V2-GGUF \
-             and place in ~/.bonsai/models/depth/".to_string()
+             and place in ~/.bonsai/models/depth/"
+                .to_string()
         })?;
 
         info!(image = image_path, model = %model.display(), "[depth] estimating");
@@ -235,7 +280,8 @@ impl Tool for DepthEstimationTool {
         } else {
             // Graceful fallback: use the running VLM
             warn!("[depth] depth_worker.py not found — falling back to VLM description");
-            run_vlm_depth_description(image_path, "http://127.0.0.1:8080").await
+            run_vlm_depth_description(image_path, "http://127.0.0.1:8080")
+                .await
                 .unwrap_or_else(|e| DepthResult {
                     depth_map_b64: None,
                     description: format!("Depth estimation unavailable: {e}"),
@@ -245,7 +291,9 @@ impl Tool for DepthEstimationTool {
                 })
         };
 
-        Ok(ToolResult::json(&serde_json::to_value(&result).unwrap_or_default()))
+        Ok(ToolResult::json(
+            &serde_json::to_value(&result).unwrap_or_default(),
+        ))
     }
 }
 

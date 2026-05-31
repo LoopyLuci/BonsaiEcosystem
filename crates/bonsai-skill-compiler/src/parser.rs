@@ -30,16 +30,16 @@ pub fn parse_skill_md(skill_dir: &Path) -> Result<(SkillMetadata, String)> {
     let content = fs::read_to_string(&skill_md_path)
         .with_context(|| format!("Failed to read {skill_md_path:?}"))?;
     let (frontmatter, body) = split_frontmatter(&content)?;
-    let metadata: SkillMetadata = serde_yaml::from_str(&frontmatter)
-        .context("Invalid YAML frontmatter in SKILL.md")?;
+    let metadata: SkillMetadata =
+        serde_yaml::from_str(&frontmatter).context("Invalid YAML frontmatter in SKILL.md")?;
     Ok((metadata, body))
 }
 
 /// Parse a SKILL.md directly from a string (for tests and in-memory installs).
 pub fn parse_skill_md_str(content: &str) -> Result<(SkillMetadata, String)> {
     let (frontmatter, body) = split_frontmatter(content)?;
-    let metadata: SkillMetadata = serde_yaml::from_str(&frontmatter)
-        .context("Invalid YAML frontmatter")?;
+    let metadata: SkillMetadata =
+        serde_yaml::from_str(&frontmatter).context("Invalid YAML frontmatter")?;
     Ok((metadata, body))
 }
 

@@ -1,7 +1,7 @@
-use tauri::State;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tauri::State;
+use tokio::sync::RwLock;
 
 pub struct FabricState {
     pub coordinator: Arc<bonsai_fabric::CoordinatorActor>,
@@ -9,7 +9,9 @@ pub struct FabricState {
 
 impl FabricState {
     pub fn new() -> Self {
-        Self { coordinator: Arc::new(bonsai_fabric::CoordinatorActor::new()) }
+        Self {
+            coordinator: Arc::new(bonsai_fabric::CoordinatorActor::new()),
+        }
     }
 }
 
@@ -37,7 +39,7 @@ pub async fn fabric_submit_and_await(
     state: State<'_, FabricState>,
     request: TaskRequest,
 ) -> Result<TaskResponse, String> {
-    use bonsai_fabric::types::{FabricTask, TaskType, TaskStatus};
+    use bonsai_fabric::types::{FabricTask, TaskStatus, TaskType};
 
     let task_id = uuid::Uuid::new_v4().to_string();
     let task_type = match request.task_type.as_str() {
@@ -67,8 +69,15 @@ pub async fn fabric_submit_and_await(
                 TaskStatus::Assigned { node_id } => format!("assigned:{node_id}"),
                 TaskStatus::Queued => "queued".to_string(),
             };
-            let output_json = result.output.map(|b| String::from_utf8_lossy(&b).to_string());
-            Ok(TaskResponse { task_id: result.task_id, status, output_json, duration_ms: result.duration_ms })
+            let output_json = result
+                .output
+                .map(|b| String::from_utf8_lossy(&b).to_string());
+            Ok(TaskResponse {
+                task_id: result.task_id,
+                status,
+                output_json,
+                duration_ms: result.duration_ms,
+            })
         }
         None => Err("Task timed out or no capable node available".to_string()),
     }
@@ -83,12 +92,15 @@ pub async fn fabric_register_node(
     available_memory_mb: u64,
 ) -> Result<(), String> {
     use bonsai_fabric::types::ComputeNode;
-    state.coordinator.add_node(ComputeNode {
-        node_id,
-        display_name,
-        available_cores,
-        available_memory_mb,
-        is_online: true,
-    }).await;
+    state
+        .coordinator
+        .add_node(ComputeNode {
+            node_id,
+            display_name,
+            available_cores,
+            available_memory_mb,
+            is_online: true,
+        })
+        .await;
     Ok(())
 }

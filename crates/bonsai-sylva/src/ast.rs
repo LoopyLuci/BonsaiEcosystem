@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SylvaType {
-    Unknown,    // gradual typing: type not yet known
+    Unknown, // gradual typing: type not yet known
     Nil,
     Bool,
     Int,
@@ -20,11 +20,13 @@ pub enum SylvaType {
     DataFrame,
     NDArray,
     Option(Box<SylvaType>),
-    Union(Vec<SylvaType>),   // gradual union
+    Union(Vec<SylvaType>), // gradual union
 }
 
 impl Default for SylvaType {
-    fn default() -> Self { Self::Unknown }
+    fn default() -> Self {
+        Self::Unknown
+    }
 }
 
 // ── Expressions ───────────────────────────────────────────────────────────────
@@ -36,8 +38,12 @@ pub struct Expr {
 }
 
 impl Expr {
-    pub fn new(kind: ExprKind, line: usize) -> Self { Self { kind, line } }
-    pub fn at(kind: ExprKind) -> Self { Self { kind, line: 0 } }
+    pub fn new(kind: ExprKind, line: usize) -> Self {
+        Self { kind, line }
+    }
+    pub fn at(kind: ExprKind) -> Self {
+        Self { kind, line: 0 }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,7 +82,12 @@ pub enum ExprKind {
     Continue,
 
     // Binding
-    Let { name: String, ty: Option<SylvaType>, value: Box<Expr>, mutable: bool },
+    Let {
+        name: String,
+        ty: Option<SylvaType>,
+        value: Box<Expr>,
+        mutable: bool,
+    },
     Assign(Box<Expr>, Box<Expr>),
     Block(Vec<Expr>),
 
@@ -84,9 +95,9 @@ pub enum ExprKind {
     Pipe(Box<Expr>, Box<Expr>),
 
     // Actor concurrency
-    Spawn(Box<Expr>),            // spawn(actor_fn)
-    Send(Box<Expr>, Box<Expr>),  // send(actor_ref, msg)
-    Receive,                     // receive()
+    Spawn(Box<Expr>),           // spawn(actor_fn)
+    Send(Box<Expr>, Box<Expr>), // send(actor_ref, msg)
+    Receive,                    // receive()
     Await(Box<Expr>),
 
     // Struct construction
@@ -98,15 +109,28 @@ pub enum ExprKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BinOp {
-    Add, Sub, Mul, Div, Rem,
-    Eq, Ne, Lt, Le, Gt, Ge,
-    And, Or,
-    Concat,     // ++
-    Pipe,       // |>  (also handled as ExprKind::Pipe)
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+    Concat, // ++
+    Pipe,   // |>  (also handled as ExprKind::Pipe)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum UnOp { Neg, Not }
+pub enum UnOp {
+    Neg,
+    Not,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FnDef {
@@ -140,7 +164,7 @@ pub enum Pattern {
     Str(String),
     Bind(String),
     Tuple(Vec<Pattern>),
-    List(Vec<Pattern>, Option<Box<Pattern>>),  // head patterns + optional rest bind
+    List(Vec<Pattern>, Option<Box<Pattern>>), // head patterns + optional rest bind
     Struct(String, Vec<(String, Pattern)>),
     Or(Vec<Pattern>),
 }
@@ -156,12 +180,22 @@ pub struct SylvaModule {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Item {
     FnDef(FnDef),
-    LetDef { name: String, ty: Option<SylvaType>, value: Expr },
+    LetDef {
+        name: String,
+        ty: Option<SylvaType>,
+        value: Expr,
+    },
     Import(Vec<String>),
     Export(Vec<String>),
     TypeDef(String, SylvaType),
-    StructDef { name: String, fields: Vec<(String, SylvaType)> },
-    EnumDef  { name: String, variants: Vec<EnumVariant> },
+    StructDef {
+        name: String,
+        fields: Vec<(String, SylvaType)>,
+    },
+    EnumDef {
+        name: String,
+        variants: Vec<EnumVariant>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

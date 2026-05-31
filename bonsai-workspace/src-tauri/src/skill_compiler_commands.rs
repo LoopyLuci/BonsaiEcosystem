@@ -20,11 +20,14 @@ pub struct WasmSkillToolPublic {
     pub registry: Arc<crate::tool_registry::ToolRegistry>,
 }
 
-
 #[async_trait::async_trait]
 impl crate::tool_registry::Tool for WasmSkillToolPublic {
-    fn name(&self) -> &str { &self.skill_name }
-    fn description(&self) -> &str { &self.skill_description }
+    fn name(&self) -> &str {
+        &self.skill_name
+    }
+    fn description(&self) -> &str {
+        &self.skill_description
+    }
 
     async fn run(&self, args: &Value) -> Result<crate::tool_registry::ToolResult, String> {
         let output = crate::plugin_host::execute_wasm_skill(
@@ -68,7 +71,9 @@ impl ToolRegistryMut for RegistryAdapter {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn make_adapter(state: &AppState) -> RegistryAdapter {
-    RegistryAdapter { registry: state.tool_registry.registry.clone() }
+    RegistryAdapter {
+        registry: state.tool_registry.registry.clone(),
+    }
 }
 
 // ── Tauri commands ────────────────────────────────────────────────────────────
@@ -139,9 +144,14 @@ pub async fn verify_compiled_skill(id: String) -> Result<bool, String> {
 #[tauri::command]
 pub async fn list_compiled_skills() -> Result<Vec<CompiledSkill>, String> {
     let dir = bonsai_skill_compiler::compiled_skills_dir();
-    if !dir.exists() { return Ok(vec![]); }
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
     let mut skills = Vec::new();
-    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+    for entry in std::fs::read_dir(&dir)
+        .map_err(|e| e.to_string())?
+        .flatten()
+    {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) == Some("json") {
             if let Ok(json) = std::fs::read_to_string(&path) {

@@ -1,11 +1,11 @@
 //! EncryptedStore — AES-256-GCM at-rest encryption with Argon2id key derivation.
 
-use std::path::{Path, PathBuf};
-use aes_gcm::{Aes256Gcm, Key, Nonce};
 use aes_gcm::aead::{Aead, KeyInit};
-use argon2::{Argon2, Params, Algorithm, Version};
+use aes_gcm::{Aes256Gcm, Key, Nonce};
+use argon2::{Algorithm, Argon2, Params, Version};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use zeroize::Zeroizing;
 
@@ -53,8 +53,7 @@ impl EncryptedStore {
 
     /// Default platform path: `{data_dir}/bonsai/store.bin`
     pub fn default_path() -> PathBuf {
-        let base = dirs::data_dir()
-            .unwrap_or_else(|| PathBuf::from("."));
+        let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
         base.join("bonsai").join("store.bin")
     }
 
@@ -95,7 +94,8 @@ impl EncryptedStore {
             .map_err(|e| StoreError::Kdf(e.to_string()))?;
         let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
         let mut key = Zeroizing::new([0u8; 32]);
-        argon2.hash_password_into(&self.passphrase, salt, key.as_mut())
+        argon2
+            .hash_password_into(&self.passphrase, salt, key.as_mut())
             .map_err(|e| StoreError::Kdf(e.to_string()))?;
         Ok(key)
     }
@@ -111,7 +111,8 @@ impl EncryptedStore {
         let cipher = Aes256Gcm::new(key);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        let ct = cipher.encrypt(nonce, plaintext)
+        let ct = cipher
+            .encrypt(nonce, plaintext)
             .map_err(|_| StoreError::DecryptFailed)?;
 
         // Build file: MAGIC | SALT | NONCE | CIPHERTEXT | BLAKE3_TAG
@@ -130,8 +131,12 @@ impl EncryptedStore {
 
     fn decrypt(&self, raw: &[u8]) -> StoreResult<Vec<u8>> {
         let min_len = 8 + SALT_LEN + NONCE_LEN + BLAKE3_TAG_LEN;
-        if raw.len() < min_len { return Err(StoreError::BadMagic); }
-        if &raw[..8] != MAGIC { return Err(StoreError::BadMagic); }
+        if raw.len() < min_len {
+            return Err(StoreError::BadMagic);
+        }
+        if &raw[..8] != MAGIC {
+            return Err(StoreError::BadMagic);
+        }
 
         let tag_offset = raw.len() - BLAKE3_TAG_LEN;
         let body = &raw[..tag_offset];
@@ -153,7 +158,9 @@ impl EncryptedStore {
         let cipher = Aes256Gcm::new(key);
         let nonce = Nonce::from_slice(&nonce_bytes);
 
-        cipher.decrypt(nonce, ct).map_err(|_| StoreError::DecryptFailed)
+        cipher
+            .decrypt(nonce, ct)
+            .map_err(|_| StoreError::DecryptFailed)
     }
 }
 
@@ -208,7 +215,10 @@ mod tests {
         raw[40] ^= 0xFF;
         std::fs::write(&path, &raw).unwrap();
 
-        assert!(matches!(store.load::<serde_json::Value>(), Err(StoreError::IntegrityFailed)));
+        assert!(matches!(
+            store.load::<serde_json::Value>(),
+            Err(StoreError::IntegrityFailed)
+        ));
 
         std::fs::remove_dir_all(&dir).unwrap();
     }

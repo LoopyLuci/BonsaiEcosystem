@@ -6,8 +6,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, SqlitePool};
 use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{Row, SqlitePool};
 
 fn now_secs() -> i64 {
     SystemTime::now()
@@ -33,8 +33,8 @@ pub enum MemoryDomain {
 impl MemoryDomain {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Session  => "session",
-            Self::Working  => "working",
+            Self::Session => "session",
+            Self::Working => "working",
             Self::LongTerm => "long_term",
         }
     }
@@ -52,8 +52,8 @@ pub enum Sensitivity {
 impl Sensitivity {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Public       => "public",
-            Self::Personal     => "personal",
+            Self::Public => "public",
+            Self::Personal => "personal",
             Self::Confidential => "confidential",
         }
     }
@@ -66,16 +66,16 @@ impl Sensitivity {
 /// A single memory record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryRecord {
-    pub id:          String,
-    pub domain:      MemoryDomain,
-    pub session_id:  Option<String>,
-    pub profile_id:  String,
-    pub content:     String,
-    pub tags:        Vec<String>,
-    pub score:       f32,
+    pub id: String,
+    pub domain: MemoryDomain,
+    pub session_id: Option<String>,
+    pub profile_id: String,
+    pub content: String,
+    pub tags: Vec<String>,
+    pub score: f32,
     pub sensitivity: Sensitivity,
-    pub created_at:  i64,
-    pub expires_at:  Option<i64>,
+    pub created_at: i64,
+    pub expires_at: Option<i64>,
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -110,7 +110,8 @@ impl MemoryStore {
     }
 
     async fn migrate(&self) -> Result<(), String> {
-        sqlx::query(r#"
+        sqlx::query(
+            r#"
             PRAGMA journal_mode=WAL;
 
             CREATE TABLE IF NOT EXISTS memory_records (
@@ -142,7 +143,8 @@ impl MemoryStore {
                 record_id  TEXT NOT NULL,
                 profile_id TEXT NOT NULL
             );
-        "#)
+        "#,
+        )
         .execute(&self.pool)
         .await
         .map_err(|e| format!("memory migrate: {e}"))?;
@@ -158,8 +160,8 @@ impl MemoryStore {
             return Err("write rejected: confidential memory requires explicit consent".into());
         }
         let tags_json = serde_json::to_string(&record.tags).unwrap_or_default();
-        let score     = record.score as f64;
-        let now       = now_secs();
+        let score = record.score as f64;
+        let now = now_secs();
 
         sqlx::query(
             r#"INSERT OR REPLACE INTO memory_records
@@ -199,11 +201,11 @@ impl MemoryStore {
     pub async fn retrieve(
         &self,
         profile_id: &str,
-        domain:     MemoryDomain,
+        domain: MemoryDomain,
         session_id: Option<&str>,
-        limit:      usize,
+        limit: usize,
     ) -> Vec<MemoryRecord> {
-        let now   = now_secs();
+        let now = now_secs();
         let limit = limit as i64;
 
         let rows = sqlx::query(
@@ -226,33 +228,34 @@ impl MemoryStore {
         .await
         .unwrap_or_default();
 
-        rows.into_iter().map(|row| {
-            let tags_json: String = row.get("tags_json");
-            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-            let domain_str: String = row.get("domain");
-            let sens_str:   String = row.get("sensitivity");
-            MemoryRecord {
-                id:          row.get("id"),
-                domain:      match domain_str.as_str() {
-                    "session"  => MemoryDomain::Session,
-                    "working"  => MemoryDomain::Working,
-                    _          => MemoryDomain::LongTerm,
-                },
-                session_id:  row.get("session_id"),
-                profile_id:  row.get("profile_id"),
-                content:     row.get("content"),
-                tags,
-                score:       row.get::<f64, _>("score") as f32,
-                sensitivity: match sens_str.as_str() {
-                    "personal"     => Sensitivity::Personal,
-                    "confidential" => Sensitivity::Confidential,
-                    _              => Sensitivity::Public,
-                },
-                created_at:  row.get("created_at"),
-                expires_at:  row.get("expires_at"),
-            }
-        })
-        .collect()
+        rows.into_iter()
+            .map(|row| {
+                let tags_json: String = row.get("tags_json");
+                let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+                let domain_str: String = row.get("domain");
+                let sens_str: String = row.get("sensitivity");
+                MemoryRecord {
+                    id: row.get("id"),
+                    domain: match domain_str.as_str() {
+                        "session" => MemoryDomain::Session,
+                        "working" => MemoryDomain::Working,
+                        _ => MemoryDomain::LongTerm,
+                    },
+                    session_id: row.get("session_id"),
+                    profile_id: row.get("profile_id"),
+                    content: row.get("content"),
+                    tags,
+                    score: row.get::<f64, _>("score") as f32,
+                    sensitivity: match sens_str.as_str() {
+                        "personal" => Sensitivity::Personal,
+                        "confidential" => Sensitivity::Confidential,
+                        _ => Sensitivity::Public,
+                    },
+                    created_at: row.get("created_at"),
+                    expires_at: row.get("expires_at"),
+                }
+            })
+            .collect()
     }
 
     // ── TTL eviction ──────────────────────────────────────────────────────────
@@ -268,12 +271,11 @@ impl MemoryStore {
     }
 
     pub async fn evict_session(&self, session_id: &str) {
-        let _ = sqlx::query(
-            "DELETE FROM memory_records WHERE domain = 'session' AND session_id = ?1",
-        )
-        .bind(session_id)
-        .execute(&self.pool)
-        .await;
+        let _ =
+            sqlx::query("DELETE FROM memory_records WHERE domain = 'session' AND session_id = ?1")
+                .bind(session_id)
+                .execute(&self.pool)
+                .await;
     }
 
     // ── Scoped purge ──────────────────────────────────────────────────────────
@@ -289,14 +291,13 @@ impl MemoryStore {
 
     pub async fn purge_by_tag(&self, profile_id: &str, tag: &str) -> Result<usize, String> {
         let pattern = format!("%\"{tag}\"%");
-        let result = sqlx::query(
-            "DELETE FROM memory_records WHERE profile_id = ?1 AND tags_json LIKE ?2",
-        )
-        .bind(profile_id)
-        .bind(&pattern)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| format!("purge_by_tag: {e}"))?;
+        let result =
+            sqlx::query("DELETE FROM memory_records WHERE profile_id = ?1 AND tags_json LIKE ?2")
+                .bind(profile_id)
+                .bind(&pattern)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| format!("purge_by_tag: {e}"))?;
         Ok(result.rows_affected() as usize)
     }
 }
@@ -308,23 +309,32 @@ pub fn extract_candidates(text: &str, profile_id: &str, session_id: &str) -> Vec
     let now = now_secs();
     let mut candidates = Vec::new();
 
-    let preference_signals = ["i prefer", "i like", "i hate", "i always", "i never",
-                              "my name is", "i am a", "i work at", "i live in"];
+    let preference_signals = [
+        "i prefer",
+        "i like",
+        "i hate",
+        "i always",
+        "i never",
+        "my name is",
+        "i am a",
+        "i work at",
+        "i live in",
+    ];
 
     for sentence in text.split('.').map(|s| s.trim()).filter(|s| s.len() > 10) {
         let lower = sentence.to_ascii_lowercase();
         if preference_signals.iter().any(|sig| lower.contains(sig)) {
             candidates.push(MemoryRecord {
-                id:          uuid_v4(),
-                domain:      MemoryDomain::LongTerm,
-                session_id:  Some(session_id.to_string()),
-                profile_id:  profile_id.to_string(),
-                content:     sentence.to_string(),
-                tags:        vec!["preference".to_string()],
-                score:       0.7,
+                id: uuid_v4(),
+                domain: MemoryDomain::LongTerm,
+                session_id: Some(session_id.to_string()),
+                profile_id: profile_id.to_string(),
+                content: sentence.to_string(),
+                tags: vec!["preference".to_string()],
+                score: 0.7,
                 sensitivity: Sensitivity::Personal,
-                created_at:  now,
-                expires_at:  None,
+                created_at: now,
+                expires_at: None,
             });
         }
     }
@@ -337,7 +347,9 @@ pub fn extract_candidates(text: &str, profile_id: &str, session_id: &str) -> Vec
 pub fn novelty_score(candidate: &str, existing: &[MemoryRecord]) -> f32 {
     let candidate_lower = candidate.to_ascii_lowercase();
     for rec in existing {
-        let overlap = rec.content.to_ascii_lowercase()
+        let overlap = rec
+            .content
+            .to_ascii_lowercase()
             .split_whitespace()
             .filter(|w| candidate_lower.contains(*w))
             .count();
@@ -351,7 +363,10 @@ pub fn novelty_score(candidate: &str, existing: &[MemoryRecord]) -> f32 {
 
 fn uuid_v4() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().subsec_nanos();
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
     format!("mem-{ts:08x}-{:08x}", rand_u32())
 }
 
@@ -373,16 +388,20 @@ mod tests {
 
     fn record(domain: MemoryDomain, profile: &str, content: &str) -> MemoryRecord {
         MemoryRecord {
-            id:          format!("r-{}-{}", content.len(), profile),
-            domain:      domain.clone(),
-            session_id:  if domain == MemoryDomain::Session { Some("sess-1".into()) } else { None },
-            profile_id:  profile.to_string(),
-            content:     content.to_string(),
-            tags:        vec!["test".into()],
-            score:       0.8,
+            id: format!("r-{}-{}", content.len(), profile),
+            domain: domain.clone(),
+            session_id: if domain == MemoryDomain::Session {
+                Some("sess-1".into())
+            } else {
+                None
+            },
+            profile_id: profile.to_string(),
+            content: content.to_string(),
+            tags: vec!["test".into()],
+            score: 0.8,
             sensitivity: Sensitivity::Public,
-            created_at:  now_secs(),
-            expires_at:  None,
+            created_at: now_secs(),
+            expires_at: None,
         }
     }
 
@@ -406,7 +425,10 @@ mod tests {
 
         store.evict_expired().await;
         let results = store.retrieve("p1", MemoryDomain::Working, None, 10).await;
-        assert!(results.is_empty(), "expired working memory should be evicted");
+        assert!(
+            results.is_empty(),
+            "expired working memory should be evicted"
+        );
     }
 
     #[tokio::test]
@@ -416,7 +438,9 @@ mod tests {
         store.write(rec, false).await.unwrap();
 
         store.evict_session("sess-1").await;
-        let results = store.retrieve("p1", MemoryDomain::Session, Some("sess-1"), 10).await;
+        let results = store
+            .retrieve("p1", MemoryDomain::Session, Some("sess-1"), 10)
+            .await;
         assert!(results.is_empty());
     }
 
@@ -444,13 +468,23 @@ mod tests {
     #[tokio::test]
     async fn profile_isolation_respected() {
         let store = mem_store().await;
-        store.write(record(MemoryDomain::LongTerm, "alice", "alice note"), false).await.unwrap();
-        store.write(record(MemoryDomain::LongTerm, "bob",   "bob note"),   false).await.unwrap();
+        store
+            .write(record(MemoryDomain::LongTerm, "alice", "alice note"), false)
+            .await
+            .unwrap();
+        store
+            .write(record(MemoryDomain::LongTerm, "bob", "bob note"), false)
+            .await
+            .unwrap();
 
-        let alice = store.retrieve("alice", MemoryDomain::LongTerm, None, 10).await;
-        let bob   = store.retrieve("bob",   MemoryDomain::LongTerm, None, 10).await;
+        let alice = store
+            .retrieve("alice", MemoryDomain::LongTerm, None, 10)
+            .await;
+        let bob = store
+            .retrieve("bob", MemoryDomain::LongTerm, None, 10)
+            .await;
         assert_eq!(alice.len(), 1);
-        assert_eq!(bob.len(),   1);
+        assert_eq!(bob.len(), 1);
         assert!(alice[0].content.contains("alice"));
         assert!(bob[0].content.contains("bob"));
     }
@@ -458,8 +492,17 @@ mod tests {
     #[tokio::test]
     async fn purge_profile_removes_all_records() {
         let store = mem_store().await;
-        store.write(record(MemoryDomain::LongTerm, "p2", "fact one"), false).await.unwrap();
-        store.write(record(MemoryDomain::LongTerm, "p2", "fact two longer"), false).await.unwrap();
+        store
+            .write(record(MemoryDomain::LongTerm, "p2", "fact one"), false)
+            .await
+            .unwrap();
+        store
+            .write(
+                record(MemoryDomain::LongTerm, "p2", "fact two longer"),
+                false,
+            )
+            .await
+            .unwrap();
 
         let n = store.purge_profile("p2").await.unwrap();
         assert_eq!(n, 2);
@@ -470,22 +513,37 @@ mod tests {
     #[test]
     fn novelty_score_detects_duplicate() {
         let existing = vec![MemoryRecord {
-            id: "x".into(), domain: MemoryDomain::LongTerm, session_id: None,
-            profile_id: "p".into(), content: "I prefer dark mode themes".into(),
-            tags: vec![], score: 0.8, sensitivity: Sensitivity::Public,
-            created_at: 0, expires_at: None,
+            id: "x".into(),
+            domain: MemoryDomain::LongTerm,
+            session_id: None,
+            profile_id: "p".into(),
+            content: "I prefer dark mode themes".into(),
+            tags: vec![],
+            score: 0.8,
+            sensitivity: Sensitivity::Public,
+            created_at: 0,
+            expires_at: None,
         }];
         let score = novelty_score("I prefer dark mode themes always", &existing);
-        assert!(score < 0.5, "very similar content should have low novelty score");
+        assert!(
+            score < 0.5,
+            "very similar content should have low novelty score"
+        );
     }
 
     #[test]
     fn novelty_score_new_content_is_high() {
         let existing = vec![MemoryRecord {
-            id: "x".into(), domain: MemoryDomain::LongTerm, session_id: None,
-            profile_id: "p".into(), content: "I prefer dark mode".into(),
-            tags: vec![], score: 0.8, sensitivity: Sensitivity::Public,
-            created_at: 0, expires_at: None,
+            id: "x".into(),
+            domain: MemoryDomain::LongTerm,
+            session_id: None,
+            profile_id: "p".into(),
+            content: "I prefer dark mode".into(),
+            tags: vec![],
+            score: 0.8,
+            sensitivity: Sensitivity::Public,
+            created_at: 0,
+            expires_at: None,
         }];
         let score = novelty_score("The capital of France is Paris", &existing);
         assert!(score > 0.5);

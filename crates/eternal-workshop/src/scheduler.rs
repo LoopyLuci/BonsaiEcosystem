@@ -16,7 +16,7 @@ use crate::memory_nodes::MemoryNodeStore;
 
 pub struct Scheduler {
     store: MemoryNodeStore,
-    cfg:   Config,
+    cfg: Config,
 }
 
 impl Scheduler {
@@ -25,7 +25,10 @@ impl Scheduler {
     }
 
     pub async fn run(self) {
-        info!("[scheduler] started — idle_trigger={}min", self.cfg.idle_trigger_mins);
+        info!(
+            "[scheduler] started — idle_trigger={}min",
+            self.cfg.idle_trigger_mins
+        );
 
         let idle_window = Duration::from_secs(self.cfg.idle_trigger_mins * 60);
         let mut last_nightly = None::<chrono::NaiveDate>;
@@ -42,7 +45,10 @@ impl Scheduler {
                 && last_nightly.map_or(true, |d| d < today)
             {
                 last_nightly = Some(today);
-                info!("[scheduler] nightly consolidation triggered at {}", now.format("%H:%M"));
+                info!(
+                    "[scheduler] nightly consolidation triggered at {}",
+                    now.format("%H:%M")
+                );
                 self.run_cycle("nightly").await;
                 continue;
             }
@@ -96,7 +102,8 @@ impl Scheduler {
             .post(&url)
             .json(&payload)
             .timeout(Duration::from_secs(5))
-            .send().await
+            .send()
+            .await
         {
             // Non-fatal — app may not be running
             info!("[scheduler] could not notify app: {e}");

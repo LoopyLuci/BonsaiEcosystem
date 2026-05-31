@@ -9,9 +9,9 @@
 //! 2. Spawn `agda --no-libraries <file>`.
 //! 3. Parse exit code + stdout for error patterns.
 
+use serde::{Deserialize, Serialize};
 use std::io::Write as _;
 use std::process::{Command, Stdio};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -57,24 +57,38 @@ pub struct AgdaSidecar {
 }
 
 impl Default for AgdaSidecar {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AgdaSidecar {
     pub fn new() -> Self {
-        Self { agda_path: Self::find_agda() }
+        Self {
+            agda_path: Self::find_agda(),
+        }
     }
 
     pub fn with_path(path: impl Into<std::path::PathBuf>) -> Self {
-        Self { agda_path: Some(path.into()) }
+        Self {
+            agda_path: Some(path.into()),
+        }
     }
 
-    pub fn agda_available() -> bool { Self::find_agda().is_some() }
+    pub fn agda_available() -> bool {
+        Self::find_agda().is_some()
+    }
 
     fn find_agda() -> Option<std::path::PathBuf> {
-        let names = if cfg!(windows) { vec!["agda.exe", "agda"] } else { vec!["agda"] };
+        let names = if cfg!(windows) {
+            vec!["agda.exe", "agda"]
+        } else {
+            vec!["agda"]
+        };
         for name in names {
-            if let Some(p) = which(name) { return Some(p); }
+            if let Some(p) = which(name) {
+                return Some(p);
+            }
         }
         None
     }
@@ -91,8 +105,10 @@ impl AgdaSidecar {
         }
 
         let mut cmd = Command::new(agda);
-        cmd.arg("--no-libraries").arg(&src_path)
-            .stdout(Stdio::piped()).stderr(Stdio::piped());
+        cmd.arg("--no-libraries")
+            .arg(&src_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
         let timeout = req.timeout_secs;
         let out = if let Some(secs) = timeout {
@@ -104,9 +120,8 @@ impl AgdaSidecar {
         let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
         let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
         let combined = format!("{stdout}\n{stderr}");
-        let success = out.status.success()
-            && !combined.contains("error")
-            && !combined.contains("Error");
+        let success =
+            out.status.success() && !combined.contains("error") && !combined.contains("Error");
 
         let diagnostics = parse_agda_diagnostics(&combined);
 
@@ -114,16 +129,30 @@ impl AgdaSidecar {
             return Err(AgdaError::VerificationFailed(combined));
         }
 
-        Ok(AgdaResponse { success, diagnostics, stdout, stderr })
+        Ok(AgdaResponse {
+            success,
+            diagnostics,
+            stdout,
+            stderr,
+        })
     }
 }
 
 fn parse_agda_diagnostics(output: &str) -> Vec<AgdaDiagnostic> {
-    output.lines()
+    output
+        .lines()
         .filter(|l| l.contains("error") || l.contains("Error") || l.contains("warning"))
         .map(|l| {
-            let severity = if l.to_lowercase().contains("error") { "error" } else { "warning" };
-            AgdaDiagnostic { severity: severity.into(), message: l.to_string(), location: None }
+            let severity = if l.to_lowercase().contains("error") {
+                "error"
+            } else {
+                "warning"
+            };
+            AgdaDiagnostic {
+                severity: severity.into(),
+                message: l.to_string(),
+                location: None,
+            }
         })
         .collect()
 }

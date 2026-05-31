@@ -1,6 +1,6 @@
-use std::path::Path;
 use rand::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// Small fully-connected network used for quick experiments and training scaffolding.
 /// Input: 17 * 19 * 19 planes (AlphaZero-style). Hidden: configurable.
@@ -36,14 +36,30 @@ impl GoNet {
         // He init for ReLU
         let std1 = (2.0f32 / in_features as f32).sqrt();
         let d1 = rand_distr::Normal::<f32>::new(0.0, std1).unwrap();
-        for v in w1.iter_mut() { *v = d1.sample(&mut rng); }
+        for v in w1.iter_mut() {
+            *v = d1.sample(&mut rng);
+        }
 
         let stdp = (2.0f32 / hidden as f32).sqrt();
         let dp = rand_distr::Normal::<f32>::new(0.0, stdp).unwrap();
-        for v in w_policy.iter_mut() { *v = dp.sample(&mut rng); }
-        for v in w_value.iter_mut() { *v = dp.sample(&mut rng); }
+        for v in w_policy.iter_mut() {
+            *v = dp.sample(&mut rng);
+        }
+        for v in w_value.iter_mut() {
+            *v = dp.sample(&mut rng);
+        }
 
-        Self { in_features, hidden, policy_size, w1, b1, w_policy, b_policy, w_value, b_value: 0.0 }
+        Self {
+            in_features,
+            hidden,
+            policy_size,
+            w1,
+            b1,
+            w_policy,
+            b_policy,
+            w_value,
+            b_value: 0.0,
+        }
     }
 
     /// Forward for a batch of inputs (each input is flat Vec<f32> of length `in_features`).
@@ -80,7 +96,9 @@ impl GoNet {
             }
             // value head
             let mut vsum = self.b_value;
-            for (i, act_i) in activations[s].iter().enumerate() { vsum += self.w_value[i] * act_i; }
+            for (i, act_i) in activations[s].iter().enumerate() {
+                vsum += self.w_value[i] * act_i;
+            }
             values[s] = vsum;
         }
 
@@ -89,13 +107,19 @@ impl GoNet {
 
     pub fn forward_single(&self, input: &[f32]) -> (Vec<f32>, f32, Vec<f32>) {
         let (l, v, act) = self.forward_batch(std::slice::from_ref(&input.to_vec()));
-        (l.into_iter().next().unwrap(), v.into_iter().next().unwrap(), act.into_iter().next().unwrap())
+        (
+            l.into_iter().next().unwrap(),
+            v.into_iter().next().unwrap(),
+            act.into_iter().next().unwrap(),
+        )
     }
 
     /// Save model parameters to disk as JSON (simple checkpoint).
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), std::io::Error> {
         let p = path.as_ref();
-        if let Some(parent) = p.parent() { std::fs::create_dir_all(parent)?; }
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let j = serde_json::to_vec(self).map_err(std::io::Error::other)?;
         std::fs::write(p, &j)
     }

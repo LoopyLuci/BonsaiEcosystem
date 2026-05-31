@@ -36,35 +36,76 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, ArrayError> {
     let mut i = 0;
     while i < chars.len() {
         let c = chars[i];
-        if c == ' ' || c == '\t' { i += 1; continue; }
-        if c == '(' { out.push(Tok::LParen);   i += 1; continue; }
-        if c == ')' { out.push(Tok::RParen);   i += 1; continue; }
-        if c == '[' { out.push(Tok::LBracket); i += 1; continue; }
-        if c == ']' { out.push(Tok::RBracket); i += 1; continue; }
-        if c == ',' { out.push(Tok::Comma);    i += 1; continue; }
+        if c == ' ' || c == '\t' {
+            i += 1;
+            continue;
+        }
+        if c == '(' {
+            out.push(Tok::LParen);
+            i += 1;
+            continue;
+        }
+        if c == ')' {
+            out.push(Tok::RParen);
+            i += 1;
+            continue;
+        }
+        if c == '[' {
+            out.push(Tok::LBracket);
+            i += 1;
+            continue;
+        }
+        if c == ']' {
+            out.push(Tok::RBracket);
+            i += 1;
+            continue;
+        }
+        if c == ',' {
+            out.push(Tok::Comma);
+            i += 1;
+            continue;
+        }
 
         // Numbers (including negative via leading ¯ or -)
-        let neg_prefix = c == '¯' || (c == '-' && i + 1 < chars.len() && chars[i+1].is_ascii_digit());
+        let neg_prefix =
+            c == '¯' || (c == '-' && i + 1 < chars.len() && chars[i + 1].is_ascii_digit());
         if c.is_ascii_digit() || neg_prefix {
             let start = i;
-            if c == '¯' || c == '-' { i += 1; }
-            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') { i += 1; }
-            let s: String = chars[start..i].iter().map(|&c| if c == '¯' { '-' } else { c }).collect();
-            let v: f64 = s.parse().map_err(|_| ArrayError::SyntaxError(format!("bad number: {s}")))?;
+            if c == '¯' || c == '-' {
+                i += 1;
+            }
+            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
+                i += 1;
+            }
+            let s: String = chars[start..i]
+                .iter()
+                .map(|&c| if c == '¯' { '-' } else { c })
+                .collect();
+            let v: f64 = s
+                .parse()
+                .map_err(|_| ArrayError::SyntaxError(format!("bad number: {s}")))?;
             out.push(Tok::Num(v));
             continue;
         }
 
         // Multi-char verbs
         let remaining: String = chars[i..].iter().collect();
-        if remaining.starts_with("+.×") { out.push(Tok::Verb("+.×".into())); i += 3; continue; }
+        if remaining.starts_with("+.×") {
+            out.push(Tok::Verb("+.×".into()));
+            i += 3;
+            continue;
+        }
         if remaining.starts_with("∘.") && i + 2 < chars.len() {
-            let verb: String = chars[i..i+3].iter().collect();
-            out.push(Tok::Verb(verb)); i += 3; continue;
+            let verb: String = chars[i..i + 3].iter().collect();
+            out.push(Tok::Verb(verb));
+            i += 3;
+            continue;
         }
 
         // Reductions / scans (verb followed by / or \)
-        let verb_chars = ['+','-','×','÷','|','⌈','⌊','⌽','⍉','⍋','⍒',',','∧','∨','~','#','⍴'];
+        let verb_chars = [
+            '+', '-', '×', '÷', '|', '⌈', '⌊', '⌽', '⍉', '⍋', '⍒', ',', '∧', '∨', '~', '#', '⍴',
+        ];
         if verb_chars.contains(&c) {
             let v = c.to_string();
             i += 1;
@@ -79,8 +120,12 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, ArrayError> {
         }
 
         // Unicode comparison operators
-        let uc_verbs = ['<','≤','=','≥','>','≠'];
-        if uc_verbs.contains(&c) { out.push(Tok::Verb(c.to_string())); i += 1; continue; }
+        let uc_verbs = ['<', '≤', '=', '≥', '>', '≠'];
+        if uc_verbs.contains(&c) {
+            out.push(Tok::Verb(c.to_string()));
+            i += 1;
+            continue;
+        }
 
         return Err(ArrayError::SyntaxError(format!("unexpected char: {c:?}")));
     }
@@ -89,17 +134,26 @@ fn tokenize(src: &str) -> Result<Vec<Tok>, ArrayError> {
 
 // ── Parser ────────────────────────────────────────────────────────────────────
 
-struct Parser { tokens: Vec<Tok>, pos: usize }
+struct Parser {
+    tokens: Vec<Tok>,
+    pos: usize,
+}
 
 impl Parser {
-    fn new(tokens: Vec<Tok>) -> Self { Self { tokens, pos: 0 } }
-    fn peek(&self) -> Option<&Tok> { self.tokens.get(self.pos) }
+    fn new(tokens: Vec<Tok>) -> Self {
+        Self { tokens, pos: 0 }
+    }
+    fn peek(&self) -> Option<&Tok> {
+        self.tokens.get(self.pos)
+    }
     fn advance(&mut self) -> Option<Tok> {
         if self.pos < self.tokens.len() {
             let t = self.tokens[self.pos].clone();
             self.pos += 1;
             Some(t)
-        } else { None }
+        } else {
+            None
+        }
     }
 
     fn parse_expr(&mut self) -> EvalResult {
@@ -133,7 +187,10 @@ impl Parser {
                 let mut vals = Vec::new();
                 loop {
                     match self.peek() {
-                        Some(Tok::RBracket) => { self.advance(); break; }
+                        Some(Tok::RBracket) => {
+                            self.advance();
+                            break;
+                        }
                         None => return Err(ArrayError::SyntaxError("unterminated [".into())),
                         _ => {
                             let e = self.parse_atom()?;
@@ -143,7 +200,9 @@ impl Parser {
                             } else {
                                 vals.extend_from_slice(&e.data);
                             }
-                            if matches!(self.peek(), Some(Tok::Comma)) { self.advance(); }
+                            if matches!(self.peek(), Some(Tok::Comma)) {
+                                self.advance();
+                            }
                         }
                     }
                 }
@@ -153,7 +212,9 @@ impl Parser {
                 self.advance();
                 Ok(NdArray::scalar(v))
             }
-            other => Err(ArrayError::SyntaxError(format!("unexpected token: {other:?}"))),
+            other => Err(ArrayError::SyntaxError(format!(
+                "unexpected token: {other:?}"
+            ))),
         }
     }
 }
@@ -162,56 +223,58 @@ impl Parser {
 
 fn apply_monad(v: &str, a: &NdArray) -> EvalResult {
     match v {
-        "-"  => Ok(ops::neg(a)),
-        "|"  => Ok(ops::abs(a)),
-        "⌈"  => Ok(ops::ceil(a)),
-        "⌊"  => Ok(ops::floor(a)),
-        "~"  => Ok(ops::not(a)),
-        "⌽"  => Ok(a.reverse()),
-        "⍉"  => Ok(a.transpose()),
-        ","  => Ok(a.ravel()),
-        "⍋"  => Ok(a.grade_up()),
-        "⍒"  => Ok(a.grade_down()),
-        "#"  => Ok(NdArray::scalar(a.len() as f64)),
-        "≡"  => Ok(NdArray::scalar(a.rank() as f64)),
-        "⍴"  => Ok(NdArray::vector(a.shape.iter().map(|&s| s as f64).collect())),
+        "-" => Ok(ops::neg(a)),
+        "|" => Ok(ops::abs(a)),
+        "⌈" => Ok(ops::ceil(a)),
+        "⌊" => Ok(ops::floor(a)),
+        "~" => Ok(ops::not(a)),
+        "⌽" => Ok(a.reverse()),
+        "⍉" => Ok(a.transpose()),
+        "," => Ok(a.ravel()),
+        "⍋" => Ok(a.grade_up()),
+        "⍒" => Ok(a.grade_down()),
+        "#" => Ok(NdArray::scalar(a.len() as f64)),
+        "≡" => Ok(NdArray::scalar(a.rank() as f64)),
+        "⍴" => Ok(NdArray::vector(a.shape.iter().map(|&s| s as f64).collect())),
         "+/" => Ok(ops::sum(a)),
         "×/" => Ok(ops::product(a)),
         "⌈/" => Ok(ops::max_reduce(a)),
         "⌊/" => Ok(ops::min_reduce(a)),
         "+\\" => Ok(ops::scan_sum(a)),
         "×\\" => Ok(ops::scan_product(a)),
-        _ => Err(ArrayError::DomainError(format!("unknown monadic verb: {v}"))),
+        _ => Err(ArrayError::DomainError(format!(
+            "unknown monadic verb: {v}"
+        ))),
     }
 }
 
 fn apply_dyad(v: &str, a: &NdArray, b: &NdArray) -> EvalResult {
     match v {
-        "+"  => ops::add(a, b),
-        "-"  => ops::sub(a, b),
-        "×"  => ops::mul(a, b),
-        "÷"  => ops::div(a, b),
-        "|"  => ops::rem(a, b),
-        "⌈"  => ops::map2(a, b, f64::max),
-        "⌊"  => ops::map2(a, b, f64::min),
-        "*"  => ops::pow(a, b),
-        "<"  => ops::lt(a, b),
-        "≤"  => ops::le(a, b),
-        "="  => ops::eq(a, b),
-        "≥"  => ops::ge(a, b),
-        ">"  => ops::gt(a, b),
-        "≠"  => ops::ne(a, b),
-        "∧"  => ops::and(a, b),
-        "∨"  => ops::or(a, b),
-        ","  => a.catenate(b),
-        "+.×"=> ops::matmul(a, b),
-        "⍴"  => {
+        "+" => ops::add(a, b),
+        "-" => ops::sub(a, b),
+        "×" => ops::mul(a, b),
+        "÷" => ops::div(a, b),
+        "|" => ops::rem(a, b),
+        "⌈" => ops::map2(a, b, f64::max),
+        "⌊" => ops::map2(a, b, f64::min),
+        "*" => ops::pow(a, b),
+        "<" => ops::lt(a, b),
+        "≤" => ops::le(a, b),
+        "=" => ops::eq(a, b),
+        "≥" => ops::ge(a, b),
+        ">" => ops::gt(a, b),
+        "≠" => ops::ne(a, b),
+        "∧" => ops::and(a, b),
+        "∨" => ops::or(a, b),
+        "," => a.catenate(b),
+        "+.×" => ops::matmul(a, b),
+        "⍴" => {
             // Reshape: left is shape vector, right is data
             let shape: Vec<usize> = a.data.iter().map(|&x| x as usize).collect();
             Ok(b.reshape(shape))
         }
-        "↑"  => a.take(b.scalar_val().unwrap_or(0.0) as i64),
-        "↓"  => a.drop(b.scalar_val().unwrap_or(0.0) as i64),
+        "↑" => a.take(b.scalar_val().unwrap_or(0.0) as i64),
+        "↓" => a.drop(b.scalar_val().unwrap_or(0.0) as i64),
         _ => Err(ArrayError::DomainError(format!("unknown dyadic verb: {v}"))),
     }
 }

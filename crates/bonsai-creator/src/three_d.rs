@@ -14,7 +14,9 @@ pub struct Trellis3DTool {
 }
 
 impl Trellis3DTool {
-    pub fn new(cas: Arc<CasStore>) -> Self { Self { cas } }
+    pub fn new(cas: Arc<CasStore>) -> Self {
+        Self { cas }
+    }
 }
 
 #[async_trait]
@@ -42,7 +44,11 @@ impl GenerativeTool for Trellis3DTool {
             "TRELLIS-2 placeholder 3D asset | format={format} | prompt={}",
             params.prompt
         );
-        let mime = if format == "ply" { "model/ply" } else { "model/gltf-binary" };
+        let mime = if format == "ply" {
+            "model/ply"
+        } else {
+            "model/gltf-binary"
+        };
         let key = self.cas.put(placeholder.as_bytes(), mime).await?;
 
         Ok(GenerationResult {

@@ -11,11 +11,15 @@ pub struct Guardian {
 }
 
 impl Default for Guardian {
-    fn default() -> Self { Self { threshold: 0.8 } }
+    fn default() -> Self {
+        Self { threshold: 0.8 }
+    }
 }
 
 impl Guardian {
-    pub fn new(threshold: f32) -> Self { Self { threshold } }
+    pub fn new(threshold: f32) -> Self {
+        Self { threshold }
+    }
 
     /// Check raw blob data.  Returns `Ok(())` if safe, `Err(reason)` if not.
     pub fn check(&self, _data: &[u8]) -> Result<(), String> {

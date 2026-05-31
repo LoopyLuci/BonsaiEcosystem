@@ -13,7 +13,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::tool_core::{ToolContext, ToolError, ToolOutput, ToolResult, RetryPolicy};
+use crate::tool_core::{RetryPolicy, ToolContext, ToolError, ToolOutput, ToolResult};
 
 /// Runtime resource ceilings applied per skill execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +51,11 @@ pub fn build_allowed_paths_env(workspace_root: &Path, skill_paths: &[String]) ->
         }
     }
 
-    let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+    let sep = if cfg!(target_os = "windows") {
+        ";"
+    } else {
+        ":"
+    };
     roots.into_iter().collect::<Vec<_>>().join(sep)
 }
 
@@ -70,17 +74,17 @@ pub fn bb_version_mismatch(required_bb_version: Option<&str>, installed_version:
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillManifest {
     /// Unique skill name (must match `user_skills.name`).
-    pub name:         String,
+    pub name: String,
     /// Human-readable description.
-    pub description:  String,
+    pub description: String,
     /// Skill kind: "shell" | "sequence".
-    pub kind:         String,
+    pub kind: String,
     /// Semver-compatible version string.
-    pub version:      String,
+    pub version: String,
     /// Minimum app version required to run this skill.
     pub min_app_version: Option<String>,
     /// Required platform capability tags (e.g. ["internet", "filesystem"]).
-    pub requires:     Vec<String>,
+    pub requires: Vec<String>,
     /// JSON Schema for accepted input `args`.
     pub input_schema: Value,
     /// JSON Schema describing the expected output shape (informational).
@@ -99,7 +103,8 @@ impl SkillManifest {
 
         // If schema says "type": "object", check required fields.
         if schema.get("type").and_then(|v| v.as_str()) == Some("object") {
-            let obj = args.as_object()
+            let obj = args
+                .as_object()
                 .ok_or_else(|| "args must be a JSON object".to_string())?;
 
             if let Some(required) = schema.get("required").and_then(|v| v.as_array()) {
@@ -116,12 +121,12 @@ impl SkillManifest {
                     if let Some(val) = obj.get(key) {
                         let expected_type = prop_schema.get("type").and_then(|t| t.as_str());
                         let actual_ok = match expected_type {
-                            Some("string")  => val.is_string(),
-                            Some("number")  => val.is_number(),
+                            Some("string") => val.is_string(),
+                            Some("number") => val.is_number(),
                             Some("boolean") => val.is_boolean(),
-                            Some("array")   => val.is_array(),
-                            Some("object")  => val.is_object(),
-                            _               => true,
+                            Some("array") => val.is_array(),
+                            Some("object") => val.is_object(),
+                            _ => true,
                         };
                         if !actual_ok {
                             return Err(format!(
@@ -142,7 +147,10 @@ impl SkillManifest {
     pub fn check_compatibility(&self, granted: &HashSet<String>) -> Result<(), String> {
         for cap in &self.requires {
             if !granted.contains(cap) {
-                return Err(format!("skill '{}' requires capability '{cap}' which is not granted", self.name));
+                return Err(format!(
+                    "skill '{}' requires capability '{cap}' which is not granted",
+                    self.name
+                ));
             }
         }
         Ok(())
@@ -151,11 +159,11 @@ impl SkillManifest {
 
 fn json_type_name(v: &Value) -> &'static str {
     match v {
-        Value::Null    => "null",
+        Value::Null => "null",
         Value::Bool(_) => "boolean",
         Value::Number(_) => "number",
         Value::String(_) => "string",
-        Value::Array(_)  => "array",
+        Value::Array(_) => "array",
         Value::Object(_) => "object",
     }
 }
@@ -165,9 +173,9 @@ fn json_type_name(v: &Value) -> &'static str {
 /// Run all preflight checks before executing a skill.
 /// Returns Ok(()) if the skill can proceed, Err with a user-facing message otherwise.
 pub fn preflight_validate(
-    manifest:  &SkillManifest,
-    args:      &Value,
-    granted:   &HashSet<String>,
+    manifest: &SkillManifest,
+    args: &Value,
+    granted: &HashSet<String>,
 ) -> Result<(), String> {
     manifest.validate_args(args)?;
     manifest.check_compatibility(granted)?;
@@ -179,26 +187,29 @@ pub fn preflight_validate(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SequenceStep {
     /// Tool name to invoke.
-    pub tool:       String,
+    pub tool: String,
     /// Args to pass (can reference `$prev` for prior step output).
-    pub args:       Value,
+    pub args: Value,
     /// Per-step retry override.
-    pub retry:      Option<SequenceRetryPolicy>,
+    pub retry: Option<SequenceRetryPolicy>,
     /// Rollback tool to call if a later step fails.
-    pub rollback:   Option<RollbackSpec>,
+    pub rollback: Option<RollbackSpec>,
     /// Human-readable label for diagnostics.
-    pub label:      Option<String>,
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SequenceRetryPolicy {
-    pub max_attempts:    u32,
-    pub backoff_ms:      u64,
+    pub max_attempts: u32,
+    pub backoff_ms: u64,
 }
 
 impl Default for SequenceRetryPolicy {
     fn default() -> Self {
-        Self { max_attempts: 1, backoff_ms: 0 }
+        Self {
+            max_attempts: 1,
+            backoff_ms: 0,
+        }
     }
 }
 
@@ -212,14 +223,18 @@ pub struct RollbackSpec {
 
 /// Invoker function type for sequence execution.
 /// Takes (tool_name, args) and returns a ToolResult.
-pub type StepInvoker = Arc<dyn Fn(String, Value) -> std::pin::Pin<Box<dyn std::future::Future<Output = ToolResult> + Send>> + Send + Sync>;
+pub type StepInvoker = Arc<
+    dyn Fn(String, Value) -> std::pin::Pin<Box<dyn std::future::Future<Output = ToolResult> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// Execute a sequence of steps; on any step failure attempt rollback
 /// in reverse order. Returns all step outputs or the first error.
 pub async fn run_sequence(
-    steps:         &[SequenceStep],
-    ctx:           &ToolContext,
-    invoke:        StepInvoker,
+    steps: &[SequenceStep],
+    ctx: &ToolContext,
+    invoke: StepInvoker,
     default_retry: &SequenceRetryPolicy,
 ) -> Result<Vec<Value>, ToolError> {
     let mut outputs: Vec<Value> = Vec::with_capacity(steps.len());
@@ -227,7 +242,9 @@ pub async fn run_sequence(
 
     for (i, step) in steps.iter().enumerate() {
         if ctx.is_cancelled() {
-            return Err(ToolError::Internal { message: "sequence cancelled".into() });
+            return Err(ToolError::Internal {
+                message: "sequence cancelled".into(),
+            });
         }
 
         let retry = step.retry.as_ref().unwrap_or(default_retry);
@@ -251,7 +268,9 @@ pub async fn run_sequence(
                 }
                 Ok(ToolOutput::Streaming(_)) => {
                     last_err = Some(ToolError::Internal {
-                        message: format!("step '{label}': streaming output not supported in sequences"),
+                        message: format!(
+                            "step '{label}': streaming output not supported in sequences"
+                        ),
                     });
                     break;
                 }
@@ -281,14 +300,12 @@ pub async fn run_sequence(
 
 fn substitute_prev(args: &Value, prev: Option<&Value>) -> Value {
     match args {
-        Value::String(s) if s == "$prev" => {
-            prev.cloned().unwrap_or(Value::Null)
-        }
+        Value::String(s) if s == "$prev" => prev.cloned().unwrap_or(Value::Null),
         Value::Object(map) => {
-            let replaced = map.iter().map(|(k, v)| {
-                (k.clone(), substitute_prev(v, prev))
-            })
-            .collect();
+            let replaced = map
+                .iter()
+                .map(|(k, v)| (k.clone(), substitute_prev(v, prev)))
+                .collect();
             Value::Object(replaced)
         }
         other => other.clone(),
@@ -303,9 +320,9 @@ pub struct ShellGuard {
     /// If non-empty, only commands in this list are allowed.
     pub allow_list: Vec<String>,
     /// Commands that are always denied regardless of allow list.
-    pub deny_list:  Vec<String>,
+    pub deny_list: Vec<String>,
     /// Maximum wall-clock execution time.
-    pub timeout:    Duration,
+    pub timeout: Duration,
     /// Maximum output bytes (stdout + stderr combined).
     pub max_output: usize,
 }
@@ -314,12 +331,17 @@ impl Default for ShellGuard {
     fn default() -> Self {
         Self {
             allow_list: Vec::new(),
-            deny_list:  vec![
-                "rm -rf /".into(), "mkfs".into(), "dd if=/dev/zero".into(),
-                ":(){ :|:& };:".into(), "shutdown".into(), "reboot".into(),
-                "halt".into(), "poweroff".into(),
+            deny_list: vec![
+                "rm -rf /".into(),
+                "mkfs".into(),
+                "dd if=/dev/zero".into(),
+                ":(){ :|:& };:".into(),
+                "shutdown".into(),
+                "reboot".into(),
+                "halt".into(),
+                "poweroff".into(),
             ],
-            timeout:    Duration::from_secs(30),
+            timeout: Duration::from_secs(30),
             max_output: 256 * 1024, // 256 KB
         }
     }
@@ -340,9 +362,10 @@ impl ShellGuard {
         // Allow list: if non-empty, the first token of the script must be in it.
         if !self.allow_list.is_empty() {
             let first_token = script.split_whitespace().next().unwrap_or("");
-            let allowed = self.allow_list.iter().any(|a| {
-                a == first_token || first_token.ends_with(&format!("/{a}"))
-            });
+            let allowed = self
+                .allow_list
+                .iter()
+                .any(|a| a == first_token || first_token.ends_with(&format!("/{a}")));
             if !allowed {
                 return Err(format!(
                     "shell command '{first_token}' is not in the allow list"
@@ -355,7 +378,8 @@ impl ShellGuard {
 
     /// Execute a shell script under this guard's constraints.
     pub async fn execute(&self, script: &str) -> ToolResult {
-        self.check(script).map_err(|e| ToolError::PolicyDenied { reason: e })?;
+        self.check(script)
+            .map_err(|e| ToolError::PolicyDenied { reason: e })?;
 
         // Use platform-appropriate shell
         let mut cmd = if cfg!(target_os = "windows") {
@@ -376,12 +400,16 @@ impl ShellGuard {
 
         let output = match tokio::time::timeout(self.timeout, output_fut).await {
             Ok(Ok(o)) => o,
-            Ok(Err(e)) => return Err(ToolError::Internal {
-                message: format!("shell spawn failed: {e}"),
-            }),
-            Err(_) => return Err(ToolError::Timeout {
-                duration_ms: self.timeout.as_millis() as u64,
-            }),
+            Ok(Err(e)) => {
+                return Err(ToolError::Internal {
+                    message: format!("shell spawn failed: {e}"),
+                })
+            }
+            Err(_) => {
+                return Err(ToolError::Timeout {
+                    duration_ms: self.timeout.as_millis() as u64,
+                })
+            }
         };
 
         let mut stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -409,10 +437,10 @@ impl ShellGuard {
 /// Returns what *would* happen: guard result, manifest validation, compatibility.
 pub fn simulate_execution(
     manifest: &SkillManifest,
-    args:     &Value,
-    granted:  &HashSet<String>,
-    guard:    Option<&ShellGuard>,
-    script:   Option<&str>,
+    args: &Value,
+    granted: &HashSet<String>,
+    guard: Option<&ShellGuard>,
+    script: Option<&str>,
 ) -> SimulationReport {
     let mut issues = Vec::new();
 
@@ -429,7 +457,7 @@ pub fn simulate_execution(
     }
 
     SimulationReport {
-        skill:   manifest.name.clone(),
+        skill: manifest.name.clone(),
         allowed: issues.is_empty(),
         issues,
     }
@@ -437,9 +465,9 @@ pub fn simulate_execution(
 
 #[derive(Debug, Serialize)]
 pub struct SimulationReport {
-    pub skill:   String,
+    pub skill: String,
     pub allowed: bool,
-    pub issues:  Vec<String>,
+    pub issues: Vec<String>,
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -450,12 +478,12 @@ mod tests {
 
     fn basic_manifest() -> SkillManifest {
         SkillManifest {
-            name:            "test_skill".into(),
-            description:     "A test skill".into(),
-            kind:            "shell".into(),
-            version:         "1.0.0".into(),
+            name: "test_skill".into(),
+            description: "A test skill".into(),
+            kind: "shell".into(),
+            version: "1.0.0".into(),
             min_app_version: None,
-            requires:        vec!["filesystem".into()],
+            requires: vec!["filesystem".into()],
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -464,8 +492,8 @@ mod tests {
                 "required": ["path"]
             }),
             output_schema: json!({}),
-            side_effects:  true,
-            retry_policy:  None,
+            side_effects: true,
+            retry_policy: None,
         }
     }
 

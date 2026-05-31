@@ -32,7 +32,9 @@ pub async fn run_dream_cycle(
     cfg: &Config,
     workspace_path: Option<&std::path::Path>,
 ) -> Result<String, String> {
-    let nodes = store.get_pending_nodes().await
+    let nodes = store
+        .get_pending_nodes()
+        .await
         .map_err(|e| format!("db read failed: {e}"))?;
 
     if nodes.is_empty() {
@@ -53,7 +55,9 @@ pub async fn run_dream_cycle(
 
     // Mark all processed nodes as consolidated
     let ids: Vec<String> = nodes.iter().map(|n| n.id.clone()).collect();
-    store.mark_consolidated(&ids).await
+    store
+        .mark_consolidated(&ids)
+        .await
         .map_err(|e| format!("mark_consolidated failed: {e}"))?;
 
     // Update BONSAI.md if workspace path is known
@@ -74,22 +78,21 @@ pub async fn run_dream_cycle(
 
 async fn is_dream_agent_available(cfg: &Config) -> bool {
     let client = reqwest::Client::new();
-    client.get(format!("{}/health", cfg.dream_agent_url()))
+    client
+        .get(format!("{}/health", cfg.dream_agent_url()))
         .timeout(std::time::Duration::from_secs(3))
-        .send().await
+        .send()
+        .await
         .map(|r| r.status().is_success())
         .unwrap_or(false)
 }
 
-async fn call_dream_agent(
-    nodes: &[MemoryNode],
-    cfg: &Config,
-) -> Result<Vec<MemoryNode>, String> {
+async fn call_dream_agent(nodes: &[MemoryNode], cfg: &Config) -> Result<Vec<MemoryNode>, String> {
     // Batch into chunks of 50 nodes to stay within context limits
     let mut all_consolidated = Vec::new();
     for chunk in nodes.chunks(50) {
-        let batch_json = serde_json::to_string(chunk)
-            .map_err(|e| format!("serialize failed: {e}"))?;
+        let batch_json =
+            serde_json::to_string(chunk).map_err(|e| format!("serialize failed: {e}"))?;
 
         let payload = json!({
             "messages": [
@@ -105,10 +108,13 @@ async fn call_dream_agent(
             .post(format!("{}/v1/chat/completions", cfg.dream_agent_url()))
             .json(&payload)
             .timeout(std::time::Duration::from_secs(120))
-            .send().await
+            .send()
+            .await
             .map_err(|e| format!("request failed: {e}"))?;
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| format!("response parse failed: {e}"))?;
 
         let content = json["choices"][0]["message"]["content"]
@@ -117,8 +123,8 @@ async fn call_dream_agent(
 
         // Try to extract JSON array from response (model may add prose before/after)
         let array_start = content.find('[').unwrap_or(0);
-        let array_end   = content.rfind(']').map(|i| i + 1).unwrap_or(content.len());
-        let json_part   = &content[array_start..array_end];
+        let array_end = content.rfind(']').map(|i| i + 1).unwrap_or(content.len());
+        let json_part = &content[array_start..array_end];
 
         if let Ok(batch_result) = serde_json::from_str::<Vec<MemoryNode>>(json_part) {
             all_consolidated.extend(batch_result);
@@ -164,7 +170,10 @@ fn nodes_to_learnings(nodes: &[MemoryNode]) -> String {
         lines.push(format!("- [{}] {}", node.node_type, preview));
     }
     if nodes.len() > 20 {
-        lines.push(format!("- *(+{} more consolidated insights)*", nodes.len() - 20));
+        lines.push(format!(
+            "- *(+{} more consolidated insights)*",
+            nodes.len() - 20
+        ));
     }
     lines.join("\n")
 }
@@ -180,9 +189,7 @@ fn append_learnings_to_bonsai_md(path: &std::path::Path, learnings: &str) {
             &existing[..pos],
         )
     } else {
-        format!(
-            "{existing}\n\n{MARKER}\n*(Updated: {timestamp})*\n\n{learnings}\n"
-        )
+        format!("{existing}\n\n{MARKER}\n*(Updated: {timestamp})*\n\n{learnings}\n")
     };
 
     let _ = std::fs::write(path, new_content);

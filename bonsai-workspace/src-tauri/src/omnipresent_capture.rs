@@ -30,64 +30,184 @@ use crate::unified_training_collector::{
 #[serde(tag = "type", content = "data")]
 pub enum OmnEventType {
     // Input
-    KeyPress { key: String, modifiers: Vec<String> },
-    MouseClick { x: i32, y: i32, button: String },
-    MouseMove { x: i32, y: i32, delta_x: i32, delta_y: i32 },
-    Scroll { delta: i32 },
-    VoiceCommand { transcript: String, confidence: f32 },
-    Gesture { gesture_type: String, data: Value },
+    KeyPress {
+        key: String,
+        modifiers: Vec<String>,
+    },
+    MouseClick {
+        x: i32,
+        y: i32,
+        button: String,
+    },
+    MouseMove {
+        x: i32,
+        y: i32,
+        delta_x: i32,
+        delta_y: i32,
+    },
+    Scroll {
+        delta: i32,
+    },
+    VoiceCommand {
+        transcript: String,
+        confidence: f32,
+    },
+    Gesture {
+        gesture_type: String,
+        data: Value,
+    },
     // System
-    AppLaunch { app_id: String, args: Vec<String> },
-    AppClose { app_id: String, duration_ms: u64 },
-    FileOpen { path: String, app_id: String },
-    FileSave { path: String, size_bytes: u64 },
-    FileDelete { path: String },
-    FileCopy { src: String, dst: String },
-    ProcessStart { pid: u32, name: String, memory_mb: u64 },
-    ProcessExit { pid: u32, exit_code: i32 },
-    NetworkRequest { url: String, method: String, status_code: u16 },
-    ClipboardChange { content_hash: String },
-    ScreenCapture { hash: String, width: u32, height: u32 },
+    AppLaunch {
+        app_id: String,
+        args: Vec<String>,
+    },
+    AppClose {
+        app_id: String,
+        duration_ms: u64,
+    },
+    FileOpen {
+        path: String,
+        app_id: String,
+    },
+    FileSave {
+        path: String,
+        size_bytes: u64,
+    },
+    FileDelete {
+        path: String,
+    },
+    FileCopy {
+        src: String,
+        dst: String,
+    },
+    ProcessStart {
+        pid: u32,
+        name: String,
+        memory_mb: u64,
+    },
+    ProcessExit {
+        pid: u32,
+        exit_code: i32,
+    },
+    NetworkRequest {
+        url: String,
+        method: String,
+        status_code: u16,
+    },
+    ClipboardChange {
+        content_hash: String,
+    },
+    ScreenCapture {
+        hash: String,
+        width: u32,
+        height: u32,
+    },
     // Shell
-    CommandTyped { command: String, shell: String },
-    CommandCompleted { command: String, exit_code: i32, duration_ms: u64 },
-    AutocompleteAccepted { prefix: String, completion: String },
+    CommandTyped {
+        command: String,
+        shell: String,
+    },
+    CommandCompleted {
+        command: String,
+        exit_code: i32,
+        duration_ms: u64,
+    },
+    AutocompleteAccepted {
+        prefix: String,
+        completion: String,
+    },
     // Intelligence
-    ModelInference { model_id: String, prompt_hash: String, tokens: u32 },
-    ToolInvocation { tool_name: String, args_hash: String, success: bool },
-    AgentAction { agent_id: String, action_type: String, outcome: String },
-    ReasoningAttempt { strategy: String, confidence: f32, correct: Option<bool> },
-    TrainingCycle { adapter_id: String, metrics: Value },
+    ModelInference {
+        model_id: String,
+        prompt_hash: String,
+        tokens: u32,
+    },
+    ToolInvocation {
+        tool_name: String,
+        args_hash: String,
+        success: bool,
+    },
+    AgentAction {
+        agent_id: String,
+        action_type: String,
+        outcome: String,
+    },
+    ReasoningAttempt {
+        strategy: String,
+        confidence: f32,
+        correct: Option<bool>,
+    },
+    TrainingCycle {
+        adapter_id: String,
+        metrics: Value,
+    },
     // User feedback
-    ExplicitCorrection { original: String, corrected: String },
-    ImplicitPreference { chosen: String, rejected: String },
-    SatisfactionRating { rating: u8, context: String },
+    ExplicitCorrection {
+        original: String,
+        corrected: String,
+    },
+    ImplicitPreference {
+        chosen: String,
+        rejected: String,
+    },
+    SatisfactionRating {
+        rating: u8,
+        context: String,
+    },
     // Workspace
-    WorkspaceSwitch { from: String, to: String },
-    WindowFocus { app_id: String, title: String },
-    WindowClose { app_id: String },
-    TabSwitch { app_id: String, from_tab: String, to_tab: String },
+    WorkspaceSwitch {
+        from: String,
+        to: String,
+    },
+    WindowFocus {
+        app_id: String,
+        title: String,
+    },
+    WindowClose {
+        app_id: String,
+    },
+    TabSwitch {
+        app_id: String,
+        from_tab: String,
+        to_tab: String,
+    },
 }
 
 impl OmnEventType {
     pub fn category(&self) -> &'static str {
         match self {
-            Self::KeyPress { .. } | Self::MouseClick { .. } | Self::MouseMove { .. }
-            | Self::Scroll { .. } | Self::VoiceCommand { .. } | Self::Gesture { .. } => "input",
-            Self::AppLaunch { .. } | Self::AppClose { .. } | Self::FileOpen { .. }
-            | Self::FileSave { .. } | Self::FileDelete { .. } | Self::FileCopy { .. }
-            | Self::ProcessStart { .. } | Self::ProcessExit { .. }
-            | Self::NetworkRequest { .. } | Self::ClipboardChange { .. }
+            Self::KeyPress { .. }
+            | Self::MouseClick { .. }
+            | Self::MouseMove { .. }
+            | Self::Scroll { .. }
+            | Self::VoiceCommand { .. }
+            | Self::Gesture { .. } => "input",
+            Self::AppLaunch { .. }
+            | Self::AppClose { .. }
+            | Self::FileOpen { .. }
+            | Self::FileSave { .. }
+            | Self::FileDelete { .. }
+            | Self::FileCopy { .. }
+            | Self::ProcessStart { .. }
+            | Self::ProcessExit { .. }
+            | Self::NetworkRequest { .. }
+            | Self::ClipboardChange { .. }
             | Self::ScreenCapture { .. } => "system",
-            Self::CommandTyped { .. } | Self::CommandCompleted { .. }
+            Self::CommandTyped { .. }
+            | Self::CommandCompleted { .. }
             | Self::AutocompleteAccepted { .. } => "shell",
-            Self::ModelInference { .. } | Self::ToolInvocation { .. }
-            | Self::AgentAction { .. } | Self::ReasoningAttempt { .. }
+            Self::ModelInference { .. }
+            | Self::ToolInvocation { .. }
+            | Self::AgentAction { .. }
+            | Self::ReasoningAttempt { .. }
             | Self::TrainingCycle { .. } => "intelligence",
-            Self::ExplicitCorrection { .. } | Self::ImplicitPreference { .. }
+            Self::ExplicitCorrection { .. }
+            | Self::ImplicitPreference { .. }
             | Self::SatisfactionRating { .. } => "feedback",
-            Self::WorkspaceSwitch { .. } | Self::WindowFocus { .. }
-            | Self::WindowClose { .. } | Self::TabSwitch { .. } => "workspace",
+            Self::WorkspaceSwitch { .. }
+            | Self::WindowFocus { .. }
+            | Self::WindowClose { .. }
+            | Self::TabSwitch { .. } => "workspace",
         }
     }
 
@@ -95,11 +215,11 @@ impl OmnEventType {
         matches!(
             self,
             Self::ExplicitCorrection { .. }
-            | Self::ImplicitPreference { .. }
-            | Self::SatisfactionRating { .. }
-            | Self::ReasoningAttempt { .. }
-            | Self::ToolInvocation { .. }
-            | Self::CommandCompleted { .. }
+                | Self::ImplicitPreference { .. }
+                | Self::SatisfactionRating { .. }
+                | Self::ReasoningAttempt { .. }
+                | Self::ToolInvocation { .. }
+                | Self::CommandCompleted { .. }
         )
     }
 }
@@ -127,7 +247,14 @@ pub struct HardwareSnapshot {
 }
 
 impl Default for HardwareSnapshot {
-    fn default() -> Self { Self { cpu_pct: 0, gpu_pct: 0, ram_mb: 0, vram_mb: 0 } }
+    fn default() -> Self {
+        Self {
+            cpu_pct: 0,
+            gpu_pct: 0,
+            ram_mb: 0,
+            vram_mb: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -209,13 +336,21 @@ impl SessionTracker {
 
     fn observe(&mut self, ev: &OmnEvent) {
         self.event_count += 1;
-        *self.categories.entry(ev.event_type.category().into()).or_default() += 1;
+        *self
+            .categories
+            .entry(ev.event_type.category().into())
+            .or_default() += 1;
         if !ev.context.active_app.is_empty() {
-            *self.app_counts.entry(ev.context.active_app.clone()).or_default() += 1;
+            *self
+                .app_counts
+                .entry(ev.context.active_app.clone())
+                .or_default() += 1;
         }
         match &ev.event_type {
             OmnEventType::CommandCompleted { .. } => self.commands_run += 1,
-            OmnEventType::FileOpen { .. } | OmnEventType::FileSave { .. } => self.files_touched += 1,
+            OmnEventType::FileOpen { .. } | OmnEventType::FileSave { .. } => {
+                self.files_touched += 1
+            }
             OmnEventType::ModelInference { .. } => self.ai_inferences += 1,
             OmnEventType::ExplicitCorrection { .. } => self.corrections_given += 1,
             _ => {}
@@ -259,7 +394,10 @@ pub struct OmnipresentCapture {
 }
 
 impl OmnipresentCapture {
-    pub fn new(cas: Arc<bonsai_cas::CasStore>, collector: Arc<UnifiedTrainingCollector>) -> Arc<Self> {
+    pub fn new(
+        cas: Arc<bonsai_cas::CasStore>,
+        collector: Arc<UnifiedTrainingCollector>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             cas,
             collector,
@@ -276,7 +414,9 @@ impl OmnipresentCapture {
     /// training collector; all events are buffered in the ring and persisted
     /// to CAS in the background.
     pub async fn record(&self, event_type: OmnEventType) {
-        if !self.enabled { return; }
+        if !self.enabled {
+            return;
+        }
 
         let context = self.current_context.read().await.clone();
         let hw = self.hw_snapshot.read().await.clone();
@@ -329,7 +469,14 @@ impl OmnipresentCapture {
     /// Return recent events (newest-last, limited by `n`)
     pub async fn recent_events(&self, n: usize) -> Vec<OmnEvent> {
         let ring = self.ring.read().await;
-        ring.iter().rev().take(n).cloned().collect::<Vec<_>>().into_iter().rev().collect()
+        ring.iter()
+            .rev()
+            .take(n)
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect()
     }
 
     /// Return the current session summary
@@ -347,19 +494,28 @@ impl OmnipresentCapture {
 
     async fn maybe_generate_training_example(&self, ev: &OmnEvent) {
         let example = match &ev.event_type {
-            OmnEventType::ExplicitCorrection { original, corrected } => {
-                let meta = QualityMeta { edit_distance: levenshtein(original, corrected) as u32,
-                    original_len: original.len() as u32, ..Default::default() };
+            OmnEventType::ExplicitCorrection {
+                original,
+                corrected,
+            } => {
+                let meta = QualityMeta {
+                    edit_distance: levenshtein(original, corrected) as u32,
+                    original_len: original.len() as u32,
+                    ..Default::default()
+                };
                 let qs = crate::unified_training_collector::quality_score(
-                    &TrainingSource::UserCorrections, &meta);
+                    &TrainingSource::UserCorrections,
+                    &meta,
+                );
                 Some(UnifiedTrainingExample {
                     id: Uuid::new_v4().to_string(),
                     target_model: ModelRole::Primary,
                     suitable_strategies: vec![TrainingStrategyType::Dpo],
                     input: TrainingInput::Conversation {
-                        messages: vec![
-                            ConvMessage { role: "user".into(), content: original.clone() },
-                        ],
+                        messages: vec![ConvMessage {
+                            role: "user".into(),
+                            content: original.clone(),
+                        }],
                     },
                     expected_output: TrainingOutput::PreferencePair {
                         chosen: corrected.clone(),
@@ -370,26 +526,37 @@ impl OmnipresentCapture {
                     priority: qs,
                     timestamp: ev.timestamp,
                     dimensions: vec!["user_corrections".into()],
-                    used: false, use_count: 0,
+                    used: false,
+                    use_count: 0,
                     metadata: serde_json::json!({
                         "session_id": ev.session_id,
                         "app": ev.context.active_app,
                     }),
                 })
             }
-            OmnEventType::CommandCompleted { command, exit_code, duration_ms } => {
+            OmnEventType::CommandCompleted {
+                command,
+                exit_code,
+                duration_ms,
+            } => {
                 let succeeded = *exit_code == 0;
-                let meta = QualityMeta { tool_succeeded: succeeded, ..Default::default() };
+                let meta = QualityMeta {
+                    tool_succeeded: succeeded,
+                    ..Default::default()
+                };
                 let qs = crate::unified_training_collector::quality_score(
-                    &TrainingSource::ToolExecution, &meta);
+                    &TrainingSource::ToolExecution,
+                    &meta,
+                );
                 Some(UnifiedTrainingExample {
                     id: Uuid::new_v4().to_string(),
                     target_model: ModelRole::Primary,
                     suitable_strategies: vec![TrainingStrategyType::CurriculumSft],
                     input: TrainingInput::Conversation {
-                        messages: vec![
-                            ConvMessage { role: "user".into(), content: format!("Run: {command}") },
-                        ],
+                        messages: vec![ConvMessage {
+                            role: "user".into(),
+                            content: format!("Run: {command}"),
+                        }],
                     },
                     expected_output: TrainingOutput::Text {
                         content: if succeeded {
@@ -403,7 +570,8 @@ impl OmnipresentCapture {
                     priority: qs,
                     timestamp: ev.timestamp,
                     dimensions: vec!["shell".into()],
-                    used: false, use_count: 0,
+                    used: false,
+                    use_count: 0,
                     metadata: serde_json::json!({ "exit_code": exit_code, "duration_ms": duration_ms }),
                 })
             }
@@ -420,14 +588,22 @@ impl OmnipresentCapture {
 fn levenshtein(a: &str, b: &str) -> usize {
     let a: Vec<char> = a.chars().take(200).collect();
     let b: Vec<char> = b.chars().take(200).collect();
-    let m = a.len(); let n = b.len();
+    let m = a.len();
+    let n = b.len();
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m { dp[i][0] = i; }
-    for j in 0..=n { dp[0][j] = j; }
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
     for i in 1..=m {
         for j in 1..=n {
-            dp[i][j] = if a[i-1] == b[j-1] { dp[i-1][j-1] }
-            else { 1 + dp[i-1][j].min(dp[i][j-1]).min(dp[i-1][j-1]) };
+            dp[i][j] = if a[i - 1] == b[j - 1] {
+                dp[i - 1][j - 1]
+            } else {
+                1 + dp[i - 1][j].min(dp[i][j - 1]).min(dp[i - 1][j - 1])
+            };
         }
     }
     dp[m][n]
@@ -438,7 +614,9 @@ impl OmnipresentCapture {
     pub async fn get_events_since(&self, since_ms: i64) -> Vec<OmnEvent> {
         // Events are stored with timestamp in microseconds
         let since_us = since_ms * 1_000;
-        self.ring.read().await
+        self.ring
+            .read()
+            .await
             .iter()
             .filter(|e| e.timestamp >= since_us)
             .cloned()
@@ -484,9 +662,7 @@ pub async fn omn_update_context(
 }
 
 #[tauri::command]
-pub async fn omn_new_session(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<(), String> {
+pub async fn omn_new_session(state: tauri::State<'_, crate::AppState>) -> Result<(), String> {
     state.omnipresent.new_session().await;
     Ok(())
 }
@@ -513,19 +689,47 @@ mod tests {
 
     #[test]
     fn event_categories() {
-        assert_eq!(OmnEventType::KeyPress { key: "a".into(), modifiers: vec![] }.category(), "input");
-        assert_eq!(OmnEventType::FileSave { path: "/tmp/x".into(), size_bytes: 0 }.category(), "system");
-        assert_eq!(OmnEventType::CommandCompleted {
-            command: "ls".into(), exit_code: 0, duration_ms: 5
-        }.category(), "shell");
+        assert_eq!(
+            OmnEventType::KeyPress {
+                key: "a".into(),
+                modifiers: vec![]
+            }
+            .category(),
+            "input"
+        );
+        assert_eq!(
+            OmnEventType::FileSave {
+                path: "/tmp/x".into(),
+                size_bytes: 0
+            }
+            .category(),
+            "system"
+        );
+        assert_eq!(
+            OmnEventType::CommandCompleted {
+                command: "ls".into(),
+                exit_code: 0,
+                duration_ms: 5
+            }
+            .category(),
+            "shell"
+        );
     }
 
     #[test]
     fn high_value_classification() {
         assert!(OmnEventType::ExplicitCorrection {
-            original: "foo".into(), corrected: "bar".into()
-        }.is_high_value());
-        assert!(!OmnEventType::MouseMove { x: 0, y: 0, delta_x: 1, delta_y: 0 }.is_high_value());
+            original: "foo".into(),
+            corrected: "bar".into()
+        }
+        .is_high_value());
+        assert!(!OmnEventType::MouseMove {
+            x: 0,
+            y: 0,
+            delta_x: 1,
+            delta_y: 0
+        }
+        .is_high_value());
     }
 
     #[test]

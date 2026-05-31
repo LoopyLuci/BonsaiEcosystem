@@ -16,10 +16,10 @@ use crate::bootstrap;
 /// Thread-safe handle to a running `whisper-server` process.
 /// Wrap in `Arc` so it can be shared across Tauri command handlers.
 pub struct WhisperManager {
-    app:     AppHandle,
-    port:    u16,
-    url:     String,
-    client:  Client,
+    app: AppHandle,
+    port: u16,
+    url: String,
+    client: Client,
     // Mutex so Drop can kill the child without requiring &mut self
     process: Mutex<Option<std::process::Child>>,
 }
@@ -73,7 +73,9 @@ impl WhisperManager {
                     let text = r.text().await.map_err(|e| e.to_string())?;
                     return Ok(text.trim().to_string());
                 }
-                Ok(r) => tracing::warn!(attempt=%attempt, status=%r.status(), "[whisper] HTTP error"),
+                Ok(r) => {
+                    tracing::warn!(attempt=%attempt, status=%r.status(), "[whisper] HTTP error")
+                }
                 Err(e) => tracing::warn!(attempt=%attempt, error=%e, "[whisper] request error"),
             }
             tokio::time::sleep(Duration::from_millis(600 * u64::from(attempt + 1))).await;
@@ -86,7 +88,10 @@ impl WhisperManager {
     }
 
     fn ensure_running(&self) -> Result<(), String> {
-        let mut guard = self.process.lock().map_err(|_| "whisper lock poisoned".to_string())?;
+        let mut guard = self
+            .process
+            .lock()
+            .map_err(|_| "whisper lock poisoned".to_string())?;
 
         if let Some(child) = guard.as_mut() {
             match child.try_wait() {
@@ -97,16 +102,16 @@ impl WhisperManager {
             }
         }
 
-        let mut child = try_spawn(&self.app, self.port)
-            .ok_or_else(|| "Whisper sidecar unavailable (binary missing/incompatible)".to_string())?;
+        let mut child = try_spawn(&self.app, self.port).ok_or_else(|| {
+            "Whisper sidecar unavailable (binary missing/incompatible)".to_string()
+        })?;
 
         // If process immediately exits, surface a clean error instead of acting healthy.
-        if child
-            .try_wait()
-            .map_err(|e| e.to_string())?
-            .is_some()
-        {
-            return Err("Whisper sidecar exited immediately (check binary/runtime compatibility)".to_string());
+        if child.try_wait().map_err(|e| e.to_string())?.is_some() {
+            return Err(
+                "Whisper sidecar exited immediately (check binary/runtime compatibility)"
+                    .to_string(),
+            );
         }
 
         *guard = Some(child);
@@ -149,7 +154,7 @@ impl Drop for WhisperManager {
 // ── Process spawn ─────────────────────────────────────────────────────────────
 
 fn try_spawn(app: &AppHandle, port: u16) -> Option<std::process::Child> {
-    let exe   = bootstrap::whisper_exe(app);
+    let exe = bootstrap::whisper_exe(app);
     let model = bootstrap::whisper_model(app);
 
     if !exe.exists() {
@@ -161,9 +166,12 @@ fn try_spawn(app: &AppHandle, port: u16) -> Option<std::process::Child> {
 
     let mut cmd = std::process::Command::new(&exe);
     cmd.args([
-        "--port",  &port.to_string(),
-        "--host",  "127.0.0.1",
-        "--model", &model.to_string_lossy(),
+        "--port",
+        &port.to_string(),
+        "--host",
+        "127.0.0.1",
+        "--model",
+        &model.to_string_lossy(),
         "--log-disable",
     ])
     .current_dir(&dir)

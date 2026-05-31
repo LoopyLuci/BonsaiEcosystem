@@ -10,10 +10,10 @@
 //! 3. Parse the JSON diagnostics stream to determine `Ok / Err`.
 //! 4. Delete the temp file and return the result.
 
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 // ── Error ─────────────────────────────────────────────────────────────────────
@@ -75,9 +75,15 @@ pub struct LeanSidecar {
 }
 
 impl LeanSidecar {
-    pub fn new() -> Self { Self { lean_path: None } }
+    pub fn new() -> Self {
+        Self { lean_path: None }
+    }
 
-    pub fn with_path(path: PathBuf) -> Self { Self { lean_path: Some(path) } }
+    pub fn with_path(path: PathBuf) -> Self {
+        Self {
+            lean_path: Some(path),
+        }
+    }
 
     /// Verify a Lean 4 source file. Returns `Ok(LeanResponse)` if the
     /// subprocess exited cleanly; the response's `success` field indicates
@@ -101,22 +107,31 @@ impl LeanSidecar {
 
     fn find_lean(&self) -> LeanResult<PathBuf> {
         if let Some(p) = &self.lean_path {
-            if p.exists() { return Ok(p.clone()); }
+            if p.exists() {
+                return Ok(p.clone());
+            }
         }
         which_binary("lean").ok_or(LeanError::BinaryNotFound)
     }
 
-    fn run_lean(&self, lean: &PathBuf, file: &PathBuf, _timeout_secs: u64) -> LeanResult<LeanResponse> {
+    fn run_lean(
+        &self,
+        lean: &PathBuf,
+        file: &PathBuf,
+        _timeout_secs: u64,
+    ) -> LeanResult<LeanResponse> {
         let output = Command::new(lean)
             .arg("--json")
             .arg(file)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
-                LeanError::BinaryNotFound
-            } else {
-                LeanError::Io(e)
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    LeanError::BinaryNotFound
+                } else {
+                    LeanError::Io(e)
+                }
             })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -126,23 +141,34 @@ impl LeanSidecar {
         let mut diagnostics = Vec::new();
         for line in stdout.lines() {
             let line = line.trim();
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(line) {
                 let severity = v["severity"].as_str().unwrap_or("information").to_string();
-                let message  = v["data"].as_str().or_else(|| v["message"].as_str()).unwrap_or("").to_string();
+                let message = v["data"]
+                    .as_str()
+                    .or_else(|| v["message"].as_str())
+                    .unwrap_or("")
+                    .to_string();
                 let pos = v["pos"].as_object().map(|p| LeanPos {
-                    line:   p["line"].as_u64().unwrap_or(0) as u32,
+                    line: p["line"].as_u64().unwrap_or(0) as u32,
                     column: p["column"].as_u64().unwrap_or(0) as u32,
                 });
-                diagnostics.push(LeanDiagnostic { severity, message, pos });
+                diagnostics.push(LeanDiagnostic {
+                    severity,
+                    message,
+                    pos,
+                });
             }
         }
 
-        let has_errors = diagnostics.iter().any(|d| d.severity == "error")
-            || !output.status.success();
+        let has_errors =
+            diagnostics.iter().any(|d| d.severity == "error") || !output.status.success();
 
         if has_errors {
-            let msg = diagnostics.iter()
+            let msg = diagnostics
+                .iter()
                 .filter(|d| d.severity == "error")
                 .map(|d| d.message.as_str())
                 .collect::<Vec<_>>()
@@ -150,22 +176,33 @@ impl LeanSidecar {
             return Err(LeanError::VerificationFailed(msg));
         }
 
-        Ok(LeanResponse { success: true, diagnostics, stdout, stderr })
+        Ok(LeanResponse {
+            success: true,
+            diagnostics,
+            stdout,
+            stderr,
+        })
     }
 }
 
 impl Default for LeanSidecar {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn which_binary(name: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH")?.to_str()?.split(if cfg!(windows) { ';' } else { ':' })
+    std::env::var_os("PATH")?
+        .to_str()?
+        .split(if cfg!(windows) { ';' } else { ':' })
         .map(|dir| {
             let mut p = PathBuf::from(dir);
             p.push(name);
-            if cfg!(windows) { p.set_extension("exe"); }
+            if cfg!(windows) {
+                p.set_extension("exe");
+            }
             p
         })
         .find(|p| p.is_file())
@@ -182,8 +219,13 @@ pub fn lean_available() -> bool {
 /// Returns `Ok(true)` if Lean accepts it, `Ok(false)` if not installed,
 /// `Err` if Lean is installed but rejects the proof.
 pub fn verify_lean_source(source: &str) -> LeanResult<bool> {
-    if !lean_available() { return Ok(false); }
+    if !lean_available() {
+        return Ok(false);
+    }
     let sidecar = LeanSidecar::new();
-    sidecar.verify(&LeanRequest { source: source.into(), timeout_secs: Some(30) })?;
+    sidecar.verify(&LeanRequest {
+        source: source.into(),
+        timeout_secs: Some(30),
+    })?;
     Ok(true)
 }

@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::process::Command;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 use std::sync::{Arc, Mutex as StdMutex};
 use sysinfo::System;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -17,16 +17,13 @@ use tokio::sync::oneshot;
 use walkdir::WalkDir;
 
 use crate::action_parser::handle_agent_response;
-use crate::api_server;
 use crate::agent_connect::{AgentConnectEvent, AgentConnectSession};
+use crate::api_server;
 use crate::bootstrap;
-use crate::error::BonsaiError;
 use crate::cluster_orchestrator::{
-    ClusterNode,
-    ClusterPolicy,
-    ClusterWorkload,
-    NodeRuntimeMetrics,
+    ClusterNode, ClusterPolicy, ClusterWorkload, NodeRuntimeMetrics,
 };
+use crate::error::BonsaiError;
 use crate::model_orchestrator::InferStats;
 use crate::remote::RemoteManager;
 use crate::remote_input::RemoteInputEvent;
@@ -89,8 +86,7 @@ pub async fn write_file(path: String, content: String) -> Result<(), String> {
     if has_parent_dir_component(&path) {
         return Err("Path not allowed: traversal sequences are forbidden".to_string());
     }
-    crate::atomic_write(std::path::Path::new(&path), content.as_bytes())
-        .map_err(|e| e.to_string())
+    crate::atomic_write(std::path::Path::new(&path), content.as_bytes()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -150,7 +146,8 @@ pub async fn save_canvas_layout(workspace_path: String, layout: Value) -> Result
     let payload = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
     {
         let mut temp = fs::File::create(&tmp_path).map_err(|e| e.to_string())?;
-        temp.write_all(payload.as_bytes()).map_err(|e| e.to_string())?;
+        temp.write_all(payload.as_bytes())
+            .map_err(|e| e.to_string())?;
         temp.write_all(b"\n").map_err(|e| e.to_string())?;
         temp.sync_all().map_err(|e| e.to_string())?;
     }
@@ -204,7 +201,9 @@ pub async fn list_project_files(workspace_path: String) -> Result<Vec<serde_json
         // strip_prefix on Windows leaves a leading backslash → leading slash after replace
         let rel = raw_rel.trim_start_matches('/').to_string();
         // Skip the workspace root itself (empty rel)
-        if rel.is_empty() { continue; }
+        if rel.is_empty() {
+            continue;
+        }
         entries.push(serde_json::json!({
             "path":   entry.path().to_string_lossy(),
             "rel":    rel,
@@ -263,7 +262,7 @@ pub async fn get_git_branch(_workspace_path: String) -> Result<String, String> {
 
 #[derive(Deserialize)]
 pub struct ChatMessagePayload {
-    pub role:    String,
+    pub role: String,
     pub content: String,
 }
 
@@ -330,11 +329,10 @@ fn trim_context_to_budget(ctx: &mut Vec<Value>, budget_tokens: usize) -> bool {
             0
         };
         if let Some(last) = ctx.last_mut() {
-            let allowed = budget_tokens.saturating_sub(without_last).saturating_sub(12);
-            let current = last
-                .get("content")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let allowed = budget_tokens
+                .saturating_sub(without_last)
+                .saturating_sub(12);
+            let current = last.get("content").and_then(|v| v.as_str()).unwrap_or("");
             set_msg_content(last, truncate_to_tokens(current, allowed));
             trimmed = true;
         }
@@ -348,10 +346,7 @@ fn trim_context_to_budget(ctx: &mut Vec<Value>, budget_tokens: usize) -> bool {
         };
         if let Some(system) = ctx.get_mut(0) {
             let allowed = budget_tokens.saturating_sub(others).saturating_sub(12);
-            let current = system
-                .get("content")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let current = system.get("content").and_then(|v| v.as_str()).unwrap_or("");
             set_msg_content(system, truncate_to_tokens(current, allowed));
             trimmed = true;
         }
@@ -388,7 +383,8 @@ fn is_greeting_message(text: &str) -> bool {
         .trim_matches(|c: char| c.is_ascii_punctuation() || c.is_whitespace())
         .to_string();
 
-    matches!(normalized.as_str(),
+    matches!(
+        normalized.as_str(),
         "hi" | "hello" | "hey" | "yo" | "sup" | "good morning" | "good afternoon" | "good evening"
     )
 }
@@ -535,20 +531,20 @@ pub async fn agent_connect_end_session(
 
 #[derive(serde::Serialize)]
 pub struct ChatResponse {
-    pub content:        String,
-    pub stats:          InferStats,
+    pub content: String,
+    pub stats: InferStats,
     /// true when the response was paused for HITL tool approval
     pub action_handled: bool,
     /// Tools automatically executed (no HITL) during this turn
-    pub tools_used:     Vec<String>,
+    pub tools_used: Vec<String>,
 }
 
 /// Single inference call — streams tokens via "token-stream" event.
 async fn run_inference(
-    task_queue:   &crate::task_queue::TaskQueue,
-    app_handle:   &AppHandle,
-    messages:     Vec<Value>,
-    cancel_flag:  Option<Arc<std::sync::atomic::AtomicBool>>,
+    task_queue: &crate::task_queue::TaskQueue,
+    app_handle: &AppHandle,
+    messages: Vec<Value>,
+    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> Result<(String, InferStats), String> {
     let (stream_tx, mut stream_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let handle = app_handle.clone();
@@ -557,27 +553,29 @@ async fn run_inference(
             let _ = handle.emit("token-stream", &tok);
         }
     });
-    task_queue.submit(InferenceTask {
-        task_type: TaskType::UserChat,
-        source: TaskSource::Workspace,
-        model_id: None,
-        messages,
-        max_tokens: 4096,
-        overrides: None,
-        stream_tx: Some(stream_tx),
-        cancel_flag,
-        estimated_tokens: 4096,
-        estimated_ram_mb: 2048,
-    }).await
+    task_queue
+        .submit(InferenceTask {
+            task_type: TaskType::UserChat,
+            source: TaskSource::Workspace,
+            model_id: None,
+            messages,
+            max_tokens: 4096,
+            overrides: None,
+            stream_tx: Some(stream_tx),
+            cancel_flag,
+            estimated_tokens: 4096,
+            estimated_ram_mb: 2048,
+        })
+        .await
 }
 
 #[tauri::command]
 pub async fn submit_chat(
-    app_handle:     AppHandle,
-    state:          State<'_, AppState>,
-    messages:       Vec<ChatMessagePayload>,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+    messages: Vec<ChatMessagePayload>,
     workspace_path: Option<String>,
-    enabled_tools:  Option<Vec<String>>,
+    enabled_tools: Option<Vec<String>>,
 ) -> Result<ChatResponse, BonsaiError> {
     state.chat_cancel.store(false, Ordering::Relaxed);
 
@@ -600,17 +598,15 @@ pub async fn submit_chat(
         }),
     );
 
-    let mut tools = tools::all_tools_full(
-        workspace_path.as_deref(),
-        None,
-        Some(&state.tool_registry),
-    );
+    let mut tools =
+        tools::all_tools_full(workspace_path.as_deref(), None, Some(&state.tool_registry));
     if let Some(enabled) = enabled_tools {
         let allow: std::collections::HashSet<String> = enabled.into_iter().collect();
         tools.retain(|t| allow.contains(&t.name));
     }
 
-    let mut sys_prompt = tools::system_prompt_for(&tools, workspace_path.as_deref(), Some(&last_user_text));
+    let mut sys_prompt =
+        tools::system_prompt_for(&tools, workspace_path.as_deref(), Some(&last_user_text));
     // Inject BONSAI.md when the feature is enabled
     if crate::features::FeatureFlags::global().bonsai_md_enabled {
         sys_prompt = crate::bonsai_md::inject(&sys_prompt, workspace_path.as_deref());
@@ -620,7 +616,7 @@ pub async fn submit_chat(
         }
     }
     if is_file_inventory_request(&last_user_text) {
-            sys_prompt.push_str(
+        sys_prompt.push_str(
                 "\n\n## Immediate instruction for this request\n\
                  - For this turn, execute tools directly (do not reply with a capabilities list).\n\
                  - If user asks to list files, call list_all_files first.\n\
@@ -636,20 +632,26 @@ pub async fn submit_chat(
             .or_else(|| tools::find_tool_by_trigger(&tools, "system_info"))
             .or_else(|| tools::find_tool_by_tag(&tools, "system"))
             .unwrap_or("get_system_stats");
-        let no_approval = tools.iter().find(|t| t.name == sysinfo_tool).map_or(false, |t| !t.requires_approval);
+        let no_approval = tools
+            .iter()
+            .find(|t| t.name == sysinfo_tool)
+            .map_or(false, |t| !t.requires_approval);
 
         // Skip re-injection if context already has a tool result (post-approval continuation).
         let already_has_tool_result = messages.iter().any(|m| {
-            m.role == "user" && (
-                m.content.contains("<tool_result>") ||
-                m.content.contains("cpu_cores") ||
-                m.content.contains("ram_total_gb") ||
-                m.content.contains("os_name") ||
-                m.content.contains("total_ram")
-            )
+            m.role == "user"
+                && (m.content.contains("<tool_result>")
+                    || m.content.contains("cpu_cores")
+                    || m.content.contains("ram_total_gb")
+                    || m.content.contains("os_name")
+                    || m.content.contains("total_ram"))
         });
         if !already_has_tool_result {
-            let approval_note = if no_approval { "(no approval needed)" } else { "(requires approval)" };
+            let approval_note = if no_approval {
+                "(no approval needed)"
+            } else {
+                "(requires approval)"
+            };
             sys_prompt.push_str(&format!(
                 "\n\n## Immediate instruction for this request\n\
                  - The user is asking for machine/system facts.\n\
@@ -664,7 +666,7 @@ pub async fn submit_chat(
             "\n\n## Immediate instruction for this request\n\
              - The user sent a greeting/salutation.\n\
              - Do not call tools for this turn.\n\
-             - Reply briefly and conversationally, then ask one helpful follow-up question.\n"
+             - Reply briefly and conversationally, then ask one helpful follow-up question.\n",
         );
     }
 
@@ -687,10 +689,10 @@ pub async fn submit_chat(
         );
     }
 
-    let mut final_content  = String::new();
-    let mut final_stats    = InferStats::default();
+    let mut final_content = String::new();
+    let mut final_stats = InferStats::default();
     let mut action_handled = false;
-    let mut tools_used     = Vec::<String>::new();
+    let mut tools_used = Vec::<String>::new();
     let mut last_auto_tool_name = String::new();
     let mut last_auto_tool_output = String::new();
     let mut last_auto_tool_sig = String::new();
@@ -698,7 +700,7 @@ pub async fn submit_chat(
     let mut malformed_retry_used = false;
     let mut system_info_retry_used = false;
     let mut greeting_retry_used = false;
-    const  MAX_TURNS: usize = 8;
+    const MAX_TURNS: usize = 8;
     let mut loop_limit_reached = true;
 
     for _turn in 0..MAX_TURNS {
@@ -708,11 +710,14 @@ pub async fn submit_chat(
             &app_handle,
             ctx.clone(),
             Some(state.chat_cancel.clone()),
-        ).await {
+        )
+        .await
+        {
             Ok(v) => v,
             Err(e) => {
                 if is_context_overflow_error(&e) {
-                    let trimmed_more = trim_context_to_budget(&mut ctx, CHAT_PROMPT_TOKEN_BUDGET_REDUCED);
+                    let trimmed_more =
+                        trim_context_to_budget(&mut ctx, CHAT_PROMPT_TOKEN_BUDGET_REDUCED);
                     if trimmed_more {
                         emit_agent_connect_event(
                             &state,
@@ -730,10 +735,10 @@ pub async fn submit_chat(
                 return Err(e.into());
             }
         };
-        final_stats       = stats;
-        let response      = strip_think_tags(&raw);
-        let parsed        = tools::parse_tool_calls(&response);
-        let calls         = parsed.calls;
+        final_stats = stats;
+        let response = strip_think_tags(&raw);
+        let parsed = tools::parse_tool_calls(&response);
+        let calls = parsed.calls;
 
         if calls.is_empty() {
             if parsed.malformed_count > 0 {
@@ -748,7 +753,8 @@ pub async fn submit_chat(
                     }),
                 );
                 if malformed_retry_used {
-                    final_content = "Tool call JSON is malformed. Please retry your request.".to_string();
+                    final_content =
+                        "Tool call JSON is malformed. Please retry your request.".to_string();
                     loop_limit_reached = false;
                     break;
                 }
@@ -771,11 +777,20 @@ pub async fn submit_chat(
                     system_info_retry_used = true;
                     if no_approval {
                         // Execute directly — no approval needed.
-                        let result = tools::execute_built_in(sysinfo_tool_name, &json!({}), workspace_path.as_deref()).await
-                            .unwrap_or_else(|e| format!("Error: {e}"));
-                        emit_agent_connect_event(&state, &app_handle, "tool.auto_executed",
+                        let result = tools::execute_built_in(
+                            sysinfo_tool_name,
+                            &json!({}),
+                            workspace_path.as_deref(),
+                        )
+                        .await
+                        .unwrap_or_else(|e| format!("Error: {e}"));
+                        emit_agent_connect_event(
+                            &state,
+                            &app_handle,
+                            "tool.auto_executed",
                             "System info tool executed automatically",
-                            json!({ "tool": sysinfo_tool_name, "source": "system_info_fallback" }));
+                            json!({ "tool": sysinfo_tool_name, "source": "system_info_fallback" }),
+                        );
                         ctx.push(json!({"role": "assistant", "content": &response}));
                         ctx.push(json!({
                             "role": "user",
@@ -793,11 +808,20 @@ pub async fn submit_chat(
                 }
 
                 // Second deterministic fallback: always execute if possible.
-                let result = tools::execute_built_in(sysinfo_tool_name, &json!({}), workspace_path.as_deref()).await
-                    .unwrap_or_else(|e| format!("Error: {e}"));
-                emit_agent_connect_event(&state, &app_handle, "tool.auto_executed",
+                let result = tools::execute_built_in(
+                    sysinfo_tool_name,
+                    &json!({}),
+                    workspace_path.as_deref(),
+                )
+                .await
+                .unwrap_or_else(|e| format!("Error: {e}"));
+                emit_agent_connect_event(
+                    &state,
+                    &app_handle,
+                    "tool.auto_executed",
                     "System info fallback (second attempt)",
-                    json!({ "tool": sysinfo_tool_name, "source": "system_info_fallback_2" }));
+                    json!({ "tool": sysinfo_tool_name, "source": "system_info_fallback_2" }),
+                );
                 ctx.push(json!({"role": "assistant", "content": &response}));
                 ctx.push(json!({
                     "role": "user",
@@ -834,7 +858,8 @@ pub async fn submit_chat(
                 continue;
             }
 
-            final_content = "Hello! I am ready to help. What would you like to work on right now?".to_string();
+            final_content =
+                "Hello! I am ready to help. What would you like to work on right now?".to_string();
             loop_limit_reached = false;
             break;
         }
@@ -882,7 +907,7 @@ pub async fn submit_chat(
                         "args": call.args,
                     }),
                 );
-                final_content  = tools::strip_tool_calls(&response);
+                final_content = tools::strip_tool_calls(&response);
                 action_handled = true;
                 loop_limit_reached = false;
                 break;
@@ -901,7 +926,8 @@ pub async fn submit_chat(
                 }
 
                 if repeated_auto_tool_count >= 2 {
-                    final_content = finalize_tool_only_response(&last_auto_tool_name, &last_auto_tool_output);
+                    final_content =
+                        finalize_tool_only_response(&last_auto_tool_name, &last_auto_tool_output);
                     emit_agent_connect_event(
                         &state,
                         &app_handle,
@@ -918,21 +944,29 @@ pub async fn submit_chat(
 
                 // Safe tool — execute automatically and loop back to inference.
                 let output = if tool_def.is_custom {
-                    let sp = tool_def.script_path.as_deref().ok_or("Missing script path")?;
-                    tools::execute_custom(sp, &call.args).await
+                    let sp = tool_def
+                        .script_path
+                        .as_deref()
+                        .ok_or("Missing script path")?;
+                    tools::execute_custom(sp, &call.args)
+                        .await
                         .unwrap_or_else(|e| format!("Error: {e}"))
                 } else {
-                    tools::execute_built_in(&call.tool, &call.args, workspace_path.as_deref()).await
+                    tools::execute_built_in(&call.tool, &call.args, workspace_path.as_deref())
+                        .await
                         .unwrap_or_else(|e| format!("Error: {e}"))
                 };
 
                 tools_used.push(call.tool.clone());
                 last_auto_tool_name = call.tool.clone();
                 last_auto_tool_output = output.clone();
-                let _ = app_handle.emit("tool-used", json!({
-                    "tool":   &call.tool,
-                    "output": &output,
-                }));
+                let _ = app_handle.emit(
+                    "tool-used",
+                    json!({
+                        "tool":   &call.tool,
+                        "output": &output,
+                    }),
+                );
 
                 emit_agent_connect_event(
                     &state,
@@ -952,11 +986,15 @@ pub async fn submit_chat(
             }
         }
 
-        if action_handled { break; }
+        if action_handled {
+            break;
+        }
     }
 
     if loop_limit_reached && !action_handled {
-        let mut summary = "Tool loop limit reached after 8 turns. Try asking again with a narrower request.".to_string();
+        let mut summary =
+            "Tool loop limit reached after 8 turns. Try asking again with a narrower request."
+                .to_string();
         if !last_auto_tool_output.trim().is_empty() {
             summary.push_str("\n\nLatest tool result:\n");
             summary.push_str(&truncate_chars(last_auto_tool_output.trim(), 1600));
@@ -966,7 +1004,8 @@ pub async fn submit_chat(
 
     if !action_handled && final_content.trim().is_empty() {
         if !last_auto_tool_output.trim().is_empty() {
-            final_content = finalize_tool_only_response(&last_auto_tool_name, &last_auto_tool_output);
+            final_content =
+                finalize_tool_only_response(&last_auto_tool_name, &last_auto_tool_output);
         } else {
             final_content = "I completed tool execution, but no final natural-language response was produced. Please ask me to summarize the result.".to_string();
         }
@@ -987,7 +1026,12 @@ pub async fn submit_chat(
         }),
     );
 
-    Ok(ChatResponse { content: final_content, stats: final_stats, action_handled, tools_used })
+    Ok(ChatResponse {
+        content: final_content,
+        stats: final_stats,
+        action_handled,
+        tools_used,
+    })
 }
 
 #[tauri::command]
@@ -1071,28 +1115,39 @@ pub async fn stop_chat_generation(state: State<'_, AppState>) -> Result<(), Stri
 
 fn tool_human_description(tool: &str, args: &Value) -> String {
     match tool {
-        "read_file"    => format!("Read file: {}",        args["path"].as_str().unwrap_or("?")),
-        "write_file"   => format!("Write file: {}",       args["path"].as_str().unwrap_or("?")),
-        "edit_file"    => format!("Edit file: {}",        args["path"].as_str().unwrap_or("?")),
-        "delete_file"  => format!("Delete: {}",           args["path"].as_str().unwrap_or("?")),
-        "create_dir"   => format!("Create directory: {}", args["path"].as_str().unwrap_or("?")),
-        "run_command"  => format!("Run command: {}",      args["command"].as_str().unwrap_or("?")),
-        "search_files" => format!("Search '{}' in {}",
+        "read_file" => format!("Read file: {}", args["path"].as_str().unwrap_or("?")),
+        "write_file" => format!("Write file: {}", args["path"].as_str().unwrap_or("?")),
+        "edit_file" => format!("Edit file: {}", args["path"].as_str().unwrap_or("?")),
+        "delete_file" => format!("Delete: {}", args["path"].as_str().unwrap_or("?")),
+        "create_dir" => format!("Create directory: {}", args["path"].as_str().unwrap_or("?")),
+        "run_command" => format!("Run command: {}", args["command"].as_str().unwrap_or("?")),
+        "search_files" => format!(
+            "Search '{}' in {}",
             args["query"].as_str().unwrap_or("?"),
-            args["path"].as_str().unwrap_or("?")),
-        "grep_files"   => format!("Regex search '{}' in {}",
+            args["path"].as_str().unwrap_or("?")
+        ),
+        "grep_files" => format!(
+            "Regex search '{}' in {}",
             args["pattern"].as_str().unwrap_or("?"),
-            args["path"].as_str().unwrap_or("?")),
-        "list_files"   => format!("List directory: {}",   args["path"].as_str().unwrap_or("?")),
-        "list_all_files" => format!("List all files in: {}", args["path"].as_str().unwrap_or("(workspace)")),
-        _              => format!("Execute tool: {tool}"),
+            args["path"].as_str().unwrap_or("?")
+        ),
+        "list_files" => format!("List directory: {}", args["path"].as_str().unwrap_or("?")),
+        "list_all_files" => format!(
+            "List all files in: {}",
+            args["path"].as_str().unwrap_or("(workspace)")
+        ),
+        _ => format!("Execute tool: {tool}"),
     }
 }
 
 fn paths_from_args(args: &Value) -> Vec<String> {
     let mut v = vec![];
-    if let Some(p) = args["path"].as_str()    { v.push(p.to_string()); }
-    if let Some(p) = args["command"].as_str() { v.push(p.to_string()); }
+    if let Some(p) = args["path"].as_str() {
+        v.push(p.to_string());
+    }
+    if let Some(p) = args["command"].as_str() {
+        v.push(p.to_string());
+    }
     v
 }
 
@@ -1125,7 +1180,11 @@ fn truncate_chars(text: &str, max_chars: usize) -> String {
 }
 
 fn finalize_tool_only_response(tool_name: &str, output: &str) -> String {
-    let safe_tool = if tool_name.trim().is_empty() { "tool" } else { tool_name };
+    let safe_tool = if tool_name.trim().is_empty() {
+        "tool"
+    } else {
+        tool_name
+    };
     let trimmed = output.trim();
     if trimmed.is_empty() {
         return format!("I ran `{}` but it returned no output.", safe_tool);
@@ -1156,11 +1215,15 @@ fn build_resume_continuation_payloads(
 ) -> Vec<ChatMessagePayload> {
     let mut continuation_payloads = Vec::<ChatMessagePayload>::new();
     for msg in ctx_snapshot {
-        let Some(role) = msg.get("role").and_then(|v| v.as_str()) else { continue };
+        let Some(role) = msg.get("role").and_then(|v| v.as_str()) else {
+            continue;
+        };
         if role == "system" {
             continue;
         }
-        let Some(content) = msg.get("content").and_then(|v| v.as_str()) else { continue };
+        let Some(content) = msg.get("content").and_then(|v| v.as_str()) else {
+            continue;
+        };
         continuation_payloads.push(ChatMessagePayload {
             role: role.to_string(),
             content: content.to_string(),
@@ -1194,8 +1257,8 @@ pub async fn execute_tool_call(
     // AppState may not be available here (headless callers), so best-effort.
     {
         let call = crate::middleware::ToolCall {
-            tool:           tool.to_string(),
-            args:           args.clone(),
+            tool: tool.to_string(),
+            args: args.clone(),
             workspace_path: workspace_path.clone(),
         };
         if let Some(state) = app_handle.try_state::<crate::AppState>() {
@@ -1279,7 +1342,10 @@ pub async fn resume_tool_call(
                 "tool": tool,
             }),
         );
-        let _ = app_handle.emit("permission-resolved", json!({ "tool": tool, "granted": false }));
+        let _ = app_handle.emit(
+            "permission-resolved",
+            json!({ "tool": tool, "granted": false }),
+        );
 
         return Ok(ChatResponse {
             content: tool_denied_message(&tool),
@@ -1298,9 +1364,13 @@ pub async fn resume_tool_call(
             "tool": tool,
         }),
     );
-    let _ = app_handle.emit("permission-resolved", json!({ "tool": tool, "granted": true }));
+    let _ = app_handle.emit(
+        "permission-resolved",
+        json!({ "tool": tool, "granted": true }),
+    );
 
-    let tool_output = execute_tool_call(app_handle.clone(), action.clone(), workspace_path.clone()).await?;
+    let tool_output =
+        execute_tool_call(app_handle.clone(), action.clone(), workspace_path.clone()).await?;
 
     let continuation_payloads =
         build_resume_continuation_payloads(&ctx_snapshot, &raw_response, &tool_output);
@@ -1311,7 +1381,8 @@ pub async fn resume_tool_call(
         continuation_payloads,
         workspace_path,
         enabled_tools,
-    ).await?;
+    )
+    .await?;
 
     if response.tools_used.is_empty() {
         response.tools_used.push(tool);
@@ -1333,7 +1404,11 @@ pub async fn resume_tool_call(
 
 #[tauri::command]
 pub async fn list_chat_sessions(state: State<'_, AppState>) -> Result<Value, String> {
-    let sessions = state.chat_sessions.list_sessions().await.map_err(|e| e.to_string())?;
+    let sessions = state
+        .chat_sessions
+        .list_sessions()
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(json!(sessions))
 }
 
@@ -1545,10 +1620,12 @@ pub async fn voice_transcribe(state: State<'_, AppState>) -> Result<String, Stri
         use hound::{SampleFormat as HoundFormat, WavSpec, WavWriter};
         use std::io::Cursor;
 
-        let host   = cpal::default_host();
-        let device = host.default_input_device().ok_or("No audio input device found")?;
-        let cfg    = device.default_input_config().map_err(|e| e.to_string())?;
-        let channels    = cfg.channels();
+        let host = cpal::default_host();
+        let device = host
+            .default_input_device()
+            .ok_or("No audio input device found")?;
+        let cfg = device.default_input_config().map_err(|e| e.to_string())?;
+        let channels = cfg.channels();
         let sample_rate = cfg.sample_rate().0;
 
         let spec = WavSpec {
@@ -1698,7 +1775,10 @@ pub async fn ai_code_review(
     let trimmed = review.trim();
 
     if trimmed.is_empty() {
-        return Ok("Code review completed, but the model returned an empty response. Please retry.".to_string());
+        return Ok(
+            "Code review completed, but the model returned an empty response. Please retry."
+                .to_string(),
+        );
     }
 
     Ok(trimmed.to_string())
@@ -1724,9 +1804,9 @@ pub async fn run_terminal_command(command: String, app_handle: AppHandle) -> Res
     while let Some(ev) = rx.recv().await {
         use tauri_plugin_shell::process::CommandEvent;
         let text = match ev {
-            CommandEvent::Stdout(b)   => String::from_utf8_lossy(&b).into_owned(),
-            CommandEvent::Stderr(b)   => String::from_utf8_lossy(&b).into_owned(),
-            CommandEvent::Error(e)    => format!("error: {e}"),
+            CommandEvent::Stdout(b) => String::from_utf8_lossy(&b).into_owned(),
+            CommandEvent::Stderr(b) => String::from_utf8_lossy(&b).into_owned(),
+            CommandEvent::Error(e) => format!("error: {e}"),
             CommandEvent::Terminated(_) => break,
             _ => continue,
         };
@@ -1754,10 +1834,19 @@ pub async fn spawn_pty_terminal(
 
     let pty_system = native_pty_system();
     let pair = pty_system
-        .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| e.to_string())?;
 
-    let cmd = CommandBuilder::new(if cfg!(target_os = "windows") { "cmd.exe" } else { "bash" });
+    let cmd = CommandBuilder::new(if cfg!(target_os = "windows") {
+        "cmd.exe"
+    } else {
+        "bash"
+    });
     let _child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
@@ -1869,7 +1958,12 @@ pub async fn resize_pty(rows: u16, cols: u16, state: State<'_, AppState>) -> Res
         .ok_or_else(|| format!("No PTY session available ({session_id})"))?;
     session
         .master
-        .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -1895,7 +1989,12 @@ pub async fn resize_pty_session(
         .ok_or_else(|| format!("No PTY session available ({session_id})"))?;
     session
         .master
-        .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -1953,7 +2052,10 @@ pub async fn accept_diff_hunk(
         .collect();
 
     let hunk_start = hunk_starts[hunk_index];
-    let hunk_end   = hunk_starts.get(hunk_index + 1).copied().unwrap_or(lines.len());
+    let hunk_end = hunk_starts
+        .get(hunk_index + 1)
+        .copied()
+        .unwrap_or(lines.len());
     let hunk_lines = &lines[hunk_start..hunk_end];
 
     let single_diff = format!("{}\n{}\n", header.join("\n"), hunk_lines.join("\n"));
@@ -1982,7 +2084,10 @@ pub async fn reject_diff_hunk(
         "file_path": file_path,
         "hunk_index": hunk_index,
     });
-    let _ = state.wal.log_event("diff_hunk_rejected", payload.clone()).await;
+    let _ = state
+        .wal
+        .log_event("diff_hunk_rejected", payload.clone())
+        .await;
     let _ = app_handle.emit("diff-hunk-rejected", payload);
     Ok(())
 }
@@ -1997,39 +2102,44 @@ pub async fn create_unified_diff(file_path: String, new_content: String) -> Resu
 
 /// Returns every GGUF model the registry found, serialized for the frontend.
 #[tauri::command]
-pub async fn list_models_registry(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+pub async fn list_models_registry(
+    state: State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
     let models = state.orchestrator.list_models().await;
     Ok(models
         .iter()
-        .map(|m| serde_json::json!({
-            "id":              m.id,
-            "name":            m.name,
-            "path":            m.path.to_string_lossy(),
-            "architecture":    m.architecture,
-            "parameter_count": m.parameter_count,
-            "context_length":  m.context_length,
-            "quant":           m.quant_label,
-            "ram_required_mb": m.ram_required_mb,
-            "ram_label":       m.ram_label(),
-            "valid":           m.valid,
-        }))
+        .map(|m| {
+            serde_json::json!({
+                "id":              m.id,
+                "name":            m.name,
+                "path":            m.path.to_string_lossy(),
+                "architecture":    m.architecture,
+                "parameter_count": m.parameter_count,
+                "context_length":  m.context_length,
+                "quant":           m.quant_label,
+                "ram_required_mb": m.ram_required_mb,
+                "ram_label":       m.ram_label(),
+                "valid":           m.valid,
+            })
+        })
         .collect())
 }
 
 /// Legacy stub kept for frontend compatibility; now delegates to the registry.
 #[tauri::command]
-pub async fn list_available_models(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+pub async fn list_available_models(
+    state: State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
     list_models_registry(state).await
 }
 
 /// Load a specific model by registry ID into the orchestrator.
 #[tauri::command]
-pub async fn load_model(
-    model_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), BonsaiError> {
+pub async fn load_model(model_id: String, state: State<'_, AppState>) -> Result<(), BonsaiError> {
     let rx = state.orchestrator.load(model_id);
-    rx.await.map_err(|_| BonsaiError::Orchestrator("Orchestrator offline".to_string()))?.map_err(BonsaiError::Orchestrator)
+    rx.await
+        .map_err(|_| BonsaiError::Orchestrator("Orchestrator offline".to_string()))?
+        .map_err(BonsaiError::Orchestrator)
 }
 
 /// Unload a specific slot by index.
@@ -2176,7 +2286,7 @@ pub async fn cluster_plan_workload(
 }
 
 struct GpuInfo {
-    name:    String,
+    name: String,
     backend: String,
 }
 
@@ -2184,27 +2294,39 @@ struct GpuInfo {
 /// Returns one GpuInfo per detected GPU (discrete or integrated).
 fn detect_gpus() -> Vec<GpuInfo> {
     let raw_names = collect_raw_gpu_names();
-    raw_names.into_iter().map(|name| {
-        let lower = name.to_lowercase();
-        let backend = if lower.contains("nvidia") {
-            "CUDA".to_string()
-        } else if lower.contains("amd") || lower.contains("radeon") {
-            // ROCm on Linux; Vulkan/DirectML on Windows
-            if cfg!(target_os = "linux") { "ROCm".to_string() } else { "Vulkan / DirectML".to_string() }
-        } else if lower.contains("intel") {
-            // Intel Xe / Arc discrete → SYCL; UHD / Iris = iGPU → OpenCL / DirectML
-            if lower.contains("arc") || lower.contains("xe") {
-                "SYCL / DirectML".to_string()
+    raw_names
+        .into_iter()
+        .map(|name| {
+            let lower = name.to_lowercase();
+            let backend = if lower.contains("nvidia") {
+                "CUDA".to_string()
+            } else if lower.contains("amd") || lower.contains("radeon") {
+                // ROCm on Linux; Vulkan/DirectML on Windows
+                if cfg!(target_os = "linux") {
+                    "ROCm".to_string()
+                } else {
+                    "Vulkan / DirectML".to_string()
+                }
+            } else if lower.contains("intel") {
+                // Intel Xe / Arc discrete → SYCL; UHD / Iris = iGPU → OpenCL / DirectML
+                if lower.contains("arc") || lower.contains("xe") {
+                    "SYCL / DirectML".to_string()
+                } else {
+                    "iGPU / OpenCL".to_string()
+                }
+            } else if lower.contains("apple")
+                || lower.contains("m1")
+                || lower.contains("m2")
+                || lower.contains("m3")
+                || lower.contains("m4")
+            {
+                "Metal".to_string()
             } else {
-                "iGPU / OpenCL".to_string()
-            }
-        } else if lower.contains("apple") || lower.contains("m1") || lower.contains("m2") || lower.contains("m3") || lower.contains("m4") {
-            "Metal".to_string()
-        } else {
-            "CPU".to_string()
-        };
-        GpuInfo { name, backend }
-    }).collect()
+                "CPU".to_string()
+            };
+            GpuInfo { name, backend }
+        })
+        .collect()
 }
 
 fn collect_raw_gpu_names() -> Vec<String> {
@@ -2238,9 +2360,18 @@ fn collect_raw_gpu_names() -> Vec<String> {
                 .lines()
                 .filter_map(|line| {
                     let lower = line.to_lowercase();
-                    if lower.contains("vga compatible controller") || lower.contains("3d controller") || lower.contains("display controller") {
+                    if lower.contains("vga compatible controller")
+                        || lower.contains("3d controller")
+                        || lower.contains("display controller")
+                    {
                         // Strip the PCI address prefix
-                        Some(line.splitn(2, ':').nth(1).unwrap_or(line).trim().to_string())
+                        Some(
+                            line.splitn(2, ':')
+                                .nth(1)
+                                .unwrap_or(line)
+                                .trim()
+                                .to_string(),
+                        )
                     } else {
                         None
                     }
@@ -2257,7 +2388,10 @@ fn collect_raw_gpu_names() -> Vec<String> {
         return vec!["Apple Silicon / Metal".to_string()];
     }
 
-    #[allow(unreachable_code)] { vec![] }
+    #[allow(unreachable_code)]
+    {
+        vec![]
+    }
 }
 
 #[tauri::command]
@@ -2303,25 +2437,25 @@ pub async fn set_api_config(
     }
 
     let mgmt = crate::management_api::MgmtState {
-        orchestrator:  state.orchestrator.clone(),
-        agent_host:    state.agent_host.clone(),
-        agent_store:   state.agent_store.clone(),
-        task_queue:    state.task_queue.clone(),
+        orchestrator: state.orchestrator.clone(),
+        agent_host: state.agent_host.clone(),
+        agent_store: state.agent_store.clone(),
+        task_queue: state.task_queue.clone(),
         swarm_cancels: state.swarm_cancels.clone(),
-        app_handle:    app_handle.clone(),
-        pair_token:    state.pair_token.clone(),
-        bonsai_core:   state.bonsai_core.clone(),
-        telemetry:     state.telemetry.clone(),
-        dual_session:  state.dual_session.clone(),
+        app_handle: app_handle.clone(),
+        pair_token: state.pair_token.clone(),
+        bonsai_core: state.bonsai_core.clone(),
+        telemetry: state.telemetry.clone(),
+        dual_session: state.dual_session.clone(),
         training_loop: state.training_loop.clone(),
-        self_play:     state.self_play.clone(),
-        plugin_host:   state.plugin_host.clone(),
+        self_play: state.self_play.clone(),
+        plugin_host: state.plugin_host.clone(),
         tool_registry: state.tool_registry.clone(),
         game_sessions: state.game_sessions.clone(),
-        knowledge:     state.knowledge.clone(),
-        reasoning:     state.reasoning.clone(),
+        knowledge: state.knowledge.clone(),
+        reasoning: state.reasoning.clone(),
         belief_reviser: state.belief_reviser.clone(),
-        metacognitive:  state.metacognitive.clone(),
+        metacognitive: state.metacognitive.clone(),
     };
 
     let started = api_server::start(
@@ -2340,15 +2474,15 @@ pub async fn set_api_config(
         Err(e) => {
             // Try to restore previous config runtime so the app keeps working.
             let rollback_remote = app_handle.state::<Arc<RemoteManager>>().inner().clone();
-                if let Ok(restored) = api_server::start(
-                    state.orchestrator.clone(),
-                    rollback_remote,
-                    state.ws_router.clone(),
-                    state.pair_token.clone(),
-                    old_config.api_host.clone(),
-                    old_config.api_port,
-                    app_handle.clone(),
-                )
+            if let Ok(restored) = api_server::start(
+                state.orchestrator.clone(),
+                rollback_remote,
+                state.ws_router.clone(),
+                state.pair_token.clone(),
+                old_config.api_host.clone(),
+                old_config.api_port,
+                app_handle.clone(),
+            )
             .await
             {
                 *api_guard = Some(restored);
@@ -2426,19 +2560,23 @@ pub async fn send_remote_input(
 pub async fn get_hardware_info() -> Result<serde_json::Value, String> {
     let mut sys = System::new_all();
     sys.refresh_all();
-    let ram_gb   = sys.total_memory() / 1024 / 1024 / 1024;
+    let ram_gb = sys.total_memory() / 1024 / 1024 / 1024;
     let avail_gb = sys.available_memory() / 1024 / 1024 / 1024;
 
     let gpus = detect_gpus();
     let (gpu_names, backends): (Vec<_>, Vec<_>) = if gpus.is_empty() {
         (vec!["None detected".to_string()], vec!["CPU".to_string()])
     } else {
-        gpus.iter().map(|g| (g.name.clone(), g.backend.clone())).unzip()
+        gpus.iter()
+            .map(|g| (g.name.clone(), g.backend.clone()))
+            .unzip()
     };
     // De-duplicate backends (e.g. two NVIDIA GPUs → one "CUDA" entry)
     let mut unique_backends: Vec<String> = vec![];
     for b in &backends {
-        if !unique_backends.contains(b) { unique_backends.push(b.clone()); }
+        if !unique_backends.contains(b) {
+            unique_backends.push(b.clone());
+        }
     }
 
     Ok(serde_json::json!({
@@ -2486,9 +2624,9 @@ pub async fn run_bootstrap(
     // Reset any previous cancellation before starting a fresh run
     state.bootstrap_cancel.store(false, Ordering::Relaxed);
 
-    let orch   = state.orchestrator.clone();
+    let orch = state.orchestrator.clone();
     let cancel = state.bootstrap_cancel.clone();
-    let bh     = app_handle.clone();
+    let bh = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         match bootstrap::run(bh.clone(), cancel).await {
             Ok(()) => {
@@ -2542,16 +2680,20 @@ async fn download_to_file(
     fs::create_dir_all(&models_dir).map_err(|e| e.to_string())?;
     let save_path = models_dir.join(file_name);
 
-    let mut file       = fs::File::create(&save_path).map_err(|e| e.to_string())?;
+    let mut file = fs::File::create(&save_path).map_err(|e| e.to_string())?;
     let mut downloaded = 0u64;
-    let mut stream     = resp.bytes_stream();
+    let mut stream = resp.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
         use std::io::Write;
         file.write_all(&chunk).map_err(|e| e.to_string())?;
-        let pct = if total > 0 { downloaded * 100 / total } else { 0 };
+        let pct = if total > 0 {
+            downloaded * 100 / total
+        } else {
+            0
+        };
         let _ = app_handle.emit(
             event_tag,
             serde_json::json!({ "progress": pct, "downloaded": downloaded, "total": total }),
@@ -2601,10 +2743,12 @@ pub async fn get_local_ip() -> Result<String, String> {
 /// `bonsai://connect?ip=<local_ip>&port=<api_port>&token=<pair_token>`.
 #[tauri::command]
 pub async fn generate_pair_qr(state: State<'_, AppState>) -> Result<String, String> {
-    use qrcode::QrCode;
     use qrcode::render::svg;
+    use qrcode::QrCode;
 
-    let ip   = local_ip_address::local_ip().map(|i| i.to_string()).unwrap_or_else(|_| "127.0.0.1".into());
+    let ip = local_ip_address::local_ip()
+        .map(|i| i.to_string())
+        .unwrap_or_else(|_| "127.0.0.1".into());
     let data = format!(
         "bonsai://connect?ip={}&port={}&token={}",
         ip,
@@ -2612,19 +2756,14 @@ pub async fn generate_pair_qr(state: State<'_, AppState>) -> Result<String, Stri
         state.pair_token
     );
     let code = QrCode::new(data.as_bytes()).map_err(|e| e.to_string())?;
-    let svg  = code.render::<svg::Color>()
-        .min_dimensions(200, 200)
-        .build();
+    let svg = code.render::<svg::Color>().min_dimensions(200, 200).build();
     Ok(svg)
 }
 
 /// Broadcasts an arbitrary JSON payload to all connected WebSocket clients.
 /// Useful for pushing chat token streams to the Android app.
 #[tauri::command]
-pub async fn ws_broadcast(
-    state: State<'_, AppState>,
-    payload: Value,
-) -> Result<(), String> {
+pub async fn ws_broadcast(state: State<'_, AppState>, payload: Value) -> Result<(), String> {
     use axum::extract::ws::Message;
     let txt = payload.to_string();
     state.ws_router.broadcast(Message::Text(txt));
@@ -2692,7 +2831,10 @@ fn run_command_with_timeout(
             return Err(format!("{label} canceled by request."));
         }
 
-        if let Some(_) = child.try_wait().map_err(|e| format!("Failed to poll {label}: {e}"))? {
+        if let Some(_) = child
+            .try_wait()
+            .map_err(|e| format!("Failed to poll {label}: {e}"))?
+        {
             return child
                 .wait_with_output()
                 .map_err(|e| format!("Failed to collect {label} output: {e}"));
@@ -2801,7 +2943,9 @@ fn adb_assert_ok(result: &serde_json::Value, label: &str) -> Result<(), String> 
     let status = result.get("status").and_then(|v| v.as_i64()).unwrap_or(-1);
     let stderr = result.get("stderr").and_then(|v| v.as_str()).unwrap_or("");
     let stdout = result.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
-    Err(format!("{label} failed (exit {status}). stderr: {stderr}. stdout: {stdout}"))
+    Err(format!(
+        "{label} failed (exit {status}). stderr: {stderr}. stdout: {stdout}"
+    ))
 }
 
 #[derive(Clone)]
@@ -2816,7 +2960,8 @@ fn mobile_view_sessions() -> &'static StdMutex<HashMap<String, u32>> {
 }
 
 fn mobile_recording_sessions() -> &'static StdMutex<HashMap<String, MobileRecordingSession>> {
-    static RECORDINGS: OnceLock<StdMutex<HashMap<String, MobileRecordingSession>>> = OnceLock::new();
+    static RECORDINGS: OnceLock<StdMutex<HashMap<String, MobileRecordingSession>>> =
+        OnceLock::new();
     RECORDINGS.get_or_init(|| StdMutex::new(HashMap::new()))
 }
 
@@ -2830,7 +2975,9 @@ fn kill_process_tree(pid: u32) -> Result<(), String> {
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
             let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            return Err(format!("taskkill failed for pid {pid}. stderr: {stderr}. stdout: {stdout}"));
+            return Err(format!(
+                "taskkill failed for pid {pid}. stderr: {stderr}. stdout: {stdout}"
+            ));
         }
         Ok(())
     }
@@ -2850,9 +2997,15 @@ fn kill_process_tree(pid: u32) -> Result<(), String> {
             .output()
             .map_err(|e| format!("Failed to run kill -KILL: {e}"))?;
         if !out_force.status.success() {
-            let stderr = String::from_utf8_lossy(&out_force.stderr).trim().to_string();
-            let stdout = String::from_utf8_lossy(&out_force.stdout).trim().to_string();
-            return Err(format!("kill failed for pid {pid}. stderr: {stderr}. stdout: {stdout}"));
+            let stderr = String::from_utf8_lossy(&out_force.stderr)
+                .trim()
+                .to_string();
+            let stdout = String::from_utf8_lossy(&out_force.stdout)
+                .trim()
+                .to_string();
+            return Err(format!(
+                "kill failed for pid {pid}. stderr: {stderr}. stdout: {stdout}"
+            ));
         }
         Ok(())
     }
@@ -2865,8 +3018,14 @@ fn resolve_scrcpy_executable() -> (String, Vec<String>) {
     {
         if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
             candidates.push(format!("{}\\Programs\\scrcpy\\scrcpy.exe", local_app_data));
-            candidates.push(format!("{}\\Programs\\scrcpy-win64\\scrcpy.exe", local_app_data));
-            candidates.push(format!("{}\\Microsoft\\WinGet\\Links\\scrcpy.exe", local_app_data));
+            candidates.push(format!(
+                "{}\\Programs\\scrcpy-win64\\scrcpy.exe",
+                local_app_data
+            ));
+            candidates.push(format!(
+                "{}\\Microsoft\\WinGet\\Links\\scrcpy.exe",
+                local_app_data
+            ));
         }
         if let Ok(program_files) = std::env::var("ProgramFiles") {
             candidates.push(format!("{}\\scrcpy\\scrcpy.exe", program_files));
@@ -2878,7 +3037,10 @@ fn resolve_scrcpy_executable() -> (String, Vec<String>) {
             candidates.push(format!("{}\\chocolatey\\bin\\scrcpy.exe", program_data));
         }
         if let Ok(user_profile) = std::env::var("USERPROFILE") {
-            candidates.push(format!("{}\\scoop\\apps\\scrcpy\\current\\scrcpy.exe", user_profile));
+            candidates.push(format!(
+                "{}\\scoop\\apps\\scrcpy\\current\\scrcpy.exe",
+                user_profile
+            ));
         }
     }
 
@@ -2902,12 +3064,23 @@ fn resolve_scrcpy_executable() -> (String, Vec<String>) {
     ("scrcpy".to_string(), candidates)
 }
 
-fn ensure_mobile_artifact_dir(app_handle: &AppHandle, category: &str) -> Result<std::path::PathBuf, String> {
+fn ensure_mobile_artifact_dir(
+    app_handle: &AppHandle,
+    category: &str,
+) -> Result<std::path::PathBuf, String> {
     use tauri::Manager as _;
 
-    let base = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let base = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     let dir = base.join("mobile-view").join(category);
-    fs::create_dir_all(&dir).map_err(|e| format!("Failed to create artifact dir {}: {e}", dir.to_string_lossy()))?;
+    fs::create_dir_all(&dir).map_err(|e| {
+        format!(
+            "Failed to create artifact dir {}: {e}",
+            dir.to_string_lossy()
+        )
+    })?;
     Ok(dir)
 }
 
@@ -3103,11 +3276,17 @@ pub async fn android_mobile_take_screenshot(
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
             let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            return Err(format!("adb exec-out screencap failed. stderr: {stderr}. stdout: {stdout}"));
+            return Err(format!(
+                "adb exec-out screencap failed. stderr: {stderr}. stdout: {stdout}"
+            ));
         }
 
-        fs::write(&output_path, &out.stdout)
-            .map_err(|e| format!("Failed writing screenshot {}: {e}", output_path.to_string_lossy()))?;
+        fs::write(&output_path, &out.stdout).map_err(|e| {
+            format!(
+                "Failed writing screenshot {}: {e}",
+                output_path.to_string_lossy()
+            )
+        })?;
 
         Ok(json!({
             "ok": true,
@@ -3139,7 +3318,10 @@ pub async fn android_mobile_start_recording(
                 .lock()
                 .map_err(|_| "mobile recording session lock poisoned".to_string())?;
             if let Some(existing) = sessions.get(&serial) {
-                return Err(format!("Recording already active for {serial} (pid {}). Stop it first.", existing.pid));
+                return Err(format!(
+                    "Recording already active for {serial} (pid {}). Stop it first.",
+                    existing.pid
+                ));
             }
         }
 
@@ -3238,13 +3420,16 @@ pub async fn android_mobile_stop_recording(
         let pull = adb_run_with_timeout(&pull_args, LONG_ADB_TIMEOUT_MS)?;
         adb_assert_ok(&pull, "adb pull screenrecord")?;
 
-        let _ = adb_run_with_timeout(&vec![
-            "-s".to_string(),
-            serial.clone(),
-            "shell".to_string(),
-            "rm".to_string(),
-            rec.remote_path.clone(),
-        ], LONG_ADB_TIMEOUT_MS);
+        let _ = adb_run_with_timeout(
+            &vec![
+                "-s".to_string(),
+                serial.clone(),
+                "shell".to_string(),
+                "rm".to_string(),
+                rec.remote_path.clone(),
+            ],
+            LONG_ADB_TIMEOUT_MS,
+        );
 
         Ok(json!({
             "ok": true,
@@ -3295,7 +3480,10 @@ pub async fn android_mobile_launch_camera(
 
 /// Send Android key events (home/back/recent/volume/power, etc.).
 #[tauri::command]
-pub async fn android_mobile_send_key(serial: String, key_code: i32) -> Result<serde_json::Value, String> {
+pub async fn android_mobile_send_key(
+    serial: String,
+    key_code: i32,
+) -> Result<serde_json::Value, String> {
     tokio::task::spawn_blocking(move || {
         let serial = serial.trim().to_string();
         if serial.is_empty() {
@@ -3324,7 +3512,10 @@ pub async fn android_mobile_send_key(serial: String, key_code: i32) -> Result<se
 
 /// Send text input to device.
 #[tauri::command]
-pub async fn android_mobile_send_text(serial: String, text: String) -> Result<serde_json::Value, String> {
+pub async fn android_mobile_send_text(
+    serial: String,
+    text: String,
+) -> Result<serde_json::Value, String> {
     tokio::task::spawn_blocking(move || {
         let serial = serial.trim().to_string();
         let text = text.trim().to_string();
@@ -3362,7 +3553,11 @@ pub async fn android_mobile_send_text(serial: String, text: String) -> Result<se
 
 /// Send tap coordinates.
 #[tauri::command]
-pub async fn android_mobile_tap(serial: String, x: u32, y: u32) -> Result<serde_json::Value, String> {
+pub async fn android_mobile_tap(
+    serial: String,
+    x: u32,
+    y: u32,
+) -> Result<serde_json::Value, String> {
     tokio::task::spawn_blocking(move || {
         let serial = serial.trim().to_string();
         if serial.is_empty() {
@@ -3528,39 +3723,64 @@ pub async fn android_mobile_set_orientation(
         match mode.as_str() {
             "portrait" => {
                 let rotate_off = adb_run(&vec![
-                    "-s".to_string(), serial.clone(), "shell".to_string(),
-                    "settings".to_string(), "put".to_string(), "system".to_string(),
-                    "accelerometer_rotation".to_string(), "0".to_string(),
+                    "-s".to_string(),
+                    serial.clone(),
+                    "shell".to_string(),
+                    "settings".to_string(),
+                    "put".to_string(),
+                    "system".to_string(),
+                    "accelerometer_rotation".to_string(),
+                    "0".to_string(),
                 ])?;
                 adb_assert_ok(&rotate_off, "adb settings put accelerometer_rotation 0")?;
 
                 let user_rotation = adb_run(&vec![
-                    "-s".to_string(), serial.clone(), "shell".to_string(),
-                    "settings".to_string(), "put".to_string(), "system".to_string(),
-                    "user_rotation".to_string(), "0".to_string(),
+                    "-s".to_string(),
+                    serial.clone(),
+                    "shell".to_string(),
+                    "settings".to_string(),
+                    "put".to_string(),
+                    "system".to_string(),
+                    "user_rotation".to_string(),
+                    "0".to_string(),
                 ])?;
                 adb_assert_ok(&user_rotation, "adb settings put user_rotation 0")?;
             }
             "landscape" => {
                 let rotate_off = adb_run(&vec![
-                    "-s".to_string(), serial.clone(), "shell".to_string(),
-                    "settings".to_string(), "put".to_string(), "system".to_string(),
-                    "accelerometer_rotation".to_string(), "0".to_string(),
+                    "-s".to_string(),
+                    serial.clone(),
+                    "shell".to_string(),
+                    "settings".to_string(),
+                    "put".to_string(),
+                    "system".to_string(),
+                    "accelerometer_rotation".to_string(),
+                    "0".to_string(),
                 ])?;
                 adb_assert_ok(&rotate_off, "adb settings put accelerometer_rotation 0")?;
 
                 let user_rotation = adb_run(&vec![
-                    "-s".to_string(), serial.clone(), "shell".to_string(),
-                    "settings".to_string(), "put".to_string(), "system".to_string(),
-                    "user_rotation".to_string(), "1".to_string(),
+                    "-s".to_string(),
+                    serial.clone(),
+                    "shell".to_string(),
+                    "settings".to_string(),
+                    "put".to_string(),
+                    "system".to_string(),
+                    "user_rotation".to_string(),
+                    "1".to_string(),
                 ])?;
                 adb_assert_ok(&user_rotation, "adb settings put user_rotation 1")?;
             }
             "unlock" => {
                 let rotate_on = adb_run(&vec![
-                    "-s".to_string(), serial.clone(), "shell".to_string(),
-                    "settings".to_string(), "put".to_string(), "system".to_string(),
-                    "accelerometer_rotation".to_string(), "1".to_string(),
+                    "-s".to_string(),
+                    serial.clone(),
+                    "shell".to_string(),
+                    "settings".to_string(),
+                    "put".to_string(),
+                    "system".to_string(),
+                    "accelerometer_rotation".to_string(),
+                    "1".to_string(),
                 ])?;
                 adb_assert_ok(&rotate_on, "adb settings put accelerometer_rotation 1")?;
             }
@@ -3651,45 +3871,77 @@ pub async fn android_mobile_prepare_uniform_runtime(
         let ws = ws_port.unwrap_or(11371);
 
         let wake = adb_run(&vec![
-            "-s".to_string(), serial.clone(), "shell".to_string(),
-            "input".to_string(), "keyevent".to_string(), "224".to_string(),
+            "-s".to_string(),
+            serial.clone(),
+            "shell".to_string(),
+            "input".to_string(),
+            "keyevent".to_string(),
+            "224".to_string(),
         ])?;
         adb_assert_ok(&wake, "adb keyevent 224")?;
 
         let unlock = adb_run(&vec![
-            "-s".to_string(), serial.clone(), "shell".to_string(),
-            "input".to_string(), "keyevent".to_string(), "82".to_string(),
+            "-s".to_string(),
+            serial.clone(),
+            "shell".to_string(),
+            "input".to_string(),
+            "keyevent".to_string(),
+            "82".to_string(),
         ])?;
         adb_assert_ok(&unlock, "adb keyevent 82")?;
 
         let reverse_api = adb_run(&vec![
-            "-s".to_string(), serial.clone(), "reverse".to_string(),
-            format!("tcp:{api}"), format!("tcp:{api}"),
+            "-s".to_string(),
+            serial.clone(),
+            "reverse".to_string(),
+            format!("tcp:{api}"),
+            format!("tcp:{api}"),
         ])?;
         adb_assert_ok(&reverse_api, "adb reverse api")?;
 
         let reverse_ws = adb_run(&vec![
-            "-s".to_string(), serial.clone(), "reverse".to_string(),
-            format!("tcp:{ws}"), format!("tcp:{ws}"),
+            "-s".to_string(),
+            serial.clone(),
+            "reverse".to_string(),
+            format!("tcp:{ws}"),
+            format!("tcp:{ws}"),
         ])?;
         adb_assert_ok(&reverse_ws, "adb reverse ws")?;
 
         let launch = adb_run(&vec![
-            "-s".to_string(), serial.clone(), "shell".to_string(),
-            "am".to_string(), "start".to_string(), "-W".to_string(),
-            "-n".to_string(), "com.bonsai.workspace/.MainActivity".to_string(),
+            "-s".to_string(),
+            serial.clone(),
+            "shell".to_string(),
+            "am".to_string(),
+            "start".to_string(),
+            "-W".to_string(),
+            "-n".to_string(),
+            "com.bonsai.workspace/.MainActivity".to_string(),
         ])?;
         adb_assert_ok(&launch, "adb launch bonsai")?;
 
         let remote_launch = if remote_surface {
             let launch_remote = adb_run(&vec![
-                "-s".to_string(), serial.clone(), "shell".to_string(),
-                "am".to_string(), "start".to_string(), "-W".to_string(),
-                "-n".to_string(), "com.bonsai.workspace/.RemoteSurfaceEntryActivity".to_string(),
-                "--es".to_string(), "desktop_host".to_string(), "127.0.0.1".to_string(),
-                "--ei".to_string(), "desktop_port".to_string(), api.to_string(),
-                "--es".to_string(), "pair_token".to_string(), pair_token_for_launch.clone(),
-                "--es".to_string(), "session_id".to_string(), remote_session_id.clone(),
+                "-s".to_string(),
+                serial.clone(),
+                "shell".to_string(),
+                "am".to_string(),
+                "start".to_string(),
+                "-W".to_string(),
+                "-n".to_string(),
+                "com.bonsai.workspace/.RemoteSurfaceEntryActivity".to_string(),
+                "--es".to_string(),
+                "desktop_host".to_string(),
+                "127.0.0.1".to_string(),
+                "--ei".to_string(),
+                "desktop_port".to_string(),
+                api.to_string(),
+                "--es".to_string(),
+                "pair_token".to_string(),
+                pair_token_for_launch.clone(),
+                "--es".to_string(),
+                "session_id".to_string(),
+                remote_session_id.clone(),
             ])?;
             adb_assert_ok(&launch_remote, "adb launch remote surface activity")?;
             Some(launch_remote)
@@ -3752,10 +4004,7 @@ pub async fn android_usb_list_devices() -> Result<serde_json::Value, String> {
         let result = adb_run(&args)?;
         adb_assert_ok(&result, "adb devices")?;
 
-        let stdout = result
-            .get("stdout")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let stdout = result.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
 
         let mut devices = Vec::new();
         for line in stdout.lines().skip(1) {
@@ -3816,7 +4065,10 @@ pub async fn android_usb_get_adb_info() -> Result<serde_json::Value, String> {
 
 /// Run an arbitrary ADB shell command on a selected Android device.
 #[tauri::command]
-pub async fn android_usb_shell(serial: String, shell_command: String) -> Result<serde_json::Value, String> {
+pub async fn android_usb_shell(
+    serial: String,
+    shell_command: String,
+) -> Result<serde_json::Value, String> {
     tokio::task::spawn_blocking(move || {
         let serial = serial.trim().to_string();
         let shell_command = shell_command.trim().to_string();
@@ -3827,12 +4079,7 @@ pub async fn android_usb_shell(serial: String, shell_command: String) -> Result<
             return Err("shell_command cannot be empty".to_string());
         }
 
-        let args = vec![
-            "-s".to_string(),
-            serial,
-            "shell".to_string(),
-            shell_command,
-        ];
+        let args = vec!["-s".to_string(), serial, "shell".to_string(), shell_command];
         let result = adb_run(&args)?;
         adb_assert_ok(&result, "adb shell")?;
         Ok(result)
@@ -4069,7 +4316,10 @@ pub async fn android_usb_disconnect_wifi(
 
 fn usb_regression_evidence_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
     use tauri::Manager;
-    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
     Ok(app_data_dir.join("android-usb-regression-evidence.jsonl"))
 }
@@ -4513,9 +4763,7 @@ fn apk_metadata(path: &str) -> Result<serde_json::Value, String> {
     let mut version_code = String::new();
 
     for tool in &["aapt2", "aapt"] {
-        let result = Command::new(tool)
-            .args(["dump", "badging", path])
-            .output();
+        let result = Command::new(tool).args(["dump", "badging", path]).output();
         if let Ok(out) = result {
             if out.status.success() {
                 let text = String::from_utf8_lossy(&out.stdout);
@@ -4767,32 +5015,48 @@ pub async fn android_usb_bootstrap_connection(
         }
 
         // 1. Reverse API port.
-        step!("adb reverse tcp:api", vec![
-            "-s".to_string(), serial.clone(),
-            "reverse".to_string(),
-            format!("tcp:{api_port}"),
-            format!("tcp:{api_port}"),
-        ]);
+        step!(
+            "adb reverse tcp:api",
+            vec![
+                "-s".to_string(),
+                serial.clone(),
+                "reverse".to_string(),
+                format!("tcp:{api_port}"),
+                format!("tcp:{api_port}"),
+            ]
+        );
 
         // 2. If ws_port differs from api_port also map it.
         if ws_port != api_port {
-            step!("adb reverse tcp:ws", vec![
-                "-s".to_string(), serial.clone(),
-                "reverse".to_string(),
-                format!("tcp:{ws_port}"),
-                format!("tcp:{ws_port}"),
-            ]);
+            step!(
+                "adb reverse tcp:ws",
+                vec![
+                    "-s".to_string(),
+                    serial.clone(),
+                    "reverse".to_string(),
+                    format!("tcp:{ws_port}"),
+                    format!("tcp:{ws_port}"),
+                ]
+            );
         }
 
         // 3. Verify reverse list contains both mappings.
-        let rev_ok = step!("adb reverse --list", vec![
-            "-s".to_string(), serial.clone(),
-            "reverse".to_string(), "--list".to_string(),
-        ]);
+        let rev_ok = step!(
+            "adb reverse --list",
+            vec![
+                "-s".to_string(),
+                serial.clone(),
+                "reverse".to_string(),
+                "--list".to_string(),
+            ]
+        );
 
         // Check stdout of the --list step for expected mapping.
         if let Some(list_step) = steps.last() {
-            let stdout = list_step.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
+            let stdout = list_step
+                .get("stdout")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let needle = format!("tcp:{api_port}");
             if rev_ok && !stdout.contains(&needle) {
                 overall_ok = false;
@@ -4801,9 +5065,12 @@ pub async fn android_usb_bootstrap_connection(
                 if let Some(s) = steps.get_mut(idx) {
                     if let Some(o) = s.as_object_mut() {
                         o.insert("ok".to_string(), serde_json::Value::Bool(false));
-                        o.insert("hint".to_string(), serde_json::Value::String(
-                            format!("Reverse --list did not contain tcp:{api_port}")
-                        ));
+                        o.insert(
+                            "hint".to_string(),
+                            serde_json::Value::String(format!(
+                                "Reverse --list did not contain tcp:{api_port}"
+                            )),
+                        );
                     }
                 }
             }
@@ -4811,14 +5078,22 @@ pub async fn android_usb_bootstrap_connection(
 
         // 4. Optional WiFi bridge.
         if bridge && !wifi_host_val.is_empty() {
-            step!("adb tcpip", vec![
-                "-s".to_string(), serial.clone(),
-                "tcpip".to_string(), wifi_port_val.to_string(),
-            ]);
-            step!("adb connect wifi", vec![
-                "connect".to_string(),
-                format!("{}:{}", wifi_host_val, wifi_port_val),
-            ]);
+            step!(
+                "adb tcpip",
+                vec![
+                    "-s".to_string(),
+                    serial.clone(),
+                    "tcpip".to_string(),
+                    wifi_port_val.to_string(),
+                ]
+            );
+            step!(
+                "adb connect wifi",
+                vec![
+                    "connect".to_string(),
+                    format!("{}:{}", wifi_host_val, wifi_port_val),
+                ]
+            );
         }
 
         Ok(serde_json::json!({
@@ -4867,7 +5142,10 @@ pub async fn save_desktop_connection(
 
     // Store the token in the OS keychain instead of the config file
     let secrets = crate::secrets_store::SecretsStore::new();
-    secrets.store(crate::secrets_store::ACCOUNT_DESKTOP_CONNECTION_TOKEN, &token)?;
+    secrets.store(
+        crate::secrets_store::ACCOUNT_DESKTOP_CONNECTION_TOKEN,
+        &token,
+    )?;
 
     Ok(serde_json::json!({
         "ip": config.desktop_connection_ip,
@@ -4877,14 +5155,17 @@ pub async fn save_desktop_connection(
 
 /// Load persisted desktop connection details for Android auto-reconnect.
 #[tauri::command]
-pub async fn load_desktop_connection(app_handle: AppHandle) -> Result<Option<serde_json::Value>, String> {
+pub async fn load_desktop_connection(
+    app_handle: AppHandle,
+) -> Result<Option<serde_json::Value>, String> {
     let config = crate::config::load_config(&app_handle)?;
-    
+
     // Retrieve the token from the OS keychain
     let secrets = crate::secrets_store::SecretsStore::new();
-    let token = secrets.get(crate::secrets_store::ACCOUNT_DESKTOP_CONNECTION_TOKEN)?
+    let token = secrets
+        .get(crate::secrets_store::ACCOUNT_DESKTOP_CONNECTION_TOKEN)?
         .and_then(|t| if t.is_empty() { None } else { Some(t) });
-    
+
     match (config.desktop_connection_ip, token) {
         (Some(ip), Some(token)) => Ok(Some(serde_json::json!({
             "ip": ip,
@@ -4896,7 +5177,10 @@ pub async fn load_desktop_connection(app_handle: AppHandle) -> Result<Option<ser
 
 fn mobile_pairing_evidence_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
     use tauri::Manager;
-    let app_data_dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     fs::create_dir_all(&app_data_dir).map_err(|e| e.to_string())?;
     Ok(app_data_dir.join("mobile-pairing-evidence.jsonl"))
 }
@@ -5034,9 +5318,9 @@ use crate::swarm_orchestrator::{SwarmRequest, SwarmResult, SwarmRuntimeSettings}
 
 #[derive(serde::Serialize)]
 pub struct AgentResourceCost {
-    pub agent_id:        String,
-    pub slot_index:      i64,
-    pub model_id:        Option<String>,
+    pub agent_id: String,
+    pub slot_index: i64,
+    pub model_id: Option<String>,
     pub ram_required_mb: u64,
 }
 
@@ -5044,47 +5328,83 @@ pub struct AgentResourceCost {
 pub struct SwarmResourceEstimate {
     pub total_ram_required_mb: u64,
     pub shared_ram_required_mb: u64,
-    pub free_ram_mb:           u64,
-    pub fits:                  bool,
-    pub per_agent:             Vec<AgentResourceCost>,
+    pub free_ram_mb: u64,
+    pub fits: bool,
+    pub per_agent: Vec<AgentResourceCost>,
 }
 
 #[tauri::command]
 pub async fn list_personas(state: State<'_, AppState>) -> Result<Vec<Persona>, String> {
-    state.agent_store.list_personas().await.map_err(|e| e.to_string())
+    state
+        .agent_store
+        .list_personas()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn upsert_persona(state: State<'_, AppState>, persona: Persona) -> Result<Persona, String> {
-    state.agent_store.upsert_persona(persona).await.map_err(|e| e.to_string())
+pub async fn upsert_persona(
+    state: State<'_, AppState>,
+    persona: Persona,
+) -> Result<Persona, String> {
+    state
+        .agent_store
+        .upsert_persona(persona)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_persona(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    state.agent_store.delete_persona(&id).await.map_err(|e| e.to_string())
+    state
+        .agent_store
+        .delete_persona(&id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn list_agent_configs(state: State<'_, AppState>) -> Result<Vec<ResolvedAgent>, String> {
-    state.agent_store.resolve_agents(&state.orchestrator).await.map_err(|e| e.to_string())
+    state
+        .agent_store
+        .resolve_agents(&state.orchestrator)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn upsert_agent_config(state: State<'_, AppState>, config: AgentConfig) -> Result<AgentConfig, String> {
-    state.agent_store.upsert_agent(config).await.map_err(|e| e.to_string())
+pub async fn upsert_agent_config(
+    state: State<'_, AppState>,
+    config: AgentConfig,
+) -> Result<AgentConfig, String> {
+    state
+        .agent_store
+        .upsert_agent(config)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn delete_agent_config(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    state.agent_store.delete_agent(&id).await.map_err(|e| e.to_string())
+    state
+        .agent_store
+        .delete_agent(&id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn estimate_swarm_resources(state: State<'_, AppState>) -> Result<SwarmResourceEstimate, String> {
+pub async fn estimate_swarm_resources(
+    state: State<'_, AppState>,
+) -> Result<SwarmResourceEstimate, String> {
     if !crate::features::FeatureFlags::is_enabled("swarm") {
         return Err("Swarm feature is disabled".into());
     }
-    let resolved = state.agent_store.resolve_agents(&state.orchestrator).await.map_err(|e| e.to_string())?;
+    let resolved = state
+        .agent_store
+        .resolve_agents(&state.orchestrator)
+        .await
+        .map_err(|e| e.to_string())?;
     let enabled: Vec<&ResolvedAgent> = resolved.iter().filter(|a| a.config.enabled).collect();
 
     // Shared-model baseline (same model ID counted once).
@@ -5110,12 +5430,15 @@ pub async fn estimate_swarm_resources(state: State<'_, AppState>) -> Result<Swar
     let free_ram_mb = sys.available_memory() / 1024 / 1024;
     let fits = total <= (free_ram_mb as f64 * 0.85) as u64;
 
-    let per_agent = enabled.iter().map(|a| AgentResourceCost {
-        agent_id:        a.config.id.clone(),
-        slot_index:      a.config.slot_index,
-        model_id:        a.effective_model_id.clone(),
-        ram_required_mb: a.ram_required_mb,
-    }).collect();
+    let per_agent = enabled
+        .iter()
+        .map(|a| AgentResourceCost {
+            agent_id: a.config.id.clone(),
+            slot_index: a.config.slot_index,
+            model_id: a.effective_model_id.clone(),
+            ram_required_mb: a.ram_required_mb,
+        })
+        .collect();
 
     Ok(SwarmResourceEstimate {
         total_ram_required_mb: total,
@@ -5128,28 +5451,32 @@ pub async fn estimate_swarm_resources(state: State<'_, AppState>) -> Result<Swar
 
 #[derive(serde::Serialize)]
 pub struct SwarmChatResponse {
-    pub run_id:         String,
-    pub final_content:  String,
-    pub leader_plan:    Option<serde_json::Value>,
-    pub agent_results:  Vec<crate::swarm_orchestrator::AgentOutput>,
-    pub stats:          InferStats,
+    pub run_id: String,
+    pub final_content: String,
+    pub leader_plan: Option<serde_json::Value>,
+    pub agent_results: Vec<crate::swarm_orchestrator::AgentOutput>,
+    pub stats: InferStats,
     pub action_handled: bool,
-    pub tools_used:     Vec<String>,
+    pub tools_used: Vec<String>,
 }
 
 #[tauri::command]
 pub async fn submit_swarm_chat(
-    app_handle:     AppHandle,
-    state:          State<'_, AppState>,
-    messages:       Vec<ChatMessagePayload>,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+    messages: Vec<ChatMessagePayload>,
     workspace_path: Option<String>,
-    enabled_tools:  Option<Vec<String>>,
+    enabled_tools: Option<Vec<String>>,
     swarm_settings: Option<SwarmRuntimeSettings>,
 ) -> Result<SwarmChatResponse, BonsaiError> {
     if !crate::features::FeatureFlags::is_enabled("swarm") {
         return Err(BonsaiError::Config("Swarm feature is disabled".into()));
     }
-    let resolved = state.agent_store.resolve_agents(&state.orchestrator).await.map_err(|e| BonsaiError::Orchestrator(e.to_string()))?;
+    let resolved = state
+        .agent_store
+        .resolve_agents(&state.orchestrator)
+        .await
+        .map_err(|e| BonsaiError::Orchestrator(e.to_string()))?;
     let leader = resolved
         .iter()
         .find(|a| a.config.slot_index == 0)
@@ -5169,15 +5496,16 @@ pub async fn submit_swarm_chat(
     if enabled.len() <= 1 {
         // Single-agent fallback: just call submit_chat logic
         state.chat_cancel.store(false, Ordering::Relaxed);
-        let result = submit_chat(app_handle, state, messages, workspace_path, enabled_tools).await?;
+        let result =
+            submit_chat(app_handle, state, messages, workspace_path, enabled_tools).await?;
         return Ok(SwarmChatResponse {
-            run_id:        "single".to_string(),
+            run_id: "single".to_string(),
             final_content: result.content,
-            leader_plan:   None,
+            leader_plan: None,
             agent_results: vec![],
-            stats:         result.stats,
+            stats: result.stats,
             action_handled: result.action_handled,
-            tools_used:    result.tools_used,
+            tools_used: result.tools_used,
         });
     }
 
@@ -5190,7 +5518,9 @@ pub async fn submit_swarm_chat(
         )));
     }
 
-    let user_prompt = messages.iter().rev()
+    let user_prompt = messages
+        .iter()
+        .rev()
         .find(|m| m.role == "user")
         .map(|m| m.content.clone())
         .unwrap_or_default();
@@ -5198,11 +5528,19 @@ pub async fn submit_swarm_chat(
     let run_id: String = {
         use rand::distributions::Alphanumeric;
         use rand::Rng;
-        rand::thread_rng().sample_iter(&Alphanumeric).take(12).map(char::from).collect()
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(12)
+            .map(char::from)
+            .collect()
     };
 
     // Build cancel flags (one per slot, indexed by slot_index)
-    let max_slot = enabled.iter().map(|a| a.config.slot_index).max().unwrap_or(0) as usize;
+    let max_slot = enabled
+        .iter()
+        .map(|a| a.config.slot_index)
+        .max()
+        .unwrap_or(0) as usize;
     let mut cancel_flags: Vec<Arc<std::sync::atomic::AtomicBool>> = (0..=max_slot)
         .map(|_| Arc::new(std::sync::atomic::AtomicBool::new(false)))
         .collect();
@@ -5220,20 +5558,21 @@ pub async fn submit_swarm_chat(
     let (resp_tx, resp_rx) = oneshot::channel();
 
     state.swarm_orchestrator.submit(SwarmRequest {
-        run_id:         run_id.clone(),
-        session_id:     None,
+        run_id: run_id.clone(),
+        session_id: None,
         user_prompt,
         workspace_path,
         enabled_tools,
         runtime_settings: swarm_settings.unwrap_or_default(),
-        agents:         enabled,
+        agents: enabled,
         cancel_flags,
         global_cancel,
         resp_tx,
         app_handle,
     })?;
 
-    let result: SwarmResult = resp_rx.await
+    let result: SwarmResult = resp_rx
+        .await
         .map_err(|_| "Swarm request cancelled".to_string())?
         .map_err(|e| e)?;
 
@@ -5244,12 +5583,12 @@ pub async fn submit_swarm_chat(
 
     Ok(SwarmChatResponse {
         run_id,
-        final_content:  result.final_response,
-        leader_plan:    result.leader_plan,
-        agent_results:  result.agent_results,
-        stats:          result.stats,
+        final_content: result.final_response,
+        leader_plan: result.leader_plan,
+        agent_results: result.agent_results,
+        stats: result.stats,
         action_handled: false,
-        tools_used:     vec![],
+        tools_used: vec![],
     })
 }
 
@@ -5260,7 +5599,9 @@ pub async fn cancel_swarm(state: State<'_, AppState>, run_id: String) -> Result<
     }
     let cancels = state.swarm_cancels.lock().map_err(|_| "lock poisoned")?;
     if let Some(flags) = cancels.get(&run_id) {
-        for f in flags { f.store(true, Ordering::Relaxed); }
+        for f in flags {
+            f.store(true, Ordering::Relaxed);
+        }
     }
     Ok(())
 }
@@ -5274,10 +5615,16 @@ pub async fn get_swarm_metrics() -> Result<Vec<crate::swarm_orchestrator::SwarmR
 }
 
 #[tauri::command]
-pub async fn cancel_agent(state: State<'_, AppState>, run_id: String, slot: usize) -> Result<(), String> {
+pub async fn cancel_agent(
+    state: State<'_, AppState>,
+    run_id: String,
+    slot: usize,
+) -> Result<(), String> {
     let cancels = state.swarm_cancels.lock().map_err(|_| "lock poisoned")?;
     if let Some(flags) = cancels.get(&run_id) {
-        if let Some(f) = flags.get(slot) { f.store(true, Ordering::Relaxed); }
+        if let Some(f) = flags.get(slot) {
+            f.store(true, Ordering::Relaxed);
+        }
     }
     Ok(())
 }
@@ -5329,7 +5676,10 @@ async fn fetch_from_bot_path(path: &str, token: &str) -> Result<(Value, u16), St
     }
 
     if let Some(persisted) = read_persisted_bot_port() {
-        let url = format!("http://127.0.0.1:{persisted}/{}", path.trim_start_matches('/'));
+        let url = format!(
+            "http://127.0.0.1:{persisted}/{}",
+            path.trim_start_matches('/')
+        );
         if let Ok(resp) = client
             .get(&url)
             .bearer_auth(token)
@@ -5427,7 +5777,11 @@ pub fn run_reclaim_listener(
         cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     if let Some(ports) = ports {
-        let port_arg = ports.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(",");
+        let port_arg = ports
+            .iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
         cmd.arg("-Ports").arg(port_arg);
     }
     if force_kill.unwrap_or(false) {
@@ -5447,7 +5801,10 @@ pub fn run_reclaim_listener(
 }
 
 fn bot_config_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
-    let dir = app_handle.path().app_data_dir().map_err(|e| e.to_string())?;
+    let dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("bonsai-bot-config.json"))
 }
@@ -5498,22 +5855,24 @@ pub async fn save_discord_bot_config(
     app_handle: AppHandle,
     state: State<'_, AppState>,
     token: String,
-    allowed_guild_ids:   Vec<String>,
+    allowed_guild_ids: Vec<String>,
     allowed_channel_ids: Vec<String>,
-    allowed_user_ids:    Vec<String>,
+    allowed_user_ids: Vec<String>,
 ) -> Result<(), String> {
     if !crate::features::FeatureFlags::is_enabled("bot") {
         return Err("Bot feature is disabled".into());
     }
     if !token.is_empty() {
-        state.secrets_store.store("discord_token", &token)
+        state
+            .secrets_store
+            .store("discord_token", &token)
             .map_err(|e| e.to_string())?;
     }
     let path = bot_config_path(&app_handle)?;
     let mut cfg = read_bot_cfg(&path);
-    cfg["discord"]["allowed_guild_ids"]   = json!(allowed_guild_ids);
+    cfg["discord"]["allowed_guild_ids"] = json!(allowed_guild_ids);
     cfg["discord"]["allowed_channel_ids"] = json!(allowed_channel_ids);
-    cfg["discord"]["allowed_user_ids"]    = json!(allowed_user_ids);
+    cfg["discord"]["allowed_user_ids"] = json!(allowed_user_ids);
     cfg["discord"]["enabled"] = json!(true);
     write_bot_cfg(&path, &cfg)?;
     let _ = bot_reload(&state).await;
@@ -5532,7 +5891,9 @@ pub async fn save_telegram_bot_config(
         return Err("Bot feature is disabled".into());
     }
     if !token.is_empty() {
-        state.secrets_store.store("telegram_token", &token)
+        state
+            .secrets_store
+            .store("telegram_token", &token)
             .map_err(|e| e.to_string())?;
     }
     let path = bot_config_path(&app_handle)?;
@@ -5549,25 +5910,27 @@ pub async fn save_telegram_bot_config(
 pub async fn save_matrix_bot_config(
     app_handle: AppHandle,
     state: State<'_, AppState>,
-    password:       String,
+    password: String,
     homeserver_url: String,
-    username:       String,
-    allowed_rooms:  Vec<String>,
-    allowed_users:  Vec<String>,
+    username: String,
+    allowed_rooms: Vec<String>,
+    allowed_users: Vec<String>,
 ) -> Result<(), String> {
     if !crate::features::FeatureFlags::is_enabled("bot") {
         return Err("Bot feature is disabled".into());
     }
     if !password.is_empty() {
-        state.secrets_store.store("matrix_password", &password)
+        state
+            .secrets_store
+            .store("matrix_password", &password)
             .map_err(|e| e.to_string())?;
     }
     let path = bot_config_path(&app_handle)?;
     let mut cfg = read_bot_cfg(&path);
     cfg["matrix"]["homeserver_url"] = json!(homeserver_url);
-    cfg["matrix"]["username"]       = json!(username);
-    cfg["matrix"]["allowed_rooms"]  = json!(allowed_rooms);
-    cfg["matrix"]["allowed_users"]  = json!(allowed_users);
+    cfg["matrix"]["username"] = json!(username);
+    cfg["matrix"]["allowed_rooms"] = json!(allowed_rooms);
+    cfg["matrix"]["allowed_users"] = json!(allowed_users);
     cfg["matrix"]["enabled"] = json!(true);
     write_bot_cfg(&path, &cfg)?;
     let _ = bot_reload(&state).await;
@@ -5579,37 +5942,41 @@ pub async fn save_matrix_bot_config(
 pub async fn save_email_bot_config(
     app_handle: AppHandle,
     state: State<'_, AppState>,
-    imap_password:      String,
-    smtp_password:      String,
-    imap_host:          String,
-    imap_port:          u16,
-    imap_username:      String,
-    smtp_host:          String,
-    smtp_username:      String,
-    smtp_from:          String,
-    subject_prefix:     String,
+    imap_password: String,
+    smtp_password: String,
+    imap_host: String,
+    imap_port: u16,
+    imap_username: String,
+    smtp_host: String,
+    smtp_username: String,
+    smtp_from: String,
+    subject_prefix: String,
     allowed_from_addrs: Vec<String>,
 ) -> Result<(), String> {
     if !crate::features::FeatureFlags::is_enabled("bot") {
         return Err("Bot feature is disabled".into());
     }
     if !imap_password.is_empty() {
-        state.secrets_store.store("email_imap_password", &imap_password)
+        state
+            .secrets_store
+            .store("email_imap_password", &imap_password)
             .map_err(|e| e.to_string())?;
     }
     if !smtp_password.is_empty() {
-        state.secrets_store.store("email_smtp_password", &smtp_password)
+        state
+            .secrets_store
+            .store("email_smtp_password", &smtp_password)
             .map_err(|e| e.to_string())?;
     }
     let path = bot_config_path(&app_handle)?;
     let mut cfg = read_bot_cfg(&path);
-    cfg["email"]["imap_host"]          = json!(imap_host);
-    cfg["email"]["imap_port"]          = json!(imap_port);
-    cfg["email"]["imap_username"]      = json!(imap_username);
-    cfg["email"]["smtp_host"]          = json!(smtp_host);
-    cfg["email"]["smtp_username"]      = json!(smtp_username);
-    cfg["email"]["smtp_from"]          = json!(smtp_from);
-    cfg["email"]["subject_prefix"]     = json!(subject_prefix);
+    cfg["email"]["imap_host"] = json!(imap_host);
+    cfg["email"]["imap_port"] = json!(imap_port);
+    cfg["email"]["imap_username"] = json!(imap_username);
+    cfg["email"]["smtp_host"] = json!(smtp_host);
+    cfg["email"]["smtp_username"] = json!(smtp_username);
+    cfg["email"]["smtp_from"] = json!(smtp_from);
+    cfg["email"]["subject_prefix"] = json!(subject_prefix);
     cfg["email"]["allowed_from_addrs"] = json!(allowed_from_addrs);
     cfg["email"]["enabled"] = json!(true);
     write_bot_cfg(&path, &cfg)?;
@@ -5627,7 +5994,8 @@ pub async fn test_bot_platform(
         return Err("Bot feature is disabled".into());
     }
     let status = get_bot_server_status(state).await?;
-    Ok(status.get("platforms")
+    Ok(status
+        .get("platforms")
         .and_then(|p| p.get(&platform))
         .cloned()
         .unwrap_or(json!({"connected": false, "error": "Platform not found"})))
@@ -5646,17 +6014,17 @@ pub async fn get_matrix_key_backup_passphrase(
         return Err("Unauthorized: invalid admin token proof".to_string());
     }
     state.audit_log.log(crate::assistant_audit_log::AuditEvent {
-        ts:           std::time::SystemTime::now()
-                          .duration_since(std::time::UNIX_EPOCH)
-                          .unwrap_or_default()
-                          .as_secs() as i64,
-        tool:         "matrix_key_backup_passphrase_reveal".to_string(),
-        decision:     "allowed".to_string(),
-        args_hash:    String::new(),
-        error:        None,
-        duration_ms:  None,
-        session_id:   None,
-        turn_id:      None,
+        ts: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64,
+        tool: "matrix_key_backup_passphrase_reveal".to_string(),
+        decision: "allowed".to_string(),
+        args_hash: String::new(),
+        error: None,
+        duration_ms: None,
+        session_id: None,
+        turn_id: None,
         tool_call_id: None,
     });
     let passphrase = keyring::Entry::new(BOT_KEYRING_SERVICE, "matrix_key_backup_pass")
@@ -5681,7 +6049,8 @@ use crate::model_data_generator::ModelDataGenerator;
 /// List all model data entries (summaries — lighter than full records).
 #[tauri::command]
 pub async fn list_model_data(state: State<'_, AppState>) -> Result<Vec<ModelDataSummary>, String> {
-    state.model_data_store
+    state
+        .model_data_store
         .list_summaries()
         .await
         .map_err(|e| e.to_string())
@@ -5693,7 +6062,8 @@ pub async fn get_model_data(
     state: State<'_, AppState>,
     id: String,
 ) -> Result<Option<ModelData>, String> {
-    state.model_data_store
+    state
+        .model_data_store
         .get(&id)
         .await
         .map_err(|e| e.to_string())
@@ -5706,7 +6076,8 @@ pub async fn save_model_data(
     mut data: ModelData,
 ) -> Result<String, String> {
     data.touch();
-    state.model_data_store
+    state
+        .model_data_store
         .save(&data)
         .await
         .map_err(|e| e.to_string())?;
@@ -5715,11 +6086,9 @@ pub async fn save_model_data(
 
 /// Delete a ModelData record.
 #[tauri::command]
-pub async fn delete_model_data(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<(), String> {
-    state.model_data_store
+pub async fn delete_model_data(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    state
+        .model_data_store
         .delete(&id)
         .await
         .map_err(|e| e.to_string())
@@ -5731,7 +6100,8 @@ pub async fn search_model_data(
     state: State<'_, AppState>,
     query: String,
 ) -> Result<Vec<ModelDataSummary>, String> {
-    let results = state.model_data_store
+    let results = state
+        .model_data_store
         .search(&query)
         .await
         .map_err(|e| e.to_string())?;
@@ -5744,7 +6114,8 @@ pub async fn rank_models_for_skill(
     state: State<'_, AppState>,
     skill_id: String,
 ) -> Result<Vec<ModelDataSummary>, String> {
-    let results = state.model_data_store
+    let results = state
+        .model_data_store
         .rank_for_skill(&skill_id)
         .await
         .map_err(|e| e.to_string())?;
@@ -5762,17 +6133,23 @@ pub async fn generate_model_data(
     match input {
         GenerateModelDataInput::FromRegistry { registry_id } => {
             let models = state.orchestrator.list_models().await;
-            let info   = models.iter()
+            let info = models
+                .iter()
                 .find(|m| m.id == registry_id)
                 .ok_or_else(|| format!("registry model '{registry_id}' not found"))?;
-            generator.from_registry_info(info).await.map_err(|e| e.to_string())
-        }
-        GenerateModelDataInput::FromProvider { provider, model_id, base_url } => {
             generator
-                .from_provider(&provider, &model_id, base_url.as_deref())
+                .from_registry_info(info)
                 .await
                 .map_err(|e| e.to_string())
         }
+        GenerateModelDataInput::FromProvider {
+            provider,
+            model_id,
+            base_url,
+        } => generator
+            .from_provider(&provider, &model_id, base_url.as_deref())
+            .await
+            .map_err(|e| e.to_string()),
     }
 }
 
@@ -5787,7 +6164,8 @@ pub async fn sync_registry_to_model_data(
     let default_mode = crate::config::load_config(&app_handle)
         .map(|c| c.default_inference_mode)
         .unwrap_or_default();
-    state.model_data_store
+    state
+        .model_data_store
         .sync_from_registry(&models, &default_mode)
         .await
         .map_err(|e| e.to_string())
@@ -5930,7 +6308,9 @@ pub async fn apply_inference_mode_to_all(
 #[tauri::command]
 pub async fn list_model_directories(app_handle: AppHandle) -> Result<Vec<String>, String> {
     let cfg = crate::config::load_config(&app_handle).map_err(|e| e.to_string())?;
-    let bootstrap = crate::bootstrap::models_dir(&app_handle).display().to_string();
+    let bootstrap = crate::bootstrap::models_dir(&app_handle)
+        .display()
+        .to_string();
     let mut dirs = vec![bootstrap];
     dirs.extend(cfg.extra_model_dirs);
     Ok(dirs)
@@ -5977,12 +6357,8 @@ pub async fn remove_model_directory(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_resume_continuation_payloads,
-        finalize_tool_only_response,
-        has_parent_dir_component,
-        is_file_inventory_request,
-        tool_denied_message,
-        tool_name_from_action,
+        build_resume_continuation_payloads, finalize_tool_only_response, has_parent_dir_component,
+        is_file_inventory_request, tool_denied_message, tool_name_from_action,
     };
     use serde_json::json;
 
@@ -6010,7 +6386,9 @@ mod tests {
         assert!(is_file_inventory_request("Show files"));
         assert!(is_file_inventory_request("Readme"));
         assert!(is_file_inventory_request("Read the file README.md"));
-        assert!(is_file_inventory_request("Can you list files in this directory?"));
+        assert!(is_file_inventory_request(
+            "Can you list files in this directory?"
+        ));
     }
 
     #[test]
@@ -6036,7 +6414,10 @@ mod tests {
     #[test]
     fn tool_name_from_action_defaults_when_missing() {
         assert_eq!(tool_name_from_action(&json!({})), "tool");
-        assert_eq!(tool_name_from_action(&json!({"tool": "write_file"})), "write_file");
+        assert_eq!(
+            tool_name_from_action(&json!({"tool": "write_file"})),
+            "write_file"
+        );
     }
 
     #[test]
@@ -6087,15 +6468,17 @@ mod tests {
             .collect();
 
         assert_eq!(token.len(), 8, "token must be 8 characters");
-        assert!(token.chars().all(|c| c.is_ascii_alphanumeric()),
-            "token must be alphanumeric, got: {token}");
+        assert!(
+            token.chars().all(|c| c.is_ascii_alphanumeric()),
+            "token must be alphanumeric, got: {token}"
+        );
     }
 
     /// QR code generation produces valid SVG containing an `<svg` root element.
     #[test]
     fn generate_pair_qr_returns_svg() {
-        use qrcode::QrCode;
         use qrcode::render::svg;
+        use qrcode::QrCode;
 
         let data = format!(
             "bonsai://connect?ip=192.168.1.100&port={}&token=ABCD1234",
@@ -6112,8 +6495,8 @@ mod tests {
     /// QR code for empty payload must still succeed.
     #[test]
     fn generate_pair_qr_empty_data() {
-        use qrcode::QrCode;
         use qrcode::render::svg;
+        use qrcode::QrCode;
 
         let code = QrCode::new(b"").expect("QR code with empty data failed");
         let svg_str = code.render::<svg::Color>().min_dimensions(100, 100).build();
@@ -6134,7 +6517,9 @@ mod tests {
         router.broadcast(Message::Text(payload.to_string()));
 
         let msg = rx.recv().await.expect("should receive broadcast");
-        let Message::Text(txt) = msg else { panic!("expected text message") };
+        let Message::Text(txt) = msg else {
+            panic!("expected text message")
+        };
         let v: serde_json::Value = serde_json::from_str(&txt).unwrap();
         assert_eq!(v["type"], "pair_info");
         assert_eq!(v["payload"]["token"], "TEST1234");
@@ -6147,10 +6532,14 @@ mod tests {
             Ok(ip) => {
                 let s = ip.to_string();
                 // Must parse back to a valid IP.
-                let parsed: std::net::IpAddr = s.parse()
+                let parsed: std::net::IpAddr = s
+                    .parse()
                     .unwrap_or_else(|_| panic!("local_ip returned unparseable string: {s}"));
                 // Must not be loopback (127.x or ::1).
-                assert!(!parsed.is_loopback(), "local_ip should not return loopback, got {parsed}");
+                assert!(
+                    !parsed.is_loopback(),
+                    "local_ip should not return loopback, got {parsed}"
+                );
             }
             // In CI / sandboxed environments there may be no network — skip.
             Err(e) => tracing::warn!(error=%e, "[skip] local_ip_address unavailable"),
@@ -6169,15 +6558,19 @@ pub async fn list_agents(
 
 #[tauri::command]
 pub async fn send_agent_message(
-    app:      tauri::AppHandle,
-    state:    State<'_, crate::AppState>,
+    app: tauri::AppHandle,
+    state: State<'_, crate::AppState>,
     agent_id: String,
-    message:  crate::agent::AgentMessage,
+    message: crate::agent::AgentMessage,
 ) -> Result<crate::agent::AgentOutput, String> {
     let ctx = crate::agent::AgentContext {
         model_url: state.orchestrator.active_slot_url().await,
     };
-    let output = state.agent_host.handle(&agent_id, ctx, message).await.map_err(|e| e.to_string())?;
+    let output = state
+        .agent_host
+        .handle(&agent_id, ctx, message)
+        .await
+        .map_err(|e| e.to_string())?;
     let payload = output.clone();
     tauri::async_runtime::spawn(async move {
         let _ = app.emit("agent-output", &payload);
@@ -6204,9 +6597,7 @@ pub async fn start_training_cycle(
         }
     }
 
-    let data = data_path.unwrap_or_else(|| {
-        "data/bonsai_core/bonsai_core_train_v2.jsonl".into()
-    });
+    let data = data_path.unwrap_or_else(|| "data/bonsai_core/bonsai_core_train_v2.jsonl".into());
     let output = output_path.unwrap_or_else(|| {
         dirs::home_dir()
             .unwrap_or_else(|| std::path::PathBuf::from("."))
@@ -6217,32 +6608,41 @@ pub async fn start_training_cycle(
 
     // Log training start to telemetry
     let run_id = crate::telemetry::new_run_id();
-    let _ = state.telemetry.log_training_start(&crate::telemetry::TrainingRun {
-        id:               run_id.clone(),
-        started_at:       std::time::SystemTime::now()
-                              .duration_since(std::time::UNIX_EPOCH)
-                              .unwrap_or_default()
-                              .as_secs() as i64,
-        finished_at:      None,
-        base_model:       model_path.clone().unwrap_or_else(|| "local".into()),
-        data_path:        Some(data.clone()),
-        adapter_path:     None,
-        status:           "running".into(),
-        metrics:          None,
-        total_examples:   None,
-        curated_examples: None,
-    }).await;
+    let _ = state
+        .telemetry
+        .log_training_start(&crate::telemetry::TrainingRun {
+            id: run_id.clone(),
+            started_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64,
+            finished_at: None,
+            base_model: model_path.clone().unwrap_or_else(|| "local".into()),
+            data_path: Some(data.clone()),
+            adapter_path: None,
+            status: "running".into(),
+            metrics: None,
+            total_examples: None,
+            curated_examples: None,
+        })
+        .await;
 
-    let result = crate::trainer::Trainer::run(
-        model_path.as_deref(),
-        &data,
-        &output,
-    );
+    let result = crate::trainer::Trainer::run(model_path.as_deref(), &data, &output);
 
     // Log outcome
     match &result {
-        Ok(_)    => { let _ = state.telemetry.log_training_end(&run_id, "completed", None, Some(&output)).await; }
-        Err(e)   => { let _ = state.telemetry.log_training_end(&run_id, "failed", Some(e.as_str()), None).await; }
+        Ok(_) => {
+            let _ = state
+                .telemetry
+                .log_training_end(&run_id, "completed", None, Some(&output))
+                .await;
+        }
+        Err(e) => {
+            let _ = state
+                .telemetry
+                .log_training_end(&run_id, "failed", Some(e.as_str()), None)
+                .await;
+        }
     }
 
     let adapter = result?;
@@ -6254,7 +6654,11 @@ pub async fn start_training_cycle(
 pub async fn get_training_status(
     state: State<'_, AppState>,
 ) -> Result<Option<crate::telemetry::TrainingRun>, String> {
-    state.telemetry.get_latest_run().await.map_err(|e| e.to_string())
+    state
+        .telemetry
+        .get_latest_run()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -6262,7 +6666,8 @@ pub async fn get_training_history(
     state: State<'_, AppState>,
     limit: Option<u32>,
 ) -> Result<Vec<crate::telemetry::TrainingRun>, String> {
-    state.telemetry
+    state
+        .telemetry
         .get_training_runs(limit.unwrap_or(20) as i64)
         .await
         .map_err(|e| e.to_string())
@@ -6276,7 +6681,10 @@ pub async fn load_model_native(
     model_path: String,
     n_gpu_layers: i32,
 ) -> Result<String, String> {
-    state.hybrid_engine.load_model(&model_path, n_gpu_layers).await?;
+    state
+        .hybrid_engine
+        .load_model(&model_path, n_gpu_layers)
+        .await?;
     Ok(format!("model loaded with {} GPU layers", n_gpu_layers))
 }
 
@@ -6286,7 +6694,10 @@ pub async fn apply_lora_native(
     lora_path: String,
     scale: Option<f32>,
 ) -> Result<String, String> {
-    state.hybrid_engine.apply_lora(&lora_path, scale.unwrap_or(1.0)).await?;
+    state
+        .hybrid_engine
+        .apply_lora(&lora_path, scale.unwrap_or(1.0))
+        .await?;
     Ok(format!("LoRA applied: {}", lora_path))
 }
 
@@ -6412,8 +6823,7 @@ pub async fn get_bonsai_md(workspace_path: String) -> Result<String, String> {
 /// Write (overwrite) the BONSAI.md for a project workspace.
 #[tauri::command]
 pub async fn set_bonsai_md(workspace_path: String, content: String) -> Result<(), String> {
-    crate::bonsai_md::write(&workspace_path, &content)
-        .map_err(|e| format!("write failed: {e}"))
+    crate::bonsai_md::write(&workspace_path, &content).map_err(|e| format!("write failed: {e}"))
 }
 
 // ── Memory node commands ──────────────────────────────────────────────────────
@@ -6431,17 +6841,22 @@ pub async fn record_memory_node(
         crate::memory_nodes::NodeType::from_str(&node_type),
         source,
         content,
-    ).with_tags(tags.unwrap_or_default());
-    state.memory_nodes.insert(&node).await
+    )
+    .with_tags(tags.unwrap_or_default());
+    state
+        .memory_nodes
+        .insert(&node)
+        .await
         .map_err(|e| format!("memory_nodes insert failed: {e}"))
 }
 
 /// Get pending (unconsolidated) memory node count.
 #[tauri::command]
-pub async fn get_memory_node_count(
-    state: State<'_, crate::AppState>,
-) -> Result<i64, String> {
-    state.memory_nodes.pending_count().await
+pub async fn get_memory_node_count(state: State<'_, crate::AppState>) -> Result<i64, String> {
+    state
+        .memory_nodes
+        .pending_count()
+        .await
         .map_err(|e| format!("count failed: {e}"))
 }
 
@@ -6453,7 +6868,9 @@ pub async fn set_undercover_mode(
     state: State<'_, crate::AppState>,
     enabled: bool,
 ) -> Result<(), String> {
-    state.undercover_enabled.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    state
+        .undercover_enabled
+        .store(enabled, std::sync::atomic::Ordering::Relaxed);
     // Persist to feature flags
     let mut flags = crate::features::FeatureFlags::global();
     flags.undercover_mode = enabled;
@@ -6467,7 +6884,9 @@ pub async fn set_plan_gate_enabled(
     state: State<'_, crate::AppState>,
     enabled: bool,
 ) -> Result<(), String> {
-    state.plan_gate_enabled.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    state
+        .plan_gate_enabled
+        .store(enabled, std::sync::atomic::Ordering::Relaxed);
     let mut flags = crate::features::FeatureFlags::global();
     flags.plan_gate_enabled = enabled;
     crate::features::FeatureFlags::set_global(flags);
@@ -6536,18 +6955,21 @@ pub async fn hot_reload_model(
             Ok(format!("Model '{model_id}' loaded and ready"))
         }
         Ok(Err(e)) => Err(format!("Failed to load '{model_id}': {e}")),
-        Err(_)     => Err("Orchestrator unavailable".into()),
+        Err(_) => Err("Orchestrator unavailable".into()),
     }
 }
 
 #[tauri::command]
-pub async fn generate_music_command(prompt: String, duration: Option<f32>) -> Result<String, String> {
+pub async fn generate_music_command(
+    prompt: String,
+    duration: Option<f32>,
+) -> Result<String, String> {
     let dur = duration.unwrap_or(10.0).clamp(1.0, 60.0);
     let wav = crate::music_engine::generate_wav(&prompt, dur).await;
     if wav.is_empty() {
         return Err("Music generation produced no audio".into());
     }
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
     Ok(format!("data:audio/wav;base64,{}", STANDARD.encode(&wav)))
 }
 
@@ -6555,17 +6977,15 @@ pub async fn generate_music_command(prompt: String, duration: Option<f32>) -> Re
 
 #[tauri::command]
 pub async fn start_training(
-    app:    tauri::AppHandle,
-    state:  tauri::State<'_, crate::AppState>,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::AppState>,
     phases: Option<Vec<String>>,
 ) -> Result<String, String> {
     state.training_jobs.start(app, phases).await
 }
 
 #[tauri::command]
-pub async fn stop_training(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<(), String> {
+pub async fn stop_training(state: tauri::State<'_, crate::AppState>) -> Result<(), String> {
     state.training_jobs.stop().await
 }
 
@@ -6588,8 +7008,8 @@ pub async fn get_adapters() -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 pub async fn deploy_adapter(
-    app:          tauri::AppHandle,
-    state:        tauri::State<'_, crate::AppState>,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::AppState>,
     adapter_path: String,
 ) -> Result<(), String> {
     use std::path::PathBuf;
@@ -6603,23 +7023,28 @@ pub async fn deploy_adapter(
         // Already a GGUF — just copy it
         std::fs::create_dir_all(target.parent().unwrap()).ok();
         std::fs::copy(&src, &target).map_err(|e| format!("Copy failed: {e}"))?;
-        tracing::info!("[deploy] Copied GGUF {} → {}", src.display(), target.display());
+        tracing::info!(
+            "[deploy] Copied GGUF {} → {}",
+            src.display(),
+            target.display()
+        );
     } else {
         return Err("Only .gguf files can be deployed directly. Use convert_to_gguf.py to convert an adapter first.".into());
     }
 
     // Trigger hot-reload via the existing orchestrator
-    if let Some(orch) = app.try_state::<std::sync::Arc<crate::model_orchestrator::ModelOrchestrator>>() {
+    if let Some(orch) =
+        app.try_state::<std::sync::Arc<crate::model_orchestrator::ModelOrchestrator>>()
+    {
         orch.refresh_registry();
     }
 
     // System-tray notification
     {
         use tauri_plugin_notification::NotificationExt;
-        let name = src.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("model");
-        let _ = app.notification()
+        let name = src.file_name().and_then(|n| n.to_str()).unwrap_or("model");
+        let _ = app
+            .notification()
             .builder()
             .title("🧠 BonsAI Brain Update Deployed")
             .body(format!("{name} is now active. BonsAI just got smarter!"))
@@ -6634,8 +7059,8 @@ pub async fn deploy_adapter(
 #[tauri::command]
 pub async fn run_coordinated_task(
     description: String,
-    items:       Vec<String>,
-    model_url:   Option<String>,
+    items: Vec<String>,
+    model_url: Option<String>,
     max_workers: Option<usize>,
 ) -> Result<serde_json::Value, String> {
     use bonsai_coordinator::{Coordinator, CoordinatorConfig, CoordinatorTask};
@@ -6645,10 +7070,10 @@ pub async fn run_coordinated_task(
     }
 
     let cfg = CoordinatorConfig {
-        model_url:   model_url.unwrap_or_else(|| "http://127.0.0.1:8082".into()),
+        model_url: model_url.unwrap_or_else(|| "http://127.0.0.1:8082".into()),
         max_workers: max_workers.unwrap_or(4),
         timeout_secs: 60,
-        max_tokens:   512,
+        max_tokens: 512,
     };
 
     let result = Coordinator::new(cfg)

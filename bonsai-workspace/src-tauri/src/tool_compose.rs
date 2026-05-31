@@ -51,7 +51,9 @@ pub enum OnError {
 }
 
 impl Default for OnError {
-    fn default() -> Self { Self::Abort }
+    fn default() -> Self {
+        Self::Abort
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -96,12 +98,12 @@ impl ComposedPipeline {
 
 #[derive(Debug, Serialize)]
 pub struct PipelineResult {
-    pub steps_run:     usize,
+    pub steps_run: usize,
     pub steps_skipped: usize,
-    pub steps_failed:  usize,
+    pub steps_failed: usize,
     /// Final accumulated variable scope after all steps.
-    pub output:        HashMap<String, Value>,
-    pub errors:        Vec<String>,
+    pub output: HashMap<String, Value>,
+    pub errors: Vec<String>,
 }
 
 // ── Variable interpolation ────────────────────────────────────────────────────
@@ -118,18 +120,21 @@ fn interpolate(template: &str, vars: &HashMap<String, Value>) -> String {
         result = result.replace(&placeholder, &replacement);
     }
     // Also handle dot-notation: {var.field}
-    let re_dot = regex::Regex::new(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\}").unwrap();
-    result = re_dot.replace_all(&result, |caps: &regex::Captures| {
-        let var = &caps[1];
-        let field = &caps[2];
-        vars.get(var)
-            .and_then(|v| v.get(field))
-            .map(|v| match v {
-                Value::String(s) => s.clone(),
-                other => other.to_string(),
-            })
-            .unwrap_or_else(|| caps[0].to_string())
-    }).to_string();
+    let re_dot =
+        regex::Regex::new(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\}").unwrap();
+    result = re_dot
+        .replace_all(&result, |caps: &regex::Captures| {
+            let var = &caps[1];
+            let field = &caps[2];
+            vars.get(var)
+                .and_then(|v| v.get(field))
+                .map(|v| match v {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                })
+                .unwrap_or_else(|| caps[0].to_string())
+        })
+        .to_string();
     result
 }
 
@@ -140,7 +145,7 @@ fn interpolate_value(v: &Value, vars: &HashMap<String, Value>) -> Value {
         Value::Object(map) => Value::Object(
             map.iter()
                 .map(|(k, v)| (k.clone(), interpolate_value(v, vars)))
-                .collect()
+                .collect(),
         ),
         Value::Array(arr) => Value::Array(arr.iter().map(|v| interpolate_value(v, vars)).collect()),
         other => other.clone(),
@@ -171,13 +176,13 @@ fn eval_condition(expr: &str, vars: &HashMap<String, Value>) -> bool {
     // Bare variable: check if truthy
     let original = expr.trim().trim_matches('{').trim_matches('}');
     match vars.get(original) {
-        None                       => false,
-        Some(Value::Null)          => false,
-        Some(Value::Bool(b))       => *b,
-        Some(Value::String(s))     => !s.is_empty(),
-        Some(Value::Array(a))      => !a.is_empty(),
-        Some(Value::Object(o))     => !o.is_empty(),
-        Some(Value::Number(n))     => n.as_f64().unwrap_or(0.0) != 0.0,
+        None => false,
+        Some(Value::Null) => false,
+        Some(Value::Bool(b)) => *b,
+        Some(Value::String(s)) => !s.is_empty(),
+        Some(Value::Array(a)) => !a.is_empty(),
+        Some(Value::Object(o)) => !o.is_empty(),
+        Some(Value::Number(n)) => n.as_f64().unwrap_or(0.0) != 0.0,
     }
 }
 
@@ -200,10 +205,10 @@ impl PipelineExecutor {
         ctx: &ToolContext,
     ) -> PipelineResult {
         let mut vars = initial_vars;
-        let mut steps_run     = 0usize;
+        let mut steps_run = 0usize;
         let mut steps_skipped = 0usize;
-        let mut steps_failed  = 0usize;
-        let mut errors        = Vec::new();
+        let mut steps_failed = 0usize;
+        let mut errors = Vec::new();
 
         for step in &pipeline.steps {
             if ctx.is_cancelled() {
@@ -222,13 +227,18 @@ impl PipelineExecutor {
 
             // Foreach loop
             if let Some(foreach_var) = &step.foreach {
-                let items = vars.get(foreach_var).cloned().unwrap_or(Value::Array(vec![]));
+                let items = vars
+                    .get(foreach_var)
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![]));
                 let arr = match items {
                     Value::Array(a) => a,
                     other => vec![other],
                 };
                 for item in arr {
-                    if ctx.is_cancelled() { break; }
+                    if ctx.is_cancelled() {
+                        break;
+                    }
                     let mut loop_vars = vars.clone();
                     loop_vars.insert("item".into(), item);
                     let step_result = self.run_step(step, &loop_vars, ctx).await;
@@ -243,7 +253,13 @@ impl PipelineExecutor {
                             steps_failed += 1;
                             errors.push(e.clone());
                             if matches!(step.on_error, OnError::Abort) {
-                                return PipelineResult { steps_run, steps_skipped, steps_failed, output: vars, errors };
+                                return PipelineResult {
+                                    steps_run,
+                                    steps_skipped,
+                                    steps_failed,
+                                    output: vars,
+                                    errors,
+                                };
                             }
                         }
                     }
@@ -286,7 +302,13 @@ impl PipelineExecutor {
             }
         }
 
-        PipelineResult { steps_run, steps_skipped, steps_failed, output: vars, errors }
+        PipelineResult {
+            steps_run,
+            steps_skipped,
+            steps_failed,
+            output: vars,
+            errors,
+        }
     }
 
     async fn run_step(
@@ -296,7 +318,8 @@ impl PipelineExecutor {
         ctx: &ToolContext,
     ) -> Result<Value, String> {
         let reg = self.registry.read().await;
-        let tool = reg.get(&step.tool)
+        let tool = reg
+            .get(&step.tool)
             .ok_or_else(|| format!("Tool '{}' not found in registry", step.tool))?;
 
         let args = interpolate_value(&step.args, vars);
@@ -317,11 +340,20 @@ impl PipelineExecutor {
 #[tauri::command]
 pub async fn validate_composed_skill(body: String) -> Result<Vec<String>, String> {
     let pipeline = ComposedPipeline::parse(&body)?;
-    Ok(pipeline.steps.iter().map(|s| {
-        format!("{}{}", s.tool,
-            s.condition.as_ref().map(|c| format!(" [if {c}]")).unwrap_or_default()
-        )
-    }).collect())
+    Ok(pipeline
+        .steps
+        .iter()
+        .map(|s| {
+            format!(
+                "{}{}",
+                s.tool,
+                s.condition
+                    .as_ref()
+                    .map(|c| format!(" [if {c}]"))
+                    .unwrap_or_default()
+            )
+        })
+        .collect())
 }
 
 #[cfg(test)]
@@ -332,7 +364,10 @@ mod tests {
     fn interpolate_simple_variable() {
         let mut vars = HashMap::new();
         vars.insert("path".into(), Value::String("/home/user/file.rs".into()));
-        assert_eq!(interpolate("Read {path} please", &vars), "Read /home/user/file.rs please");
+        assert_eq!(
+            interpolate("Read {path} please", &vars),
+            "Read /home/user/file.rs please"
+        );
     }
 
     #[test]
@@ -377,6 +412,9 @@ steps:
         let pipeline = ComposedPipeline::parse(yaml).unwrap();
         assert_eq!(pipeline.steps.len(), 2);
         assert_eq!(pipeline.steps[0].tool, "read_file");
-        assert_eq!(pipeline.steps[1].on_error.clone() as u8, OnError::Continue as u8);
+        assert_eq!(
+            pipeline.steps[1].on_error.clone() as u8,
+            OnError::Continue as u8
+        );
     }
 }

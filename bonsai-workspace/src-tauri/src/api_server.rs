@@ -12,37 +12,40 @@
 //! can point at `http://localhost:11369` and use the Bonsai models directly.
 //! Default port is 11369.
 
-use std::convert::Infallible;
-use std::process::Command;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use axum::{
     body::Body,
-    extract::{State, ws::{WebSocket, WebSocketUpgrade}},
+    extract::{
+        ws::{WebSocket, WebSocketUpgrade},
+        State,
+    },
     http::{HeaderMap, HeaderValue, Method, StatusCode},
-    response::{IntoResponse, Response, Sse},
     response::sse::{Event, KeepAlive},
+    response::{IntoResponse, Response, Sse},
     routing::{get, post},
     Json, Router,
 };
 use base64::Engine;
 use bytes::Bytes;
-use futures::{StreamExt, SinkExt, stream::BoxStream};
+use futures::{stream::BoxStream, SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::convert::Infallible;
+use std::process::Command;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_stream::wrappers::IntervalStream;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tokio::sync::oneshot;
-use tokio::task::JoinHandle;
 
-use tauri::AppHandle;
-use tauri::Emitter;
 use crate::model_orchestrator::ModelOrchestrator;
 use crate::model_registry::ModelInfo;
 use crate::remote::RemoteManager;
 use crate::remote_input::RemoteInputEvent;
 use crate::ws_router::WsRouter;
+use tauri::AppHandle;
+use tauri::Emitter;
 
 const CONTENT_TYPE_JSON: HeaderValue = HeaderValue::from_static("application/json");
 
@@ -59,23 +62,23 @@ fn allow_extension_origin(origin: &HeaderValue) -> bool {
 
 #[derive(Clone)]
 struct ApiState {
-    orchestrator:    Arc<ModelOrchestrator>,
-    client:          reqwest::Client,
-    remote_manager:  Arc<RemoteManager>,
-    ws_router:       Arc<WsRouter>,
-    pair_token:      String,
-    api_host:        String,
-    api_port:        u16,
-    app_handle:      AppHandle,
+    orchestrator: Arc<ModelOrchestrator>,
+    client: reqwest::Client,
+    remote_manager: Arc<RemoteManager>,
+    ws_router: Arc<WsRouter>,
+    pair_token: String,
+    api_host: String,
+    api_port: u16,
+    app_handle: AppHandle,
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 pub struct ApiServerHandle {
     shutdown_tx: Option<oneshot::Sender<()>>,
-    join:        JoinHandle<()>,
-    pub host:    String,
-    pub port:    u16,
+    join: JoinHandle<()>,
+    pub host: String,
+    pub port: u16,
 }
 
 impl ApiServerHandle {
@@ -127,30 +130,30 @@ pub async fn start(
 
     let app = Router::new()
         // OpenAI-compatible
-        .route("/v1/models",            get(list_models))
-        .route("/v1/chat/completions",  post(chat_completions))
-        .route("/v1/admin/recycle",     post(admin_recycle))
+        .route("/v1/models", get(list_models))
+        .route("/v1/chat/completions", post(chat_completions))
+        .route("/v1/admin/recycle", post(admin_recycle))
         // Ollama-compatible (for tools that speak Ollama)
-        .route("/api/tags",             get(ollama_tags))
-        .route("/api/chat",             post(ollama_chat))
-        .route("/api/generate",         post(ollama_generate))
+        .route("/api/tags", get(ollama_tags))
+        .route("/api/chat", post(ollama_chat))
+        .route("/api/generate", post(ollama_generate))
         // Remote control / screen capture
         .route("/remote/session/start", post(start_remote_session))
-        .route("/remote/session/stop",  post(stop_remote_session))
+        .route("/remote/session/stop", post(stop_remote_session))
         .route("/remote/session/offer", post(remote_session_offer))
-        .route("/remote/input",         post(remote_input_event))
-        .route("/remote/frame",         get(remote_frame))
-        .route("/remote/stream",        get(remote_stream))
+        .route("/remote/input", post(remote_input_event))
+        .route("/remote/frame", get(remote_frame))
+        .route("/remote/stream", get(remote_stream))
         // Authenticated remote-surface bridge (for Fire/non-WebView devices)
         .route("/remote/surface/session/start", post(remote_surface_start))
-        .route("/remote/surface/session/stop",  post(remote_surface_stop))
-        .route("/remote/surface/frame",         get(remote_surface_frame))
-        .route("/remote/surface/input",         post(remote_surface_input))
+        .route("/remote/surface/session/stop", post(remote_surface_stop))
+        .route("/remote/surface/frame", get(remote_surface_frame))
+        .route("/remote/surface/input", post(remote_surface_input))
         // Meta
-        .route("/health",               get(health))
-        .route("/api/version",          get(ollama_version))
+        .route("/health", get(health))
+        .route("/api/version", get(ollama_version))
         // WebSocket — bidirectional relay for Android app + VSCode extension
-        .route("/ws",                   get(ws_handler))
+        .route("/ws", get(ws_handler))
         .layer(cors)
         .with_state(state);
 
@@ -296,7 +299,11 @@ fn try_reclaim_stale_bonsai_listener(port: u16) -> bool {
             if let Ok(out) = {
                 let mut c = Command::new("taskkill");
                 c.args(["/PID", &pid.to_string(), "/T", "/F"]);
-                #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    c.creation_flags(0x0800_0000);
+                }
                 c.output()
             } {
                 if out.status.success() {
@@ -313,7 +320,11 @@ fn listening_pids_on_port(port: u16) -> Vec<u32> {
     let out = match {
         let mut c = Command::new("netstat");
         c.args(["-ano"]);
-        #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            c.creation_flags(0x0800_0000);
+        }
         c.output()
     } {
         Ok(o) => o,
@@ -346,7 +357,11 @@ fn process_image_name(pid: u32) -> String {
     let out = match {
         let mut c = Command::new("tasklist");
         c.args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"]);
-        #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            c.creation_flags(0x0800_0000);
+        }
         c.output()
     } {
         Ok(o) => o,
@@ -373,11 +388,9 @@ async fn ollama_version() -> impl IntoResponse {
     Json(json!({ "version": "0.1.0-bonsai" }))
 }
 
-async fn admin_recycle(
-    State(s): State<ApiState>,
-    body: Option<Json<Value>>,
-) -> impl IntoResponse {
-    let model_filter = body.as_ref()
+async fn admin_recycle(State(s): State<ApiState>, body: Option<Json<Value>>) -> impl IntoResponse {
+    let model_filter = body
+        .as_ref()
         .and_then(|b| b.get("model_id"))
         .and_then(|v| v.as_str())
         .map(|s| s.to_owned());
@@ -405,10 +418,14 @@ async fn admin_recycle(
         recycled.push(slot_label);
     }
 
-    (StatusCode::OK, Json(json!({
-        "recycled": recycled,
-        "errors": errors,
-    }))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({
+            "recycled": recycled,
+            "errors": errors,
+        })),
+    )
+        .into_response()
 }
 // ── Remote session / screen capture ───────────────────────────────────────────────
 
@@ -420,21 +437,37 @@ async fn start_remote_session(State(s): State<ApiState>) -> impl IntoResponse {
             "stream_url": format!("http://{}:{}/remote/stream", s.api_host, s.api_port),
             "frame_url": format!("http://{}:{}/remote/frame", s.api_host, s.api_port),
             "input_url": format!("http://{}:{}/remote/input", s.api_host, s.api_port),
-        })).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": err}))).into_response(),
+        }))
+        .into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": err})),
+        )
+            .into_response(),
     }
 }
 
 async fn stop_remote_session(State(s): State<ApiState>) -> impl IntoResponse {
     match s.remote_manager.stop_session().await {
         Ok(()) => (StatusCode::OK, Json(json!({"status": "stopped"}))).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": err}))).into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": err})),
+        )
+            .into_response(),
     }
 }
 
-async fn remote_session_offer(State(s): State<ApiState>, Json(payload): Json<Value>) -> impl IntoResponse {
+async fn remote_session_offer(
+    State(s): State<ApiState>,
+    Json(payload): Json<Value>,
+) -> impl IntoResponse {
     let Some(session) = s.remote_manager.get_active_session() else {
-        return (StatusCode::BAD_REQUEST, Json(json!({"error": "No active remote session"}))).into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "No active remote session"})),
+        )
+            .into_response();
     };
 
     Json(json!({
@@ -443,7 +476,8 @@ async fn remote_session_offer(State(s): State<ApiState>, Json(payload): Json<Val
             "status": "ready",
             "received_offer": payload,
         }
-    })).into_response()
+    }))
+    .into_response()
 }
 
 async fn remote_frame(State(s): State<ApiState>) -> Response {
@@ -462,20 +496,28 @@ async fn remote_frame(State(s): State<ApiState>) -> Response {
         Err(err) => Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .header("content-type", "application/json")
-            .body(Body::from(Bytes::from(json!({"error": err.to_string()}).to_string())))
+            .body(Body::from(Bytes::from(
+                json!({"error": err.to_string()}).to_string(),
+            )))
             .unwrap(),
     }
 }
 
-async fn remote_stream(State(s): State<ApiState>) -> Sse<BoxStream<'static, Result<Event, Infallible>>> {
+async fn remote_stream(
+    State(s): State<ApiState>,
+) -> Sse<BoxStream<'static, Result<Event, Infallible>>> {
     let stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(1)))
         .then(move |_| {
             let manager = s.remote_manager.clone();
             async move {
                 let event = match tokio::task::spawn_blocking(move || manager.capture_png()).await {
                     Ok(Ok(image_bytes)) => {
-                        let encoded = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
-                        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
+                        let encoded =
+                            base64::engine::general_purpose::STANDARD.encode(&image_bytes);
+                        let now = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis();
                         let payload = json!({"timestamp": now, "frame": encoded}).to_string();
                         Event::default().data(payload)
                     }
@@ -542,7 +584,11 @@ async fn remote_surface_start(
 ) -> impl IntoResponse {
     let token = extract_pair_token(&headers, body.token.as_deref());
     if !token_authorized(&s, token.as_deref()) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "invalid pair token" }))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "invalid pair token" })),
+        )
+            .into_response();
     }
 
     match s.remote_manager.start_session().await {
@@ -555,39 +601,51 @@ async fn remote_surface_start(
             "stop_url": format!("http://{}:{}/remote/surface/session/stop", s.api_host, s.api_port),
         }))
         .into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": err }))).into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": err })),
+        )
+            .into_response(),
     }
 }
 
-async fn remote_surface_stop(
-    State(s): State<ApiState>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+async fn remote_surface_stop(State(s): State<ApiState>, headers: HeaderMap) -> impl IntoResponse {
     let token = extract_pair_token(&headers, None);
     if !token_authorized(&s, token.as_deref()) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "invalid pair token" }))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "invalid pair token" })),
+        )
+            .into_response();
     }
 
     if !session_authorized(&s, None) {
-        return (StatusCode::FORBIDDEN, Json(json!({ "error": "session mismatch or no active session" }))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "session mismatch or no active session" })),
+        )
+            .into_response();
     }
 
     match s.remote_manager.stop_session().await {
         Ok(()) => Json(json!({ "ok": true, "status": "stopped" })).into_response(),
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": err }))).into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": err })),
+        )
+            .into_response(),
     }
 }
 
-async fn remote_surface_frame(
-    State(s): State<ApiState>,
-    headers: HeaderMap,
-) -> Response {
+async fn remote_surface_frame(State(s): State<ApiState>, headers: HeaderMap) -> Response {
     let token = extract_pair_token(&headers, None);
     if !token_authorized(&s, token.as_deref()) {
         return Response::builder()
             .status(StatusCode::UNAUTHORIZED)
             .header("content-type", "application/json")
-            .body(Body::from(Bytes::from(json!({ "error": "invalid pair token" }).to_string())))
+            .body(Body::from(Bytes::from(
+                json!({ "error": "invalid pair token" }).to_string(),
+            )))
             .unwrap();
     }
 
@@ -595,7 +653,9 @@ async fn remote_surface_frame(
         return Response::builder()
             .status(StatusCode::FORBIDDEN)
             .header("content-type", "application/json")
-            .body(Body::from(Bytes::from(json!({ "error": "session mismatch or no active session" }).to_string())))
+            .body(Body::from(Bytes::from(
+                json!({ "error": "session mismatch or no active session" }).to_string(),
+            )))
             .unwrap();
     }
 
@@ -614,7 +674,9 @@ async fn remote_surface_frame(
         Err(err) => Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .header("content-type", "application/json")
-            .body(Body::from(Bytes::from(json!({ "error": err.to_string() }).to_string())))
+            .body(Body::from(Bytes::from(
+                json!({ "error": err.to_string() }).to_string(),
+            )))
             .unwrap(),
     }
 }
@@ -626,11 +688,19 @@ async fn remote_surface_input(
 ) -> impl IntoResponse {
     let token = extract_pair_token(&headers, None);
     if !token_authorized(&s, token.as_deref()) {
-        return (StatusCode::UNAUTHORIZED, Json(json!({ "error": "invalid pair token" }))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "invalid pair token" })),
+        )
+            .into_response();
     }
 
     if !session_authorized(&s, None) {
-        return (StatusCode::FORBIDDEN, Json(json!({ "error": "session mismatch or no active session" }))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "session mismatch or no active session" })),
+        )
+            .into_response();
     }
 
     match s.remote_manager.submit_input(event).await {
@@ -661,23 +731,24 @@ fn openai_model_object(m: &ModelInfo) -> Value {
 // Ollama-compatible model list
 async fn ollama_tags(State(s): State<ApiState>) -> impl IntoResponse {
     let models = s.orchestrator.list_models().await;
-    let list: Vec<Value> = models.iter().map(|m| json!({
-        "name":        format!("{}:latest", m.name.to_lowercase().replace(' ', "-")),
-        "model":       m.id,
-        "modified_at": "2024-01-01T00:00:00Z",
-        "size":        m.file_size_bytes,
-        "details": { "parameter_size": format!("{}B", m.parameter_count / 1_000_000_000) }
-    })).collect();
+    let list: Vec<Value> = models
+        .iter()
+        .map(|m| {
+            json!({
+                "name":        format!("{}:latest", m.name.to_lowercase().replace(' ', "-")),
+                "model":       m.id,
+                "modified_at": "2024-01-01T00:00:00Z",
+                "size":        m.file_size_bytes,
+                "details": { "parameter_size": format!("{}B", m.parameter_count / 1_000_000_000) }
+            })
+        })
+        .collect();
     Json(json!({ "models": list }))
 }
 
 // ── Chat completions (OpenAI-compatible) ──────────────────────────────────────
 
-async fn chat_completions(
-    State(s): State<ApiState>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Response {
+async fn chat_completions(State(s): State<ApiState>, headers: HeaderMap, body: Bytes) -> Response {
     proxy_to_llama(s, "/v1/chat/completions", headers, body).await
 }
 
@@ -685,16 +756,13 @@ async fn chat_completions(
 
 #[derive(Deserialize)]
 struct OllamaChat {
-    model:    Option<String>,
+    model: Option<String>,
     messages: Option<Vec<Value>>,
-    prompt:   Option<String>,
-    stream:   Option<bool>,
+    prompt: Option<String>,
+    stream: Option<bool>,
 }
 
-async fn ollama_chat(
-    State(s): State<ApiState>,
-    Json(body): Json<OllamaChat>,
-) -> Response {
+async fn ollama_chat(State(s): State<ApiState>, Json(body): Json<OllamaChat>) -> Response {
     // Convert Ollama format → OpenAI format and proxy
     let messages = body.messages.unwrap_or_else(|| {
         if let Some(p) = body.prompt {
@@ -714,10 +782,7 @@ async fn ollama_chat(
     proxy_to_llama(s, "/v1/chat/completions", headers, body_bytes).await
 }
 
-async fn ollama_generate(
-    State(s): State<ApiState>,
-    Json(body): Json<OllamaChat>,
-) -> Response {
+async fn ollama_generate(State(s): State<ApiState>, Json(body): Json<OllamaChat>) -> Response {
     // Map to chat completions
     let prompt = body.prompt.unwrap_or_default();
     let openai_body = json!({
@@ -733,10 +798,7 @@ async fn ollama_generate(
 
 // ── WebSocket relay ───────────────────────────────────────────────────────────
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(s): State<ApiState>,
-) -> impl IntoResponse {
+async fn ws_handler(ws: WebSocketUpgrade, State(s): State<ApiState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_ws(socket, s.ws_router.clone(), s.pair_token.clone()))
 }
 
@@ -750,7 +812,10 @@ async fn handle_ws(socket: WebSocket, router: Arc<WsRouter>, pair_token: String)
         Some(Ok(Message::Text(txt))) => {
             if let Ok(v) = serde_json::from_str::<Value>(&txt) {
                 let msg_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                let token    = v.pointer("/payload/token").and_then(|t| t.as_str()).unwrap_or("");
+                let token = v
+                    .pointer("/payload/token")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("");
                 msg_type == "auth" && (pair_token.is_empty() || token == pair_token)
             } else {
                 false
@@ -760,15 +825,19 @@ async fn handle_ws(socket: WebSocket, router: Arc<WsRouter>, pair_token: String)
     };
 
     if !authed {
-        let _ = sender.send(Message::Text(
-            json!({"type":"auth_fail","payload":{"reason":"invalid token"}}).to_string(),
-        )).await;
+        let _ = sender
+            .send(Message::Text(
+                json!({"type":"auth_fail","payload":{"reason":"invalid token"}}).to_string(),
+            ))
+            .await;
         return;
     }
 
-    let _ = sender.send(Message::Text(
-        json!({"type":"auth_ok","payload":{}}).to_string(),
-    )).await;
+    let _ = sender
+        .send(Message::Text(
+            json!({"type":"auth_ok","payload":{}}).to_string(),
+        ))
+        .await;
 
     let (client_id, mut rx) = router.register();
     tracing::info!(client_id=%client_id, total=%router.client_count(), "[ws] client connected");
@@ -800,12 +869,7 @@ async fn handle_ws(socket: WebSocket, router: Arc<WsRouter>, pair_token: String)
 
 // ── Core proxy ────────────────────────────────────────────────────────────────
 
-async fn proxy_to_llama(
-    s: ApiState,
-    path: &str,
-    _headers: HeaderMap,
-    body: Bytes,
-) -> Response {
+async fn proxy_to_llama(s: ApiState, path: &str, _headers: HeaderMap, body: Bytes) -> Response {
     let model_hint = resolve_proxy_model_hint(&s, &body).await;
 
     let Some(base_url) = ensure_active_slot_url(&s, model_hint.as_deref()).await else {
@@ -826,7 +890,8 @@ async fn proxy_to_llama(
             .send()
     };
 
-    let initial = s.client
+    let initial = s
+        .client
         .post(&url)
         .header("content-type", "application/json")
         .body(request_body.clone())
@@ -838,7 +903,14 @@ async fn proxy_to_llama(
         Err(first_err) => {
             if let Some(model_id) = model_hint.clone() {
                 let _ = timeout(Duration::from_secs(45), s.orchestrator.load(model_id)).await;
-                if let Some(recovered_url) = wait_for_active_slot_url(&s, model_hint.as_deref(), 80, Duration::from_millis(200)).await {
+                if let Some(recovered_url) = wait_for_active_slot_url(
+                    &s,
+                    model_hint.as_deref(),
+                    80,
+                    Duration::from_millis(200),
+                )
+                .await
+                {
                     url = format!("{recovered_url}{path}");
                     send(&url, request_body.clone()).await
                 } else {
@@ -854,27 +926,41 @@ async fn proxy_to_llama(
         Err(e) => (
             StatusCode::BAD_GATEWAY,
             Json(json!({ "error": format!("llama-server unreachable: {e}") })),
-        ).into_response(),
+        )
+            .into_response(),
 
         Ok(resp) => {
             // 502 retry: slot was reachable but returned Bad Gateway (recycling).
             let resp = if resp.status() == StatusCode::BAD_GATEWAY {
-                let _ = s.app_handle.emit("proxy-recovery-attempted", serde_json::json!({
-                    "url": &url, "status": 502,
-                }));
+                let _ = s.app_handle.emit(
+                    "proxy-recovery-attempted",
+                    serde_json::json!({
+                        "url": &url, "status": 502,
+                    }),
+                );
                 if let Some(model_id) = model_hint.clone() {
                     let _ = timeout(Duration::from_secs(45), s.orchestrator.load(model_id)).await;
                 }
-                if let Some(recovered_url) = wait_for_active_slot_url(&s, model_hint.as_deref(), 80, Duration::from_millis(200)).await {
+                if let Some(recovered_url) = wait_for_active_slot_url(
+                    &s,
+                    model_hint.as_deref(),
+                    80,
+                    Duration::from_millis(200),
+                )
+                .await
+                {
                     url = format!("{recovered_url}{path}");
                     match send(&url, request_body).await {
                         Ok(retry_resp) => retry_resp,
                         Err(_) => resp,
                     }
                 } else {
-                    let _ = s.app_handle.emit("proxy-recovery-failed", serde_json::json!({
-                        "url": &url, "reason": "slot did not recover within timeout",
-                    }));
+                    let _ = s.app_handle.emit(
+                        "proxy-recovery-failed",
+                        serde_json::json!({
+                            "url": &url, "reason": "slot did not recover within timeout",
+                        }),
+                    );
                     resp
                 }
             } else {
@@ -923,7 +1009,11 @@ async fn ensure_active_slot_url(s: &ApiState, model_hint: Option<&str>) -> Optio
     }
 
     if let Some(model_id) = model_hint {
-        let _ = timeout(Duration::from_secs(45), s.orchestrator.load(model_id.to_string())).await;
+        let _ = timeout(
+            Duration::from_secs(45),
+            s.orchestrator.load(model_id.to_string()),
+        )
+        .await;
     }
 
     wait_for_active_slot_url(s, model_hint, 80, Duration::from_millis(200)).await

@@ -10,17 +10,17 @@
 //! registers all tools at startup and dispatches `creator.generate` RPC calls
 //! to the correct tool by matching `params.modality`.
 
-pub mod image;
-pub mod video;
-pub mod three_d;
 pub mod audio;
 pub mod composer;
 pub mod fine_tuning;
 pub mod gaussian;
 pub mod gaussian_pipeline;
-pub mod model_fetch;
 pub mod guardian;
+pub mod image;
+pub mod model_fetch;
 pub mod progress;
+pub mod three_d;
+pub mod video;
 
 use async_trait::async_trait;
 use bonsai_cas::CasKey;
@@ -49,9 +49,15 @@ pub struct GenerateParams {
     pub extra: serde_json::Value,
 }
 
-fn default_dim() -> u32 { 512 }
-fn default_steps() -> u32 { 20 }
-fn default_guidance() -> f64 { 7.5 }
+fn default_dim() -> u32 {
+    512
+}
+fn default_steps() -> u32 {
+    20
+}
+fn default_guidance() -> f64 {
+    7.5
+}
 
 // ── Generation result ─────────────────────────────────────────────────────────
 
@@ -88,7 +94,9 @@ impl CreatorOrchestrator {
     }
 
     pub async fn get(&self, name: &str) -> Option<Arc<dyn GenerativeTool>> {
-        self.tools.lock().await
+        self.tools
+            .lock()
+            .await
             .iter()
             .find(|(n, _)| n == name)
             .map(|(_, t)| t.clone())
@@ -96,6 +104,11 @@ impl CreatorOrchestrator {
 
     /// List registered tool names.
     pub async fn list_tools(&self) -> Vec<String> {
-        self.tools.lock().await.iter().map(|(n, _)| n.clone()).collect()
+        self.tools
+            .lock()
+            .await
+            .iter()
+            .map(|(n, _)| n.clone())
+            .collect()
     }
 }

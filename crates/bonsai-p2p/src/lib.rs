@@ -11,16 +11,16 @@
 //!
 //! All three implement [`bonsai_transfer_core::lane::TransportLane`].
 
-#[cfg(feature = "webrtc-lane")]
-pub mod webrtc;
-#[cfg(feature = "swarm-lane")]
-pub mod swarm;
 #[cfg(feature = "onion-lane")]
 pub mod onion;
-
-#[cfg(feature = "webrtc-lane")]
-pub use webrtc::WebRtcLane;
 #[cfg(feature = "swarm-lane")]
-pub use swarm::SwarmLane;
+pub mod swarm;
+#[cfg(feature = "webrtc-lane")]
+pub mod webrtc;
+
 #[cfg(feature = "onion-lane")]
 pub use onion::OnionLane;
+#[cfg(feature = "swarm-lane")]
+pub use swarm::SwarmLane;
+#[cfg(feature = "webrtc-lane")]
+pub use webrtc::WebRtcLane;

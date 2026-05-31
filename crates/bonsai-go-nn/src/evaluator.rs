@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use anyhow::Result;
-use candle_core::{Device, Tensor};
-use bonsai_go::board::{GoBoard, Stone, Point};
-use bonsai_go::mcts::GoEvaluator as BonsaiGoEvaluator;
 use crate::model::GoNet;
+use anyhow::Result;
+use bonsai_go::board::{GoBoard, Point, Stone};
+use bonsai_go::mcts::GoEvaluator as BonsaiGoEvaluator;
+use candle_core::{Device, Tensor};
+use std::sync::Arc;
 
 /// Neural evaluator bridge — currently a scaffold that falls back to uniform policy.
 pub struct NeuralEvaluator {
@@ -14,12 +14,18 @@ pub struct NeuralEvaluator {
 impl NeuralEvaluator {
     pub fn new(_model_path: &str, device: Device) -> Result<Self> {
         // In a full implementation, load model vars here. For now, keep model None.
-        Ok(Self { model: None, device })
+        Ok(Self {
+            model: None,
+            device,
+        })
     }
 
     /// Construct an evaluator from an existing model instance.
     pub fn new_from_model(model: crate::model::GoNet, device: Device) -> Result<Self> {
-        Ok(Self { model: Some(Arc::new(model)), device })
+        Ok(Self {
+            model: Some(Arc::new(model)),
+            device,
+        })
     }
 
     fn board_to_tensor(&self, board: &GoBoard) -> Result<Tensor> {
@@ -49,7 +55,11 @@ impl BonsaiGoEvaluator for NeuralEvaluator {
             let maxl = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
             let exps: Vec<f32> = logits.iter().map(|v| (v - maxl).exp()).collect();
             let sum: f32 = exps.iter().sum();
-            let probs: Vec<f32> = if sum > 0.0 { exps.into_iter().map(|v| v / sum).collect() } else { vec![1.0 / logits.len() as f32; logits.len()] };
+            let probs: Vec<f32> = if sum > 0.0 {
+                exps.into_iter().map(|v| v / sum).collect()
+            } else {
+                vec![1.0 / logits.len() as f32; logits.len()]
+            };
 
             let mut out: Vec<(Option<Point>, f32)> = Vec::new();
             let mut total = 0.0f32;
@@ -61,10 +71,14 @@ impl BonsaiGoEvaluator for NeuralEvaluator {
             }
             // normalize
             if total > 0.0 {
-                for (_p, prob) in out.iter_mut() { *prob /= total; }
+                for (_p, prob) in out.iter_mut() {
+                    *prob /= total;
+                }
             } else {
                 let n = out.len() as f32;
-                for (_p, prob) in out.iter_mut() { *prob = 1.0 / n; }
+                for (_p, prob) in out.iter_mut() {
+                    *prob = 1.0 / n;
+                }
             }
             // append pass with tiny prob 0.0
             out.push((None, 0.0));

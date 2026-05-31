@@ -8,13 +8,13 @@
 //!   - `DfOp` / `DfResult`: error-bounded operation type
 //!   - Serde-round-trip via JSON (for IPC with Tauri / Sylva VM)
 
-pub mod frame;
-pub mod lazy;
-pub mod io;
-pub mod ops;
 pub mod error;
+pub mod frame;
+pub mod io;
+pub mod lazy;
+pub mod ops;
 
+pub use error::{DfError, DfResult};
 pub use frame::BonsaiFrame;
 pub use lazy::BonsaiLazyFrame;
-pub use error::{DfError, DfResult};
 pub use ops::{AggExpr, FilterExpr, SortSpec};

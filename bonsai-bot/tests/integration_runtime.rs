@@ -1,7 +1,7 @@
+use dashmap::DashMap;
 use reqwest::Client;
 use serde_json::json;
 use std::sync::Arc;
-use dashmap::DashMap;
 use tokio::sync::mpsc;
 
 use bonsai_bot::metrics::Metrics;
@@ -18,9 +18,10 @@ async fn integration_runtime_start_stop() -> Result<(), Box<dyn std::error::Erro
 
     let admin_token = "itest-token".to_string();
     // start admin server on ephemeral port
-    let mut handle = bonsai_bot::admin_api::start(0, metrics, platform_states, db, tx, admin_token.clone())
-        .await
-        .map_err(|e| format!("failed to start admin server: {}", e))?;
+    let mut handle =
+        bonsai_bot::admin_api::start(0, metrics, platform_states, db, tx, admin_token.clone())
+            .await
+            .map_err(|e| format!("failed to start admin server: {}", e))?;
 
     let client = Client::new();
     let base = format!("http://127.0.0.1:{}", handle.port);
@@ -34,27 +35,47 @@ async fn integration_runtime_start_stop() -> Result<(), Box<dyn std::error::Erro
             "user": "itest",
             "timeout_secs": 6
         });
-        let resp = client.post(format!("{}/runtime/start", base))
+        let resp = client
+            .post(format!("{}/runtime/start", base))
             .header("authorization", format!("Bearer {}", admin_token))
             .json(&start_req)
-            .send().await?;
-        assert!(resp.status().is_success(), "start python runtime failed: {}", resp.text().await?);
+            .send()
+            .await?;
+        assert!(
+            resp.status().is_success(),
+            "start python runtime failed: {}",
+            resp.text().await?
+        );
         let j: serde_json::Value = resp.json().await?;
         let id = j.get("id").and_then(|v| v.as_str()).unwrap().to_string();
 
         // list runtimes
-        let list = client.get(format!("{}/runtime/list", base))
+        let list = client
+            .get(format!("{}/runtime/list", base))
             .header("authorization", format!("Bearer {}", admin_token))
-            .send().await?.json::<serde_json::Value>().await?;
-        assert!(list["runtimes"].as_array().unwrap().iter().any(|r| r["id"] == id));
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
+        assert!(list["runtimes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["id"] == id));
 
         // stop
         let stop_req = json!({"id": id});
-        let stop = client.post(format!("{}/runtime/stop", base))
+        let stop = client
+            .post(format!("{}/runtime/stop", base))
             .header("authorization", format!("Bearer {}", admin_token))
             .json(&stop_req)
-            .send().await?;
-        assert!(stop.status().is_success(), "stop python runtime failed: {}", stop.text().await?);
+            .send()
+            .await?;
+        assert!(
+            stop.status().is_success(),
+            "stop python runtime failed: {}",
+            stop.text().await?
+        );
     } else {
         eprintln!("python not found; skipping python runtime integration test");
     }
@@ -66,25 +87,45 @@ async fn integration_runtime_start_stop() -> Result<(), Box<dyn std::error::Erro
             "script": "runtimes/clojure/bb_runner.clj",
             "user": "itest"
         });
-        let resp = client.post(format!("{}/runtime/start", base))
+        let resp = client
+            .post(format!("{}/runtime/start", base))
             .header("authorization", format!("Bearer {}", admin_token))
             .json(&start_req)
-            .send().await?;
-        assert!(resp.status().is_success(), "start bb runtime failed: {}", resp.text().await?);
+            .send()
+            .await?;
+        assert!(
+            resp.status().is_success(),
+            "start bb runtime failed: {}",
+            resp.text().await?
+        );
         let j: serde_json::Value = resp.json().await?;
         let id = j.get("id").and_then(|v| v.as_str()).unwrap().to_string();
 
-        let list = client.get(format!("{}/runtime/list", base))
+        let list = client
+            .get(format!("{}/runtime/list", base))
             .header("authorization", format!("Bearer {}", admin_token))
-            .send().await?.json::<serde_json::Value>().await?;
-        assert!(list["runtimes"].as_array().unwrap().iter().any(|r| r["id"] == id));
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
+        assert!(list["runtimes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["id"] == id));
 
         let stop_req = json!({"id": id});
-        let stop = client.post(format!("{}/runtime/stop", base))
+        let stop = client
+            .post(format!("{}/runtime/stop", base))
             .header("authorization", format!("Bearer {}", admin_token))
             .json(&stop_req)
-            .send().await?;
-        assert!(stop.status().is_success(), "stop bb runtime failed: {}", stop.text().await?);
+            .send()
+            .await?;
+        assert!(
+            stop.status().is_success(),
+            "stop bb runtime failed: {}",
+            stop.text().await?
+        );
     } else {
         eprintln!("bb not found; skipping babashka runtime integration test");
     }

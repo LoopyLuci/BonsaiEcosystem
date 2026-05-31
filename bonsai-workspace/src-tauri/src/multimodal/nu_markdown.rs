@@ -27,47 +27,70 @@ use crate::tool_registry::{Tool, ToolResult};
 fn find_model() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("NUMARKDOWN_MODEL_PATH") {
         let pb = PathBuf::from(&p);
-        if pb.exists() { return Some(pb); }
+        if pb.exists() {
+            return Some(pb);
+        }
     }
-    let base = dirs::home_dir().unwrap_or_default().join(".bonsai/models/numarkdown");
-    for name in &["NuMarkdown-8B-Q4_K_M.gguf", "NuMarkdown-8B-Q5_K_M.gguf", "NuMarkdown-8B-Q8_0.gguf"] {
+    let base = dirs::home_dir()
+        .unwrap_or_default()
+        .join(".bonsai/models/numarkdown");
+    for name in &[
+        "NuMarkdown-8B-Q4_K_M.gguf",
+        "NuMarkdown-8B-Q5_K_M.gguf",
+        "NuMarkdown-8B-Q8_0.gguf",
+    ] {
         let p = base.join(name);
-        if p.exists() { return Some(p); }
+        if p.exists() {
+            return Some(p);
+        }
     }
     None
 }
 
 fn find_mmproj() -> Option<PathBuf> {
-    let base = dirs::home_dir().unwrap_or_default().join(".bonsai/models/numarkdown");
+    let base = dirs::home_dir()
+        .unwrap_or_default()
+        .join(".bonsai/models/numarkdown");
     for name in &["mmproj.gguf", "mmproj-f16.gguf", "mmproj-q4_0.gguf"] {
         let p = base.join(name);
-        if p.exists() { return Some(p); }
+        if p.exists() {
+            return Some(p);
+        }
     }
     None
 }
 
-pub fn is_available() -> bool { find_model().is_some() }
+pub fn is_available() -> bool {
+    find_model().is_some()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarkdownResult {
-    pub markdown:        String,
+    pub markdown: String,
     /// The internal reasoning trace (thinking tokens), if present.
-    pub thinking_trace:  Option<String>,
+    pub thinking_trace: Option<String>,
     pub detected_tables: usize,
     pub detected_headers: usize,
-    pub word_count:      usize,
-    pub model:           String,
-    pub elapsed_ms:      u64,
+    pub word_count: usize,
+    pub model: String,
+    pub elapsed_ms: u64,
 }
 
 /// Call the running llama-server slot with a vision request.
 async fn call_vlm(image_path: &str, slot_url: &str, prompt: &str) -> Result<String, String> {
-    let image_bytes = tokio::fs::read(image_path).await
+    let image_bytes = tokio::fs::read(image_path)
+        .await
         .map_err(|e| format!("Cannot read image: {e}"))?;
-    let b64  = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
-    let ext  = std::path::Path::new(image_path).extension()
-        .and_then(|e| e.to_str()).unwrap_or("jpeg");
-    let mime = match ext { "png" => "image/png", "webp" => "image/webp", _ => "image/jpeg" };
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
+    let ext = std::path::Path::new(image_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("jpeg");
+    let mime = match ext {
+        "png" => "image/png",
+        "webp" => "image/webp",
+        _ => "image/jpeg",
+    };
 
     let payload = json!({
         "messages": [{
@@ -82,19 +105,25 @@ async fn call_vlm(image_path: &str, slot_url: &str, prompt: &str) -> Result<Stri
     });
 
     let client = reqwest::Client::new();
-    let resp = client.post(format!("{slot_url}/v1/chat/completions"))
+    let resp = client
+        .post(format!("{slot_url}/v1/chat/completions"))
         .json(&payload)
         .timeout(Duration::from_secs(120))
-        .send().await.map_err(|e| format!("VLM request failed: {e}"))?;
+        .send()
+        .await
+        .map_err(|e| format!("VLM request failed: {e}"))?;
 
     let body: Value = resp.json().await.map_err(|e| e.to_string())?;
-    Ok(body["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string())
+    Ok(body["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("")
+        .to_string())
 }
 
 fn parse_thinking(raw: &str) -> (String, Option<String>) {
     if let (Some(start), Some(end)) = (raw.find("<think>"), raw.find("</think>")) {
         let think = raw[start + 7..end].trim().to_string();
-        let rest  = raw[end + 8..].trim().to_string();
+        let rest = raw[end + 8..].trim().to_string();
         (rest, Some(think))
     } else {
         (raw.to_string(), None)
@@ -102,7 +131,10 @@ fn parse_thinking(raw: &str) -> (String, Option<String>) {
 }
 
 fn count_tables(md: &str) -> usize {
-    md.lines().filter(|l| l.contains('|') && l.trim().starts_with('|')).count() / 3
+    md.lines()
+        .filter(|l| l.contains('|') && l.trim().starts_with('|'))
+        .count()
+        / 3
 }
 
 fn count_headers(md: &str) -> usize {
@@ -120,17 +152,17 @@ async fn run_ocr(image_path: &str, slot_url: &str) -> Result<MarkdownResult, Str
     let raw = call_vlm(image_path, slot_url, prompt).await?;
     let (markdown, thinking_trace) = parse_thinking(&raw);
 
-    let tables  = count_tables(&markdown);
+    let tables = count_tables(&markdown);
     let headers = count_headers(&markdown);
-    let words   = markdown.split_whitespace().count();
+    let words = markdown.split_whitespace().count();
 
     Ok(MarkdownResult {
         markdown,
         thinking_trace,
-        detected_tables:  tables,
+        detected_tables: tables,
         detected_headers: headers,
-        word_count:       words,
-        model:            find_model()
+        word_count: words,
+        model: find_model()
             .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
             .unwrap_or_else(|| "vlm-fallback".into()),
         elapsed_ms: t0.elapsed().as_millis() as u64,
@@ -143,7 +175,9 @@ pub struct ImageToMarkdownTool;
 
 #[async_trait]
 impl Tool for ImageToMarkdownTool {
-    fn name(&self) -> &str { "image_to_markdown" }
+    fn name(&self) -> &str {
+        "image_to_markdown"
+    }
     fn description(&self) -> &str {
         "Convert a document image (PDF screenshot, scan, spreadsheet) to clean Markdown \
          using NuMarkdown-8B-Thinking VLM. \
@@ -158,7 +192,9 @@ impl Tool for ImageToMarkdownTool {
         let slot_url = args["slot_url"].as_str().unwrap_or("http://127.0.0.1:8080");
         info!(image = image_path, "[numarkdown] tool call");
         let result = run_ocr(image_path, slot_url).await?;
-        Ok(ToolResult::json(&serde_json::to_value(&result).unwrap_or_default()))
+        Ok(ToolResult::json(
+            &serde_json::to_value(&result).unwrap_or_default(),
+        ))
     }
 }
 
@@ -166,7 +202,9 @@ pub struct ExtractDocStructureTool;
 
 #[async_trait]
 impl Tool for ExtractDocStructureTool {
-    fn name(&self) -> &str { "extract_document_structure" }
+    fn name(&self) -> &str {
+        "extract_document_structure"
+    }
     fn description(&self) -> &str {
         "Extract structural outline (sections, table count, image count) from a document image. \
          Args: {image_path: string, slot_url?: string}. \
@@ -181,10 +219,11 @@ impl Tool for ExtractDocStructureTool {
         let prompt = "Analyse this document image. List: 1) all section headings in order, \
                       2) count of tables, 3) count of images/figures, 4) a one-sentence summary. \
                       Reply as JSON: {sections:[str], table_count:int, image_count:int, summary:str}";
-        let raw  = call_vlm(image_path, slot_url, prompt).await?;
+        let raw = call_vlm(image_path, slot_url, prompt).await?;
         let (clean, _) = parse_thinking(&raw);
         // Try to parse as JSON, else wrap as plain
-        let out: Value = serde_json::from_str(&clean).unwrap_or_else(|_| json!({ "summary": clean }));
+        let out: Value =
+            serde_json::from_str(&clean).unwrap_or_else(|_| json!({ "summary": clean }));
         Ok(ToolResult::json(&out))
     }
 }
@@ -192,11 +231,18 @@ impl Tool for ExtractDocStructureTool {
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn image_to_markdown(image_path: String, slot_url: Option<String>) -> Result<MarkdownResult, String> {
+pub async fn image_to_markdown(
+    image_path: String,
+    slot_url: Option<String>,
+) -> Result<MarkdownResult, String> {
     if !std::path::Path::new(&image_path).exists() {
         return Err(format!("Image not found: {image_path}"));
     }
-    run_ocr(&image_path, slot_url.as_deref().unwrap_or("http://127.0.0.1:8080")).await
+    run_ocr(
+        &image_path,
+        slot_url.as_deref().unwrap_or("http://127.0.0.1:8080"),
+    )
+    .await
 }
 
 #[tauri::command]

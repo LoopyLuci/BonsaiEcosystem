@@ -8,10 +8,10 @@
 //! 2. Spawn `java -jar tla2tools.jar <spec>` or the `tlc` wrapper.
 //! 3. Parse TLC's stdout for "Model checking completed" / "Error:" lines.
 
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 // ── Error ─────────────────────────────────────────────────────────────────────
@@ -66,7 +66,12 @@ pub struct TlaSidecar {
 }
 
 impl TlaSidecar {
-    pub fn new() -> Self { Self { jar_path: None, java_path: None } }
+    pub fn new() -> Self {
+        Self {
+            jar_path: None,
+            java_path: None,
+        }
+    }
 
     pub fn verify(&self, req: &TlaRequest) -> TlaResult<TlaResponse> {
         let (java, jar) = self.find_tlc()?;
@@ -81,9 +86,10 @@ impl TlaSidecar {
         }
 
         // Write config
-        let cfg_content = req.config.clone().unwrap_or_else(|| {
-            format!("SPECIFICATION {spec_name}\nINVARIANT TypeOK\n")
-        });
+        let cfg_content = req
+            .config
+            .clone()
+            .unwrap_or_else(|| format!("SPECIFICATION {spec_name}\nINVARIANT TypeOK\n"));
         let mut cfg_path = spec_path.clone();
         cfg_path.set_extension("cfg");
         {
@@ -98,11 +104,15 @@ impl TlaSidecar {
     }
 
     fn find_tlc(&self) -> TlaResult<(PathBuf, PathBuf)> {
-        let java = self.java_path.clone()
+        let java = self
+            .java_path
+            .clone()
             .or_else(|| which_binary("java"))
             .ok_or(TlaError::BinaryNotFound)?;
 
-        let jar = self.jar_path.clone()
+        let jar = self
+            .jar_path
+            .clone()
             .or_else(|| std::env::var("BONSAI_TLC_JAR").ok().map(PathBuf::from))
             .or_else(|| {
                 // Look for tla2tools.jar in common locations
@@ -111,7 +121,11 @@ impl TlaSidecar {
                     "/opt/tla/tla2tools.jar",
                     "C:\\tla\\tla2tools.jar",
                 ];
-                candidates.iter().map(Path::new).find(|p| p.exists()).map(PathBuf::from)
+                candidates
+                    .iter()
+                    .map(Path::new)
+                    .find(|p| p.exists())
+                    .map(PathBuf::from)
             })
             .ok_or(TlaError::BinaryNotFound)?;
 
@@ -127,21 +141,23 @@ impl TlaSidecar {
         req: &TlaRequest,
     ) -> TlaResult<TlaResponse> {
         let mut cmd = Command::new(java);
-        cmd.arg("-jar").arg(jar)
-           .arg("-config").arg(cfg)
-           .arg(spec);
-        for flag in &req.extra_flags { cmd.arg(flag); }
+        cmd.arg("-jar").arg(jar).arg("-config").arg(cfg).arg(spec);
+        for flag in &req.extra_flags {
+            cmd.arg(flag);
+        }
         cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-        let output = cmd.output().map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
-            TlaError::BinaryNotFound
-        } else {
-            TlaError::Io(e)
+        let output = cmd.output().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                TlaError::BinaryNotFound
+            } else {
+                TlaError::Io(e)
+            }
         })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
 
-        let mut errors     = Vec::new();
+        let mut errors = Vec::new();
         let mut violations = Vec::new();
         let mut states_explored = None;
         let mut in_violation = false;
@@ -152,7 +168,10 @@ impl TlaSidecar {
                 // Extract state count
                 if let Some(idx) = line.find("states explored") {
                     let before = &line[..idx];
-                    let n: Option<u64> = before.split_whitespace().last().and_then(|s| s.parse().ok());
+                    let n: Option<u64> = before
+                        .split_whitespace()
+                        .last()
+                        .and_then(|s| s.parse().ok());
                     states_explored = n;
                 }
             } else if line.starts_with("Error:") || line.starts_with("TLC threw an unexpected") {
@@ -194,26 +213,39 @@ impl TlaSidecar {
 }
 
 impl Default for TlaSidecar {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn which_binary(name: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH")?.to_str()?.split(if cfg!(windows) { ';' } else { ':' })
+    std::env::var_os("PATH")?
+        .to_str()?
+        .split(if cfg!(windows) { ';' } else { ':' })
         .map(|dir| {
             let mut p = PathBuf::from(dir);
             p.push(name);
-            if cfg!(windows) && !name.ends_with(".exe") { p.set_extension("exe"); }
+            if cfg!(windows) && !name.ends_with(".exe") {
+                p.set_extension("exe");
+            }
             p
         })
         .find(|p| p.is_file())
 }
 
 /// Returns true if `java` is on PATH (necessary but not sufficient for TLC).
-pub fn java_available() -> bool { which_binary("java").is_some() }
+pub fn java_available() -> bool {
+    which_binary("java").is_some()
+}
 
 /// Returns true if BONSAI_TLC_JAR is set and points to an existing file.
 pub fn tlc_jar_available() -> bool {
-    std::env::var("BONSAI_TLC_JAR").ok().map(|p| Path::new(&p).is_file()).unwrap_or(false)
+    std::env::var("BONSAI_TLC_JAR")
+        .ok()
+        .map(|p| Path::new(&p).is_file())
+        .unwrap_or(false)
 }
 
-pub fn tla_available() -> bool { java_available() && tlc_jar_available() }
+pub fn tla_available() -> bool {
+    java_available() && tlc_jar_available()
+}

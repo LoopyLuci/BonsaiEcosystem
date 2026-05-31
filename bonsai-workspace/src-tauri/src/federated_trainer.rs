@@ -66,7 +66,9 @@ pub struct FederatedState {
 }
 
 impl FederatedState {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn merge(&mut self, other: &FederatedState) {
         self.contributions.merge(&other.contributions);
@@ -122,19 +124,24 @@ impl FederatedTrainer {
         // Update best adapter (LWW — highest lamport timestamp wins)
         let ts = state.clock.get(&self.local_peer_id) + 1;
         let desc_json = serde_json::to_string(&desc).unwrap_or_default();
-        state.best_adapter
+        state
+            .best_adapter
             .entry(base_model.to_string())
             .or_insert_with(|| LwwRegister::new(String::new()))
             .set(desc_json, ts, self.local_peer_id.clone());
         state.clock.tick(&self.local_peer_id);
 
-        info!("[federated] registered adapter '{}' for '{base_model}'", desc.label);
+        info!(
+            "[federated] registered adapter '{}' for '{base_model}'",
+            desc.label
+        );
     }
 
     /// Positive reputation feedback for a peer (e.g., their adapter improved eval).
     pub async fn upvote_peer(&self, peer_id: &PeerId) {
         let mut state = self.state.write().await;
-        state.reputation
+        state
+            .reputation
             .entry(peer_id.clone())
             .or_insert_with(PNCounter::new)
             .increment(peer_id);
@@ -143,7 +150,8 @@ impl FederatedTrainer {
     /// Negative reputation feedback for a peer (e.g., their adapter regressed eval).
     pub async fn downvote_peer(&self, peer_id: &PeerId) {
         let mut state = self.state.write().await;
-        state.reputation
+        state
+            .reputation
             .entry(peer_id.clone())
             .or_insert_with(PNCounter::new)
             .decrement(peer_id);
@@ -166,7 +174,8 @@ impl FederatedTrainer {
         });
 
         for (model, (adapter_json, ts, origin)) in &peer_state.best_adapter {
-            state.best_adapter
+            state
+                .best_adapter
                 .entry(model.clone())
                 .or_insert_with(|| LwwRegister::new(String::new()))
                 .set(adapter_json.clone(), *ts, origin.clone());
@@ -185,8 +194,11 @@ impl FederatedTrainer {
 
     /// Reputation score for a peer.
     pub async fn peer_reputation(&self, peer_id: &PeerId) -> i64 {
-        self.state.read().await
-            .reputation.get(peer_id)
+        self.state
+            .read()
+            .await
+            .reputation
+            .get(peer_id)
             .map(|c| c.value())
             .unwrap_or(0)
     }
@@ -201,7 +213,11 @@ impl FederatedTrainer {
         let state = self.state.read().await;
         let reg = state.best_adapter.get(base_model)?;
         let s = reg.get().clone();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     }
 
     /// Register a new peer.
@@ -225,14 +241,20 @@ impl FederatedTrainer {
                 let mut m = HashMap::new();
                 // GCounter doesn't expose internals; use total per-peer via a
                 // separate tracking map. For the snapshot we just expose the total.
-                m.insert(self.local_peer_id.clone(),
-                    state.contributions.value());
+                m.insert(self.local_peer_id.clone(), state.contributions.value());
                 m
             },
-            best_adapter: state.best_adapter.iter().map(|(model, reg)| {
-                let ts_clock = state.clock.get(&self.local_peer_id);
-                (model.clone(), (reg.get().clone(), ts_clock, self.local_peer_id.clone()))
-            }).collect(),
+            best_adapter: state
+                .best_adapter
+                .iter()
+                .map(|(model, reg)| {
+                    let ts_clock = state.clock.get(&self.local_peer_id);
+                    (
+                        model.clone(),
+                        (reg.get().clone(), ts_clock, self.local_peer_id.clone()),
+                    )
+                })
+                .collect(),
         }
     }
 }

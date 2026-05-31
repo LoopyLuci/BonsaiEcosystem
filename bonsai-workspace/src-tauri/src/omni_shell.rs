@@ -12,10 +12,10 @@
 //! The actual process execution delegates to tokio::process::Command so it
 //! works on Windows, Linux, and macOS without additional dependencies.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use std::collections::HashMap;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -63,7 +63,9 @@ pub struct ShellResult {
 }
 
 impl ShellResult {
-    pub fn success(&self) -> bool { self.exit_code == 0 }
+    pub fn success(&self) -> bool {
+        self.exit_code == 0
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +86,12 @@ pub struct ShellAssistantConfig {
 
 impl Default for ShellAssistantConfig {
     fn default() -> Self {
-        Self { auto_fix: true, auto_explain: false, nl_to_command: true, context_lines: 40 }
+        Self {
+            auto_fix: true,
+            auto_explain: false,
+            nl_to_command: true,
+            context_lines: 40,
+        }
     }
 }
 
@@ -143,8 +150,10 @@ impl OmniShell {
         if input.is_empty() {
             return ShellResult {
                 command_id: Uuid::new_v4().to_string(),
-                stdout: String::new(), stderr: String::new(),
-                exit_code: 0, duration_ms: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: 0,
+                duration_ms: 0,
             };
         }
 
@@ -159,7 +168,11 @@ impl OmniShell {
         // NL-to-command (prefix: `?` or `nl:`)
         let config = self.config.read().await.clone();
         if config.nl_to_command && (expanded.starts_with("? ") || expanded.starts_with("nl:")) {
-            let nl = if expanded.starts_with("? ") { &expanded[2..] } else { &expanded[3..] };
+            let nl = if expanded.starts_with("? ") {
+                &expanded[2..]
+            } else {
+                &expanded[3..]
+            };
             let cmd = self.translate_nl(nl).await;
             return self.execute_raw(&cmd, &config).await;
         }
@@ -200,7 +213,8 @@ impl OmniShell {
         let cmd_parts: Vec<&str> = command.trim().splitn(2, ' ').collect();
         if cmd_parts.first() == Some(&"cd") && exit_code == 0 {
             if let Some(dir) = cmd_parts.get(1) {
-                let new_path = if dir.starts_with('/') || dir.starts_with('\\') || dir.contains(':') {
+                let new_path = if dir.starts_with('/') || dir.starts_with('\\') || dir.contains(':')
+                {
                     PathBuf::from(dir)
                 } else {
                     cwd.join(dir)
@@ -222,11 +236,13 @@ impl OmniShell {
 
         // Record as OmnEvent
         let session_id = Uuid::parse_str(&self.session_id).unwrap_or_else(|_| Uuid::new_v4());
-        self.capture.record(OmnEventType::CommandCompleted {
-            command: command.to_string(),
-            exit_code,
-            duration_ms,
-        }).await;
+        self.capture
+            .record(OmnEventType::CommandCompleted {
+                command: command.to_string(),
+                exit_code,
+                duration_ms,
+            })
+            .await;
 
         // Store in history
         let mut sc = ShellCommand {
@@ -254,9 +270,14 @@ impl OmniShell {
         }
 
         // Predict for the predictor model
-        let pred_ev = OmnEvent::new(session_id, OmnEventType::CommandTyped {
-            command: command.to_string(), shell: "omni_shell".into(),
-        }, crate::omnipresent_capture::OmnContext::default());
+        let pred_ev = OmnEvent::new(
+            session_id,
+            OmnEventType::CommandTyped {
+                command: command.to_string(),
+                shell: "omni_shell".into(),
+            },
+            crate::omnipresent_capture::OmnContext::default(),
+        );
         self.predictor.observe(&pred_ev).await;
 
         self.history.write().await.push(sc);
@@ -266,12 +287,18 @@ impl OmniShell {
     async fn execute_lua(&self, code: &str) -> ShellResult {
         let t0 = Instant::now();
         let (stdout, stderr, exit_code) = match self.sylva.exec_str(code) {
-            Ok(val) => (serde_json::to_string_pretty(&val).unwrap_or_else(|_| val.to_string()), String::new(), 0),
+            Ok(val) => (
+                serde_json::to_string_pretty(&val).unwrap_or_else(|_| val.to_string()),
+                String::new(),
+                0,
+            ),
             Err(e) => (String::new(), e, 1),
         };
         ShellResult {
             command_id: Uuid::new_v4().to_string(),
-            stdout, stderr, exit_code,
+            stdout,
+            stderr,
+            exit_code,
             duration_ms: t0.elapsed().as_millis() as u64,
         }
     }
@@ -284,20 +311,41 @@ impl OmniShell {
         let nl_lower = nl.to_lowercase();
 
         // Common NL patterns → commands (heuristic fallback)
-        if nl_lower.contains("list files") || nl_lower.contains("show files") || nl_lower.contains("what files") {
-            if cfg!(windows) { "Get-ChildItem".into() } else { "ls -la".into() }
+        if nl_lower.contains("list files")
+            || nl_lower.contains("show files")
+            || nl_lower.contains("what files")
+        {
+            if cfg!(windows) {
+                "Get-ChildItem".into()
+            } else {
+                "ls -la".into()
+            }
         } else if nl_lower.contains("disk space") || nl_lower.contains("disk usage") {
-            if cfg!(windows) { "Get-PSDrive -PSProvider FileSystem".into() } else { "df -h".into() }
+            if cfg!(windows) {
+                "Get-PSDrive -PSProvider FileSystem".into()
+            } else {
+                "df -h".into()
+            }
         } else if nl_lower.contains("running process") || nl_lower.contains("what is running") {
-            if cfg!(windows) { "Get-Process | Sort-Object CPU -Descending | Select-Object -First 20".into() }
-            else { "ps aux --sort=-%cpu | head -20".into() }
+            if cfg!(windows) {
+                "Get-Process | Sort-Object CPU -Descending | Select-Object -First 20".into()
+            } else {
+                "ps aux --sort=-%cpu | head -20".into()
+            }
         } else if nl_lower.contains("memory") || nl_lower.contains("ram") {
-            if cfg!(windows) { "Get-CimInstance Win32_OperatingSystem | Select-Object FreePhysicalMemory, TotalVisibleMemorySize".into() }
-            else { "free -h".into() }
+            if cfg!(windows) {
+                "Get-CimInstance Win32_OperatingSystem | Select-Object FreePhysicalMemory, TotalVisibleMemorySize".into()
+            } else {
+                "free -h".into()
+            }
         } else if nl_lower.contains("git status") || nl_lower.contains("check git") {
             "git status".into()
         } else if nl_lower.contains("current directory") || nl_lower.contains("where am i") {
-            if cfg!(windows) { "Get-Location".into() } else { "pwd".into() }
+            if cfg!(windows) {
+                "Get-Location".into()
+            } else {
+                "pwd".into()
+            }
         } else {
             // Fallback: echo back what we got with a comment
             format!("# Could not translate: {nl}\n# Try prefixing with a specific command")
@@ -329,7 +377,10 @@ impl OmniShell {
 
     async fn generate_explanation(&self, command: &str, stdout: &str) -> String {
         let preview: String = stdout.lines().take(3).collect::<Vec<_>>().join(" | ");
-        format!("'{}' completed successfully. Output preview: {}", command, preview)
+        format!(
+            "'{}' completed successfully. Output preview: {}",
+            command, preview
+        )
     }
 
     // ── Prediction ───────────────────────────────────────────────────────────
@@ -343,18 +394,28 @@ impl OmniShell {
             ..Default::default()
         };
         let predictions = self.predictor.predict_next(&ctx, top_n).await;
-        predictions.into_iter().map(|p| PredictedCommand {
-            command: p.action_label.trim_start_matches("cmd:").to_string(),
-            confidence: p.confidence,
-            source: p.source,
-        }).collect()
+        predictions
+            .into_iter()
+            .map(|p| PredictedCommand {
+                command: p.action_label.trim_start_matches("cmd:").to_string(),
+                confidence: p.confidence,
+                source: p.source,
+            })
+            .collect()
     }
 
     // ── History ──────────────────────────────────────────────────────────────
 
     pub async fn history(&self, limit: usize) -> Vec<ShellCommand> {
         let h = self.history.read().await;
-        h.iter().rev().take(limit).cloned().collect::<Vec<_>>().into_iter().rev().collect()
+        h.iter()
+            .rev()
+            .take(limit)
+            .cloned()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect()
     }
 
     pub async fn clear_history(&self) {
@@ -364,7 +425,10 @@ impl OmniShell {
     // ── Aliases ──────────────────────────────────────────────────────────────
 
     pub async fn set_alias(&self, name: &str, expansion: &str) {
-        self.aliases.write().await.insert(name.to_string(), expansion.to_string());
+        self.aliases
+            .write()
+            .await
+            .insert(name.to_string(), expansion.to_string());
     }
 
     pub async fn delete_alias(&self, name: &str) {
@@ -380,7 +444,11 @@ impl OmniShell {
         let aliases = self.aliases.read().await;
         if let Some(expansion) = aliases.get(first_word) {
             let rest = input[first_word.len()..].trim();
-            if rest.is_empty() { expansion.clone() } else { format!("{expansion} {rest}") }
+            if rest.is_empty() {
+                expansion.clone()
+            } else {
+                format!("{expansion} {rest}")
+            }
         } else {
             input.to_string()
         }
@@ -399,7 +467,11 @@ fn truncate_lines(s: &str, max_lines: usize) -> String {
         s.to_string()
     } else {
         let kept = &lines[..max_lines];
-        format!("{}\n… ({} more lines truncated)", kept.join("\n"), lines.len() - max_lines)
+        format!(
+            "{}\n… ({} more lines truncated)",
+            kept.join("\n"),
+            lines.len() - max_lines
+        )
     }
 }
 
@@ -417,7 +489,9 @@ impl OmniShellState {
         sylva: Arc<SylvaRuntime>,
         capture: Arc<OmnipresentCapture>,
     ) -> Self {
-        Self { shell: OmniShell::new(predictor, sylva, capture) }
+        Self {
+            shell: OmniShell::new(predictor, sylva, capture),
+        }
     }
 }
 
@@ -438,7 +512,11 @@ pub async fn omni_shell_predict(
     state: tauri::State<'_, crate::AppState>,
     top_n: usize,
 ) -> Result<Vec<PredictedCommand>, String> {
-    Ok(state.omni_shell.shell.predict_next_commands(top_n.min(10)).await)
+    Ok(state
+        .omni_shell
+        .shell
+        .predict_next_commands(top_n.min(10))
+        .await)
 }
 
 #[tauri::command]
@@ -493,9 +571,7 @@ pub async fn omni_shell_config_set(
 }
 
 #[tauri::command]
-pub async fn omni_shell_cwd(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<String, String> {
+pub async fn omni_shell_cwd(state: tauri::State<'_, crate::AppState>) -> Result<String, String> {
     Ok(state.omni_shell.shell.cwd().await)
 }
 
@@ -511,7 +587,10 @@ mod tests {
 
     #[test]
     fn truncate_lines_long() {
-        let s = (0..100).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
+        let s = (0..100)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
         let out = truncate_lines(&s, 5);
         assert!(out.contains("95 more lines truncated"));
     }

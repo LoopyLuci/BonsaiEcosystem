@@ -36,7 +36,11 @@ pub struct ToolCall {
 
 impl ToolCall {
     pub fn new(tool: impl Into<String>, args: Value) -> Self {
-        Self { tool: tool.into(), args, workspace_path: None }
+        Self {
+            tool: tool.into(),
+            args,
+            workspace_path: None,
+        }
     }
 }
 
@@ -65,7 +69,9 @@ pub struct MiddlewareRegistry {
 
 impl MiddlewareRegistry {
     pub fn new() -> Self {
-        Self { middlewares: RwLock::new(Vec::new()) }
+        Self {
+            middlewares: RwLock::new(Vec::new()),
+        }
     }
 
     pub fn register(&self, mw: Arc<dyn ToolMiddleware>) {
@@ -73,7 +79,10 @@ impl MiddlewareRegistry {
     }
 
     pub fn unregister(&self, name: &str) {
-        self.middlewares.write().unwrap().retain(|m| m.name() != name);
+        self.middlewares
+            .write()
+            .unwrap()
+            .retain(|m| m.name() != name);
     }
 
     /// Run the call through the full chain.  Returns `Ok(call)` if all
@@ -84,7 +93,7 @@ impl MiddlewareRegistry {
         for mw in chain.iter() {
             match mw.intercept(current) {
                 MiddlewareOutcome::Continue(next) => current = next,
-                MiddlewareOutcome::Block(msg)     => return Err(msg),
+                MiddlewareOutcome::Block(msg) => return Err(msg),
                 MiddlewareOutcome::PendingApproval => {
                     return Err("__pending_approval__".to_string());
                 }
@@ -115,17 +124,20 @@ const BLOCKED_PATTERNS: &[&str] = &[
     "format c:",
     "del /f /s /q c:\\",
     "rd /s /q c:\\windows",
-    ":(){ :|:& };:",    // fork bomb
+    ":(){ :|:& };:", // fork bomb
 ];
 
 impl ToolMiddleware for SafetyGateMiddleware {
-    fn name(&self) -> &'static str { "safety_gate" }
+    fn name(&self) -> &'static str {
+        "safety_gate"
+    }
 
     fn intercept(&self, call: ToolCall) -> MiddlewareOutcome {
         // Only inspect shell/terminal tools
-        if !matches!(call.tool.as_str(),
-            "run_command" | "run_terminal_command" | "omni_shell_exec" | "execute_code")
-        {
+        if !matches!(
+            call.tool.as_str(),
+            "run_command" | "run_terminal_command" | "omni_shell_exec" | "execute_code"
+        ) {
             return MiddlewareOutcome::Continue(call);
         }
 
@@ -159,14 +171,16 @@ pub struct UndercoverMiddleware {
 }
 
 const INTERNAL_NAMES: &[(&str, &str)] = &[
-    ("BonsAI",          "AI Assistant"),
-    ("Bonsai Workspace","Development Environment"),
-    ("bonsai-latest",   "model-latest"),
-    ("bonsai_core",     "assistant_core"),
+    ("BonsAI", "AI Assistant"),
+    ("Bonsai Workspace", "Development Environment"),
+    ("bonsai-latest", "model-latest"),
+    ("bonsai_core", "assistant_core"),
 ];
 
 impl ToolMiddleware for UndercoverMiddleware {
-    fn name(&self) -> &'static str { "undercover" }
+    fn name(&self) -> &'static str {
+        "undercover"
+    }
 
     fn intercept(&self, mut call: ToolCall) -> MiddlewareOutcome {
         if !self.enabled.load(std::sync::atomic::Ordering::Relaxed) {
@@ -186,10 +200,14 @@ fn sanitize_json_strings(val: &mut Value) {
             }
         }
         Value::Object(map) => {
-            for v in map.values_mut() { sanitize_json_strings(v); }
+            for v in map.values_mut() {
+                sanitize_json_strings(v);
+            }
         }
         Value::Array(arr) => {
-            for v in arr.iter_mut() { sanitize_json_strings(v); }
+            for v in arr.iter_mut() {
+                sanitize_json_strings(v);
+            }
         }
         _ => {}
     }

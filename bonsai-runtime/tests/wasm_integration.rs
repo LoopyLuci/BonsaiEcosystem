@@ -5,7 +5,10 @@ use std::io::Write;
 #[tokio::test]
 async fn start_clojurewasm_if_wasmtime_present() -> Result<(), Box<dyn std::error::Error>> {
     // Check for wasmtime on PATH
-    let has_wasmtime = std::process::Command::new("wasmtime").arg("--version").output().is_ok();
+    let has_wasmtime = std::process::Command::new("wasmtime")
+        .arg("--version")
+        .output()
+        .is_ok();
     if !has_wasmtime {
         eprintln!("wasmtime not found; skipping wasm integration test");
         return Ok(());

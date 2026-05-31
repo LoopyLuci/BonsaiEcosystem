@@ -76,7 +76,10 @@ pub fn extract_permissions(_metadata: &SkillMetadata, rules: &[Rule]) -> Vec<Str
     if combined.contains("write file") || combined.contains("write_file") {
         perms.push("write_fs".into());
     }
-    if combined.contains("run command") || combined.contains("run_command") || combined.contains("shell") {
+    if combined.contains("run command")
+        || combined.contains("run_command")
+        || combined.contains("shell")
+    {
         perms.push("run_shell".into());
     }
     if combined.contains("network") || combined.contains("http") || combined.contains("url") {

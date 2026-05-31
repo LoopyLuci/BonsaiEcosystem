@@ -11,15 +11,15 @@ use tokio::sync::Mutex;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingStatus {
     pub examples_collected: usize,
-    pub threshold:          usize,
-    pub running:            bool,
-    pub last_adapter:       Option<String>,
-    pub last_f1:            Option<f32>,
+    pub threshold: usize,
+    pub running: bool,
+    pub last_adapter: Option<String>,
+    pub last_f1: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedbackTriple {
-    pub prompt:   String,
+    pub prompt: String,
     pub response: String,
     pub feedback: String,
 }
@@ -27,8 +27,8 @@ pub struct FeedbackTriple {
 // ── State ─────────────────────────────────────────────────────────────────────
 
 pub struct ContinuousTrainer {
-    pub feedback_buffer:  Mutex<Vec<FeedbackTriple>>,
-    pub status:           Mutex<TrainingStatus>,
+    pub feedback_buffer: Mutex<Vec<FeedbackTriple>>,
+    pub status: Mutex<TrainingStatus>,
     pub trigger_threshold: usize,
 }
 
@@ -38,10 +38,10 @@ impl ContinuousTrainer {
             feedback_buffer: Mutex::new(vec![]),
             status: Mutex::new(TrainingStatus {
                 examples_collected: 0,
-                threshold:          50,
-                running:            false,
-                last_adapter:       None,
-                last_f1:            None,
+                threshold: 50,
+                running: false,
+                last_adapter: None,
+                last_f1: None,
             }),
             trigger_threshold: 50,
         }
@@ -51,7 +51,7 @@ impl ContinuousTrainer {
         let len = {
             let mut buf = self.feedback_buffer.lock().await;
             buf.push(FeedbackTriple {
-                prompt:   prompt.into(),
+                prompt: prompt.into(),
                 response: response.into(),
                 feedback: feedback.into(),
             });
@@ -74,10 +74,10 @@ impl ContinuousTrainer {
         let status = {
             let mut s = self.status.lock().await;
             self.feedback_buffer.lock().await.clear();
-            s.running            = false;
+            s.running = false;
             s.examples_collected = 0;
-            s.last_adapter       = Some(format!("bonsai-core-v{}", rand::random::<u16>()));
-            s.last_f1            = Some(0.92);
+            s.last_adapter = Some(format!("bonsai-core-v{}", rand::random::<u16>()));
+            s.last_f1 = Some(0.92);
             s.clone()
         };
         Ok(status)
@@ -94,7 +94,10 @@ pub async fn ingest_feedback_continuous(
     response: String,
     feedback: String,
 ) -> Result<(), String> {
-    state.continuous_trainer.ingest(&prompt, &response, &feedback).await;
+    state
+        .continuous_trainer
+        .ingest(&prompt, &response, &feedback)
+        .await;
     Ok(())
 }
 

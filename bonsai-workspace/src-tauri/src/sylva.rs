@@ -9,13 +9,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use mlua::prelude::*;
-use tauri::Emitter;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
-use crate::tool_registry::{Tool, ToolResult, ToolRegistryState};
+use crate::tool_registry::{Tool, ToolRegistryState, ToolResult};
 
 // ── Call record for time-travel debugging ─────────────────────────────────────
 
@@ -77,7 +77,9 @@ impl SylvaRuntime {
     fn inject_bonsai_globals(lua: &Lua, registry: &Arc<ToolRegistryState>) -> LuaResult<()> {
         // Remove modules that could escape the sandbox
         let globals = lua.globals();
-        for module in &["os", "io", "package", "require", "dofile", "loadfile", "load"] {
+        for module in &[
+            "os", "io", "package", "require", "dofile", "loadfile", "load",
+        ] {
             globals.raw_remove(*module)?;
         }
 
@@ -91,8 +93,7 @@ impl SylvaRuntime {
                 let json_args = lua_value_to_json(args)?;
                 // Synchronous bridge: use block_in_place since Lua is sync
                 let result = tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current()
-                        .block_on(reg.invoke_by_name(&name, json_args))
+                    tokio::runtime::Handle::current().block_on(reg.invoke_by_name(&name, json_args))
                 });
                 match result {
                     Ok(val) => Ok(json_to_lua_value(lua_ctx, val)?),
@@ -123,8 +124,8 @@ impl SylvaRuntime {
         bonsai.set(
             "json_decode",
             lua.create_function(|lua_ctx, s: String| {
-                let json: serde_json::Value = serde_json::from_str(&s)
-                    .map_err(|e| LuaError::external(e))?;
+                let json: serde_json::Value =
+                    serde_json::from_str(&s).map_err(|e| LuaError::external(e))?;
                 json_to_lua_value(lua_ctx, json)
             })?,
         )?;
@@ -135,18 +136,22 @@ impl SylvaRuntime {
 
     /// Load (or reload) a Lua script file and register it as a tool.
     pub async fn load_script(&self, path: &Path) -> Result<String, String> {
-        let name = path.file_stem()
+        let name = path
+            .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(|| format!("invalid script path: {}", path.display()))?
             .to_string();
 
-        let source = tokio::fs::read_to_string(path).await
+        let source = tokio::fs::read_to_string(path)
+            .await
             .map_err(|e| format!("read error: {e}"))?;
 
         // Try to compile + execute in the Lua VM to catch syntax errors
         let compile_result = {
             let lua = self.lua.lock().map_err(|e| e.to_string())?;
-            lua.load(&source).set_name(&name).exec()
+            lua.load(&source)
+                .set_name(&name)
+                .exec()
                 .map_err(|e| format!("Lua compile error in {name}: {e}"))
         };
 
@@ -178,7 +183,7 @@ impl SylvaRuntime {
                     Self::inject_bonsai_globals(&lua, &self.tool_registry)
                         .map_err(|e| e.to_string())?;
                     lua
-                }
+                },
             )),
         };
 
@@ -193,7 +198,11 @@ impl SylvaRuntime {
         // Set instruction count limit (~10M ops ≈ a few seconds of pure Lua)
         lua.set_hook(
             mlua::HookTriggers::new().every_nth_instruction(10_000_000),
-            |_lua, _debug| Err(mlua::Error::RuntimeError("Sylva execution limit reached (10M instructions)".into())),
+            |_lua, _debug| {
+                Err(mlua::Error::RuntimeError(
+                    "Sylva execution limit reached (10M instructions)".into(),
+                ))
+            },
         );
         let result = lua.load(src).eval::<LuaValue>().map_err(|e| e.to_string());
         let _ = lua.remove_hook();
@@ -203,20 +212,25 @@ impl SylvaRuntime {
 
     /// Execute a `.lua` file by path and return the result as JSON.
     pub async fn exec_file(&self, path: &Path) -> Result<serde_json::Value, String> {
-        let source = tokio::fs::read_to_string(path).await
+        let source = tokio::fs::read_to_string(path)
+            .await
             .map_err(|e| format!("read error: {e}"))?;
         self.exec_str(&source)
     }
 
     /// Call a named function defined in any loaded script.
-    pub fn call_fn(&self, name: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
+    pub fn call_fn(
+        &self,
+        name: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
         let lua = self.lua.lock().map_err(|e| e.to_string())?;
-        let func: LuaFunction = lua.globals().get(name)
+        let func: LuaFunction = lua
+            .globals()
+            .get(name)
             .map_err(|_| format!("function '{name}' not found in Sylva VM"))?;
-        let lua_args = json_to_lua_value(&lua, args)
-            .map_err(|e| e.to_string())?;
-        let result: LuaValue = func.call(lua_args)
-            .map_err(|e| e.to_string())?;
+        let lua_args = json_to_lua_value(&lua, args).map_err(|e| e.to_string())?;
+        let result: LuaValue = func.call(lua_args).map_err(|e| e.to_string())?;
         lua_value_to_json(result).map_err(|e| e.to_string())
     }
 
@@ -233,7 +247,9 @@ impl SylvaRuntime {
     async fn push_history(&self, record: SylvaCallRecord) {
         let mut h = self.call_history.write().await;
         h.push_back(record);
-        if h.len() > self.history_limit { h.pop_front(); }
+        if h.len() > self.history_limit {
+            h.pop_front();
+        }
     }
 
     /// Scan the scripts directory and load all `.lua` files.
@@ -272,10 +288,7 @@ pub struct SylvaWatcher {
 }
 
 impl SylvaWatcher {
-    pub fn start(
-        runtime: Arc<SylvaRuntime>,
-        app_handle: tauri::AppHandle,
-    ) -> Option<Self> {
+    pub fn start(runtime: Arc<SylvaRuntime>, app_handle: tauri::AppHandle) -> Option<Self> {
         let scripts_dir = runtime.scripts_dir.clone();
         if !scripts_dir.exists() {
             if let Err(e) = std::fs::create_dir_all(&scripts_dir) {
@@ -287,7 +300,10 @@ impl SylvaWatcher {
         let (tx, rx) = std::sync::mpsc::channel::<notify::Result<Event>>();
         let mut watcher = match notify::recommended_watcher(tx) {
             Ok(w) => w,
-            Err(e) => { warn!("[sylva] watcher init failed: {e}"); return None; }
+            Err(e) => {
+                warn!("[sylva] watcher init failed: {e}");
+                return None;
+            }
         };
 
         if let Err(e) = watcher.watch(&scripts_dir, RecursiveMode::NonRecursive) {
@@ -306,7 +322,9 @@ impl SylvaWatcher {
                             event.kind,
                             notify::EventKind::Create(_) | notify::EventKind::Modify(_)
                         );
-                        if !is_modify_or_create { continue; }
+                        if !is_modify_or_create {
+                            continue;
+                        }
 
                         for path in event.paths {
                             if path.extension().and_then(|e| e.to_str()) != Some("lua") {
@@ -323,7 +341,10 @@ impl SylvaWatcher {
                                             let _ = ah2.emit("sylva-reload", &name);
                                         }
                                         Err(e) => {
-                                            warn!("[sylva] reload error for {}: {e}", path2.display());
+                                            warn!(
+                                                "[sylva] reload error for {}: {e}",
+                                                path2.display()
+                                            );
                                             let _ = ah2.emit("sylva-error", &e);
                                         }
                                     }
@@ -350,8 +371,12 @@ struct SylvaTool {
 
 #[async_trait::async_trait]
 impl Tool for SylvaTool {
-    fn name(&self) -> &str { &self.name }
-    fn description(&self) -> &str { "Sylva (Lua) script tool" }
+    fn name(&self) -> &str {
+        &self.name
+    }
+    fn description(&self) -> &str {
+        "Sylva (Lua) script tool"
+    }
 
     async fn run(&self, args: &serde_json::Value) -> Result<ToolResult, String> {
         let lua = self.lua.lock().map_err(|e| e.to_string())?;
@@ -360,13 +385,13 @@ impl Tool for SylvaTool {
         lua.load(&self.source).exec().map_err(|e| e.to_string())?;
 
         // Call the `run(args)` function defined in the script
-        let func: LuaFunction = lua.globals().get("run")
+        let func: LuaFunction = lua
+            .globals()
+            .get("run")
             .map_err(|_| format!("script '{}' must define a `run(args)` function", self.name))?;
 
-        let lua_args = json_to_lua_value(&lua, args.clone())
-            .map_err(|e| e.to_string())?;
-        let result: LuaValue = func.call(lua_args)
-            .map_err(|e| e.to_string())?;
+        let lua_args = json_to_lua_value(&lua, args.clone()).map_err(|e| e.to_string())?;
+        let result: LuaValue = func.call(lua_args).map_err(|e| e.to_string())?;
         let json = lua_value_to_json(result).map_err(|e| e.to_string())?;
 
         Ok(ToolResult::json(&json))
@@ -417,8 +442,11 @@ pub fn json_to_lua_value(lua: &Lua, val: serde_json::Value) -> LuaResult<LuaValu
         serde_json::Value::Null => LuaValue::Nil,
         serde_json::Value::Bool(b) => LuaValue::Boolean(b),
         serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() { LuaValue::Integer(i) }
-            else { LuaValue::Number(n.as_f64().unwrap_or(0.0)) }
+            if let Some(i) = n.as_i64() {
+                LuaValue::Integer(i)
+            } else {
+                LuaValue::Number(n.as_f64().unwrap_or(0.0))
+            }
         }
         serde_json::Value::String(s) => LuaValue::String(lua.create_string(&s)?),
         serde_json::Value::Array(arr) => {
@@ -491,13 +519,15 @@ pub async fn sylva_exec_file(
     state: tauri::State<'_, crate::AppState>,
     path: String,
 ) -> Result<serde_json::Value, String> {
-    state.sylva.runtime.exec_file(std::path::Path::new(&path)).await
+    state
+        .sylva
+        .runtime
+        .exec_file(std::path::Path::new(&path))
+        .await
 }
 
 #[tauri::command]
-pub async fn sylva_clear_history(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<(), String> {
+pub async fn sylva_clear_history(state: tauri::State<'_, crate::AppState>) -> Result<(), String> {
     state.sylva.runtime.call_history.write().await.clear();
     Ok(())
 }
@@ -507,7 +537,11 @@ pub async fn sylva_load_script(
     state: tauri::State<'_, crate::AppState>,
     path: String,
 ) -> Result<String, String> {
-    state.sylva.runtime.load_script(std::path::Path::new(&path)).await
+    state
+        .sylva
+        .runtime
+        .load_script(std::path::Path::new(&path))
+        .await
 }
 
 #[tauri::command]
@@ -516,7 +550,8 @@ pub async fn sylva_get_script_content(
     name: String,
 ) -> Result<String, String> {
     let scripts = state.sylva.runtime.scripts.read().await;
-    scripts.get(&name)
+    scripts
+        .get(&name)
         .map(|s| s.source.clone())
         .ok_or_else(|| format!("Script '{}' not found", name))
 }
@@ -529,7 +564,8 @@ pub async fn sylva_save_script(
 ) -> Result<String, String> {
     let scripts_dir = state.sylva.runtime.scripts_dir.clone();
     let path = scripts_dir.join(format!("{}.lua", name));
-    tokio::fs::write(&path, &source).await
+    tokio::fs::write(&path, &source)
+        .await
         .map_err(|e| format!("Failed to write script: {e}"))?;
     state.sylva.runtime.load_script(&path).await
 }

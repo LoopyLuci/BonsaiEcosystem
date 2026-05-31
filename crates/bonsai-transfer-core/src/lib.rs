@@ -7,17 +7,17 @@
 //!   - Reassembly Window — ordered delivery with NACK-based gap detection
 //!   - Retransmit Buffer — unacknowledged chunk tracking
 
-pub mod lane;
-pub mod gsn;
-pub mod scheduler;
-pub mod reassembly;
-pub mod transfer;
 pub mod error;
+pub mod gsn;
+pub mod lane;
+pub mod reassembly;
+pub mod scheduler;
 pub mod streams;
+pub mod transfer;
 
-pub use lane::{TransportLane, LaneHealth, LaneKind};
-pub use gsn::GsnAllocator;
-pub use scheduler::{EcfRgScheduler, ChunkAssignment};
-pub use reassembly::{ReassemblyWindow, AssembledMessage};
-pub use transfer::{Transfer, TransferHandle, TransferStatus, TransferDirection};
 pub use error::{TransferError, TransferResult};
+pub use gsn::GsnAllocator;
+pub use lane::{LaneHealth, LaneKind, TransportLane};
+pub use reassembly::{AssembledMessage, ReassemblyWindow};
+pub use scheduler::{ChunkAssignment, EcfRgScheduler};
+pub use transfer::{Transfer, TransferDirection, TransferHandle, TransferStatus};

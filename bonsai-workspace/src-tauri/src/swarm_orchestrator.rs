@@ -1,6 +1,9 @@
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -25,8 +28,8 @@ pub struct LeaderPlan {
 #[derive(Deserialize, Serialize, Clone)]
 pub struct SubtaskSpec {
     pub worker_slot: usize,
-    pub task:        String,
-    pub context:     String,
+    pub task: String,
+    pub context: String,
     /// Optional per-subtask tool allow-list.  When Some, the worker receives only
     /// these tools regardless of the global tool set.  When None, the worker gets
     /// the role-appropriate default (read-only for reviewers/analysts; full set for
@@ -50,21 +53,21 @@ pub struct WorkerAssessment {
 
 #[derive(Serialize, Clone)]
 pub struct AgentOutput {
-    pub agent_id:    String,
-    pub slot_index:  i64,
-    pub subtask:     String,
-    pub result:      String,
-    pub stats:       InferStats,
+    pub agent_id: String,
+    pub slot_index: i64,
+    pub subtask: String,
+    pub result: String,
+    pub stats: InferStats,
     /// Parsed from the worker's <worker_assessment> block; None if worker did not emit one.
-    pub assessment:  Option<WorkerAssessment>,
+    pub assessment: Option<WorkerAssessment>,
 }
 
 #[derive(Serialize)]
 pub struct SwarmResult {
     pub final_response: String,
-    pub leader_plan:    Option<Value>,
-    pub agent_results:  Vec<AgentOutput>,
-    pub stats:          InferStats,
+    pub leader_plan: Option<Value>,
+    pub agent_results: Vec<AgentOutput>,
+    pub stats: InferStats,
 }
 
 // ── Aggregated run metrics ────────────────────────────────────────────────────
@@ -73,14 +76,14 @@ const METRICS_HISTORY_CAP: usize = 50;
 
 #[derive(Serialize, Clone)]
 pub struct SwarmRunRecord {
-    pub run_id:                  String,
-    pub chain_strategy:          String,
-    pub worker_count:            usize,
-    pub successful_workers:      usize,
-    pub total_prompt_tokens:     u32,
+    pub run_id: String,
+    pub chain_strategy: String,
+    pub worker_count: usize,
+    pub successful_workers: usize,
+    pub total_prompt_tokens: u32,
     pub total_completion_tokens: u32,
-    pub total_time_ms:           u64,
-    pub summary:                 String,
+    pub total_time_ms: u64,
+    pub summary: String,
 }
 
 fn metrics_store() -> &'static std::sync::Mutex<VecDeque<SwarmRunRecord>> {
@@ -198,17 +201,17 @@ impl Default for SwarmRuntimeSettings {
 // ── Request ───────────────────────────────────────────────────────────────────
 
 pub struct SwarmRequest {
-    pub run_id:        String,
-    pub session_id:    Option<String>,
-    pub user_prompt:   String,
+    pub run_id: String,
+    pub session_id: Option<String>,
+    pub user_prompt: String,
     pub workspace_path: Option<String>,
     pub enabled_tools: Option<Vec<String>>,
     pub runtime_settings: SwarmRuntimeSettings,
-    pub agents:        Vec<ResolvedAgent>,    // index 0 = leader
-    pub cancel_flags:  Vec<Arc<AtomicBool>>, // per slot
+    pub agents: Vec<ResolvedAgent>,         // index 0 = leader
+    pub cancel_flags: Vec<Arc<AtomicBool>>, // per slot
     pub global_cancel: Arc<AtomicBool>,
-    pub resp_tx:       oneshot::Sender<Result<SwarmResult, String>>,
-    pub app_handle:    AppHandle,
+    pub resp_tx: oneshot::Sender<Result<SwarmResult, String>>,
+    pub app_handle: AppHandle,
 }
 
 // ── Internal channel ──────────────────────────────────────────────────────────
@@ -240,7 +243,9 @@ pub struct SwarmCrdtState {
 }
 
 impl SwarmCrdtState {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn merge(&mut self, other: &SwarmCrdtState) {
         self.dispatched.merge(&other.dispatched);
         self.completed.merge(&other.completed);
@@ -311,7 +316,10 @@ impl Actor for SwarmSupervisorActor {
             SupervisionDirective::Restart
         } else {
             tracing::error!("[swarm] child {child_id} exceeded restart limit: {error}");
-            ctx.emit("swarm-child-failed", serde_json::json!({ "id": child_id.to_string(), "error": error }));
+            ctx.emit(
+                "swarm-child-failed",
+                serde_json::json!({ "id": child_id.to_string(), "error": error }),
+            );
             SupervisionDirective::Stop
         }
     }
@@ -347,12 +355,17 @@ impl SwarmOrchestrator {
         let supervisor = SwarmSupervisorActor::new(orchestrator);
         let supervisor_ref = actor_system.spawn(supervisor);
 
-        Self { cmd_tx, actor_system, supervisor_ref }
+        Self {
+            cmd_tx,
+            actor_system,
+            supervisor_ref,
+        }
     }
 
     pub fn submit(&self, req: SwarmRequest) -> Result<(), String> {
         // Route through actor system (preferred path)
-        self.supervisor_ref.send(SwarmSupervisorMsg::Submit(req))
+        self.supervisor_ref
+            .send(SwarmSupervisorMsg::Submit(req))
             .map_err(|e| format!("swarm supervisor offline: {e}"))
     }
 }
@@ -365,7 +378,17 @@ async fn run_swarm(
     req: SwarmRequest,
 ) -> Result<(), ()> {
     let SwarmRequest {
-        run_id, session_id, workspace_path, enabled_tools, runtime_settings, agents, cancel_flags, global_cancel, resp_tx, user_prompt, ..
+        run_id,
+        session_id,
+        workspace_path,
+        enabled_tools,
+        runtime_settings,
+        agents,
+        cancel_flags,
+        global_cancel,
+        resp_tx,
+        user_prompt,
+        ..
     } = req;
 
     let agent_store = app_handle
@@ -374,16 +397,18 @@ async fn run_swarm(
 
     if let Some(store) = &agent_store {
         let started_at = unix_now();
-        let _ = store.save_swarm_run(&crate::agent_store::SwarmRun {
-            id: run_id.clone(),
-            session_id: session_id.clone(),
-            user_prompt: user_prompt.clone(),
-            leader_plan: None,
-            summary: None,
-            status: "running".to_string(),
-            started_at,
-            completed_at: None,
-        }).await;
+        let _ = store
+            .save_swarm_run(&crate::agent_store::SwarmRun {
+                id: run_id.clone(),
+                session_id: session_id.clone(),
+                user_prompt: user_prompt.clone(),
+                leader_plan: None,
+                summary: None,
+                status: "running".to_string(),
+                started_at,
+                completed_at: None,
+            })
+            .await;
     }
 
     let leader = agents
@@ -413,7 +438,11 @@ async fn run_swarm(
                             "self"
                         } else if !slot_to_agent.contains_key(candidate) {
                             "out_of_range"
-                        } else if !slot_to_agent.get(candidate).map(|a| a.config.enabled).unwrap_or(false) {
+                        } else if !slot_to_agent
+                            .get(candidate)
+                            .map(|a| a.config.enabled)
+                            .unwrap_or(false)
+                        {
                             "disabled"
                         } else if !policy_for_slot(&runtime_settings, *candidate).allow_heavy_work {
                             "heavy_off"
@@ -468,22 +497,33 @@ async fn run_swarm(
     let base_prompt = if leader.system_prompt.is_empty() {
         tools::system_prompt(&tools, workspace_path.as_deref())
     } else {
-        format!("{}\n\n{}", leader.system_prompt, tools::system_prompt(&tools, workspace_path.as_deref()))
+        format!(
+            "{}\n\n{}",
+            leader.system_prompt,
+            tools::system_prompt(&tools, workspace_path.as_deref())
+        )
     };
 
-    let workers_summary: String = agents.iter().filter(|a| a.config.slot_index != 0 && a.config.enabled)
+    let workers_summary: String = agents
+        .iter()
+        .filter(|a| a.config.slot_index != 0 && a.config.enabled)
         .map(|a| {
-            let name = a.persona.as_ref().map(|p| p.name.as_str()).unwrap_or(&a.config.label);
+            let name = a
+                .persona
+                .as_ref()
+                .map(|p| p.name.as_str())
+                .unwrap_or(&a.config.label);
             let desc = a.system_prompt.lines().next().unwrap_or("specialist agent");
             let role = role_profile_for_slot(&runtime_settings, a.config.slot_index as usize);
             let ctx_k = (a.context_length / 1024).max(1);
-            let tool_cap = if a.supports_tools { "tool-capable" } else { "chat-only hint" };
+            let tool_cap = if a.supports_tools {
+                "tool-capable"
+            } else {
+                "chat-only hint"
+            };
             format!(
                 "  Worker {} ({name}) [{}/{} | {}k ctx | {tool_cap}]: {desc}",
-                a.config.slot_index,
-                role.role_name,
-                role.focus,
-                ctx_k,
+                a.config.slot_index, role.role_name, role.focus, ctx_k,
             )
         })
         .collect::<Vec<_>>()
@@ -515,14 +555,20 @@ async fn run_swarm(
     };
 
     if runtime_settings.emit_debug_events {
-        let _ = app_handle.emit("swarm-debug", json!({
-            "run_id": &run_id,
-            "phase": "leader.plan.start",
-            "settings": &runtime_settings,
-        }));
+        let _ = app_handle.emit(
+            "swarm-debug",
+            json!({
+                "run_id": &run_id,
+                "phase": "leader.plan.start",
+                "settings": &runtime_settings,
+            }),
+        );
     }
 
-    let leader_cancel = cancel_flags.get(0).cloned().unwrap_or_else(|| global_cancel.clone());
+    let leader_cancel = cancel_flags
+        .get(0)
+        .cloned()
+        .unwrap_or_else(|| global_cancel.clone());
 
     // Leader first pass
     let ctx = vec![
@@ -543,7 +589,9 @@ async fn run_swarm(
         leader_model.clone(),
         Some(leader_cancel.clone()),
         true,
-    ).await {
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             let _ = resp_tx.send(Err(e));
@@ -559,12 +607,15 @@ async fn run_swarm(
         Ok(plan) => Some(plan),
         Err(reason) => {
             if runtime_settings.emit_debug_events {
-                let _ = app_handle.emit("swarm-debug", json!({
-                    "run_id": &run_id,
-                    "phase": "leader.plan.parse_failed",
-                    "reason": &reason,
-                    "snippet": &leader_response[..leader_response.len().min(400)],
-                }));
+                let _ = app_handle.emit(
+                    "swarm-debug",
+                    json!({
+                        "run_id": &run_id,
+                        "phase": "leader.plan.parse_failed",
+                        "reason": &reason,
+                        "snippet": &leader_response[..leader_response.len().min(400)],
+                    }),
+                );
             }
 
             // One repair pass: show the leader its own output, explain the error,
@@ -584,31 +635,41 @@ async fn run_swarm(
             ];
 
             let repair_result = run_agent_inference(
-                &*orchestrator, &app_handle,
+                &*orchestrator,
+                &app_handle,
                 repair_ctx,
-                leader_agent_id.clone(), leader_slot, leader_model.clone(),
+                leader_agent_id.clone(),
+                leader_slot,
+                leader_model.clone(),
                 Some(leader_cancel.clone()),
                 false, // don't stream the repair pass
-            ).await;
+            )
+            .await;
 
             match repair_result {
                 Ok((repair_raw, _)) => match parse_swarm_plan(&strip_think_tags(&repair_raw)) {
                     Ok(repaired) => {
                         if runtime_settings.emit_debug_events {
-                            let _ = app_handle.emit("swarm-debug", json!({
-                                "run_id": &run_id,
-                                "phase": "leader.plan.repaired",
-                            }));
+                            let _ = app_handle.emit(
+                                "swarm-debug",
+                                json!({
+                                    "run_id": &run_id,
+                                    "phase": "leader.plan.repaired",
+                                }),
+                            );
                         }
                         Some(repaired)
                     }
                     Err(repair_reason) => {
                         if runtime_settings.emit_debug_events {
-                            let _ = app_handle.emit("swarm-debug", json!({
-                                "run_id": &run_id,
-                                "phase": "leader.plan.repair_failed",
-                                "reason": &repair_reason,
-                            }));
+                            let _ = app_handle.emit(
+                                "swarm-debug",
+                                json!({
+                                    "run_id": &run_id,
+                                    "phase": "leader.plan.repair_failed",
+                                    "reason": &repair_reason,
+                                }),
+                            );
                         }
                         None // fall through to role-framed fallback subtasks
                     }
@@ -622,24 +683,34 @@ async fn run_swarm(
     if enabled_worker_slots.is_empty() {
         // Single-agent fallback: return leader response directly.
         let final_text = tools::strip_tool_calls(&leader_response);
-        let _ = app_handle.emit("swarm-complete", json!({
-            "run_id": &run_id,
-            "final_content": &final_text,
-            "stats": &leader_stats,
-        }));
+        let _ = app_handle.emit(
+            "swarm-complete",
+            json!({
+                "run_id": &run_id,
+                "final_content": &final_text,
+                "stats": &leader_stats,
+            }),
+        );
 
         if let Some(store) = &agent_store {
-            let summary = summarize_swarm_run(&user_prompt, &final_text, &runtime_settings.chain_strategy, &[]);
-            let _ = store.save_swarm_run(&crate::agent_store::SwarmRun {
-                id: run_id.clone(),
-                session_id: session_id.clone(),
-                user_prompt: user_prompt.clone(),
-                leader_plan: None,
-                summary: Some(summary),
-                status: "completed".to_string(),
-                started_at: unix_now(),
-                completed_at: Some(unix_now()),
-            }).await;
+            let summary = summarize_swarm_run(
+                &user_prompt,
+                &final_text,
+                &runtime_settings.chain_strategy,
+                &[],
+            );
+            let _ = store
+                .save_swarm_run(&crate::agent_store::SwarmRun {
+                    id: run_id.clone(),
+                    session_id: session_id.clone(),
+                    user_prompt: user_prompt.clone(),
+                    leader_plan: None,
+                    summary: Some(summary),
+                    status: "completed".to_string(),
+                    started_at: unix_now(),
+                    completed_at: Some(unix_now()),
+                })
+                .await;
         }
 
         let _ = resp_tx.send(Ok(SwarmResult {
@@ -674,7 +745,9 @@ async fn run_swarm(
             }
         })
         .collect::<Vec<_>>();
-    let effective_plan = parsed_plan.unwrap_or(LeaderPlan { subtasks: fallback_subtasks });
+    let effective_plan = parsed_plan.unwrap_or(LeaderPlan {
+        subtasks: fallback_subtasks,
+    });
 
     continue_swarm_with_plan(
         app_handle,
@@ -695,7 +768,8 @@ async fn run_swarm(
         leader_model,
         leader_cancel,
         effective_plan,
-    ).await
+    )
+    .await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -748,10 +822,7 @@ async fn continue_swarm_with_plan(
         if !lowered.contains("deliverable") {
             spec.context = format!(
                 "{}\nRole guidance: {} focus on {}. Deliverable: {}",
-                spec.context,
-                profile.role_name,
-                profile.focus,
-                profile.deliverable,
+                spec.context, profile.role_name, profile.focus, profile.deliverable,
             );
         }
     }
@@ -762,18 +833,30 @@ async fn continue_swarm_with_plan(
     }
     let plan_json = serde_json::to_value(&planned_subtasks).unwrap_or(Value::Null);
 
-    let _ = app_handle.emit("swarm-plan-ready", json!({
-        "run_id": &run_id,
-        "leader_plan": &plan_json,
-    }));
+    let _ = app_handle.emit(
+        "swarm-plan-ready",
+        json!({
+            "run_id": &run_id,
+            "leader_plan": &plan_json,
+        }),
+    );
 
     // Chain-of-command scheduling based on per-agent policy + global strategy.
     let mut ordered_subtasks = planned_subtasks.clone();
     ordered_subtasks.sort_by_key(|spec| {
         let policy = policy_for_slot(&runtime_settings, spec.worker_slot);
-        let primary_bias = if spec.worker_slot == runtime_settings.preferred_primary_slot { 0usize } else { 1usize };
+        let primary_bias = if spec.worker_slot == runtime_settings.preferred_primary_slot {
+            0usize
+        } else {
+            1usize
+        };
         let always_bias = if policy.always_run { 0usize } else { 1usize };
-        (always_bias, policy.execution_tier, primary_bias, spec.worker_slot)
+        (
+            always_bias,
+            policy.execution_tier,
+            primary_bias,
+            spec.worker_slot,
+        )
     });
 
     let chain_strategy = runtime_settings.chain_strategy.to_lowercase();
@@ -798,7 +881,10 @@ async fn continue_swarm_with_plan(
             }
 
             let worker = slot_to_agent.get(&slot_idx).cloned().unwrap();
-            let worker_cancel = cancel_flags.get(slot_idx).cloned().unwrap_or_else(|| global_cancel.clone());
+            let worker_cancel = cancel_flags
+                .get(slot_idx)
+                .cloned()
+                .unwrap_or_else(|| global_cancel.clone());
             let ah_clone = app_handle.clone();
             let orch_clone = orchestrator.clone();
             let run_id_clone = run_id.clone();
@@ -820,7 +906,8 @@ async fn continue_swarm_with_plan(
                     &spec,
                     worker_cancel,
                     String::new(),
-                ).await
+                )
+                .await
             }));
         }
 
@@ -828,7 +915,7 @@ async fn continue_swarm_with_plan(
             futures::future::join_all(worker_handles)
                 .await
                 .into_iter()
-                .filter_map(|r| r.ok())
+                .filter_map(|r| r.ok()),
         );
     } else {
         for spec in ordered_subtasks.clone() {
@@ -843,13 +930,20 @@ async fn continue_swarm_with_plan(
             let policy = policy_for_slot(&runtime_settings, slot_idx);
             let allowed_prior = worker_outputs
                 .iter()
-                .filter(|o| policy.can_review_from_slots.contains(&(o.slot_index as usize)))
+                .filter(|o| {
+                    policy
+                        .can_review_from_slots
+                        .contains(&(o.slot_index as usize))
+                })
                 .map(|o| format!("Worker {} prior result:\n{}", o.slot_index, o.result))
                 .collect::<Vec<_>>()
                 .join("\n\n");
 
             let worker = slot_to_agent.get(&slot_idx).cloned().unwrap();
-            let worker_cancel = cancel_flags.get(slot_idx).cloned().unwrap_or_else(|| global_cancel.clone());
+            let worker_cancel = cancel_flags
+                .get(slot_idx)
+                .cloned()
+                .unwrap_or_else(|| global_cancel.clone());
 
             let out = run_worker_subtask(
                 &app_handle,
@@ -863,7 +957,8 @@ async fn continue_swarm_with_plan(
                 &spec,
                 worker_cancel,
                 allowed_prior,
-            ).await;
+            )
+            .await;
             let score = score_agent_output(&out, &policy);
             worker_outputs.push(out);
 
@@ -873,21 +968,26 @@ async fn continue_swarm_with_plan(
                 && !runtime_settings.force_all_workers_before_decision;
             if can_early_exit && score >= threshold {
                 if runtime_settings.emit_debug_events {
-                    let _ = app_handle.emit("swarm-debug", json!({
-                        "run_id": &run_id,
-                        "phase": "early_exit.gate_triggered",
-                        "slot": slot_idx,
-                        "score": score,
-                        "threshold": threshold,
-                    }));
+                    let _ = app_handle.emit(
+                        "swarm-debug",
+                        json!({
+                            "run_id": &run_id,
+                            "phase": "early_exit.gate_triggered",
+                            "slot": slot_idx,
+                            "score": score,
+                            "threshold": threshold,
+                        }),
+                    );
                 }
                 break;
             }
         }
     }
 
-    let enable_heavy_delegate = matches!(chain_strategy.as_str(), "parallel_then_delegate" | "sequential_then_delegate")
-        && runtime_settings.heavy_work_delegate_mode != "none"
+    let enable_heavy_delegate = matches!(
+        chain_strategy.as_str(),
+        "parallel_then_delegate" | "sequential_then_delegate"
+    ) && runtime_settings.heavy_work_delegate_mode != "none"
         && !worker_outputs.is_empty();
 
     if enable_heavy_delegate {
@@ -902,7 +1002,10 @@ async fn continue_swarm_with_plan(
                 })
                 .collect::<Vec<_>>();
             scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            scored.first().map(|(slot, _)| *slot).unwrap_or(runtime_settings.preferred_primary_slot)
+            scored
+                .first()
+                .map(|(slot, _)| *slot)
+                .unwrap_or(runtime_settings.preferred_primary_slot)
         };
 
         let base_policy = policy_for_slot(&runtime_settings, selected_slot);
@@ -911,7 +1014,11 @@ async fn continue_swarm_with_plan(
             if !slot_to_agent.contains_key(&slot) {
                 return Some("target_out_of_range");
             }
-            if !slot_to_agent.get(&slot).map(|a| a.config.enabled).unwrap_or(false) {
+            if !slot_to_agent
+                .get(&slot)
+                .map(|a| a.config.enabled)
+                .unwrap_or(false)
+            {
                 return Some("target_agent_disabled");
             }
             if !policy_for_slot(&runtime_settings, slot).allow_heavy_work {
@@ -924,47 +1031,63 @@ async fn continue_swarm_with_plan(
             for candidate in &base_policy.can_delegate_to_slots {
                 if *candidate == selected_slot {
                     if runtime_settings.emit_debug_events {
-                        let _ = app_handle.emit("swarm-debug", json!({
-                            "run_id": &run_id,
-                            "phase": "delegate.skip_candidate",
-                            "candidate_slot": *candidate,
-                            "reason": "self_delegate_forbidden",
-                        }));
+                        let _ = app_handle.emit(
+                            "swarm-debug",
+                            json!({
+                                "run_id": &run_id,
+                                "phase": "delegate.skip_candidate",
+                                "candidate_slot": *candidate,
+                                "reason": "self_delegate_forbidden",
+                            }),
+                        );
                     }
                     continue;
                 }
                 if !slot_to_agent.contains_key(candidate) {
                     if runtime_settings.emit_debug_events {
-                        let _ = app_handle.emit("swarm-debug", json!({
-                            "run_id": &run_id,
-                            "phase": "delegate.skip_candidate",
-                            "candidate_slot": *candidate,
-                            "reason": "out_of_range",
-                        }));
+                        let _ = app_handle.emit(
+                            "swarm-debug",
+                            json!({
+                                "run_id": &run_id,
+                                "phase": "delegate.skip_candidate",
+                                "candidate_slot": *candidate,
+                                "reason": "out_of_range",
+                            }),
+                        );
                     }
                     continue;
                 }
 
-                if !slot_to_agent.get(candidate).map(|a| a.config.enabled).unwrap_or(false) {
+                if !slot_to_agent
+                    .get(candidate)
+                    .map(|a| a.config.enabled)
+                    .unwrap_or(false)
+                {
                     if runtime_settings.emit_debug_events {
-                        let _ = app_handle.emit("swarm-debug", json!({
-                            "run_id": &run_id,
-                            "phase": "delegate.skip_candidate",
-                            "candidate_slot": *candidate,
-                            "reason": "agent_disabled",
-                        }));
+                        let _ = app_handle.emit(
+                            "swarm-debug",
+                            json!({
+                                "run_id": &run_id,
+                                "phase": "delegate.skip_candidate",
+                                "candidate_slot": *candidate,
+                                "reason": "agent_disabled",
+                            }),
+                        );
                     }
                     continue;
                 }
 
                 if !policy_for_slot(&runtime_settings, *candidate).allow_heavy_work {
                     if runtime_settings.emit_debug_events {
-                        let _ = app_handle.emit("swarm-debug", json!({
-                            "run_id": &run_id,
-                            "phase": "delegate.skip_candidate",
-                            "candidate_slot": *candidate,
-                            "reason": "policy_disallows_heavy_work",
-                        }));
+                        let _ = app_handle.emit(
+                            "swarm-debug",
+                            json!({
+                                "run_id": &run_id,
+                                "phase": "delegate.skip_candidate",
+                                "candidate_slot": *candidate,
+                                "reason": "policy_disallows_heavy_work",
+                            }),
+                        );
                     }
                     continue;
                 }
@@ -993,13 +1116,16 @@ async fn continue_swarm_with_plan(
                 }
                 if let Some(reason) = validate_delegate_slot(slot) {
                     if runtime_settings.emit_debug_events {
-                        let _ = app_handle.emit("swarm-debug", json!({
-                            "run_id": &run_id,
-                            "phase": "delegate.skip_candidate",
-                            "candidate_slot": slot,
-                            "reason": reason,
-                            "source": "fallback_scan",
-                        }));
+                        let _ = app_handle.emit(
+                            "swarm-debug",
+                            json!({
+                                "run_id": &run_id,
+                                "phase": "delegate.skip_candidate",
+                                "candidate_slot": slot,
+                                "reason": reason,
+                                "source": "fallback_scan",
+                            }),
+                        );
                     }
                     continue;
                 }
@@ -1007,13 +1133,16 @@ async fn continue_swarm_with_plan(
                 target_slot = slot;
                 target_invalid_reason = None;
                 if runtime_settings.emit_debug_events {
-                    let _ = app_handle.emit("swarm-debug", json!({
-                        "run_id": &run_id,
-                        "phase": "delegate.fallback_applied",
-                        "from_slot": from_slot,
-                        "to_slot": target_slot,
-                        "reason": from_reason,
-                    }));
+                    let _ = app_handle.emit(
+                        "swarm-debug",
+                        json!({
+                            "run_id": &run_id,
+                            "phase": "delegate.fallback_applied",
+                            "from_slot": from_slot,
+                            "to_slot": target_slot,
+                            "reason": from_reason,
+                        }),
+                    );
                 }
                 break;
             }
@@ -1024,15 +1153,21 @@ async fn continue_swarm_with_plan(
             let delegate_policy = policy_for_slot(&runtime_settings, target_slot);
             if !delegate_worker.config.enabled {
                 if runtime_settings.emit_debug_events {
-                    let _ = app_handle.emit("swarm-debug", json!({
-                        "run_id": &run_id,
-                        "phase": "delegate.skipped",
-                        "target_slot": target_slot,
-                        "reason": "target_agent_disabled",
-                    }));
+                    let _ = app_handle.emit(
+                        "swarm-debug",
+                        json!({
+                            "run_id": &run_id,
+                            "phase": "delegate.skipped",
+                            "target_slot": target_slot,
+                            "reason": "target_agent_disabled",
+                        }),
+                    );
                 }
             } else if delegate_policy.allow_heavy_work {
-                let worker_cancel = cancel_flags.get(target_slot).cloned().unwrap_or_else(|| global_cancel.clone());
+                let worker_cancel = cancel_flags
+                    .get(target_slot)
+                    .cloned()
+                    .unwrap_or_else(|| global_cancel.clone());
                 let best_summary = worker_outputs
                     .iter()
                     .map(|o| format!("Worker {}:\n{}", o.slot_index, o.result))
@@ -1058,24 +1193,31 @@ async fn continue_swarm_with_plan(
                     &delegate_spec,
                     worker_cancel,
                     best_summary,
-                ).await;
+                )
+                .await;
                 worker_outputs.push(out);
             } else if runtime_settings.emit_debug_events {
-                let _ = app_handle.emit("swarm-debug", json!({
-                    "run_id": &run_id,
-                    "phase": "delegate.skipped",
-                    "target_slot": target_slot,
-                    "reason": "target_policy_disallows_heavy_work",
-                }));
+                let _ = app_handle.emit(
+                    "swarm-debug",
+                    json!({
+                        "run_id": &run_id,
+                        "phase": "delegate.skipped",
+                        "target_slot": target_slot,
+                        "reason": "target_policy_disallows_heavy_work",
+                    }),
+                );
             }
         } else if runtime_settings.emit_debug_events {
             let reason = target_invalid_reason.unwrap_or("target_out_of_range");
-            let _ = app_handle.emit("swarm-debug", json!({
-                "run_id": &run_id,
-                "phase": "delegate.skipped",
-                "target_slot": target_slot,
-                "reason": reason,
-            }));
+            let _ = app_handle.emit(
+                "swarm-debug",
+                json!({
+                    "run_id": &run_id,
+                    "phase": "delegate.skipped",
+                    "target_slot": target_slot,
+                    "reason": reason,
+                }),
+            );
         }
     }
 
@@ -1094,11 +1236,14 @@ async fn continue_swarm_with_plan(
 
     if !missing_slots.is_empty() {
         if runtime_settings.emit_debug_events {
-            let _ = app_handle.emit("swarm-debug", json!({
-                "run_id": &run_id,
-                "phase": "workers.retry_missing.start",
-                "missing_worker_slots": &missing_slots,
-            }));
+            let _ = app_handle.emit(
+                "swarm-debug",
+                json!({
+                    "run_id": &run_id,
+                    "phase": "workers.retry_missing.start",
+                    "missing_worker_slots": &missing_slots,
+                }),
+            );
         }
 
         let subtask_by_slot: HashMap<usize, SubtaskSpec> = ordered_subtasks
@@ -1114,8 +1259,13 @@ async fn continue_swarm_with_plan(
 
         let mut retry_handles = Vec::new();
         for slot in missing_slots.clone() {
-            let Some(worker) = slot_to_agent.get(&slot).cloned() else { continue };
-            let worker_cancel = cancel_flags.get(slot).cloned().unwrap_or_else(|| global_cancel.clone());
+            let Some(worker) = slot_to_agent.get(&slot).cloned() else {
+                continue;
+            };
+            let worker_cancel = cancel_flags
+                .get(slot)
+                .cloned()
+                .unwrap_or_else(|| global_cancel.clone());
             let spec = subtask_by_slot.get(&slot).cloned().unwrap_or(SubtaskSpec {
                 worker_slot: slot,
                 task: format!("Retry worker task after initial miss: {}", user_prompt),
@@ -1145,7 +1295,8 @@ async fn continue_swarm_with_plan(
                     &spec,
                     worker_cancel,
                     prior_clone,
-                ).await
+                )
+                .await
             }));
         }
 
@@ -1168,11 +1319,14 @@ async fn continue_swarm_with_plan(
         missing_slots.sort_unstable();
 
         if runtime_settings.emit_debug_events {
-            let _ = app_handle.emit("swarm-debug", json!({
-                "run_id": &run_id,
-                "phase": "workers.retry_missing.complete",
-                "missing_worker_slots": &missing_slots,
-            }));
+            let _ = app_handle.emit(
+                "swarm-debug",
+                json!({
+                    "run_id": &run_id,
+                    "phase": "workers.retry_missing.complete",
+                    "missing_worker_slots": &missing_slots,
+                }),
+            );
         }
     }
 
@@ -1188,12 +1342,15 @@ async fn continue_swarm_with_plan(
             });
 
             if runtime_settings.emit_debug_events {
-                let _ = app_handle.emit("swarm-error", json!({
-                    "run_id": &run_id,
-                    "agent_id": worker.config.id,
-                    "slot": slot,
-                    "error": "missing_worker_output",
-                }));
+                let _ = app_handle.emit(
+                    "swarm-error",
+                    json!({
+                        "run_id": &run_id,
+                        "agent_id": worker.config.id,
+                        "slot": slot,
+                        "error": "missing_worker_output",
+                    }),
+                );
             }
         }
     }
@@ -1201,15 +1358,18 @@ async fn continue_swarm_with_plan(
     worker_outputs.sort_by_key(|o| o.slot_index);
 
     if runtime_settings.emit_debug_events {
-        let _ = app_handle.emit("swarm-debug", json!({
-            "run_id": &run_id,
-            "phase": "workers.completed",
-            "worker_count": worker_outputs.len(),
-            "expected_worker_count": enabled_worker_slots.len(),
-            "missing_worker_slots": missing_slots,
-            "parallel": run_parallel,
-            "chain_strategy": runtime_settings.chain_strategy,
-        }));
+        let _ = app_handle.emit(
+            "swarm-debug",
+            json!({
+                "run_id": &run_id,
+                "phase": "workers.completed",
+                "worker_count": worker_outputs.len(),
+                "expected_worker_count": enabled_worker_slots.len(),
+                "missing_worker_slots": missing_slots,
+                "parallel": run_parallel,
+                "chain_strategy": runtime_settings.chain_strategy,
+            }),
+        );
     }
 
     // Build synthesis context — exclude failed workers, surface self-assessments.
@@ -1220,43 +1380,73 @@ async fn continue_swarm_with_plan(
     // Conversation compression: if the total worker output exceeds the synthesis budget,
     // truncate each worker result proportionally using token estimates rather than raw chars.
     const SYNTHESIS_CONTEXT_BUDGET_TOKENS: usize = 6_000;
-    let raw_worker_tokens: usize = successful_outputs.iter().map(|o| estimate_tokens(&o.result)).sum();
+    let raw_worker_tokens: usize = successful_outputs
+        .iter()
+        .map(|o| estimate_tokens(&o.result))
+        .sum();
     let n_successful = successful_outputs.len().max(1);
     let per_worker_cap_tokens = if raw_worker_tokens > SYNTHESIS_CONTEXT_BUDGET_TOKENS {
         let cap = SYNTHESIS_CONTEXT_BUDGET_TOKENS / n_successful;
         if runtime_settings.emit_debug_events {
-            let _ = app_handle.emit("swarm-debug", json!({
-                "run_id": &run_id,
-                "phase": "synthesis.context_compressed",
-                "raw_worker_tokens": raw_worker_tokens,
-                "budget_tokens": SYNTHESIS_CONTEXT_BUDGET_TOKENS,
-                "per_worker_cap_tokens": cap,
-            }));
+            let _ = app_handle.emit(
+                "swarm-debug",
+                json!({
+                    "run_id": &run_id,
+                    "phase": "synthesis.context_compressed",
+                    "raw_worker_tokens": raw_worker_tokens,
+                    "budget_tokens": SYNTHESIS_CONTEXT_BUDGET_TOKENS,
+                    "per_worker_cap_tokens": cap,
+                }),
+            );
         }
         cap
     } else {
         usize::MAX
     };
 
-    let synthesis_context = successful_outputs.iter()
+    let synthesis_context = successful_outputs
+        .iter()
         .map(|o| {
-            let assessment_line = o.assessment.as_ref().map(|a| {
-                let sources = if a.evidence_sources.is_empty() { "none cited".to_string() } else { a.evidence_sources.join("; ") };
-                let gaps    = if a.gaps.is_empty() { "none".to_string() } else { a.gaps.join("; ") };
-                format!("\n> Self-assessment — confidence: {}%, evidence: [{}], gaps: [{}]", a.confidence as u32, sources, gaps)
-            }).unwrap_or_default();
+            let assessment_line = o
+                .assessment
+                .as_ref()
+                .map(|a| {
+                    let sources = if a.evidence_sources.is_empty() {
+                        "none cited".to_string()
+                    } else {
+                        a.evidence_sources.join("; ")
+                    };
+                    let gaps = if a.gaps.is_empty() {
+                        "none".to_string()
+                    } else {
+                        a.gaps.join("; ")
+                    };
+                    format!(
+                        "\n> Self-assessment — confidence: {}%, evidence: [{}], gaps: [{}]",
+                        a.confidence as u32, sources, gaps
+                    )
+                })
+                .unwrap_or_default();
 
-            let capped = if per_worker_cap_tokens < usize::MAX && estimate_tokens(&o.result) > per_worker_cap_tokens {
+            let capped = if per_worker_cap_tokens < usize::MAX
+                && estimate_tokens(&o.result) > per_worker_cap_tokens
+            {
                 truncate_to_token_budget(&o.result, per_worker_cap_tokens)
             } else {
                 o.result.clone()
             };
 
             if runtime_settings.include_worker_summaries {
-                format!("### Worker {} result{}\n{}", o.slot_index, assessment_line, capped)
+                format!(
+                    "### Worker {} result{}\n{}",
+                    o.slot_index, assessment_line, capped
+                )
             } else {
                 let summary = capped.lines().take(3).collect::<Vec<_>>().join(" ");
-                format!("### Worker {} summary{}\n{}", o.slot_index, assessment_line, summary)
+                format!(
+                    "### Worker {} summary{}\n{}",
+                    o.slot_index, assessment_line, summary
+                )
             }
         })
         .collect::<Vec<_>>()
@@ -1265,8 +1455,15 @@ async fn continue_swarm_with_plan(
     let failure_note = if failed_outputs.is_empty() {
         String::new()
     } else {
-        let list = failed_outputs.iter()
-            .map(|o| format!("  - Worker {}: {}", o.slot_index, &o.result[..o.result.len().min(120)]))
+        let list = failed_outputs
+            .iter()
+            .map(|o| {
+                format!(
+                    "  - Worker {}: {}",
+                    o.slot_index,
+                    &o.result[..o.result.len().min(120)]
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
         format!("\n\n**Workers excluded (failed or timed out — do not speculate about their output):**\n{list}")
@@ -1307,7 +1504,9 @@ async fn continue_swarm_with_plan(
         leader_model.clone(),
         Some(leader_cancel.clone()),
         true,
-    ).await {
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             let _ = resp_tx.send(Err(e));
@@ -1320,7 +1519,8 @@ async fn continue_swarm_with_plan(
     // Pass 2 — gap-fill.  Triggered when workers flagged gaps, any had confidence < 60,
     // or cross-review is enabled.  Keeps pass 1 result on failure or empty output.
     let worker_has_gaps = successful_outputs.iter().any(|o| {
-        o.assessment.as_ref()
+        o.assessment
+            .as_ref()
             .map(|a| !a.gaps.is_empty() || a.confidence < 60.0)
             .unwrap_or(false)
     });
@@ -1346,53 +1546,67 @@ async fn continue_swarm_with_plan(
         ];
 
         if let Ok((raw2, stats2)) = run_agent_inference(
-            &*orchestrator, &app_handle,
+            &*orchestrator,
+            &app_handle,
             pass2_ctx,
             leader_agent_id,
             leader_slot,
             leader_model,
             Some(leader_cancel),
             true,
-        ).await {
+        )
+        .await
+        {
             let text2 = tools::strip_tool_calls(&strip_think_tags(&raw2));
             if !text2.is_empty() {
                 synth_stats = InferStats {
-                    prompt_tokens:          synth_stats.prompt_tokens     + stats2.prompt_tokens,
-                    completion_tokens:      synth_stats.completion_tokens + stats2.completion_tokens,
-                    tokens_per_second:      stats2.tokens_per_second,
+                    prompt_tokens: synth_stats.prompt_tokens + stats2.prompt_tokens,
+                    completion_tokens: synth_stats.completion_tokens + stats2.completion_tokens,
+                    tokens_per_second: stats2.tokens_per_second,
                     time_to_first_token_ms: stats2.time_to_first_token_ms,
-                    total_time_ms:          synth_stats.total_time_ms     + stats2.total_time_ms,
+                    total_time_ms: synth_stats.total_time_ms + stats2.total_time_ms,
                 };
                 final_text = text2;
                 if runtime_settings.emit_debug_events {
-                    let _ = app_handle.emit("swarm-debug", json!({
-                        "run_id": &run_id,
-                        "phase": "leader.synthesis.pass2.complete",
-                        "chars": final_text.len(),
-                    }));
+                    let _ = app_handle.emit(
+                        "swarm-debug",
+                        json!({
+                            "run_id": &run_id,
+                            "phase": "leader.synthesis.pass2.complete",
+                            "chars": final_text.len(),
+                        }),
+                    );
                 }
             }
         }
     }
 
     if runtime_settings.emit_debug_events {
-        let _ = app_handle.emit("swarm-debug", json!({
-            "run_id": &run_id,
-            "phase": "leader.synthesis.complete",
-            "final_chars": final_text.len(),
-        }));
+        let _ = app_handle.emit(
+            "swarm-debug",
+            json!({
+                "run_id": &run_id,
+                "phase": "leader.synthesis.complete",
+                "final_chars": final_text.len(),
+            }),
+        );
     }
 
-    let memory_summary = summarize_swarm_run(&user_prompt, &final_text, &chain_strategy, &worker_outputs);
+    let memory_summary =
+        summarize_swarm_run(&user_prompt, &final_text, &chain_strategy, &worker_outputs);
 
     record_swarm_run(SwarmRunRecord {
         run_id: run_id.clone(),
         chain_strategy: chain_strategy.clone(),
         worker_count: worker_outputs.len(),
         successful_workers: successful_outputs.len(),
-        total_prompt_tokens: worker_outputs.iter().map(|o| o.stats.prompt_tokens).sum::<u32>()
+        total_prompt_tokens: worker_outputs
+            .iter()
+            .map(|o| o.stats.prompt_tokens)
+            .sum::<u32>()
             + synth_stats.prompt_tokens,
-        total_completion_tokens: worker_outputs.iter()
+        total_completion_tokens: worker_outputs
+            .iter()
             .map(|o| o.stats.completion_tokens)
             .sum::<u32>()
             + synth_stats.completion_tokens,
@@ -1401,23 +1615,28 @@ async fn continue_swarm_with_plan(
     });
 
     if let Some(store) = &agent_store {
-        let _ = store.save_swarm_run(&crate::agent_store::SwarmRun {
-            id: run_id.clone(),
-            session_id: session_id.clone(),
-            user_prompt: user_prompt.clone(),
-            leader_plan: serde_json::to_string(&plan_json).ok(),
-            summary: Some(memory_summary),
-            status: "completed".to_string(),
-            started_at: unix_now(),
-            completed_at: Some(unix_now()),
-        }).await;
+        let _ = store
+            .save_swarm_run(&crate::agent_store::SwarmRun {
+                id: run_id.clone(),
+                session_id: session_id.clone(),
+                user_prompt: user_prompt.clone(),
+                leader_plan: serde_json::to_string(&plan_json).ok(),
+                summary: Some(memory_summary),
+                status: "completed".to_string(),
+                started_at: unix_now(),
+                completed_at: Some(unix_now()),
+            })
+            .await;
     }
 
-    let _ = app_handle.emit("swarm-complete", json!({
-        "run_id": &run_id,
-        "final_content": &final_text,
-        "stats": &synth_stats,
-    }));
+    let _ = app_handle.emit(
+        "swarm-complete",
+        json!({
+            "run_id": &run_id,
+            "final_content": &final_text,
+            "stats": &synth_stats,
+        }),
+    );
 
     let _ = resp_tx.send(Ok(SwarmResult {
         final_response: final_text,
@@ -1481,7 +1700,11 @@ async fn run_worker_subtask(
     let worker_sys_prompt = if worker.system_prompt.is_empty() {
         tools::system_prompt(&worker_tools, workspace_path.as_deref())
     } else {
-        format!("{}\n\n{}", worker.system_prompt, tools::system_prompt(&worker_tools, workspace_path.as_deref()))
+        format!(
+            "{}\n\n{}",
+            worker.system_prompt,
+            tools::system_prompt(&worker_tools, workspace_path.as_deref())
+        )
     };
     let worker_sys_prompt = format!("{}\n\n{}", worker_sys_prompt, worker_role_prompt);
 
@@ -1496,13 +1719,19 @@ async fn run_worker_subtask(
             original_prompt, spec.task, spec.context, workspace_grounding
         )
     } else {
-        format!("## Task\n{}\n\n## Context\n{}{}", spec.task, spec.context, workspace_grounding)
+        format!(
+            "## Task\n{}\n\n## Context\n{}{}",
+            spec.task, spec.context, workspace_grounding
+        )
     };
 
     let ctx_user = if prior_results_context.trim().is_empty() {
         ctx_user_base
     } else {
-        format!("{}\n\n## Prior worker results allowed by policy\n{}", ctx_user_base, prior_results_context)
+        format!(
+            "{}\n\n## Prior worker results allowed by policy\n{}",
+            ctx_user_base, prior_results_context
+        )
     };
 
     let worker_ctx = vec![
@@ -1515,20 +1744,26 @@ async fn run_worker_subtask(
     let model_id = worker.effective_model_id.clone();
     let task_clone = spec.task.clone();
 
-    let _ = app_handle.emit("agent-thinking-start", json!({
-        "agent_id": &agent_id,
-        "slot": slot,
-    }));
+    let _ = app_handle.emit(
+        "agent-thinking-start",
+        json!({
+            "agent_id": &agent_id,
+            "slot": slot,
+        }),
+    );
 
     // Emit a thinking token so the ThinkingPanel can show worker cognition.
-    let _ = app_handle.emit("thinking-token", json!({
-        "model_role": "worker",
-        "agent_id":   &agent_id,
-        "slot":       slot,
-        "model_id":   &model_id,
-        "task":       &task_clone,
-        "kind":       "Think",
-    }));
+    let _ = app_handle.emit(
+        "thinking-token",
+        json!({
+            "model_role": "worker",
+            "agent_id":   &agent_id,
+            "slot":       slot,
+            "model_id":   &model_id,
+            "task":       &task_clone,
+            "kind":       "Think",
+        }),
+    );
 
     let run_once = || {
         let worker_ctx_attempt = worker_ctx.clone();
@@ -1546,14 +1781,26 @@ async fn run_worker_subtask(
                 Some(worker_cancel_attempt),
                 settings.stream_worker_tokens,
             );
-            match tokio::time::timeout(std::time::Duration::from_millis(settings.worker_timeout_ms), infer_fut).await {
+            match tokio::time::timeout(
+                std::time::Duration::from_millis(settings.worker_timeout_ms),
+                infer_fut,
+            )
+            .await
+            {
                 Ok(v) => v,
-                Err(_) => Err(format!("Worker timed out after {}ms", settings.worker_timeout_ms)),
+                Err(_) => Err(format!(
+                    "Worker timed out after {}ms",
+                    settings.worker_timeout_ms
+                )),
             }
         }
     };
 
-    let max_retries = if settings.retry_failed_workers { 2usize } else { 0usize };
+    let max_retries = if settings.retry_failed_workers {
+        2usize
+    } else {
+        0usize
+    };
     let mut last_error: Option<String> = None;
 
     for attempt in 0..=max_retries {
@@ -1564,15 +1811,29 @@ async fn run_worker_subtask(
                 let raw_clone = raw.clone();
                 let final_raw = if settings.allow_worker_tools && !worker_tools.is_empty() {
                     execute_worker_tool_calls(
-                        app_handle, orchestrator, run_id, settings, &worker_tools,
-                        workspace_path.as_deref(), &agent_id, slot, &model_id,
-                        worker_ctx.clone(), raw, Some(worker_cancel.clone()),
-                    ).await.unwrap_or_else(|e| {
+                        app_handle,
+                        orchestrator,
+                        run_id,
+                        settings,
+                        &worker_tools,
+                        workspace_path.as_deref(),
+                        &agent_id,
+                        slot,
+                        &model_id,
+                        worker_ctx.clone(),
+                        raw,
+                        Some(worker_cancel.clone()),
+                    )
+                    .await
+                    .unwrap_or_else(|e| {
                         if settings.emit_debug_events {
-                            let _ = app_handle.emit("swarm-debug", json!({
-                                "run_id": run_id, "phase": "worker.tool_exec.error",
-                                "agent_id": &agent_id, "slot": slot, "error": e,
-                            }));
+                            let _ = app_handle.emit(
+                                "swarm-debug",
+                                json!({
+                                    "run_id": run_id, "phase": "worker.tool_exec.error",
+                                    "agent_id": &agent_id, "slot": slot, "error": e,
+                                }),
+                            );
                         }
                         String::new()
                     })
@@ -1591,16 +1852,26 @@ async fn run_worker_subtask(
                 if text.len() > settings.max_worker_response_chars {
                     text = truncate_at_semantic_boundary(&text, settings.max_worker_response_chars);
                 }
-                let _ = app_handle.emit("swarm-agent-complete", json!({
-                    "run_id": run_id,
-                    "agent_id": &agent_id,
-                    "slot": slot,
-                    "result": &text,
-                    "confidence": assessment.as_ref().map(|a| a.confidence),
-                    "stats": &stats,
-                    "attempt": attempt + 1,
-                }));
-                return AgentOutput { agent_id, slot_index: slot, subtask: task_clone, result: text, stats, assessment };
+                let _ = app_handle.emit(
+                    "swarm-agent-complete",
+                    json!({
+                        "run_id": run_id,
+                        "agent_id": &agent_id,
+                        "slot": slot,
+                        "result": &text,
+                        "confidence": assessment.as_ref().map(|a| a.confidence),
+                        "stats": &stats,
+                        "attempt": attempt + 1,
+                    }),
+                );
+                return AgentOutput {
+                    agent_id,
+                    slot_index: slot,
+                    subtask: task_clone,
+                    result: text,
+                    stats,
+                    assessment,
+                };
             }
             Err(e) => {
                 last_error = Some(e.clone());
@@ -1608,17 +1879,20 @@ async fn run_worker_subtask(
                 let cancelled = worker_cancel.load(Ordering::Relaxed);
                 let has_retry_left = attempt < max_retries;
                 if settings.emit_debug_events {
-                    let _ = app_handle.emit("swarm-debug", json!({
-                        "run_id": run_id,
-                        "phase": "worker.retry.failed_attempt",
-                        "agent_id": &agent_id,
-                        "slot": slot,
-                        "attempt": attempt + 1,
-                        "max_attempts": max_retries + 1,
-                        "error": &e,
-                        "cancelled": cancelled,
-                        "has_retry_left": has_retry_left,
-                    }));
+                    let _ = app_handle.emit(
+                        "swarm-debug",
+                        json!({
+                            "run_id": run_id,
+                            "phase": "worker.retry.failed_attempt",
+                            "agent_id": &agent_id,
+                            "slot": slot,
+                            "attempt": attempt + 1,
+                            "max_attempts": max_retries + 1,
+                            "error": &e,
+                            "cancelled": cancelled,
+                            "has_retry_left": has_retry_left,
+                        }),
+                    );
                 }
 
                 if cancelled || !has_retry_left {
@@ -1632,17 +1906,21 @@ async fn run_worker_subtask(
                     settings,
                     worker,
                     attempt + 1,
-                ).await;
+                )
+                .await;
 
                 if settings.emit_debug_events {
-                    let _ = app_handle.emit("swarm-debug", json!({
-                        "run_id": run_id,
-                        "phase": "worker.retry.reset_result",
-                        "agent_id": &agent_id,
-                        "slot": slot,
-                        "attempt": attempt + 1,
-                        "reset_ok": reset_ok,
-                    }));
+                    let _ = app_handle.emit(
+                        "swarm-debug",
+                        json!({
+                            "run_id": run_id,
+                            "phase": "worker.retry.reset_result",
+                            "agent_id": &agent_id,
+                            "slot": slot,
+                            "attempt": attempt + 1,
+                            "reset_ok": reset_ok,
+                        }),
+                    );
                 }
 
                 let backoff_ms = 350u64.saturating_mul((attempt + 1) as u64);
@@ -1652,12 +1930,15 @@ async fn run_worker_subtask(
     }
 
     let final_err = last_error.unwrap_or_else(|| "unknown worker failure".to_string());
-    let _ = app_handle.emit("swarm-error", json!({
-        "run_id": run_id,
-        "agent_id": &agent_id,
-        "slot": slot,
-        "error": &final_err,
-    }));
+    let _ = app_handle.emit(
+        "swarm-error",
+        json!({
+            "run_id": run_id,
+            "agent_id": &agent_id,
+            "slot": slot,
+            "error": &final_err,
+        }),
+    );
     AgentOutput {
         agent_id,
         slot_index: slot,
@@ -1686,29 +1967,35 @@ async fn reset_worker_runtime(
         Ok(Ok(Ok(()))) => true,
         Ok(Ok(Err(err))) => {
             if settings.emit_debug_events {
-                let _ = app_handle.emit("swarm-debug", json!({
-                    "run_id": run_id,
-                    "phase": "worker.retry.reset_failed",
-                    "slot": worker.config.slot_index,
-                    "agent_id": worker.config.id,
-                    "attempt": attempt,
-                    "model_id": model_id,
-                    "error": err,
-                }));
+                let _ = app_handle.emit(
+                    "swarm-debug",
+                    json!({
+                        "run_id": run_id,
+                        "phase": "worker.retry.reset_failed",
+                        "slot": worker.config.slot_index,
+                        "agent_id": worker.config.id,
+                        "attempt": attempt,
+                        "model_id": model_id,
+                        "error": err,
+                    }),
+                );
             }
             false
         }
         Ok(Err(_)) | Err(_) => {
             if settings.emit_debug_events {
-                let _ = app_handle.emit("swarm-debug", json!({
-                    "run_id": run_id,
-                    "phase": "worker.retry.reset_timeout",
-                    "slot": worker.config.slot_index,
-                    "agent_id": worker.config.id,
-                    "attempt": attempt,
-                    "model_id": model_id,
-                    "wait_ms": wait_ms,
-                }));
+                let _ = app_handle.emit(
+                    "swarm-debug",
+                    json!({
+                        "run_id": run_id,
+                        "phase": "worker.retry.reset_timeout",
+                        "slot": worker.config.slot_index,
+                        "agent_id": worker.config.id,
+                        "attempt": attempt,
+                        "model_id": model_id,
+                        "wait_ms": wait_ms,
+                    }),
+                );
             }
             false
         }
@@ -1744,15 +2031,23 @@ fn score_agent_output(out: &AgentOutput, policy: &AgentChainPolicy) -> f64 {
         // Structured self-assessment path: use worker-reported confidence with
         // an evidence bonus and a gap penalty.
         let evidence_bonus = (a.evidence_sources.len().min(5) as f64) * 4.0;
-        let gap_penalty    = (a.gaps.len().min(3) as f64) * 3.0;
+        let gap_penalty = (a.gaps.len().min(3) as f64) * 3.0;
         (a.confidence + evidence_bonus - gap_penalty).clamp(0.0, 100.0)
     } else {
         // Fallback heuristics when worker did not emit an assessment block.
         // Still less reliable than self-assessment, but avoids total score collapse.
-        let explicit_conf  = extract_confidence_percent(text).unwrap_or(0.0);
-        let length_bonus   = (text.len().min(4000) as f64 / 4000.0) * 30.0;
-        let clarity_bonus  = if text.contains("```") || text.contains("1.") { 12.0 } else { 4.0 };
-        let explicit_bonus = if explicit_conf > 0.0 { explicit_conf * 0.55 } else { 0.0 };
+        let explicit_conf = extract_confidence_percent(text).unwrap_or(0.0);
+        let length_bonus = (text.len().min(4000) as f64 / 4000.0) * 30.0;
+        let clarity_bonus = if text.contains("```") || text.contains("1.") {
+            12.0
+        } else {
+            4.0
+        };
+        let explicit_bonus = if explicit_conf > 0.0 {
+            explicit_conf * 0.55
+        } else {
+            0.0
+        };
         (38.0 + explicit_bonus + length_bonus + clarity_bonus).min(100.0)
     };
 
@@ -1780,13 +2075,13 @@ fn extract_confidence_percent(text: &str) -> Option<f64> {
 
 async fn run_agent_inference(
     orchestrator: &ModelOrchestrator,
-    app_handle:   &AppHandle,
-    messages:     Vec<Value>,
-    agent_id:     String,
-    slot:         i64,
-    model_id:     Option<String>,
-    cancel_flag:  Option<Arc<AtomicBool>>,
-    emit_tokens:  bool,
+    app_handle: &AppHandle,
+    messages: Vec<Value>,
+    agent_id: String,
+    slot: i64,
+    model_id: Option<String>,
+    cancel_flag: Option<Arc<AtomicBool>>,
+    emit_tokens: bool,
 ) -> Result<(String, InferStats), String> {
     let (stream_tx, mut stream_rx) = mpsc::unbounded_channel::<String>();
 
@@ -1795,11 +2090,14 @@ async fn run_agent_inference(
     tokio::spawn(async move {
         while let Some(tok) = stream_rx.recv().await {
             if emit_tokens {
-                let _ = ah.emit("agent-token-stream", json!({
-                    "agent_id": &aid,
-                    "slot": slot,
-                    "token": &tok,
-                }));
+                let _ = ah.emit(
+                    "agent-token-stream",
+                    json!({
+                        "agent_id": &aid,
+                        "slot": slot,
+                        "token": &tok,
+                    }),
+                );
             }
             // Also forward to backward-compat token-stream if slot 0 (leader synthesis)
             if slot == 0 {
@@ -1831,8 +2129,8 @@ async fn run_agent_inference(
         model_id,
         messages,
         max_tokens: 4096,
-        overrides:  None,
-        stream_tx:  Some(stream_tx),
+        overrides: None,
+        stream_tx: Some(stream_tx),
         cancel_flag,
         resp_tx,
         source: "workspace",
@@ -1845,7 +2143,10 @@ async fn run_agent_inference(
 
 /// Returns true for tools whose only side-effect is reading — safe to execute in parallel.
 fn is_read_only_tool(name: &str) -> bool {
-    matches!(name, "read_file" | "list_files" | "list_all_files" | "search_files" | "grep_files")
+    matches!(
+        name,
+        "read_file" | "list_files" | "list_all_files" | "search_files" | "grep_files"
+    )
 }
 
 /// Execute tool calls generated by a worker, then do one follow-up inference with the
@@ -1858,18 +2159,18 @@ fn is_read_only_tool(name: &str) -> bool {
 /// - Results are collected in original call order regardless of parallel/serial split.
 #[allow(clippy::too_many_arguments)]
 async fn execute_worker_tool_calls(
-    app_handle:      &AppHandle,
-    orchestrator:    &ModelOrchestrator,
-    run_id:          &str,
-    settings:        &SwarmRuntimeSettings,
+    app_handle: &AppHandle,
+    orchestrator: &ModelOrchestrator,
+    run_id: &str,
+    settings: &SwarmRuntimeSettings,
     tools_available: &[tools::ToolDef],
-    workspace_path:  Option<&str>,
-    agent_id:        &str,
-    slot:            i64,
-    model_id:        &Option<String>,
-    mut ctx:         Vec<Value>,
-    initial_raw:     String,
-    cancel_flag:     Option<Arc<AtomicBool>>,
+    workspace_path: Option<&str>,
+    agent_id: &str,
+    slot: i64,
+    model_id: &Option<String>,
+    mut ctx: Vec<Value>,
+    initial_raw: String,
+    cancel_flag: Option<Arc<AtomicBool>>,
 ) -> Result<String, String> {
     let mut current_raw = initial_raw;
     let max_rounds = 8usize;
@@ -1888,20 +2189,33 @@ async fn execute_worker_tool_calls(
         // Slot N = result for calls[N]; pre-fill with None.
         let mut slot_results: Vec<Option<String>> = vec![None; parsed.calls.len()];
         let mut parallel_batch: Vec<(usize, String, Value)> = Vec::new(); // (index, tool, args)
-        let mut serial_batch:   Vec<(usize, &tools::ToolCall)> = Vec::new();
+        let mut serial_batch: Vec<(usize, &tools::ToolCall)> = Vec::new();
 
         for (idx, call) in parsed.calls.iter().enumerate() {
-            if cancel_flag.as_ref().map(|f| f.load(Ordering::Relaxed)).unwrap_or(false) {
+            if cancel_flag
+                .as_ref()
+                .map(|f| f.load(Ordering::Relaxed))
+                .unwrap_or(false)
+            {
                 break;
             }
-            match validate_worker_tool_call(call, tools_available, workspace_path, &ctx, &discovered_paths) {
+            match validate_worker_tool_call(
+                call,
+                tools_available,
+                workspace_path,
+                &ctx,
+                &discovered_paths,
+            ) {
                 Err(reason) => {
                     if settings.emit_debug_events {
-                        let _ = app_handle.emit("swarm-debug", json!({
-                            "run_id": run_id, "phase": "worker.tool_validation.blocked",
-                            "agent_id": agent_id, "slot": slot,
-                            "tool": &call.tool, "reason": &reason,
-                        }));
+                        let _ = app_handle.emit(
+                            "swarm-debug",
+                            json!({
+                                "run_id": run_id, "phase": "worker.tool_validation.blocked",
+                                "agent_id": agent_id, "slot": slot,
+                                "tool": &call.tool, "reason": &reason,
+                            }),
+                        );
                     }
                     slot_results[idx] = Some(format!("Tool `{}` blocked: {}", call.tool, reason));
                 }
@@ -1927,13 +2241,14 @@ async fn execute_worker_tool_calls(
             }
 
             let read_futures = parallel_batch.iter().map(|(idx, tool, args)| {
-                let tool  = tool.clone();
-                let args  = args.clone();
+                let tool = tool.clone();
+                let args = args.clone();
                 async move {
                     let result = tokio::time::timeout(
                         std::time::Duration::from_secs(30),
                         tools::execute_built_in(&tool, &args, workspace_path),
-                    ).await
+                    )
+                    .await
                     .unwrap_or_else(|_| Err("Tool timed out".into()))
                     .unwrap_or_else(|e| format!("Tool error: {e}"));
                     (*idx, tool, args, result)
@@ -1942,12 +2257,21 @@ async fn execute_worker_tool_calls(
 
             let par_results = futures::future::join_all(read_futures).await;
             for (idx, tool, args, result) in par_results {
-                update_discovered_paths_from_tool_result(&tool, &args, workspace_path, &result, &mut discovered_paths);
+                update_discovered_paths_from_tool_result(
+                    &tool,
+                    &args,
+                    workspace_path,
+                    &result,
+                    &mut discovered_paths,
+                );
                 if settings.emit_debug_events {
-                    let _ = app_handle.emit("swarm-debug", json!({
-                        "run_id": run_id, "phase": "worker.tool_executed",
-                        "agent_id": agent_id, "slot": slot, "tool": &tool, "parallel": true,
-                    }));
+                    let _ = app_handle.emit(
+                        "swarm-debug",
+                        json!({
+                            "run_id": run_id, "phase": "worker.tool_executed",
+                            "agent_id": agent_id, "slot": slot, "tool": &tool, "parallel": true,
+                        }),
+                    );
                 }
                 slot_results[idx] = Some(format!("Tool `{tool}` result:\n{result}"));
             }
@@ -1955,22 +2279,36 @@ async fn execute_worker_tool_calls(
 
         // ── Phase 3: execute mutating/external tools serially ────────────────────────
         for (idx, call) in &serial_batch {
-            if cancel_flag.as_ref().map(|f| f.load(Ordering::Relaxed)).unwrap_or(false) {
+            if cancel_flag
+                .as_ref()
+                .map(|f| f.load(Ordering::Relaxed))
+                .unwrap_or(false)
+            {
                 break;
             }
             let result = tokio::time::timeout(
                 std::time::Duration::from_secs(30),
                 tools::execute_built_in(&call.tool, &call.args, workspace_path),
-            ).await
+            )
+            .await
             .unwrap_or_else(|_| Err("Tool timed out".into()))
             .unwrap_or_else(|e| format!("Tool error: {e}"));
 
-            update_discovered_paths_from_tool_result(&call.tool, &call.args, workspace_path, &result, &mut discovered_paths);
+            update_discovered_paths_from_tool_result(
+                &call.tool,
+                &call.args,
+                workspace_path,
+                &result,
+                &mut discovered_paths,
+            );
             if settings.emit_debug_events {
-                let _ = app_handle.emit("swarm-debug", json!({
-                    "run_id": run_id, "phase": "worker.tool_executed",
-                    "agent_id": agent_id, "slot": slot, "tool": &call.tool, "parallel": false,
-                }));
+                let _ = app_handle.emit(
+                    "swarm-debug",
+                    json!({
+                        "run_id": run_id, "phase": "worker.tool_executed",
+                        "agent_id": agent_id, "slot": slot, "tool": &call.tool, "parallel": false,
+                    }),
+                );
             }
             slot_results[*idx] = Some(format!("Tool `{}` result:\n{result}", call.tool));
         }
@@ -1995,10 +2333,17 @@ async fn execute_worker_tool_calls(
 
         // Inference pass — the worker reasons about results and either calls more tools or answers.
         let followup = run_agent_inference(
-            orchestrator, app_handle, ctx.clone(),
-            agent_id.to_string(), slot, model_id.clone(),
-            cancel_flag.clone(), settings.stream_worker_tokens,
-        ).await.map(|(r, _)| r)?;
+            orchestrator,
+            app_handle,
+            ctx.clone(),
+            agent_id.to_string(),
+            slot,
+            model_id.clone(),
+            cancel_flag.clone(),
+            settings.stream_worker_tokens,
+        )
+        .await
+        .map(|(r, _)| r)?;
 
         current_raw = followup;
     }
@@ -2029,7 +2374,10 @@ async fn build_recent_swarm_memory(
         .into_iter()
         .filter_map(|run| {
             let summary = run.summary?;
-            let overlap = lexical_overlap(&prompt_terms, &lexical_terms(&format!("{} {}", run.user_prompt, summary)));
+            let overlap = lexical_overlap(
+                &prompt_terms,
+                &lexical_terms(&format!("{} {}", run.user_prompt, summary)),
+            );
             Some((overlap, run.completed_at.unwrap_or(run.started_at), summary))
         })
         .collect::<Vec<_>>();
@@ -2226,7 +2574,9 @@ fn normalize_path_for_compare(path: &Path) -> String {
 }
 
 fn is_within_workspace(path: &Path, workspace_path: Option<&str>) -> bool {
-    let Some(ws) = workspace_path else { return true; };
+    let Some(ws) = workspace_path else {
+        return true;
+    };
     let ws_norm = normalize_path_for_compare(Path::new(ws));
     let path_norm = normalize_path_for_compare(path);
     path_norm == ws_norm || path_norm.starts_with(&(ws_norm + "/"))
@@ -2257,12 +2607,23 @@ fn validate_worker_tool_call(
     discovered_paths: &HashSet<String>,
 ) -> Result<(), String> {
     if !tools_available.iter().any(|t| t.name == call.tool) {
-        return Err(format!("tool `{}` is not in the allowed worker tool list", call.tool));
+        return Err(format!(
+            "tool `{}` is not in the allowed worker tool list",
+            call.tool
+        ));
     }
 
     let path_tool = matches!(
         call.tool.as_str(),
-        "read_file" | "list_files" | "list_all_files" | "search_files" | "grep_files" | "write_file" | "edit_file" | "delete_file" | "create_dir"
+        "read_file"
+            | "list_files"
+            | "list_all_files"
+            | "search_files"
+            | "grep_files"
+            | "write_file"
+            | "edit_file"
+            | "delete_file"
+            | "create_dir"
     );
 
     if !path_tool {
@@ -2287,7 +2648,8 @@ fn validate_worker_tool_call(
     if call.tool == "read_file" {
         let normalized = normalize_path_for_compare(&resolved);
         let discovered = discovered_paths.contains(&normalized);
-        let mentioned = context_mentions_path(ctx, &normalized) || context_mentions_path(ctx, &raw_path);
+        let mentioned =
+            context_mentions_path(ctx, &normalized) || context_mentions_path(ctx, &raw_path);
         if !discovered && !mentioned {
             return Err("read_file path not yet grounded; list files first or reference an existing known path".to_string());
         }
@@ -2316,7 +2678,9 @@ fn update_discovered_paths_from_tool_result(
     }
 
     let parsed: Result<Value, _> = serde_json::from_str(result);
-    let Ok(payload) = parsed else { return; };
+    let Ok(payload) = parsed else {
+        return;
+    };
 
     let root = payload
         .get("path")
@@ -2339,17 +2703,17 @@ fn update_discovered_paths_from_tool_result(
 /// Parse the <worker_assessment> JSON block from the end of a worker response.
 /// Uses rfind so incidental mentions of the tag earlier in the text are ignored.
 fn parse_worker_assessment(text: &str) -> Option<WorkerAssessment> {
-    let open  = "<worker_assessment>";
+    let open = "<worker_assessment>";
     let close = "</worker_assessment>";
     let start = text.rfind(open)?;
-    let end   = text[start..].find(close).map(|p| start + p)?;
-    let json  = text[start + open.len()..end].trim();
+    let end = text[start..].find(close).map(|p| start + p)?;
+    let json = text[start + open.len()..end].trim();
     serde_json::from_str(json).ok()
 }
 
 /// Remove the <worker_assessment> block from worker output so it is not shown to users.
 fn strip_worker_assessment(text: &str) -> String {
-    let open  = "<worker_assessment>";
+    let open = "<worker_assessment>";
     let close = "</worker_assessment>";
     if let Some(start) = text.rfind(open) {
         if let Some(rel) = text[start..].find(close) {
@@ -2363,10 +2727,15 @@ fn strip_worker_assessment(text: &str) -> String {
 /// Truncate worker output at a paragraph or sentence boundary rather than mid-character,
 /// and append a notice so synthesis knows the output was cut.
 fn truncate_at_semantic_boundary(text: &str, max_chars: usize) -> String {
-    if text.len() <= max_chars { return text.to_string(); }
+    if text.len() <= max_chars {
+        return text.to_string();
+    }
     let candidate = &text[..max_chars];
     if let Some(pos) = candidate.rfind("\n\n") {
-        return format!("{}\n\n[... response truncated at {max_chars} chars]", &text[..pos]);
+        return format!(
+            "{}\n\n[... response truncated at {max_chars} chars]",
+            &text[..pos]
+        );
     }
     if let Some(pos) = candidate.rfind(". ") {
         return format!("{}.\n\n[... response truncated]", &text[..pos]);
@@ -2403,7 +2772,9 @@ fn clean_plan_json(raw: &str) -> String {
         if chars[i] == ',' {
             // Peek past whitespace — if next non-whitespace is `}` or `]`, drop the comma.
             let mut j = i + 1;
-            while j < chars.len() && chars[j].is_whitespace() { j += 1; }
+            while j < chars.len() && chars[j].is_whitespace() {
+                j += 1;
+            }
             if j < chars.len() && (chars[j] == '}' || chars[j] == ']') {
                 i += 1;
                 continue;
@@ -2419,13 +2790,15 @@ fn clean_plan_json(raw: &str) -> String {
 /// Uses `rfind` so any explanatory prose the leader writes *before* the tag is ignored.
 /// Returns `Err(reason)` with a human-readable description so the caller can attempt repair.
 fn parse_swarm_plan(text: &str) -> Result<LeaderPlan, String> {
-    let open  = "<swarm_plan>";
+    let open = "<swarm_plan>";
     let close = "</swarm_plan>";
 
     // rfind: pick the *last* opening tag so inline examples earlier in the text are skipped.
-    let start = text.rfind(open)
+    let start = text
+        .rfind(open)
         .ok_or_else(|| "no <swarm_plan> tag in leader response".to_string())?;
-    let end = text[start..].find(close)
+    let end = text[start..]
+        .find(close)
         .map(|p| start + p)
         .ok_or_else(|| "<swarm_plan> tag was opened but never closed".to_string())?;
 
@@ -2435,8 +2808,8 @@ fn parse_swarm_plan(text: &str) -> Result<LeaderPlan, String> {
     }
 
     let cleaned = clean_plan_json(json_str);
-    let plan: LeaderPlan = serde_json::from_str(&cleaned)
-        .map_err(|e| format!("plan JSON parse error: {e}"))?;
+    let plan: LeaderPlan =
+        serde_json::from_str(&cleaned).map_err(|e| format!("plan JSON parse error: {e}"))?;
 
     if plan.subtasks.is_empty() {
         return Err("plan contains no subtasks".to_string());

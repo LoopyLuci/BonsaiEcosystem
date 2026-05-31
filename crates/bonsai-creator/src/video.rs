@@ -13,7 +13,9 @@ pub struct SvdVideoTool {
 }
 
 impl SvdVideoTool {
-    pub fn new(cas: Arc<CasStore>) -> Self { Self { cas } }
+    pub fn new(cas: Arc<CasStore>) -> Self {
+        Self { cas }
+    }
 }
 
 #[async_trait]
@@ -26,7 +28,10 @@ impl GenerativeTool for SvdVideoTool {
         let input_key = bonsai_cas::CasKey::from_hex(input_key_hex)
             .map_err(|e| anyhow::anyhow!("invalid CAS key: {e}"))?;
 
-        let _input_image = self.cas.get(&input_key).await?
+        let _input_image = self
+            .cas
+            .get(&input_key)
+            .await?
             .ok_or_else(|| anyhow::anyhow!("input image not found in CAS: {input_key_hex}"))?;
 
         let num_frames = params.extra["num_frames"].as_u64().unwrap_or(25) as usize;

@@ -111,7 +111,9 @@ impl FsIndex {
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
                 let children = self.dirs.entry(parent_str).or_default();
-                if !children.contains(&name) { children.push(name); }
+                if !children.contains(&name) {
+                    children.push(name);
+                }
             }
         }
         self.files.insert(path.to_string(), inode);
@@ -122,7 +124,9 @@ impl FsIndex {
             if let Some(parent) = std::path::Path::new(path).parent() {
                 let parent_str = parent.to_string_lossy().replace('\\', "/");
                 let name = std::path::Path::new(path)
-                    .file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
                 if let Some(children) = self.dirs.get_mut(&parent_str) {
                     children.retain(|c| c != &name);
                 }
@@ -141,7 +145,11 @@ impl FsIndex {
         };
         let mut entries = Vec::new();
         for name in &children {
-            let child_path = if dir.is_empty() { name.clone() } else { format!("{dir}/{name}") };
+            let child_path = if dir.is_empty() {
+                name.clone()
+            } else {
+                format!("{dir}/{name}")
+            };
             if let Some(inode) = self.files.get(&child_path) {
                 entries.push(DirEntry {
                     name: name.clone(),
@@ -217,11 +225,16 @@ impl OmnFS {
         let content_key;
         {
             let idx = self.index.read().await;
-            let inode = idx.lookup(path).ok_or_else(|| OmnFsError::NotFound(path.into()))?;
+            let inode = idx
+                .lookup(path)
+                .ok_or_else(|| OmnFsError::NotFound(path.into()))?;
             content_key = inode.content_key.clone();
             key_id = inode.key_id.clone();
         }
-        let encrypted = self.cas.get(&content_key).await
+        let encrypted = self
+            .cas
+            .get(&content_key)
+            .await
             .map_err(|e| OmnFsError::Cas(e.to_string()))?
             .ok_or_else(|| OmnFsError::NotFound(path.into()))?;
         Ok(self.crypto.decrypt(&encrypted, key_id.as_deref()))
@@ -232,7 +245,10 @@ impl OmnFS {
     pub async fn write(&self, path: &str, data: &[u8], mime: Option<&str>) -> OmnFsResult<CasKey> {
         let mime = mime.unwrap_or("application/octet-stream");
         let encrypted = self.crypto.encrypt(data, None);
-        let key = self.cas.put(&encrypted, mime).await
+        let key = self
+            .cas
+            .put(&encrypted, mime)
+            .await
             .map_err(|e| OmnFsError::Cas(e.to_string()))?;
 
         let now = Utc::now().timestamp_micros();
@@ -241,17 +257,20 @@ impl OmnFS {
             Some(existing) => (existing.version + 1, existing.created_at),
             None => (1, now),
         };
-        idx.upsert(path, Inode {
-            path: path.to_string(),
-            content_key: key.clone(),
-            key_id: None,
-            size_bytes: data.len() as u64,
-            created_at,
-            modified_at: now,
-            version,
-            mime: mime.to_string(),
-            tags: vec![],
-        });
+        idx.upsert(
+            path,
+            Inode {
+                path: path.to_string(),
+                content_key: key.clone(),
+                key_id: None,
+                size_bytes: data.len() as u64,
+                created_at,
+                modified_at: now,
+                version,
+                mime: mime.to_string(),
+                tags: vec![],
+            },
+        );
         debug!("[omnfs] wrote {path} (v{version}, {} bytes)", data.len());
         Ok(key)
     }
@@ -273,7 +292,10 @@ impl OmnFS {
 
     /// Get inode metadata
     pub async fn stat(&self, path: &str) -> OmnFsResult<Inode> {
-        self.index.read().await.lookup(path)
+        self.index
+            .read()
+            .await
+            .lookup(path)
             .cloned()
             .ok_or_else(|| OmnFsError::NotFound(path.into()))
     }
@@ -297,7 +319,10 @@ impl OmnFS {
     pub async fn snapshot(&self, tag: &str) -> OmnFsResult<FsSnapshot> {
         let idx = self.index.read().await;
         let bytes = serde_json::to_vec(&*idx)?;
-        let key = self.cas.put(&bytes, "application/json").await
+        let key = self
+            .cas
+            .put(&bytes, "application/json")
+            .await
             .map_err(|e| OmnFsError::Cas(e.to_string()))?;
         let snap = FsSnapshot {
             id: Uuid::new_v4().to_string(),
@@ -315,12 +340,17 @@ impl OmnFS {
     pub async fn rollback(&self, tag: &str) -> OmnFsResult<()> {
         let key = {
             let snaps = self.snapshots.read().await;
-            snaps.iter().rev()
+            snaps
+                .iter()
+                .rev()
                 .find(|s| s.tag == tag)
                 .map(|s| s.index_key.clone())
                 .ok_or_else(|| OmnFsError::SnapshotNotFound(tag.into()))?
         };
-        let bytes = self.cas.get(&key).await
+        let bytes = self
+            .cas
+            .get(&key)
+            .await
             .map_err(|e| OmnFsError::Cas(e.to_string()))?
             .ok_or_else(|| OmnFsError::SnapshotNotFound(tag.into()))?;
         let restored: FsIndex = serde_json::from_slice(&bytes)?;
@@ -339,7 +369,10 @@ impl OmnFS {
     pub async fn stats(&self) -> FsStats {
         let idx = self.index.read().await;
         let snap_count = self.snapshots.read().await.len();
-        let cas_stats = self.cas.stats().await
+        let cas_stats = self
+            .cas
+            .stats()
+            .await
             .map(|s| serde_json::to_value(s).unwrap_or_default())
             .unwrap_or_default();
         FsStats {
@@ -377,7 +410,10 @@ pub async fn omnfs_write(
     req: WriteRequest,
 ) -> Result<String, String> {
     let data = base64_decode(&req.data_base64).map_err(|e| e.to_string())?;
-    let key = state.omnfs.write(&req.path, &data, req.mime.as_deref()).await
+    let key = state
+        .omnfs
+        .write(&req.path, &data, req.mime.as_deref())
+        .await
         .map_err(|e| e.to_string())?;
     Ok(key.hex())
 }
@@ -430,9 +466,7 @@ pub async fn omnfs_list_snapshots(
 }
 
 #[tauri::command]
-pub async fn omnfs_stats(
-    state: tauri::State<'_, crate::AppState>,
-) -> Result<FsStats, String> {
+pub async fn omnfs_stats(state: tauri::State<'_, crate::AppState>) -> Result<FsStats, String> {
     Ok(state.omnfs.stats().await)
 }
 
@@ -446,11 +480,11 @@ fn base64_encode(data: &[u8]) -> String {
     let mut out = String::with_capacity((data.len() * 4 / 3) + 4);
     let mut i = 0;
     while i + 2 < data.len() {
-        let b = ((data[i] as u32) << 16) | ((data[i+1] as u32) << 8) | (data[i+2] as u32);
+        let b = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8) | (data[i + 2] as u32);
         out.push(CHARS[((b >> 18) & 0x3f) as usize] as char);
         out.push(CHARS[((b >> 12) & 0x3f) as usize] as char);
-        out.push(CHARS[((b >> 6)  & 0x3f) as usize] as char);
-        out.push(CHARS[( b        & 0x3f) as usize] as char);
+        out.push(CHARS[((b >> 6) & 0x3f) as usize] as char);
+        out.push(CHARS[(b & 0x3f) as usize] as char);
         i += 3;
     }
     let rem = data.len() - i;
@@ -460,10 +494,10 @@ fn base64_encode(data: &[u8]) -> String {
         out.push(CHARS[((b >> 12) & 0x3f) as usize] as char);
         out.push_str("==");
     } else if rem == 2 {
-        let b = ((data[i] as u32) << 16) | ((data[i+1] as u32) << 8);
+        let b = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8);
         out.push(CHARS[((b >> 18) & 0x3f) as usize] as char);
         out.push(CHARS[((b >> 12) & 0x3f) as usize] as char);
-        out.push(CHARS[((b >> 6)  & 0x3f) as usize] as char);
+        out.push(CHARS[((b >> 6) & 0x3f) as usize] as char);
         out.push('=');
     }
     out
@@ -475,7 +509,9 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
             b'A'..=b'Z' => Ok(c - b'A'),
             b'a'..=b'z' => Ok(c - b'a' + 26),
             b'0'..=b'9' => Ok(c - b'0' + 52),
-            b'+' => Ok(62), b'/' => Ok(63), b'=' => Ok(0),
+            b'+' => Ok(62),
+            b'/' => Ok(63),
+            b'=' => Ok(0),
             _ => Err(format!("invalid base64 char: {c}")),
         }
     }
@@ -483,11 +519,15 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
     let mut out = Vec::with_capacity(s.len() * 3 / 4);
     let mut i = 0;
     while i + 3 < s.len() {
-        let (a, b, c, d) = (val(s[i])?, val(s[i+1])?, val(s[i+2])?, val(s[i+3])?);
+        let (a, b, c, d) = (val(s[i])?, val(s[i + 1])?, val(s[i + 2])?, val(s[i + 3])?);
         let n = ((a as u32) << 18) | ((b as u32) << 12) | ((c as u32) << 6) | (d as u32);
         out.push((n >> 16) as u8);
-        if s[i+2] != b'=' { out.push((n >> 8) as u8); }
-        if s[i+3] != b'=' { out.push(n as u8); }
+        if s[i + 2] != b'=' {
+            out.push((n >> 8) as u8);
+        }
+        if s[i + 3] != b'=' {
+            out.push(n as u8);
+        }
         i += 4;
     }
     Ok(out)
@@ -511,8 +551,13 @@ mod tests {
         let inode = Inode {
             path: "docs/readme.md".into(),
             content_key: CasKey::from_bytes(b"test"),
-            key_id: None, size_bytes: 42, created_at: 0, modified_at: 0,
-            version: 1, mime: "text/markdown".into(), tags: vec![],
+            key_id: None,
+            size_bytes: 42,
+            created_at: 0,
+            modified_at: 0,
+            version: 1,
+            mime: "text/markdown".into(),
+            tags: vec![],
         };
         idx.upsert("docs/readme.md", inode);
         assert!(idx.lookup("docs/readme.md").is_some());
@@ -525,9 +570,15 @@ mod tests {
     fn fs_index_remove() {
         let mut idx = FsIndex::default();
         let inode = Inode {
-            path: "a/b.txt".into(), content_key: CasKey::from_bytes(b"x"),
-            key_id: None, size_bytes: 1, created_at: 0, modified_at: 0,
-            version: 1, mime: "text/plain".into(), tags: vec![],
+            path: "a/b.txt".into(),
+            content_key: CasKey::from_bytes(b"x"),
+            key_id: None,
+            size_bytes: 1,
+            created_at: 0,
+            modified_at: 0,
+            version: 1,
+            mime: "text/plain".into(),
+            tags: vec![],
         };
         idx.upsert("a/b.txt", inode);
         assert!(idx.remove("a/b.txt"));

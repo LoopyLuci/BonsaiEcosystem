@@ -15,7 +15,7 @@ use serde::Serialize;
 #[derive(Debug, Clone)]
 struct WindowEntry {
     success: bool,
-    at:      Instant,
+    at: Instant,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -66,14 +66,18 @@ pub enum BreakerState {
 
 #[derive(Debug, Clone)]
 struct BreakerInner {
-    state:            BreakerState,
-    opened_at:        Option<Instant>,
-    probe_successes:  u32,
+    state: BreakerState,
+    opened_at: Option<Instant>,
+    probe_successes: u32,
 }
 
 impl Default for BreakerInner {
     fn default() -> Self {
-        Self { state: BreakerState::Closed, opened_at: None, probe_successes: 0 }
+        Self {
+            state: BreakerState::Closed,
+            opened_at: None,
+            probe_successes: 0,
+        }
     }
 }
 
@@ -82,25 +86,25 @@ impl Default for BreakerInner {
 #[derive(Debug, Clone)]
 pub struct HealthConfig {
     /// Rolling window over which success rate is computed.
-    pub window:                  Duration,
+    pub window: Duration,
     /// Consecutive failures before breaker trips to Open.
-    pub open_after_failures:     u32,
+    pub open_after_failures: u32,
     /// How long the breaker stays Open before probing.
-    pub half_open_after:         Duration,
+    pub half_open_after: Duration,
     /// Probe successes needed to return to Closed.
-    pub close_on_successes:      u32,
+    pub close_on_successes: u32,
     /// Minimum calls before health score departs from 1.0.
-    pub min_sample_size:         usize,
+    pub min_sample_size: usize,
 }
 
 impl Default for HealthConfig {
     fn default() -> Self {
         Self {
-            window:              Duration::from_secs(300), // 5-min rolling window
+            window: Duration::from_secs(300), // 5-min rolling window
             open_after_failures: 5,
-            half_open_after:     Duration::from_secs(30),
-            close_on_successes:  2,
-            min_sample_size:     3,
+            half_open_after: Duration::from_secs(30),
+            close_on_successes: 2,
+            min_sample_size: 3,
         }
     }
 }
@@ -108,13 +112,16 @@ impl Default for HealthConfig {
 // ── Per-tool entry ────────────────────────────────────────────────────────────
 
 struct ToolEntry {
-    window:  ToolWindow,
+    window: ToolWindow,
     breaker: BreakerInner,
 }
 
 impl Default for ToolEntry {
     fn default() -> Self {
-        Self { window: ToolWindow::default(), breaker: BreakerInner::default() }
+        Self {
+            window: ToolWindow::default(),
+            breaker: BreakerInner::default(),
+        }
     }
 }
 
@@ -122,13 +129,16 @@ impl Default for ToolEntry {
 
 #[derive(Clone)]
 pub struct ToolHealthTracker {
-    inner:  Arc<Mutex<HashMap<String, ToolEntry>>>,
+    inner: Arc<Mutex<HashMap<String, ToolEntry>>>,
     config: HealthConfig,
 }
 
 impl ToolHealthTracker {
     pub fn new(config: HealthConfig) -> Self {
-        Self { inner: Arc::new(Mutex::new(HashMap::new())), config }
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            config,
+        }
     }
 
     pub fn with_defaults() -> Self {
@@ -148,7 +158,7 @@ impl ToolHealthTracker {
         match entry.breaker.state {
             BreakerState::Closed => {
                 if entry.window.consecutive_failures() >= cfg.open_after_failures {
-                    entry.breaker.state     = BreakerState::Open;
+                    entry.breaker.state = BreakerState::Open;
                     entry.breaker.opened_at = Some(Instant::now());
                     entry.breaker.probe_successes = 0;
                 }
@@ -169,7 +179,7 @@ impl ToolHealthTracker {
                             }
                         } else {
                             // Probe failed — reopen the breaker and reset timer.
-                            entry.breaker.state     = BreakerState::Open;
+                            entry.breaker.state = BreakerState::Open;
                             entry.breaker.opened_at = Some(Instant::now());
                             entry.breaker.probe_successes = 0;
                         }
@@ -186,7 +196,7 @@ impl ToolHealthTracker {
                     }
                 } else {
                     // Probe failed — reopen.
-                    entry.breaker.state     = BreakerState::Open;
+                    entry.breaker.state = BreakerState::Open;
                     entry.breaker.opened_at = Some(Instant::now());
                     entry.breaker.probe_successes = 0;
                 }
@@ -229,20 +239,21 @@ impl ToolHealthTracker {
     pub fn snapshot(&self) -> Vec<ToolHealthSnapshot> {
         let mut map = self.inner.lock().unwrap();
         let now = Instant::now();
-        map.iter_mut().map(|(name, entry)| {
-            entry.window.evict(now, self.config.window);
-            let total    = entry.window.entries.len();
-            let successes = entry.window.entries.iter().filter(|e| e.success).count();
-            ToolHealthSnapshot {
-                tool:     name.clone(),
-                score:    entry.window.health_score(),
-                total,
-                successes,
-                failures: total - successes,
-                breaker:  entry.breaker.state.clone(),
-            }
-        })
-        .collect()
+        map.iter_mut()
+            .map(|(name, entry)| {
+                entry.window.evict(now, self.config.window);
+                let total = entry.window.entries.len();
+                let successes = entry.window.entries.iter().filter(|e| e.success).count();
+                ToolHealthSnapshot {
+                    tool: name.clone(),
+                    score: entry.window.health_score(),
+                    total,
+                    successes,
+                    failures: total - successes,
+                    breaker: entry.breaker.state.clone(),
+                }
+            })
+            .collect()
     }
 
     /// Reset all state for a tool (useful after a deploy or manual recovery).
@@ -254,12 +265,12 @@ impl ToolHealthTracker {
 
 #[derive(Debug, Serialize)]
 pub struct ToolHealthSnapshot {
-    pub tool:      String,
-    pub score:     f32,
-    pub total:     usize,
+    pub tool: String,
+    pub score: f32,
+    pub total: usize,
     pub successes: usize,
-    pub failures:  usize,
-    pub breaker:   BreakerState,
+    pub failures: usize,
+    pub breaker: BreakerState,
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -270,11 +281,11 @@ mod tests {
 
     fn tracker() -> ToolHealthTracker {
         ToolHealthTracker::new(HealthConfig {
-            window:              Duration::from_secs(600),
+            window: Duration::from_secs(600),
             open_after_failures: 3,
-            half_open_after:     Duration::from_millis(50), // very short for tests
-            close_on_successes:  2,
-            min_sample_size:     1,
+            half_open_after: Duration::from_millis(50), // very short for tests
+            close_on_successes: 2,
+            min_sample_size: 1,
         })
     }
 
@@ -293,7 +304,9 @@ mod tests {
     #[test]
     fn all_successes_score_is_one() {
         let t = tracker();
-        for _ in 0..5 { t.record("tool", true); }
+        for _ in 0..5 {
+            t.record("tool", true);
+        }
         assert!((t.health_score("tool") - 1.0).abs() < 0.01);
     }
 
@@ -309,23 +322,32 @@ mod tests {
     #[test]
     fn breaker_opens_after_failures() {
         let t = tracker();
-        for _ in 0..3 { t.record("tool", false); }
+        for _ in 0..3 {
+            t.record("tool", false);
+        }
         assert!(!t.is_allowed("tool"), "breaker should be Open");
     }
 
     #[test]
     fn breaker_transitions_to_half_open() {
         let t = tracker();
-        for _ in 0..3 { t.record("tool", false); }
+        for _ in 0..3 {
+            t.record("tool", false);
+        }
         // Wait for half_open_after (50ms in test config)
         std::thread::sleep(Duration::from_millis(60));
-        assert!(t.is_allowed("tool"), "breaker should allow probe after wait");
+        assert!(
+            t.is_allowed("tool"),
+            "breaker should allow probe after wait"
+        );
     }
 
     #[test]
     fn breaker_closes_after_probe_successes() {
         let t = tracker();
-        for _ in 0..3 { t.record("tool", false); }
+        for _ in 0..3 {
+            t.record("tool", false);
+        }
         std::thread::sleep(Duration::from_millis(60));
         // Two probe successes should close the breaker
         t.record("tool", true);
@@ -336,7 +358,9 @@ mod tests {
     #[test]
     fn breaker_reopens_on_probe_failure() {
         let t = tracker();
-        for _ in 0..3 { t.record("tool", false); }
+        for _ in 0..3 {
+            t.record("tool", false);
+        }
         std::thread::sleep(Duration::from_millis(60));
         t.record("tool", false); // probe fails → reopen
         assert!(!t.is_allowed("tool"), "should reopen after failed probe");
@@ -345,7 +369,9 @@ mod tests {
     #[test]
     fn reset_clears_all_state() {
         let t = tracker();
-        for _ in 0..5 { t.record("tool", false); }
+        for _ in 0..5 {
+            t.record("tool", false);
+        }
         t.reset("tool");
         assert!((t.health_score("tool") - 1.0).abs() < 0.01);
         assert!(t.is_allowed("tool"));

@@ -6,17 +6,17 @@
 //! - Location transparency: `ActorRef<M>` is just a channel handle.
 //! - Async-native: built on `tokio` mpsc channels.
 
-pub mod transport;
 pub mod checkpoint;
 pub mod supervisor;
 pub mod swap_buffer;
+pub mod transport;
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 type EmitFn = Box<dyn Fn(&str, serde_json::Value) + Send + Sync>;
 
@@ -24,7 +24,9 @@ type EmitFn = Box<dyn Fn(&str, serde_json::Value) + Send + Sync>;
 
 pub type ActorId = Uuid;
 
-pub fn new_actor_id() -> ActorId { Uuid::new_v4() }
+pub fn new_actor_id() -> ActorId {
+    Uuid::new_v4()
+}
 
 // ── Error ─────────────────────────────────────────────────────────────────────
 
@@ -152,7 +154,9 @@ impl ActorContext {
     }
 
     /// Get the system handle (for spawning unrelated actors).
-    pub fn system(&self) -> Arc<ActorSystem> { self.system.clone() }
+    pub fn system(&self) -> Arc<ActorSystem> {
+        self.system.clone()
+    }
 
     /// Emit a Tauri-style event (payload as JSON). No-op if no emitter is wired.
     pub fn emit(&self, channel: &str, payload: serde_json::Value) {
@@ -202,7 +206,8 @@ impl ActorSystem {
 
     /// Wire in a Tauri `app_handle.emit()` equivalent.
     pub async fn set_emitter<F>(&self, f: F)
-    where F: Fn(&str, serde_json::Value) + Send + Sync + 'static
+    where
+        F: Fn(&str, serde_json::Value) + Send + Sync + 'static,
     {
         *self.inner.emitter.lock().await = Some(Box::new(f));
     }
@@ -264,7 +269,9 @@ impl ActorSystem {
         tokio::spawn(async move {
             system_inner.stoppers.write().await.insert(
                 id_clone,
-                Box::new(move || { let _ = stopper_tx.send(ActorEnvelope::Stop); }),
+                Box::new(move || {
+                    let _ = stopper_tx.send(ActorEnvelope::Stop);
+                }),
             );
         });
 
@@ -277,8 +284,13 @@ impl ActorSystem {
         // Stop all registered actors
         let stoppers: Vec<_> = {
             let guard = self.inner.stoppers.read().await;
-            guard.values().collect::<Vec<_>>().into_iter()
-                .map(|f| { f(); })
+            guard
+                .values()
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|f| {
+                    f();
+                })
                 .collect()
         };
         drop(stoppers);
@@ -382,7 +394,10 @@ mod tests {
     async fn basic_send_receive() {
         let system = ActorSystem::new();
         let total = Arc::new(AtomicU32::new(0));
-        let actor = CounterActor { count: 0, total: total.clone() };
+        let actor = CounterActor {
+            count: 0,
+            total: total.clone(),
+        };
         let r = system.spawn(actor);
         r.send(5).unwrap();
         r.send(3).unwrap();
@@ -394,7 +409,10 @@ mod tests {
     async fn stop_terminates() {
         let system = ActorSystem::new();
         let total = Arc::new(AtomicU32::new(0));
-        let actor = CounterActor { count: 0, total: total.clone() };
+        let actor = CounterActor {
+            count: 0,
+            total: total.clone(),
+        };
         let r = system.spawn(actor);
         r.send(1).unwrap();
         r.stop();

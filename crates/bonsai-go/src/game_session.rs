@@ -1,9 +1,9 @@
 //! Go game session — players, move history, SGF export.
 
+use crate::board::{BoardSize, GoBoard, Point, Stone, DEFAULT_SIZE};
+use crate::error::GoError;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::board::{GoBoard, Stone, Point, BoardSize, DEFAULT_SIZE};
-use crate::error::GoError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum GoPlayerKind {
@@ -13,14 +13,23 @@ pub enum GoPlayerKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GoColor { Black, White }
+pub enum GoColor {
+    Black,
+    White,
+}
 
 impl GoColor {
     pub fn to_stone(self) -> Stone {
-        match self { GoColor::Black => Stone::Black, GoColor::White => Stone::White }
+        match self {
+            GoColor::Black => Stone::Black,
+            GoColor::White => Stone::White,
+        }
     }
     pub fn opponent(self) -> Self {
-        match self { GoColor::Black => GoColor::White, GoColor::White => GoColor::Black }
+        match self {
+            GoColor::Black => GoColor::White,
+            GoColor::White => GoColor::Black,
+        }
     }
 }
 
@@ -90,11 +99,19 @@ impl GoGameSession {
     }
 
     pub fn current_color(&self) -> GoColor {
-        if self.moves.len().is_multiple_of(2) { GoColor::Black } else { GoColor::White }
+        if self.moves.len().is_multiple_of(2) {
+            GoColor::Black
+        } else {
+            GoColor::White
+        }
     }
 
     pub fn current_player(&self) -> &GoPlayer {
-        if self.moves.len().is_multiple_of(2) { &self.black } else { &self.white }
+        if self.moves.len().is_multiple_of(2) {
+            &self.black
+        } else {
+            &self.white
+        }
     }
 
     /// Play a move. `gtp_coord` is a GTP string like "D4" or "pass".
@@ -115,8 +132,7 @@ impl GoGameSession {
             self.board.pass();
             (None, vec![], "pass".to_string())
         } else {
-            let p = Point::from_gtp(gtp_coord, self.size)
-                .ok_or(GoError::InvalidPosition(0, 0))?;
+            let p = Point::from_gtp(gtp_coord, self.size).ok_or(GoError::InvalidPosition(0, 0))?;
             let caps = self.board.place_stone(p, stone)?;
             (Some(p), caps, p.to_gtp(self.size))
         };
@@ -160,13 +176,14 @@ impl GoGameSession {
 
     /// Whether the AI should move next.
     pub fn needs_ai_move(&self) -> bool {
-        self.result == GoGameResult::Ongoing
-            && self.current_player().kind == GoPlayerKind::BonsAI
+        self.result == GoGameResult::Ongoing && self.current_player().kind == GoPlayerKind::BonsAI
     }
 
     /// Export game as SGF string.
     pub fn to_sgf(&self) -> String {
-        let move_seq: Vec<(Stone, Option<Point>)> = self.moves.iter()
+        let move_seq: Vec<(Stone, Option<Point>)> = self
+            .moves
+            .iter()
             .map(|m| (m.color.to_stone(), m.point))
             .collect();
         GoBoard::to_sgf(&move_seq, self.size, self.komi)
@@ -183,8 +200,20 @@ mod tests {
     use super::*;
 
     fn make_session() -> GoGameSession {
-        let b = GoPlayer { id: "user".into(), name: "User".into(), kind: GoPlayerKind::Human, color: GoColor::Black, rank: None };
-        let w = GoPlayer { id: "ai".into(), name: "BonsAI".into(), kind: GoPlayerKind::BonsAI, color: GoColor::White, rank: None };
+        let b = GoPlayer {
+            id: "user".into(),
+            name: "User".into(),
+            kind: GoPlayerKind::Human,
+            color: GoColor::Black,
+            rank: None,
+        };
+        let w = GoPlayer {
+            id: "ai".into(),
+            name: "BonsAI".into(),
+            kind: GoPlayerKind::BonsAI,
+            color: GoColor::White,
+            rank: None,
+        };
         GoGameSession::new(b, w)
     }
 

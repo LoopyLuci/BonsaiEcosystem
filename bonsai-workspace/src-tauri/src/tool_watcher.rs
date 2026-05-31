@@ -41,8 +41,8 @@ const FILE_SENSITIVE_TOOLS: &[&str] = &[
 // ── ToolWatcher ───────────────────────────────────────────────────────────────
 
 pub struct ToolWatcher {
-    _watcher:      RecommendedWatcher,  // must be kept alive
-    watch_root:    PathBuf,
+    _watcher: RecommendedWatcher, // must be kept alive
+    watch_root: PathBuf,
 }
 
 impl ToolWatcher {
@@ -53,11 +53,17 @@ impl ToolWatcher {
 
         let mut watcher = notify::recommended_watcher(move |res| {
             let _ = tx.blocking_send(res);
-        }).map_err(|e| format!("[tool_watcher] Failed to create watcher: {e}"))?;
+        })
+        .map_err(|e| format!("[tool_watcher] Failed to create watcher: {e}"))?;
 
         watcher
             .watch(workspace_root, RecursiveMode::Recursive)
-            .map_err(|e| format!("[tool_watcher] Failed to watch {}: {e}", workspace_root.display()))?;
+            .map_err(|e| {
+                format!(
+                    "[tool_watcher] Failed to watch {}: {e}",
+                    workspace_root.display()
+                )
+            })?;
 
         info!(root=%workspace_root.display(), "[tool_watcher] Watching workspace for cache invalidation");
 

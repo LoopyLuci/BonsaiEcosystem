@@ -39,10 +39,18 @@ impl GpuTelemetry {
     }
 
     pub fn success_count(&self, backend: &BackendType) -> u64 {
-        self.stats.lock().unwrap().get(backend).map_or(0, |s| s.successes)
+        self.stats
+            .lock()
+            .unwrap()
+            .get(backend)
+            .map_or(0, |s| s.successes)
     }
 
     pub fn failure_count(&self, backend: &BackendType) -> u64 {
-        self.stats.lock().unwrap().get(backend).map_or(0, |s| s.failures)
+        self.stats
+            .lock()
+            .unwrap()
+            .get(backend)
+            .map_or(0, |s| s.failures)
     }
 }

@@ -9,14 +9,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 use tracing::{error, info};
+use uuid::Uuid;
 
 use tauri::Manager;
 
-use crate::AppState;
 use crate::gpu_controller::GpuController;
 use crate::model_orchestrator::ModelOrchestrator;
+use crate::AppState;
 
 #[derive(Clone, Deserialize)]
 pub struct CommandRequest {
@@ -71,7 +71,9 @@ impl OrchestratorState {
         let state = Arc::clone(self);
         let id_for_spawn = id.clone();
         tokio::spawn(async move {
-            state.execute_job(id_for_spawn, action.clone(), params).await;
+            state
+                .execute_job(id_for_spawn, action.clone(), params)
+                .await;
         });
         id
     }
@@ -117,9 +119,12 @@ impl OrchestratorState {
 
     async fn compile_launcher(&self) -> Result<serde_json::Value, String> {
         // Attempt to run the provided PS1 script in workspace root (best-effort)
-        let script = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../BonsaiExeLauncherBuilder.ps1");
+        let script = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../BonsaiExeLauncherBuilder.ps1");
         let script_str = script.to_string_lossy().to_string();
-        let cwd = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
+        let cwd = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..");
         info!(script=%script_str, cwd=%cwd.display(), "orchestrator: running launcher builder");
 
         let output = tokio::process::Command::new("powershell")
@@ -142,7 +147,10 @@ impl OrchestratorState {
         }
     }
 
-    async fn start_training(&self, _params: serde_json::Value) -> Result<serde_json::Value, String> {
+    async fn start_training(
+        &self,
+        _params: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
         // Trigger an immediate cycle via AppState training loop
         let state = self.app_handle.state::<AppState>();
         let training = state.training.clone();
@@ -158,8 +166,12 @@ impl OrchestratorState {
     }
 
     async fn run_evaluation(&self, params: serde_json::Value) -> Result<serde_json::Value, String> {
-        let full = params.get("full").and_then(|v| v.as_bool()).unwrap_or(false);
-        let harness = crate::evaluation_harness::EvaluationHarness::new(self.model_orchestrator.clone());
+        let full = params
+            .get("full")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let harness =
+            crate::evaluation_harness::EvaluationHarness::new(self.model_orchestrator.clone());
         if full {
             let res = harness.run_full_harness().await;
             serde_json::to_value(res).map_err(|e| e.to_string())
@@ -175,12 +187,20 @@ impl OrchestratorState {
         let _ = tokio::task::spawn_blocking(move || {
             let _ = std::process::Command::new(exe).spawn();
             std::process::exit(0);
-        }).await.map_err(|e| e.to_string())?;
+        })
+        .await
+        .map_err(|e| e.to_string())?;
         Ok(serde_json::json!({"status":"restarting"}))
     }
 
-    async fn train_all_models_hours(&self, params: serde_json::Value) -> Result<serde_json::Value, String> {
-        let duration_hours = params.get("duration_hours").and_then(|v| v.as_u64()).unwrap_or(6);
+    async fn train_all_models_hours(
+        &self,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let duration_hours = params
+            .get("duration_hours")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(6);
         let state = self.app_handle.state::<AppState>();
         let _training = state.training.clone();
         // The eternal loop already runs in background; scheduling/rotation across models
@@ -197,7 +217,10 @@ async fn submit_command(
     Json(req): Json<CommandRequest>,
 ) -> impl IntoResponse {
     let id = state.submit_job(req.action, req.parameters).await;
-    (StatusCode::ACCEPTED, Json(serde_json::json!({ "job_id": id })))
+    (
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({ "job_id": id })),
+    )
 }
 
 async fn get_job_status(
@@ -209,7 +232,10 @@ async fn get_job_status(
         let val = serde_json::to_value(job.clone()).unwrap_or(serde_json::json!({}));
         (StatusCode::OK, Json(val))
     } else {
-        (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "Job not found" })))
+        (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Job not found" })),
+        )
     }
 }
 

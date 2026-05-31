@@ -5,17 +5,19 @@ pub struct FormattedMessage {
 
 impl FormattedMessage {
     fn single(text: impl Into<String>) -> Self {
-        Self { chunks: vec![text.into()] }
+        Self {
+            chunks: vec![text.into()],
+        }
     }
 }
 
 pub fn format(reply: &str, platform: &str) -> FormattedMessage {
     match platform {
-        "discord"  => format_discord(reply),
+        "discord" => format_discord(reply),
         "telegram" => format_telegram_mdv2(reply),
-        "matrix"   => format_matrix_html(reply),
-        "email"    => format_email_html(reply),
-        _          => FormattedMessage::single(reply),
+        "matrix" => format_matrix_html(reply),
+        "email" => format_email_html(reply),
+        _ => FormattedMessage::single(reply),
     }
 }
 
@@ -23,19 +25,24 @@ pub fn format(reply: &str, platform: &str) -> FormattedMessage {
 
 fn format_discord(reply: &str) -> FormattedMessage {
     // Standard Markdown. Split at 1990 chars preserving paragraph boundaries.
-    FormattedMessage { chunks: split_at(reply, 1990) }
+    FormattedMessage {
+        chunks: split_at(reply, 1990),
+    }
 }
 
 // ── Telegram MarkdownV2 ───────────────────────────────────────────────────────
 
 fn format_telegram_mdv2(reply: &str) -> FormattedMessage {
     let escaped = escape_telegram_mdv2(reply);
-    FormattedMessage { chunks: split_at(&escaped, 4000) }
+    FormattedMessage {
+        chunks: split_at(&escaped, 4000),
+    }
 }
 
 fn escape_telegram_mdv2(s: &str) -> String {
     const SPECIAL: &[char] = &[
-        '.', '!', '(', ')', '-', '=', '+', '{', '}', '|', '~', '>', '#', '[', ']', '*', '_', '`', '\\',
+        '.', '!', '(', ')', '-', '=', '+', '{', '}', '|', '~', '>', '#', '[', ']', '*', '_', '`',
+        '\\',
     ];
     let mut out = String::with_capacity(s.len() + 64);
     for c in s.chars() {
@@ -57,9 +64,9 @@ fn format_matrix_html(reply: &str) -> FormattedMessage {
 
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
-     .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 // ── Email HTML ────────────────────────────────────────────────────────────────
@@ -95,7 +102,8 @@ fn split_at(text: &str, limit: usize) -> Vec<String> {
         }
         // Try to split on paragraph boundary
         let slice = &remaining[..limit];
-        let split_at = slice.rfind("\n\n")
+        let split_at = slice
+            .rfind("\n\n")
             .or_else(|| slice.rfind('\n'))
             .unwrap_or(limit);
         chunks.push(remaining[..split_at].to_string());

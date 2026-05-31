@@ -1,3 +1,4 @@
+use crate::tool_core::ToolRegistry;
 /// Semantic tool selector — keyword-index approach, no embedding model required.
 ///
 /// Scores tools by how many of the query's tokens appear in each tool's
@@ -7,7 +8,6 @@
 /// Upgrade path: replace `keyword_score()` with cosine similarity against
 /// pre-computed nomic-embed-text embeddings for a full semantic selector.
 use std::collections::HashMap;
-use crate::tool_core::ToolRegistry;
 
 pub struct ToolSelector {
     /// term → list of tool names that mention it
@@ -22,11 +22,25 @@ impl ToolSelector {
         let mut index: HashMap<String, Vec<String>> = HashMap::new();
 
         for def in registry.all_definitions() {
-            let name = def.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let desc = def.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let tags: Vec<String> = def.get("tags")
+            let name = def
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let desc = def
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let tags: Vec<String> = def
+                .get("tags")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|t| t.as_str()).map(|s| s.to_string()).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|t| t.as_str())
+                        .map(|s| s.to_string())
+                        .collect()
+                })
                 .unwrap_or_default();
 
             let text = format!("{name} {desc} {}", tags.join(" "));
@@ -45,13 +59,10 @@ impl ToolSelector {
     /// we boost tools that were already selected to maintain context continuity.
     ///
     /// Returns names sorted by relevance score descending.
-    pub fn select(
-        &self,
-        query:                &str,
-        top_k:                usize,
-        previously_selected:  &[String],
-    ) -> Vec<String> {
-        if self.all_names.is_empty() { return Vec::new(); }
+    pub fn select(&self, query: &str, top_k: usize, previously_selected: &[String]) -> Vec<String> {
+        if self.all_names.is_empty() {
+            return Vec::new();
+        }
 
         let tokens = tokenize(query);
         if tokens.is_empty() {
@@ -85,11 +96,15 @@ impl ToolSelector {
 
         // Sort by score descending, break ties alphabetically
         let mut ranked: Vec<(String, f32)> = scores.into_iter().collect();
-        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.0.cmp(&b.0)));
+        ranked.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
 
         // Take top_k; fall back to all tools if fewer than top_k scored
-        let mut result: Vec<String> = ranked.into_iter()
+        let mut result: Vec<String> = ranked
+            .into_iter()
             .take(top_k)
             .map(|(name, _)| name)
             .collect();
@@ -97,8 +112,12 @@ impl ToolSelector {
         // If fewer than top_k matched, pad with unscored tools in stable order
         if result.len() < top_k {
             for name in &self.all_names {
-                if result.len() >= top_k { break; }
-                if !result.contains(name) { result.push(name.clone()); }
+                if result.len() >= top_k {
+                    break;
+                }
+                if !result.contains(name) {
+                    result.push(name.clone());
+                }
             }
         }
 
@@ -132,9 +151,8 @@ fn tokenize(text: &str) -> Vec<String> {
 static STOP_WORDS: std::sync::LazyLock<std::collections::HashSet<&'static str>> =
     std::sync::LazyLock::new(|| {
         [
-            "the", "and", "for", "from", "with", "that", "this", "are", "you",
-            "can", "use", "get", "set", "all", "any", "new", "not", "but",
-            "its", "into", "via", "per", "etc",
+            "the", "and", "for", "from", "with", "that", "this", "are", "you", "can", "use", "get",
+            "set", "all", "any", "new", "not", "but", "its", "into", "via", "per", "etc",
         ]
         .into_iter()
         .collect()
@@ -154,7 +172,10 @@ mod tests {
         let reg = mock_registry();
         let sel = ToolSelector::build(&reg);
         let result = sel.select("what is the weather in Tokyo", 4, &[]);
-        assert!(result.contains(&"get_weather".to_string()), "weather tool should be selected");
+        assert!(
+            result.contains(&"get_weather".to_string()),
+            "weather tool should be selected"
+        );
     }
 
     #[test]
@@ -162,7 +183,10 @@ mod tests {
         let reg = mock_registry();
         let sel = ToolSelector::build(&reg);
         let result = sel.select("what time is it now", 4, &[]);
-        assert!(result.contains(&"get_datetime".to_string()), "datetime tool should be selected");
+        assert!(
+            result.contains(&"get_datetime".to_string()),
+            "datetime tool should be selected"
+        );
     }
 
     #[test]
@@ -181,7 +205,10 @@ mod tests {
         let first = sel.select("read and find files in workspace", 6, &[]);
         let second = sel.select("read and find files in workspace", 6, &[]);
 
-        assert_eq!(first, second, "selector output should be stable for identical input");
+        assert_eq!(
+            first, second,
+            "selector output should be stable for identical input"
+        );
     }
 
     #[test]

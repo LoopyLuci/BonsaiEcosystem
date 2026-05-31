@@ -15,9 +15,8 @@ use anyhow::Result;
 use serde_json::{json, Value};
 
 use crate::model_data::{
-    AffinityLevel, InferenceProfile, LocalFileInfo, ModelCapabilities, ModelData,
-    ModelSource, ModelStrength, ModelTier, PromptFormat, SkillAffinity,
-    ToolCallingSupport,
+    AffinityLevel, InferenceProfile, LocalFileInfo, ModelCapabilities, ModelData, ModelSource,
+    ModelStrength, ModelTier, PromptFormat, SkillAffinity, ToolCallingSupport,
 };
 use crate::model_orchestrator::ModelOrchestrator;
 use crate::model_registry::ModelInfo;
@@ -28,28 +27,30 @@ use crate::model_registry::ModelInfo;
 /// Fields left as None are filled by the LLM inference pass.
 #[derive(Clone)]
 struct KbEntry {
-    family:           &'static str,
-    organization:     &'static str,
-    description:      &'static str,
-    license:          &'static str,
-    homepage_url:     &'static str,
-    training_cutoff:  Option<&'static str>,
-    strengths:        &'static [ModelStrength],
-    tier:             ModelTier,
-    tool_calling:     ToolCallingSupport,
-    prompt_format:    PromptFormat,
-    json_mode:        bool,
+    family: &'static str,
+    organization: &'static str,
+    description: &'static str,
+    license: &'static str,
+    homepage_url: &'static str,
+    training_cutoff: Option<&'static str>,
+    strengths: &'static [ModelStrength],
+    tier: ModelTier,
+    tool_calling: ToolCallingSupport,
+    prompt_format: PromptFormat,
+    json_mode: bool,
     extended_thinking: bool,
     skill_affinities: &'static [(&'static str, AffinityLevel)],
 }
 
 // Build the knowledge base keyed on lowercase family/architecture patterns.
 fn knowledge_base() -> HashMap<&'static str, KbEntry> {
-    use ModelStrength::*;
     use AffinityLevel::*;
+    use ModelStrength::*;
 
     macro_rules! kb {
-        ($key:expr => $entry:expr) => { ($key, $entry) };
+        ($key:expr => $entry:expr) => {
+            ($key, $entry)
+        };
     }
 
     HashMap::from([
@@ -359,12 +360,15 @@ fn knowledge_base() -> HashMap<&'static str, KbEntry> {
 
 pub struct ModelDataGenerator {
     orchestrator: Arc<ModelOrchestrator>,
-    kb:           HashMap<&'static str, KbEntry>,
+    kb: HashMap<&'static str, KbEntry>,
 }
 
 impl ModelDataGenerator {
     pub fn new(orchestrator: Arc<ModelOrchestrator>) -> Self {
-        Self { orchestrator, kb: knowledge_base() }
+        Self {
+            orchestrator,
+            kb: knowledge_base(),
+        }
     }
 
     /// Auto-generate ModelData for a local GGUF entry from the registry.
@@ -373,14 +377,19 @@ impl ModelDataGenerator {
 
         // Give the model a clean display name.
         let clean = clean_display_name(&info.name);
-        if !clean.is_empty() { data.name = clean; }
+        if !clean.is_empty() {
+            data.name = clean;
+        }
 
         // 1. Apply knowledge base if we recognise the model family.
         self.apply_knowledge_base(&mut data, &info.name, &info.architecture);
 
         // 2. Use LLM to fill in description + any remaining gaps.
         if let Err(e) = self.enrich_via_llm(&mut data).await {
-            tracing::warn!("[model-data-gen] LLM enrichment failed for '{}': {e}", info.name);
+            tracing::warn!(
+                "[model-data-gen] LLM enrichment failed for '{}': {e}",
+                info.name
+            );
             // Non-fatal — return what we have from the knowledge base.
         }
 
@@ -397,7 +406,7 @@ impl ModelDataGenerator {
     ) -> Result<ModelData> {
         let now = chrono::Utc::now().timestamp_millis();
         let provider_lower = provider.to_lowercase();
-        let model_lower    = model_id.to_lowercase();
+        let model_lower = model_id.to_lowercase();
 
         // Infer a human-readable name from the model_id.
         let name = model_id_to_display_name(model_id);
@@ -405,39 +414,39 @@ impl ModelDataGenerator {
         let base = base_url.unwrap_or_else(|| default_base_url(&provider_lower));
 
         let mut data = ModelData {
-            id:          uuid::Uuid::new_v4().to_string(),
-            name:        name.clone(),
-            family:      None,
-            version:     None,
+            id: uuid::Uuid::new_v4().to_string(),
+            name: name.clone(),
+            family: None,
+            version: None,
             description: String::new(),
             source: ModelSource::OpenAICompatible {
-                base_url:            base.to_string(),
-                model_id:            model_id.to_string(),
-                provider_name:       capitalise(&provider_lower),
+                base_url: base.to_string(),
+                model_id: model_id.to_string(),
+                provider_name: capitalise(&provider_lower),
                 api_key_secret_name: Some(format!("{}_api_key", provider_lower)),
             },
             capabilities: ModelCapabilities {
-                context_window:   128_000,
+                context_window: 128_000,
                 max_output_tokens: 8_192,
-                streaming:        true,
+                streaming: true,
                 ..Default::default()
             },
-            inference:        InferenceProfile::default(),
-            inference_mode:   crate::inference_mode::InferenceMode::default(),
-            prompt_format:    PromptFormat::OpenAIMessages,
+            inference: InferenceProfile::default(),
+            inference_mode: crate::inference_mode::InferenceMode::default(),
+            prompt_format: PromptFormat::OpenAIMessages,
             skill_affinities: vec![],
-            authors:          vec![],
-            organization:     None,
-            license:          None,
-            homepage_url:     None,
-            training_cutoff:  None,
-            parameter_count:  None,
-            architecture:     None,
-            tags:             vec![provider.to_string()],
-            notes:            String::new(),
-            local_file:       None,
-            created_at:       now,
-            updated_at:       now,
+            authors: vec![],
+            organization: None,
+            license: None,
+            homepage_url: None,
+            training_cutoff: None,
+            parameter_count: None,
+            architecture: None,
+            tags: vec![provider.to_string()],
+            notes: String::new(),
+            local_file: None,
+            created_at: now,
+            updated_at: now,
         };
 
         // Apply knowledge base using both provider name and model_id as hints.
@@ -461,7 +470,11 @@ impl ModelDataGenerator {
 
         // Find the best matching knowledge base key.
         let best = self.kb.iter().max_by_key(|(key, _)| {
-            if haystack.contains(*key) { key.len() } else { 0 }
+            if haystack.contains(*key) {
+                key.len()
+            } else {
+                0
+            }
         });
 
         let Some((_, entry)) = best.filter(|(key, _)| haystack.contains(*key)) else {
@@ -490,22 +503,24 @@ impl ModelDataGenerator {
         if data.capabilities.strengths.is_empty() {
             data.capabilities.strengths = entry.strengths.to_vec();
         }
-        data.capabilities.tier              = entry.tier.clone();
-        data.capabilities.tool_calling      = entry.tool_calling.clone();
-        data.capabilities.json_mode         = entry.json_mode;
-        data.capabilities.extended_thinking  = entry.extended_thinking;
-        data.prompt_format                   = entry.prompt_format.clone();
+        data.capabilities.tier = entry.tier.clone();
+        data.capabilities.tool_calling = entry.tool_calling.clone();
+        data.capabilities.json_mode = entry.json_mode;
+        data.capabilities.extended_thinking = entry.extended_thinking;
+        data.prompt_format = entry.prompt_format.clone();
 
         // Merge skill affinities (don't overwrite any the user already set).
-        let existing_ids: Vec<String> = data.skill_affinities.iter()
+        let existing_ids: Vec<String> = data
+            .skill_affinities
+            .iter()
             .map(|a| a.skill_id.clone())
             .collect();
         for (skill_id, level) in entry.skill_affinities {
             if !existing_ids.iter().any(|id| id == skill_id) {
                 data.skill_affinities.push(SkillAffinity {
                     skill_id: skill_id.to_string(),
-                    level:    level.clone(),
-                    note:     None,
+                    level: level.clone(),
+                    note: None,
                 });
             }
         }
@@ -520,13 +535,16 @@ impl ModelDataGenerator {
         }
 
         let prompt = build_enrichment_prompt(data);
-        let (response, _stats) = self.orchestrator.infer_simple(&prompt, 512, "model-gen").await
+        let (response, _stats) = self
+            .orchestrator
+            .infer_simple(&prompt, 512, "model-gen")
+            .await
             .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         // Parse JSON from the response (may be wrapped in ```json...```).
         let json_str = extract_json(&response);
-        let Ok(val)  = serde_json::from_str::<Value>(&json_str) else {
-            return Ok(());   // Gracefully ignore unparseable LLM output.
+        let Ok(val) = serde_json::from_str::<Value>(&json_str) else {
+            return Ok(()); // Gracefully ignore unparseable LLM output.
         };
 
         // Apply only non-empty / non-null fields so we don't overwrite KB data.
@@ -559,7 +577,8 @@ impl ModelDataGenerator {
         // Strengths — only override if the response is non-empty and KB gave nothing.
         if data.capabilities.strengths.is_empty() {
             if let Some(arr) = val["strengths"].as_array() {
-                let strengths: Vec<ModelStrength> = arr.iter()
+                let strengths: Vec<ModelStrength> = arr
+                    .iter()
                     .filter_map(|v| v.as_str())
                     .filter_map(|s| parse_strength(s))
                     .collect();
@@ -585,15 +604,23 @@ impl ModelDataGenerator {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn build_enrichment_prompt(data: &ModelData) -> String {
-    let name    = &data.name;
-    let arch    = data.architecture.as_deref().unwrap_or("unknown");
-    let family  = data.family.as_deref().unwrap_or("unknown");
-    let params  = data.parameter_count.map(|p| format!("{:.1}B", p as f64 / 1e9)).unwrap_or_else(|| "unknown".into());
-    let ctx     = data.capabilities.context_window;
-    let quant   = data.local_file.as_ref().map(|lf| lf.quant_label.as_str()).unwrap_or("N/A");
+    let name = &data.name;
+    let arch = data.architecture.as_deref().unwrap_or("unknown");
+    let family = data.family.as_deref().unwrap_or("unknown");
+    let params = data
+        .parameter_count
+        .map(|p| format!("{:.1}B", p as f64 / 1e9))
+        .unwrap_or_else(|| "unknown".into());
+    let ctx = data.capabilities.context_window;
+    let quant = data
+        .local_file
+        .as_ref()
+        .map(|lf| lf.quant_label.as_str())
+        .unwrap_or("N/A");
     let source_type = data.source.source_type();
 
-    format!(r#"You are an AI model metadata expert. Given this information about an AI model, return a JSON object with the fields below.
+    format!(
+        r#"You are an AI model metadata expert. Given this information about an AI model, return a JSON object with the fields below.
 
 Model name: {name}
 Architecture: {arch}
@@ -614,7 +641,8 @@ Return ONLY valid JSON with these fields:
   "tier": "one of: frontier|capable|fast|specialized|embedded"
 }}
 
-Respond with the JSON object only."#)
+Respond with the JSON object only."#
+    )
 }
 
 fn extract_json(s: &str) -> String {
@@ -633,41 +661,44 @@ fn extract_json(s: &str) -> String {
 
 fn parse_strength(s: &str) -> Option<ModelStrength> {
     match s {
-        "coding"        => Some(ModelStrength::Coding),
-        "math"          => Some(ModelStrength::Math),
-        "reasoning"     => Some(ModelStrength::Reasoning),
-        "writing"       => Some(ModelStrength::Writing),
-        "instruction"   => Some(ModelStrength::Instruction),
-        "multilingual"  => Some(ModelStrength::Multilingual),
-        "long_context"  => Some(ModelStrength::LongContext),
-        "speed"         => Some(ModelStrength::Speed),
-        "vision"        => Some(ModelStrength::Vision),
-        "research"      => Some(ModelStrength::Research),
+        "coding" => Some(ModelStrength::Coding),
+        "math" => Some(ModelStrength::Math),
+        "reasoning" => Some(ModelStrength::Reasoning),
+        "writing" => Some(ModelStrength::Writing),
+        "instruction" => Some(ModelStrength::Instruction),
+        "multilingual" => Some(ModelStrength::Multilingual),
+        "long_context" => Some(ModelStrength::LongContext),
+        "speed" => Some(ModelStrength::Speed),
+        "vision" => Some(ModelStrength::Vision),
+        "research" => Some(ModelStrength::Research),
         "data_analysis" => Some(ModelStrength::DataAnalysis),
-        _               => None,
+        _ => None,
     }
 }
 
 fn parse_tier(s: &str) -> Option<ModelTier> {
     match s {
-        "frontier"    => Some(ModelTier::Frontier),
-        "capable"     => Some(ModelTier::Capable),
-        "fast"        => Some(ModelTier::Fast),
+        "frontier" => Some(ModelTier::Frontier),
+        "capable" => Some(ModelTier::Capable),
+        "fast" => Some(ModelTier::Fast),
         "specialized" => Some(ModelTier::Specialized),
-        "embedded"    => Some(ModelTier::Embedded),
-        _             => None,
+        "embedded" => Some(ModelTier::Embedded),
+        _ => None,
     }
 }
 
 fn model_id_to_display_name(model_id: &str) -> String {
     let parts: Vec<&str> = model_id.split('-').collect();
-    let capitalised: Vec<String> = parts.iter().map(|p| {
-        let mut chars = p.chars();
-        match chars.next() {
-            None    => String::new(),
-            Some(c) => c.to_uppercase().to_string() + chars.as_str(),
-        }
-    }).collect();
+    let capitalised: Vec<String> = parts
+        .iter()
+        .map(|p| {
+            let mut chars = p.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+            }
+        })
+        .collect();
     capitalised.join(" ")
 }
 
@@ -677,32 +708,42 @@ fn model_id_to_display_name(model_id: &str) -> String {
 pub fn clean_display_name(raw: &str) -> String {
     // Known specific rewrites (match substring, most-specific first).
     let rewrites: &[(&str, &str)] = &[
-        ("Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-I-Quality",
-            "Qwen 3 35B MoE · APEX-I Quality (Claude Opus Distilled)"),
-        ("Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-I-Compact",
-            "Qwen 3 35B MoE · APEX-I Compact (Claude Opus Distilled)"),
-        ("Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-I",
-            "Qwen 3 35B MoE · APEX-I (Claude Opus Distilled)"),
-        ("Gliese-Qwen3.5-0.8B-Abliterated-Caption", "Gliese 0.8B Caption (Abliterated)"),
-        ("Qwen3.5-0.8B-UD-IQ2_XXS",   "Qwen 2.5 0.8B · IQ2_XXS"),
-        ("gemma-4-31B-it-UD-Q2_K_XL",  "Gemma 4 31B IT · Q2_K_XL"),
-        ("Bonsai-1.7B-IQ1_S",          "Bonsai 1.7B · IQ1_S"),
-        ("Bonsai-1.7B-Q2_K",           "Bonsai 1.7B · Q2_K"),
-        ("Bonsai-1.7B-TQ1_0",          "Bonsai 1.7B · TQ1_0"),
-        ("Bonsai-1.7B-TQ2_0",          "Bonsai 1.7B · TQ2_0"),
+        (
+            "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-I-Quality",
+            "Qwen 3 35B MoE · APEX-I Quality (Claude Opus Distilled)",
+        ),
+        (
+            "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-I-Compact",
+            "Qwen 3 35B MoE · APEX-I Compact (Claude Opus Distilled)",
+        ),
+        (
+            "Qwen3.6-35B-A3B-Claude-4.7-Opus-Reasoning-Distilled-APEX-I",
+            "Qwen 3 35B MoE · APEX-I (Claude Opus Distilled)",
+        ),
+        (
+            "Gliese-Qwen3.5-0.8B-Abliterated-Caption",
+            "Gliese 0.8B Caption (Abliterated)",
+        ),
+        ("Qwen3.5-0.8B-UD-IQ2_XXS", "Qwen 2.5 0.8B · IQ2_XXS"),
+        ("gemma-4-31B-it-UD-Q2_K_XL", "Gemma 4 31B IT · Q2_K_XL"),
+        ("Bonsai-1.7B-IQ1_S", "Bonsai 1.7B · IQ1_S"),
+        ("Bonsai-1.7B-Q2_K", "Bonsai 1.7B · Q2_K"),
+        ("Bonsai-1.7B-TQ1_0", "Bonsai 1.7B · TQ1_0"),
+        ("Bonsai-1.7B-TQ2_0", "Bonsai 1.7B · TQ2_0"),
     ];
     for (pattern, label) in rewrites {
-        if raw.contains(pattern) { return label.to_string(); }
+        if raw.contains(pattern) {
+            return label.to_string();
+        }
     }
 
     // Generic fallback: strip trailing quant token(s) and clean separators.
     // Pattern: anything matching known quant suffixes at the end.
-    let stripped = regex::Regex::new(
-        r"[-_](?:IQ\d+_\w+|Q\d+[_K]\w*|TQ\d+_\d+|UD-\w+|i1-\w+|gguf)$"
-    )
-    .ok()
-    .map(|re| re.replace(raw, "").to_string())
-    .unwrap_or_else(|| raw.to_string());
+    let stripped =
+        regex::Regex::new(r"[-_](?:IQ\d+_\w+|Q\d+[_K]\w*|TQ\d+_\d+|UD-\w+|i1-\w+|gguf)$")
+            .ok()
+            .map(|re| re.replace(raw, "").to_string())
+            .unwrap_or_else(|| raw.to_string());
 
     stripped
         .replace('-', " ")
@@ -715,7 +756,7 @@ pub fn clean_display_name(raw: &str) -> String {
 fn capitalise(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
-        None    => String::new(),
+        None => String::new(),
         Some(c) => c.to_uppercase().to_string() + chars.as_str(),
     }
 }
@@ -723,21 +764,24 @@ fn capitalise(s: &str) -> String {
 fn default_base_url(provider: &str) -> &'static str {
     match provider {
         "anthropic" => "https://api.anthropic.com/v1",
-        "openai"    => "https://api.openai.com/v1",
-        "groq"      => "https://api.groq.com/openai/v1",
-        "mistral"   => "https://api.mistral.ai/v1",
-        "ollama"    => "http://127.0.0.1:11434/v1",
-        "together"  => "https://api.together.xyz/v1",
-        "deepseek"  => "https://api.deepseek.com/v1",
-        _           => "https://api.openai.com/v1",
+        "openai" => "https://api.openai.com/v1",
+        "groq" => "https://api.groq.com/openai/v1",
+        "mistral" => "https://api.mistral.ai/v1",
+        "ollama" => "http://127.0.0.1:11434/v1",
+        "together" => "https://api.together.xyz/v1",
+        "deepseek" => "https://api.deepseek.com/v1",
+        _ => "https://api.openai.com/v1",
     }
 }
 
 fn apply_known_context_overrides(data: &mut ModelData, model_id: &str) {
     let id = model_id.to_lowercase();
     let (ctx, out) = if id.contains("claude") {
-        if id.contains("opus") { (200_000, 16_384) }
-        else                   { (200_000, 8_192)  }
+        if id.contains("opus") {
+            (200_000, 16_384)
+        } else {
+            (200_000, 8_192)
+        }
     } else if id.contains("gpt-4o") {
         (128_000, 16_384)
     } else if id.contains("gpt-4-turbo") {
@@ -755,6 +799,6 @@ fn apply_known_context_overrides(data: &mut ModelData, model_id: &str) {
     } else {
         return;
     };
-    data.capabilities.context_window    = ctx;
+    data.capabilities.context_window = ctx;
     data.capabilities.max_output_tokens = out;
 }

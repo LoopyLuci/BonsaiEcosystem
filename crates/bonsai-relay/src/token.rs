@@ -33,8 +33,12 @@ impl RelayToken {
         RelayToken(bytes)
     }
 
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
-    pub fn to_hex(&self) -> String { hex::encode(self.0) }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
 
     pub fn from_hex(s: &str) -> Result<Self, hex::FromHexError> {
         let bytes = hex::decode(s)?;
@@ -61,7 +65,10 @@ impl RegisterRequest {
         let mut nonce: u64 = 0;
         loop {
             if check_pow(&token, nonce) {
-                return Self { token, pow_nonce: nonce };
+                return Self {
+                    token,
+                    pow_nonce: nonce,
+                };
             }
             nonce = nonce.wrapping_add(1);
         }
@@ -82,11 +89,15 @@ fn check_pow(token: &RelayToken, nonce: u64) -> bool {
     let full_bytes = (POW_BITS / 8) as usize;
     let rem_bits = POW_BITS % 8;
     for &byte in h.iter().take(full_bytes) {
-        if byte != 0 { return false; }
+        if byte != 0 {
+            return false;
+        }
     }
     if rem_bits > 0 {
         let mask = 0xFF_u8 << (8 - rem_bits);
-        if h[full_bytes] & mask != 0 { return false; }
+        if h[full_bytes] & mask != 0 {
+            return false;
+        }
     }
     true
 }

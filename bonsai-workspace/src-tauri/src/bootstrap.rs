@@ -25,9 +25,9 @@ use std::sync::{
 use anyhow::{Context, Result};
 use futures::StreamExt;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager};
-use sha2::{Digest, Sha256};
 
 // ── Model sources ─────────────────────────────────────────────────────────────
 
@@ -41,10 +41,8 @@ const WHISPER_MODEL_FILE: &str = "ggml-base.en.bin";
 
 // ── Sidecar sources ───────────────────────────────────────────────────────────
 
-const LLAMA_API: &str =
-    "https://api.github.com/repos/ggerganov/llama.cpp/releases/latest";
-const WHISPER_API: &str =
-    "https://api.github.com/repos/ggerganov/whisper.cpp/releases/latest";
+const LLAMA_API: &str = "https://api.github.com/repos/ggerganov/llama.cpp/releases/latest";
+const WHISPER_API: &str = "https://api.github.com/repos/ggerganov/whisper.cpp/releases/latest";
 
 // ── Checksum verification ─────────────────────────────────────────────────────
 
@@ -62,7 +60,8 @@ async fn load_checksums() -> Result<std::collections::HashMap<String, String>> {
     // Try to load from the assets bundled with the binary
     if let Ok(data) = std::fs::read_to_string("checksums.json") {
         if let Ok(map) = serde_json::from_str::<serde_json::Value>(&data) {
-            let mut checksums: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+            let mut checksums: std::collections::HashMap<String, String> =
+                std::collections::HashMap::new();
             if let Some(obj) = map.as_object() {
                 for (key, val) in obj {
                     if let Some(hash) = val.get("latest").and_then(|v| v.as_str()) {
@@ -81,9 +80,9 @@ async fn load_checksums() -> Result<std::collections::HashMap<String, String>> {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct BootstrapStatus {
-    pub llama_ready:   bool,
+    pub llama_ready: bool,
     pub whisper_ready: bool,
-    pub model_ready:   bool,
+    pub model_ready: bool,
 }
 
 impl BootstrapStatus {
@@ -95,11 +94,17 @@ impl BootstrapStatus {
 // ── Canonical paths ───────────────────────────────────────────────────────────
 
 pub fn sidecars_dir(app: &AppHandle) -> PathBuf {
-    app.path().app_data_dir().expect("app_data_dir").join("sidecars")
+    app.path()
+        .app_data_dir()
+        .expect("app_data_dir")
+        .join("sidecars")
 }
 
 pub fn models_dir(app: &AppHandle) -> PathBuf {
-    app.path().app_data_dir().expect("app_data_dir").join("models")
+    app.path()
+        .app_data_dir()
+        .expect("app_data_dir")
+        .join("models")
 }
 
 pub fn llama_exe(app: &AppHandle) -> PathBuf {
@@ -131,7 +136,11 @@ pub fn find_gguf(app: &AppHandle) -> Option<PathBuf> {
             if p.extension().and_then(|e| e.to_str()) != Some("gguf") {
                 continue;
             }
-            let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+            let stem = p
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_lowercase();
             if stem.contains("bonsai") {
                 return Some(p);
             }
@@ -144,9 +153,9 @@ pub fn find_gguf(app: &AppHandle) -> Option<PathBuf> {
 
 pub fn check_status(app: &AppHandle) -> BootstrapStatus {
     BootstrapStatus {
-        llama_ready:   llama_exe(app).exists(),
+        llama_ready: llama_exe(app).exists(),
         whisper_ready: whisper_exe(app).exists(),
-        model_ready:   find_gguf(app).is_some(),
+        model_ready: find_gguf(app).is_some(),
     }
 }
 
@@ -180,7 +189,10 @@ pub async fn run(app: AppHandle, cancel: Arc<AtomicBool>) -> Result<()> {
 
     // 2. whisper-server
     if !whisper_exe(&app).exists() {
-        check_cancel(&cancel, "Bootstrap cancelled before whisper-server download")?;
+        check_cancel(
+            &cancel,
+            "Bootstrap cancelled before whisper-server download",
+        )?;
         step(&app, "whisper", 0, "Locating whisper.cpp release…");
         let url = github_zip_url(&client, WHISPER_API)
             .await
@@ -194,21 +206,43 @@ pub async fn run(app: AppHandle, cancel: Arc<AtomicBool>) -> Result<()> {
     // 3. Whisper model
     if !whisper_model(&app).exists() {
         check_cancel(&cancel, "Bootstrap cancelled before Whisper model download")?;
-        step(&app, "whisper_model", 0, "Downloading Whisper base.en (148 MB)…");
-        stream_file(&client, WHISPER_MODEL_URL, &whisper_model(&app), &app, "whisper_model", &cancel)
-            .await
-            .context("Whisper model download failed")?;
+        step(
+            &app,
+            "whisper_model",
+            0,
+            "Downloading Whisper base.en (148 MB)…",
+        );
+        stream_file(
+            &client,
+            WHISPER_MODEL_URL,
+            &whisper_model(&app),
+            &app,
+            "whisper_model",
+            &cancel,
+        )
+        .await
+        .context("Whisper model download failed")?;
     }
 
     // 4. Bonsai-1.7B
     if find_gguf(&app).is_none() {
         check_cancel(&cancel, "Bootstrap cancelled before Bonsai model download")?;
-        step(&app, "bonsai_model", 0, "Locating Bonsai-1.7B on HuggingFace…");
+        step(
+            &app,
+            "bonsai_model",
+            0,
+            "Locating Bonsai-1.7B on HuggingFace…",
+        );
         let (url, filename) = hf_gguf_url(&client, BONSAI_HF_REPO, BONSAI_QUANT_PREF)
             .await
             .context("Could not locate Bonsai-1.7B GGUF on HuggingFace")?;
         let dest = models_dir(&app).join(&filename);
-        step(&app, "bonsai_model", 1, &format!("Downloading {} …", filename));
+        step(
+            &app,
+            "bonsai_model",
+            1,
+            &format!("Downloading {} …", filename),
+        );
         stream_file(&client, &url, &dest, &app, "bonsai_model", &cancel)
             .await
             .context("Bonsai model download failed")?;
@@ -340,12 +374,19 @@ fn has_vulkan_gpu() -> bool {
         if let Ok(out) = {
             let mut c = std::process::Command::new("wmic");
             c.args(["path", "win32_VideoController", "get", "name"]);
-            #[cfg(windows)] { use std::os::windows::process::CommandExt; c.creation_flags(0x0800_0000); }
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                c.creation_flags(0x0800_0000);
+            }
             c.output()
         } {
             let s = String::from_utf8_lossy(&out.stdout).to_lowercase();
-            return s.contains("nvidia") || s.contains("amd") || s.contains("radeon")
-                || s.contains("intel arc") || s.contains("intel xe");
+            return s.contains("nvidia")
+                || s.contains("amd")
+                || s.contains("radeon")
+                || s.contains("intel arc")
+                || s.contains("intel xe");
         }
     }
     #[cfg(target_os = "linux")]
@@ -365,7 +406,9 @@ fn has_vulkan_gpu() -> bool {
 ///   - Otherwise prefer: noavx → avx2 → avx → cpu (pure CPU).
 ///   - CUDA and Metal are excluded (require separate driver installs).
 pub(crate) fn pick_zip(assets: &[serde_json::Value], must: &[&str]) -> Option<String> {
-    if must.is_empty() { return None; }
+    if must.is_empty() {
+        return None;
+    }
 
     let use_vulkan = cfg!(target_os = "windows") && has_vulkan_gpu();
 
@@ -373,11 +416,15 @@ pub(crate) fn pick_zip(assets: &[serde_json::Value], must: &[&str]) -> Option<St
     if use_vulkan {
         for asset in assets {
             let name = asset["name"].as_str().unwrap_or("").to_lowercase();
-            if !name.ends_with(".zip") { continue; }
-            if !must.iter().all(|p| name.contains(p)) { continue; }
+            if !name.ends_with(".zip") {
+                continue;
+            }
+            if !must.iter().all(|p| name.contains(p)) {
+                continue;
+            }
             if name.contains("vulkan") {
                 if let Some(url) = asset["browser_download_url"].as_str() {
-                tracing::info!(name=%name, "[bootstrap] Using Vulkan llama.cpp build");
+                    tracing::info!(name=%name, "[bootstrap] Using Vulkan llama.cpp build");
                     return Some(url.to_string());
                 }
             }
@@ -390,12 +437,23 @@ pub(crate) fn pick_zip(assets: &[serde_json::Value], must: &[&str]) -> Option<St
 
     for asset in assets {
         let name = asset["name"].as_str().unwrap_or("").to_lowercase();
-        if !name.ends_with(".zip") { continue; }
-        if !must.iter().all(|p| name.contains(p)) { continue; }
+        if !name.ends_with(".zip") {
+            continue;
+        }
+        if !must.iter().all(|p| name.contains(p)) {
+            continue;
+        }
         // Skip GPU-specific non-Vulkan builds
-        if name.contains("cuda") || name.contains("metal") || name.contains("hip") { continue; }
-        if name.contains("vulkan") { continue; } // already tried above
-        let score = cpu_pref.iter().position(|p| name.contains(p)).unwrap_or(cpu_pref.len());
+        if name.contains("cuda") || name.contains("metal") || name.contains("hip") {
+            continue;
+        }
+        if name.contains("vulkan") {
+            continue;
+        } // already tried above
+        let score = cpu_pref
+            .iter()
+            .position(|p| name.contains(p))
+            .unwrap_or(cpu_pref.len());
         if best.is_none() || score < best.unwrap().1 {
             best = Some((asset, score));
         }
@@ -437,11 +495,13 @@ async fn download_and_extract(
             let mut hasher = Sha256::new();
             hasher.update(&buf);
             let actual_hash = format!("{:x}", hasher.finalize());
-            
+
             if actual_hash != *expected_hash {
                 return Err(anyhow::anyhow!(
                     "SHA-256 mismatch for {}: expected {}, got {}",
-                    tag, expected_hash, actual_hash
+                    tag,
+                    expected_hash,
+                    actual_hash
                 ));
             }
         }
@@ -457,11 +517,19 @@ async fn download_and_extract(
 /// Returns `Some(true)` if `bytes` is a 64-bit PE (x86-64), `Some(false)` if it
 /// is a PE of a different architecture, or `None` if the bytes are not a PE file.
 fn pe_is_x64(bytes: &[u8]) -> Option<bool> {
-    if bytes.len() < 64 { return None; }
-    if bytes[0] != 0x4D || bytes[1] != 0x5A { return None; } // "MZ"
+    if bytes.len() < 64 {
+        return None;
+    }
+    if bytes[0] != 0x4D || bytes[1] != 0x5A {
+        return None;
+    } // "MZ"
     let pe_off = u32::from_le_bytes(bytes[60..64].try_into().ok()?) as usize;
-    if bytes.len() < pe_off + 6 { return None; }
-    if &bytes[pe_off..pe_off + 4] != b"PE\0\0" { return None; }
+    if bytes.len() < pe_off + 6 {
+        return None;
+    }
+    if &bytes[pe_off..pe_off + 4] != b"PE\0\0" {
+        return None;
+    }
     let machine = u16::from_le_bytes(bytes[pe_off + 4..pe_off + 6].try_into().ok()?);
     Some(machine == 0x8664) // AMD64 / x86-64
 }
@@ -471,7 +539,9 @@ fn extract(data: &[u8], dest: &Path) -> Result<()> {
     let mut archive = zip::ZipArchive::new(Cursor::new(data))?;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        if entry.is_dir() { continue; }
+        if entry.is_dir() {
+            continue;
+        }
 
         let raw = entry.name().to_string();
 
@@ -482,7 +552,10 @@ fn extract(data: &[u8], dest: &Path) -> Result<()> {
         // defence against exotic implementations.
         let fname = match Path::new(&raw).file_name() {
             Some(n) => n.to_string_lossy().to_string(),
-            None    => { tracing::warn!(entry=%raw, "[zip] Skipping entry with no filename"); continue; }
+            None => {
+                tracing::warn!(entry=%raw, "[zip] Skipping entry with no filename");
+                continue;
+            }
         };
         if fname.is_empty() || fname.contains("..") || fname.contains('/') || fname.contains('\\') {
             tracing::warn!(entry=%raw, "[zip] Skipping suspicious entry");
@@ -501,7 +574,9 @@ fn extract(data: &[u8], dest: &Path) -> Result<()> {
             || fname.contains("llama")
             || fname.contains("ggml")
             || fname.contains("whisper");
-        if !keep { continue; }
+        if !keep {
+            continue;
+        }
 
         // Read all entry bytes up-front so we can inspect the PE header before
         // writing. This lets us reject 32-bit binaries from mixed-arch zips.
@@ -523,7 +598,8 @@ fn extract(data: &[u8], dest: &Path) -> Result<()> {
         let out = dest.join(&fname);
         std::fs::write(&out, &content)?;
 
-        #[cfg(unix)] {
+        #[cfg(unix)]
+        {
             use std::os::unix::fs::PermissionsExt;
             if ext.is_empty() || ext == "so" || ext == "dylib" {
                 std::fs::set_permissions(&out, std::fs::Permissions::from_mode(0o755))?;
@@ -541,7 +617,9 @@ fn normalise_exe(dir: &Path, canonical: &str) -> Result<()> {
     #[cfg(not(windows))]
     let target = dir.join(canonical);
 
-    if target.exists() { return Ok(()); }
+    if target.exists() {
+        return Ok(());
+    }
 
     #[cfg(windows)]
     let alts = ["server.exe", "main.exe"];
@@ -584,7 +662,7 @@ async fn stream_file(
     let mut done = 0u64;
     let mut hasher = Sha256::new();
     use tokio::io::AsyncWriteExt;
-    
+
     while let Some(chunk) = stream.next().await {
         check_cancel(cancel, "Download cancelled")?;
         let chunk = chunk?;
@@ -603,13 +681,15 @@ async fn stream_file(
         if let Some(expected_hash) = checksums.get(tag) {
             step(app, tag, 95, "Verifying SHA-256…");
             let actual_hash = format!("{:x}", hasher.finalize());
-            
+
             if actual_hash != *expected_hash {
                 // Delete the file on mismatch
                 let _ = tokio::fs::remove_file(dest).await;
                 return Err(anyhow::anyhow!(
                     "SHA-256 mismatch for {}: expected {}, got {}",
-                    tag, expected_hash, actual_hash
+                    tag,
+                    expected_hash,
+                    actual_hash
                 ));
             }
         }

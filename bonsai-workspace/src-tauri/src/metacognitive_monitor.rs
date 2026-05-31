@@ -1,8 +1,8 @@
 //! Metacognitive Monitor — tracks reasoning quality, calibrates confidence,
 //! detects overconfidence, and recommends strategies.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // ── ReasoningStrategy ─────────────────────────────────────────────────────────
 
@@ -66,7 +66,9 @@ pub struct ReasoningRecord {
 }
 
 impl ReasoningRecord {
-    pub fn is_correct(&self) -> bool { self.actual_outcome.is_correct() }
+    pub fn is_correct(&self) -> bool {
+        self.actual_outcome.is_correct()
+    }
 }
 
 // ── CalibrationCurve ──────────────────────────────────────────────────────────
@@ -80,10 +82,18 @@ struct CalibrationBin {
 
 impl CalibrationBin {
     fn accuracy(&self) -> f32 {
-        if self.total_count == 0 { 0.5 } else { self.correct_count as f32 / self.total_count as f32 }
+        if self.total_count == 0 {
+            0.5
+        } else {
+            self.correct_count as f32 / self.total_count as f32
+        }
     }
     fn avg_confidence(&self) -> f32 {
-        if self.total_count == 0 { 0.5 } else { self.predicted_sum / self.total_count as f32 }
+        if self.total_count == 0 {
+            0.5
+        } else {
+            self.predicted_sum / self.total_count as f32
+        }
     }
 }
 
@@ -95,14 +105,18 @@ pub struct CalibrationCurve {
 
 impl CalibrationCurve {
     pub fn new() -> Self {
-        Self { bins: (0..10).map(|_| CalibrationBin::default()).collect() }
+        Self {
+            bins: (0..10).map(|_| CalibrationBin::default()).collect(),
+        }
     }
 
     pub fn add_point(&mut self, predicted: f32, correct: bool) {
         let idx = ((predicted * 10.0) as usize).min(9);
         self.bins[idx].predicted_sum += predicted;
         self.bins[idx].total_count += 1;
-        if correct { self.bins[idx].correct_count += 1; }
+        if correct {
+            self.bins[idx].correct_count += 1;
+        }
     }
 
     /// Return calibrated confidence: blend raw with empirical accuracy from that bin.
@@ -119,8 +133,11 @@ impl CalibrationCurve {
     /// Expected Calibration Error (ECE) — lower is better.
     pub fn ece(&self) -> f32 {
         let total: u32 = self.bins.iter().map(|b| b.total_count).sum();
-        if total == 0 { return 0.0; }
-        self.bins.iter()
+        if total == 0 {
+            return 0.0;
+        }
+        self.bins
+            .iter()
             .map(|b| {
                 let weight = b.total_count as f32 / total as f32;
                 let diff = (b.avg_confidence() - b.accuracy()).abs();
@@ -130,12 +147,16 @@ impl CalibrationCurve {
     }
 
     pub fn as_points(&self) -> Vec<CalibrationPoint> {
-        self.bins.iter().enumerate().map(|(i, b)| CalibrationPoint {
-            bucket_center: (i as f32 + 0.5) / 10.0,
-            avg_confidence: b.avg_confidence(),
-            accuracy: b.accuracy(),
-            count: b.total_count,
-        }).collect()
+        self.bins
+            .iter()
+            .enumerate()
+            .map(|(i, b)| CalibrationPoint {
+                bucket_center: (i as f32 + 0.5) / 10.0,
+                avg_confidence: b.avg_confidence(),
+                accuracy: b.accuracy(),
+                count: b.total_count,
+            })
+            .collect()
     }
 }
 
@@ -154,7 +175,7 @@ pub struct StrategyPerformance {
     pub total_attempts: u32,
     pub correct_attempts: u32,
     pub total_confidence: f32,
-    pub rolling_accuracy: f32,   // Exponential moving average
+    pub rolling_accuracy: f32, // Exponential moving average
     pub average_confidence: f32,
 }
 
@@ -163,10 +184,13 @@ impl StrategyPerformance {
 
     pub fn update(&mut self, correct: bool, confidence: f32) {
         self.total_attempts += 1;
-        if correct { self.correct_attempts += 1; }
+        if correct {
+            self.correct_attempts += 1;
+        }
         self.total_confidence += confidence;
         let accuracy = if correct { 1.0 } else { 0.0 };
-        self.rolling_accuracy = (1.0 - Self::ALPHA) * self.rolling_accuracy + Self::ALPHA * accuracy;
+        self.rolling_accuracy =
+            (1.0 - Self::ALPHA) * self.rolling_accuracy + Self::ALPHA * accuracy;
         self.average_confidence = self.total_confidence / self.total_attempts as f32;
     }
 
@@ -195,7 +219,8 @@ impl MetacognitiveMonitor {
     /// Record the result of a reasoning attempt.
     pub fn record(&mut self, record: ReasoningRecord) {
         let correct = record.is_correct();
-        self.calibration.add_point(record.predicted_confidence, correct);
+        self.calibration
+            .add_point(record.predicted_confidence, correct);
         self.strategy_performance
             .entry(record.strategy.clone())
             .or_default()
@@ -210,40 +235,52 @@ impl MetacognitiveMonitor {
 
     /// True if this strategy is predicting > 15% more than it actually achieves.
     pub fn is_overconfident(&self, strategy: &ReasoningStrategy) -> bool {
-        self.strategy_performance.get(strategy)
+        self.strategy_performance
+            .get(strategy)
             .map(|p| p.average_confidence - p.rolling_accuracy > 0.15)
             .unwrap_or(false)
     }
 
     /// Recommend the strategy with highest rolling accuracy (min 5 attempts).
     pub fn recommend_strategy(&self) -> Option<ReasoningStrategy> {
-        self.strategy_performance.iter()
+        self.strategy_performance
+            .iter()
             .filter(|(_, p)| p.total_attempts >= 5)
-            .max_by(|a, b| a.1.rolling_accuracy.partial_cmp(&b.1.rolling_accuracy)
-                .unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.1.rolling_accuracy
+                    .partial_cmp(&b.1.rolling_accuracy)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|(s, _)| s.clone())
     }
 
     /// Generate a full metacognitive report.
     pub fn reflect(&self) -> MetacognitiveReport {
-        let strategy_reports = self.strategy_performance.iter().map(|(s, p)| {
-            let overconfident = self.is_overconfident(s);
-            StrategyReport {
-                strategy: s.name().to_string(),
-                total_attempts: p.total_attempts,
-                rolling_accuracy: p.rolling_accuracy,
-                avg_confidence: p.average_confidence,
-                calibration_error: p.calibration_error(),
-                recommendation: if overconfident {
-                    format!("Reduce {} confidence by {:.0}%",
-                        s.name(), (p.average_confidence - p.rolling_accuracy) * 100.0)
-                } else if p.total_attempts < 5 {
-                    format!("{} needs more samples", s.name())
-                } else {
-                    format!("{} is well-calibrated", s.name())
-                },
-            }
-        }).collect();
+        let strategy_reports = self
+            .strategy_performance
+            .iter()
+            .map(|(s, p)| {
+                let overconfident = self.is_overconfident(s);
+                StrategyReport {
+                    strategy: s.name().to_string(),
+                    total_attempts: p.total_attempts,
+                    rolling_accuracy: p.rolling_accuracy,
+                    avg_confidence: p.average_confidence,
+                    calibration_error: p.calibration_error(),
+                    recommendation: if overconfident {
+                        format!(
+                            "Reduce {} confidence by {:.0}%",
+                            s.name(),
+                            (p.average_confidence - p.rolling_accuracy) * 100.0
+                        )
+                    } else if p.total_attempts < 5 {
+                        format!("{} needs more samples", s.name())
+                    } else {
+                        format!("{} is well-calibrated", s.name())
+                    },
+                }
+            })
+            .collect();
 
         MetacognitiveReport {
             total_reasoning_attempts: self.history.len() as u32,
@@ -257,7 +294,9 @@ impl MetacognitiveMonitor {
 
     pub fn overall_accuracy(&self) -> f32 {
         let total = self.history.len();
-        if total == 0 { return 0.0; }
+        if total == 0 {
+            return 0.0;
+        }
         let correct = self.history.iter().filter(|r| r.is_correct()).count();
         correct as f32 / total as f32
     }
@@ -269,7 +308,9 @@ impl MetacognitiveMonitor {
 }
 
 impl Default for MetacognitiveMonitor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Report types ──────────────────────────────────────────────────────────────
@@ -307,7 +348,11 @@ mod tests {
             query: "test".into(),
             conclusion: "answer".into(),
             predicted_confidence: conf,
-            actual_outcome: if correct { Outcome::Correct } else { Outcome::Incorrect },
+            actual_outcome: if correct {
+                Outcome::Correct
+            } else {
+                Outcome::Incorrect
+            },
             latency_ms: 50,
             timestamp: chrono::Utc::now().timestamp_millis(),
         }
@@ -325,8 +370,12 @@ mod tests {
     #[test]
     fn recommend_strategy_picks_best() {
         let mut m = MetacognitiveMonitor::new();
-        for _ in 0..5 { m.record(record(ReasoningStrategy::Deduction, 0.8, true)); }
-        for _ in 0..5 { m.record(record(ReasoningStrategy::Induction, 0.8, false)); }
+        for _ in 0..5 {
+            m.record(record(ReasoningStrategy::Deduction, 0.8, true));
+        }
+        for _ in 0..5 {
+            m.record(record(ReasoningStrategy::Induction, 0.8, false));
+        }
         let rec = m.recommend_strategy();
         assert_eq!(rec, Some(ReasoningStrategy::Deduction));
     }

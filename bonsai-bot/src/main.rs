@@ -1,7 +1,16 @@
-#![allow(clippy::manual_is_multiple_of, clippy::bind_instead_of_map, clippy::needless_return, clippy::map_identity, clippy::suspicious_open_options)]
+#![allow(
+    clippy::manual_is_multiple_of,
+    clippy::bind_instead_of_map,
+    clippy::needless_return,
+    clippy::map_identity,
+    clippy::suspicious_open_options
+)]
 
 // All modules are declared in lib.rs; import them here
-use bonsai_bot::{admin_api, buddy_client, config, dedup, health, metrics, mgmt_client, platforms, router, scheduler, session, swarm_client};
+use bonsai_bot::{
+    admin_api, buddy_client, config, dedup, health, metrics, mgmt_client, platforms, router,
+    scheduler, session, swarm_client,
+};
 
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -9,11 +18,13 @@ use tokio::time::{interval, Duration};
 
 use crate::admin_api::PlatformStates;
 use crate::buddy_client::BuddyClient;
-use crate::mgmt_client::MgmtClient;
-use crate::config::{ensure_admin_token, keyring_get, load_config, read_workspace_api_url, read_workspace_pair_token};
+use crate::config::{
+    ensure_admin_token, keyring_get, load_config, read_workspace_api_url, read_workspace_pair_token,
+};
 use crate::dedup::DedupCache;
 use crate::health::{wait_for_buddy, CircuitBreaker};
 use crate::metrics::Metrics;
+use crate::mgmt_client::MgmtClient;
 use crate::platforms::{InboundMessage, MessagingPlatform, ShedNotice};
 use crate::router::Router;
 
@@ -26,11 +37,11 @@ fn spawn_platform_with_backoff(
 ) {
     tokio::spawn(async move {
         let mut delay_secs: u64 = 1;
-        let mut attempts: u32   = 0;
+        let mut attempts: u32 = 0;
         loop {
-            let name  = p.name();
-            let p2    = p.clone();
-            let tx2   = tx.clone();
+            let name = p.name();
+            let p2 = p.clone();
+            let tx2 = tx.clone();
             let shed2 = shed_tx.clone();
             p2.run(tx2, shed2).await;
             attempts += 1;
@@ -38,7 +49,9 @@ fn spawn_platform_with_backoff(
                 tracing::error!("[{name}] Platform exited 10 times — giving up");
                 break;
             }
-            tracing::warn!("[{name}] Platform exited (attempt {attempts}); reconnecting in {delay_secs}s");
+            tracing::warn!(
+                "[{name}] Platform exited (attempt {attempts}); reconnecting in {delay_secs}s"
+            );
             tokio::time::sleep(Duration::from_secs(delay_secs)).await;
             delay_secs = (delay_secs * 2).min(32);
         }
@@ -49,8 +62,7 @@ fn spawn_platform_with_backoff(
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into())
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -61,26 +73,39 @@ async fn main() {
     // Config validation
     {
         let mut errs: Vec<&str> = Vec::new();
-        if cfg.buddy_api_url.is_empty()     { errs.push("buddy_api_url is empty"); }
-        if cfg.preferred_model_tags.is_empty() { errs.push("preferred_model_tags is empty"); }
-        let any_platform = cfg.discord.enabled || cfg.telegram.enabled || cfg.email.enabled || cfg.matrix.enabled;
-        if !any_platform { tracing::warn!("[bonsai-bot] No platforms are enabled — bot will not receive messages"); }
-        for e in &errs { tracing::error!("[bonsai-bot] Config error: {e}"); }
-        if !errs.is_empty() { std::process::exit(1); }
+        if cfg.buddy_api_url.is_empty() {
+            errs.push("buddy_api_url is empty");
+        }
+        if cfg.preferred_model_tags.is_empty() {
+            errs.push("preferred_model_tags is empty");
+        }
+        let any_platform =
+            cfg.discord.enabled || cfg.telegram.enabled || cfg.email.enabled || cfg.matrix.enabled;
+        if !any_platform {
+            tracing::warn!("[bonsai-bot] No platforms are enabled — bot will not receive messages");
+        }
+        for e in &errs {
+            tracing::error!("[bonsai-bot] Config error: {e}");
+        }
+        if !errs.is_empty() {
+            std::process::exit(1);
+        }
     }
 
     let admin_token = ensure_admin_token().expect("keychain access for admin token");
 
     // Wait for Buddy
     if !wait_for_buddy(&cfg.buddy_api_url, 60).await {
-        tracing::warn!("[bonsai-bot] Buddy not reachable after 60s — starting with circuit breaker open");
+        tracing::warn!(
+            "[bonsai-bot] Buddy not reachable after 60s — starting with circuit breaker open"
+        );
     }
 
     // SQLite
     let db = Arc::new(
         tokio_rusqlite::Connection::open(&cfg.db_path)
             .await
-            .expect("SQLite open")
+            .expect("SQLite open"),
     );
 
     session::migrate(&db).await.expect("DB migrate");
@@ -97,7 +122,7 @@ async fn main() {
     // Shared state
     let metrics = Arc::new(Metrics::default());
     let breaker = CircuitBreaker::new(cfg.circuit_breaker.clone());
-    let buddy   = Arc::new(BuddyClient::new(
+    let buddy = Arc::new(BuddyClient::new(
         cfg.buddy_api_url.clone(),
         cfg.workspace_api_url.clone(),
         cfg.preferred_model_tags.clone(),
@@ -114,12 +139,17 @@ async fn main() {
 
     // Resolve pair token: prefer live value from bonsai-config.json, fall back to config file.
     let pair_token = read_workspace_pair_token()
-        .or_else(|| (!cfg.workspace_pair_token.is_empty()).then(|| cfg.workspace_pair_token.clone()))
+        .or_else(|| {
+            (!cfg.workspace_pair_token.is_empty()).then(|| cfg.workspace_pair_token.clone())
+        })
         .unwrap_or_default();
     if pair_token.is_empty() {
         tracing::warn!("[bonsai-bot] No workspace pair token found — slash commands disabled. Start Bonsai Workspace first, or set workspace_pair_token in bonsai-bot-config.json");
     } else {
-        tracing::info!("[bonsai-bot] Workspace pair token loaded ({} chars)", pair_token.len());
+        tracing::info!(
+            "[bonsai-bot] Workspace pair token loaded ({} chars)",
+            pair_token.len()
+        );
     }
     let mgmt = MgmtClient::new(&workspace_url, pair_token);
 
@@ -175,7 +205,13 @@ async fn main() {
     if cfg.discord.enabled {
         if let Some(token) = keyring_get("discord_token") {
             use crate::platforms::discord::DiscordPlatform;
-            let p = DiscordPlatform::new(token, cfg.discord.config.clone(), metrics.clone(), router.clone(), platform_states.clone());
+            let p = DiscordPlatform::new(
+                token,
+                cfg.discord.config.clone(),
+                metrics.clone(),
+                router.clone(),
+                platform_states.clone(),
+            );
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
             platform_list.push(p2.clone());
             spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
@@ -188,7 +224,13 @@ async fn main() {
     if cfg.telegram.enabled {
         if let Some(token) = keyring_get("telegram_token") {
             use crate::platforms::telegram::TelegramPlatform;
-            let p = TelegramPlatform::new(token, cfg.telegram.config.clone(), metrics.clone(), router.clone(), platform_states.clone());
+            let p = TelegramPlatform::new(
+                token,
+                cfg.telegram.config.clone(),
+                metrics.clone(),
+                router.clone(),
+                platform_states.clone(),
+            );
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
             platform_list.push(p2.clone());
             spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
@@ -199,11 +241,18 @@ async fn main() {
 
     #[cfg(feature = "email")]
     if cfg.email.enabled {
-        if let (Some(imap_pass), Some(smtp_pass)) =
-            (keyring_get("email_imap_password"), keyring_get("email_smtp_password"))
-        {
+        if let (Some(imap_pass), Some(smtp_pass)) = (
+            keyring_get("email_imap_password"),
+            keyring_get("email_smtp_password"),
+        ) {
             use crate::platforms::email::EmailPlatform;
-            let p = EmailPlatform::new(imap_pass, smtp_pass, cfg.email.config.clone(), metrics.clone(), platform_states.clone());
+            let p = EmailPlatform::new(
+                imap_pass,
+                smtp_pass,
+                cfg.email.config.clone(),
+                metrics.clone(),
+                platform_states.clone(),
+            );
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
             platform_list.push(p2.clone());
             spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
@@ -216,7 +265,12 @@ async fn main() {
     if cfg.matrix.enabled {
         if let Some(password) = keyring_get("matrix_password") {
             use crate::platforms::matrix::MatrixPlatform;
-            let p = MatrixPlatform::new(password, cfg.matrix.config.clone(), metrics.clone(), platform_states.clone());
+            let p = MatrixPlatform::new(
+                password,
+                cfg.matrix.config.clone(),
+                metrics.clone(),
+                platform_states.clone(),
+            );
             let p2 = p.clone() as Arc<dyn MessagingPlatform>;
             platform_list.push(p2.clone());
             spawn_platform_with_backoff(p2, tx.clone(), shed_tx.clone());
@@ -248,9 +302,15 @@ async fn main() {
             if let Ok(nonce) = session::mark_prompted(&db, pc.token.clone()).await {
                 for plat in platforms.iter() {
                     if plat.name() == pc.platform {
-                        let _ = plat.send_confirm_prompt(
-                            &pc.chat_id, &pc.user_id, &pc.token, &pc.prompt, nonce,
-                        ).await;
+                        let _ = plat
+                            .send_confirm_prompt(
+                                &pc.chat_id,
+                                &pc.user_id,
+                                &pc.token,
+                                &pc.prompt,
+                                nonce,
+                            )
+                            .await;
                     }
                 }
             }
@@ -285,7 +345,8 @@ async fn main() {
         tokio::spawn(async move {
             while let Some(req) = broadcast_rx.recv().await {
                 for plat in plats2.iter() {
-                    if req.platforms.is_empty() || req.platforms.contains(&plat.name().to_string()) {
+                    if req.platforms.is_empty() || req.platforms.contains(&plat.name().to_string())
+                    {
                         let _ = plat.send_reply("", "", &req.message, None).await;
                     }
                 }
@@ -295,9 +356,11 @@ async fn main() {
 
     // Main processing loop — single receiver dispatches to per-message tasks,
     // bounded by global semaphore (cfg.backpressure.global_semaphore in-flight max)
-    let semaphore = Arc::new(tokio::sync::Semaphore::new(cfg.backpressure.global_semaphore));
-    let sem   = semaphore.clone();
-    let rtr   = router.clone();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(
+        cfg.backpressure.global_semaphore,
+    ));
+    let sem = semaphore.clone();
+    let rtr = router.clone();
     let plats = platforms.clone();
     let swarm2 = swarm.clone();
 

@@ -13,8 +13,8 @@
 //! suggestions are returned to the frontend for user approval.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -22,8 +22,8 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use bonsai_capability_registry::BonsaiEffect;
 use crate::gpu_layer::GpuLayer;
+use bonsai_capability_registry::BonsaiEffect;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1 — Trust level and sandboxing
@@ -46,8 +46,8 @@ impl TrustLevel {
         match self {
             Self::Untrusted => "L0:Untrusted",
             Self::Sandboxed => "L1:Sandboxed",
-            Self::Managed   => "L2:Managed",
-            Self::System    => "L3:System",
+            Self::Managed => "L2:Managed",
+            Self::System => "L3:System",
         }
     }
 
@@ -56,10 +56,16 @@ impl TrustLevel {
         match self {
             Self::Untrusted => vec![],
             Self::Sandboxed => vec![BonsaiEffect::FileIO],
-            Self::Managed   => vec![BonsaiEffect::FileIO, BonsaiEffect::NetworkIO, BonsaiEffect::ShellExec],
-            Self::System    => vec![
-                BonsaiEffect::FileIO, BonsaiEffect::NetworkIO,
-                BonsaiEffect::ShellExec, BonsaiEffect::Spawn,
+            Self::Managed => vec![
+                BonsaiEffect::FileIO,
+                BonsaiEffect::NetworkIO,
+                BonsaiEffect::ShellExec,
+            ],
+            Self::System => vec![
+                BonsaiEffect::FileIO,
+                BonsaiEffect::NetworkIO,
+                BonsaiEffect::ShellExec,
+                BonsaiEffect::Spawn,
             ],
         }
     }
@@ -81,10 +87,34 @@ pub struct ResourceBudget {
 impl ResourceBudget {
     pub fn for_trust(level: TrustLevel) -> Self {
         match level {
-            TrustLevel::Untrusted => Self { max_ram_mb: 256, max_cpu_pct: 10, max_disk_mb: 0, max_gpu_mb: 0, network_allowed: false },
-            TrustLevel::Sandboxed => Self { max_ram_mb: 1024, max_cpu_pct: 25, max_disk_mb: 512, max_gpu_mb: 0, network_allowed: false },
-            TrustLevel::Managed   => Self { max_ram_mb: 4096, max_cpu_pct: 50, max_disk_mb: 4096, max_gpu_mb: 2048, network_allowed: true },
-            TrustLevel::System    => Self { max_ram_mb: u64::MAX, max_cpu_pct: 100, max_disk_mb: u64::MAX, max_gpu_mb: u64::MAX, network_allowed: true },
+            TrustLevel::Untrusted => Self {
+                max_ram_mb: 256,
+                max_cpu_pct: 10,
+                max_disk_mb: 0,
+                max_gpu_mb: 0,
+                network_allowed: false,
+            },
+            TrustLevel::Sandboxed => Self {
+                max_ram_mb: 1024,
+                max_cpu_pct: 25,
+                max_disk_mb: 512,
+                max_gpu_mb: 0,
+                network_allowed: false,
+            },
+            TrustLevel::Managed => Self {
+                max_ram_mb: 4096,
+                max_cpu_pct: 50,
+                max_disk_mb: 4096,
+                max_gpu_mb: 2048,
+                network_allowed: true,
+            },
+            TrustLevel::System => Self {
+                max_ram_mb: u64::MAX,
+                max_cpu_pct: 100,
+                max_disk_mb: u64::MAX,
+                max_gpu_mb: u64::MAX,
+                network_allowed: true,
+            },
         }
     }
 }
@@ -112,7 +142,9 @@ pub enum SchedulingPolicy {
 }
 
 impl Default for SchedulingPolicy {
-    fn default() -> Self { Self::Normal }
+    fn default() -> Self {
+        Self::Normal
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,7 +168,13 @@ pub struct ManagedProcess {
 }
 
 impl ManagedProcess {
-    fn new(pid: u32, binary: &str, args: &[String], trust_level: TrustLevel, parent: Option<u32>) -> Self {
+    fn new(
+        pid: u32,
+        binary: &str,
+        args: &[String],
+        trust_level: TrustLevel,
+        parent: Option<u32>,
+    ) -> Self {
         let allowed = trust_level.allowed_effects();
         let budget = ResourceBudget::for_trust(trust_level);
         Self {
@@ -216,13 +254,18 @@ impl ProcessManager {
 
     // ── Effect validation ────────────────────────────────────────────────────
 
-    fn validate_effects(&self, requested: &[BonsaiEffect], level: TrustLevel) -> Result<(), String> {
+    fn validate_effects(
+        &self,
+        requested: &[BonsaiEffect],
+        level: TrustLevel,
+    ) -> Result<(), String> {
         let allowed = level.allowed_effects();
         for effect in requested {
             if !allowed.contains(effect) {
                 return Err(format!(
                     "Effect {:?} is not permitted at trust level {}",
-                    effect, level.label()
+                    effect,
+                    level.label()
                 ));
             }
         }
@@ -249,16 +292,23 @@ impl ProcessManager {
                 return self.spawn_sandboxed(req, vpid).await;
             }
             TrustLevel::Managed | TrustLevel::System => {
-                if cfg!(windows) { ("powershell.exe", "-Command") }
-                else { ("sh", "-c") }
+                if cfg!(windows) {
+                    ("powershell.exe", "-Command")
+                } else {
+                    ("sh", "-c")
+                }
             }
         };
 
         // 4. Spawn native
         let mut cmd = tokio::process::Command::new(sh);
         cmd.arg(flag).arg(&req.binary);
-        for (k, v) in &req.env_vars { cmd.env(k, v); }
-        if let Some(ref wd) = req.working_dir { cmd.current_dir(wd); }
+        for (k, v) in &req.env_vars {
+            cmd.env(k, v);
+        }
+        if let Some(ref wd) = req.working_dir {
+            cmd.current_dir(wd);
+        }
 
         let proc = cmd.spawn().map_err(|e| e.to_string())?;
         let real_pid = proc.id().unwrap_or(vpid);
@@ -271,8 +321,15 @@ impl ProcessManager {
         // 6. Async monitor
         self.spawn_monitor(real_pid, proc);
 
-        info!("[process-mgr] spawned pid={real_pid} binary={} trust={}", req.binary, req.trust_level.label());
-        Ok(SpawnResult { pid: real_pid, status: "running".into() })
+        info!(
+            "[process-mgr] spawned pid={real_pid} binary={} trust={}",
+            req.binary,
+            req.trust_level.label()
+        );
+        Ok(SpawnResult {
+            pid: real_pid,
+            status: "running".into(),
+        })
     }
 
     async fn spawn_sandboxed(&self, req: SpawnRequest, vpid: u32) -> Result<SpawnResult, String> {
@@ -287,19 +344,28 @@ impl ProcessManager {
         self.processes.write().await.insert(vpid, mp);
 
         // Run sandboxed asynchronously
-        let processes = Arc::clone(&Arc::new(RwLock::new(HashMap::<u32, ManagedProcess>::new())));
+        let processes = Arc::clone(&Arc::new(
+            RwLock::new(HashMap::<u32, ManagedProcess>::new()),
+        ));
         // Note: we can't easily clone RwLock, so we update state via a channel pattern.
         // For now, log the result — a future version can use a watch channel.
         tokio::spawn(async move {
             let result = crate::sandbox_executor::run_sandboxed_code(sr).await;
             let state = match result {
-                Ok(r) => ProcessState::Completed { exit_code: r.exit_code },
-                Err(_) => ProcessState::Killed { reason: "sandbox error".into() },
+                Ok(r) => ProcessState::Completed {
+                    exit_code: r.exit_code,
+                },
+                Err(_) => ProcessState::Killed {
+                    reason: "sandbox error".into(),
+                },
             };
             debug!("[process-mgr] sandbox vpid={vpid} completed: {state:?}");
         });
 
-        Ok(SpawnResult { pid: vpid, status: "sandboxed".into() })
+        Ok(SpawnResult {
+            pid: vpid,
+            status: "sandboxed".into(),
+        })
     }
 
     fn spawn_monitor(&self, pid: u32, mut child: tokio::process::Child) {
@@ -311,8 +377,12 @@ impl ProcessManager {
         tokio::spawn(async move {
             let status = child.wait().await;
             let state = match status {
-                Ok(s) => ProcessState::Completed { exit_code: s.code().unwrap_or(-1) },
-                Err(e) => ProcessState::Killed { reason: e.to_string() },
+                Ok(s) => ProcessState::Completed {
+                    exit_code: s.code().unwrap_or(-1),
+                },
+                Err(e) => ProcessState::Killed {
+                    reason: e.to_string(),
+                },
             };
             debug!("[process-mgr] pid={pid} exited: {state:?}");
         });
@@ -327,8 +397,13 @@ impl ProcessManager {
         reason: Option<String>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + '_>> {
         Box::pin(async move {
-            let children: Vec<u32> = self.processes.read().await
-                .get(&pid).map(|p| p.children.clone()).unwrap_or_default();
+            let children: Vec<u32> = self
+                .processes
+                .read()
+                .await
+                .get(&pid)
+                .map(|p| p.children.clone())
+                .unwrap_or_default();
 
             if !children.is_empty() && !force {
                 return Err(format!(
@@ -338,7 +413,9 @@ impl ProcessManager {
             }
 
             for child_pid in &children {
-                let _ = self.kill(*child_pid, true, Some("parent killed".into())).await;
+                let _ = self
+                    .kill(*child_pid, true, Some("parent killed".into()))
+                    .await;
             }
 
             if let Some(p) = self.processes.write().await.get_mut(&pid) {
@@ -357,7 +434,9 @@ impl ProcessManager {
         if let Some(p) = self.processes.write().await.get_mut(&pid) {
             p.scheduling = policy;
             true
-        } else { false }
+        } else {
+            false
+        }
     }
 
     // ── Query ────────────────────────────────────────────────────────────────
@@ -394,16 +473,20 @@ impl ProcessManager {
 
         let snapshot = self.processes.read().await;
         for p in snapshot.values() {
-            if p.state != ProcessState::Running { continue; }
+            if p.state != ProcessState::Running {
+                continue;
+            }
 
-            if matches!(p.scheduling, SchedulingPolicy::Normal)
-                && p.cpu_pct < 0.5 && p.ram_mb > 512
+            if matches!(p.scheduling, SchedulingPolicy::Normal) && p.cpu_pct < 0.5 && p.ram_mb > 512
             {
                 actions.push(ProcessAction::MoveToBackground { pid: p.pid });
             }
 
             if p.ram_mb > p.budget.max_ram_mb.saturating_sub(256) {
-                actions.push(ProcessAction::LimitMemory { pid: p.pid, max_mb: p.budget.max_ram_mb });
+                actions.push(ProcessAction::LimitMemory {
+                    pid: p.pid,
+                    max_mb: p.budget.max_ram_mb,
+                });
             }
 
             if vram_pressure && p.trust_level <= TrustLevel::Sandboxed && p.ram_mb > 256 {
@@ -420,7 +503,10 @@ impl ProcessManager {
 
     pub async fn stats(&self) -> serde_json::Value {
         let snapshot = self.processes.read().await;
-        let running = snapshot.values().filter(|p| p.state == ProcessState::Running).count();
+        let running = snapshot
+            .values()
+            .filter(|p| p.state == ProcessState::Running)
+            .count();
         let total = snapshot.len();
         let mut trust_counts: HashMap<&str, usize> = HashMap::new();
         for p in snapshot.values() {
@@ -496,7 +582,10 @@ mod tests {
 
     fn make_pm() -> Arc<ProcessManager> {
         let gpu = Arc::new(crate::gpu_layer::GpuLayer::new(
-            &crate::gpu_layer::GpuInfo { has_vulkan: false, has_directml: false }
+            &crate::gpu_layer::GpuInfo {
+                has_vulkan: false,
+                has_directml: false,
+            },
         ));
         ProcessManager::new(gpu)
     }
@@ -510,15 +599,23 @@ mod tests {
     #[test]
     fn validate_effects_ok() {
         let pm = make_pm();
-        assert!(pm.validate_effects(&[BonsaiEffect::FileIO], TrustLevel::Sandboxed).is_ok());
-        assert!(pm.validate_effects(&[BonsaiEffect::ShellExec], TrustLevel::Managed).is_ok());
+        assert!(pm
+            .validate_effects(&[BonsaiEffect::FileIO], TrustLevel::Sandboxed)
+            .is_ok());
+        assert!(pm
+            .validate_effects(&[BonsaiEffect::ShellExec], TrustLevel::Managed)
+            .is_ok());
     }
 
     #[test]
     fn validate_effects_deny() {
         let pm = make_pm();
-        assert!(pm.validate_effects(&[BonsaiEffect::ShellExec], TrustLevel::Untrusted).is_err());
-        assert!(pm.validate_effects(&[BonsaiEffect::NetworkIO], TrustLevel::Sandboxed).is_err());
+        assert!(pm
+            .validate_effects(&[BonsaiEffect::ShellExec], TrustLevel::Untrusted)
+            .is_err());
+        assert!(pm
+            .validate_effects(&[BonsaiEffect::NetworkIO], TrustLevel::Sandboxed)
+            .is_err());
     }
 
     #[test]

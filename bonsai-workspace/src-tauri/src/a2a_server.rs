@@ -1,4 +1,9 @@
-use axum::{extract::Path, response::Json, routing::{get, post}, Router, Extension};
+use axum::{
+    extract::Path,
+    response::Json,
+    routing::{get, post},
+    Extension, Router,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
@@ -45,17 +50,30 @@ async fn get_agent_card() -> Json<AgentCard> {
     Json(AgentCard {
         name: "BonsAI".into(),
         version: env!("CARGO_PKG_VERSION").into(),
-        capabilities: vec!["text".into(), "code".into(), "vision".into(), "music".into()],
+        capabilities: vec![
+            "text".into(),
+            "code".into(),
+            "vision".into(),
+            "music".into(),
+        ],
         url: "http://localhost".into(),
     })
 }
 
 async fn send_task(Json(payload): Json<TaskRequest>) -> Json<TaskResponse> {
     // TODO: enqueue into AgentHost task table and return task id
-    Json(TaskResponse { task_id: uuid::Uuid::new_v4().to_string(), status: "accepted".into(), output: None })
+    Json(TaskResponse {
+        task_id: uuid::Uuid::new_v4().to_string(),
+        status: "accepted".into(),
+        output: None,
+    })
 }
 
 async fn get_task(Path(task_id): Path<String>) -> Json<TaskResponse> {
     // TODO: query task status
-    Json(TaskResponse { task_id, status: "completed".into(), output: Some(json!({"result":"example"})) })
+    Json(TaskResponse {
+        task_id,
+        status: "completed".into(),
+        output: Some(json!({"result":"example"})),
+    })
 }

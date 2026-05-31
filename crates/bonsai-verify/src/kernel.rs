@@ -10,9 +10,9 @@
 //!
 //! This is the *trusted* kernel: only code in this file can produce a `Proof`.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-use serde::{Deserialize, Serialize};
 
 // ── Sorts ─────────────────────────────────────────────────────────────────────
 
@@ -78,16 +78,29 @@ pub enum Term {
 
     /// λ-abstraction: `λ(x : ty). body`.
     /// The binder name is kept for pretty-printing only.
-    Lam { name: String, ty: Box<Term>, body: Box<Term> },
+    Lam {
+        name: String,
+        ty: Box<Term>,
+        body: Box<Term>,
+    },
 
     /// Dependent function type: `Π(x : domain). codomain`.
-    Pi { name: String, domain: Box<Term>, codomain: Box<Term> },
+    Pi {
+        name: String,
+        domain: Box<Term>,
+        codomain: Box<Term>,
+    },
 
     /// A universe sort.
     Sort(Sort),
 
     /// Let-binding: `let x : ty := val in body`.
-    Let { name: String, ty: Box<Term>, val: Box<Term>, body: Box<Term> },
+    Let {
+        name: String,
+        ty: Box<Term>,
+        val: Box<Term>,
+        body: Box<Term>,
+    },
 
     /// The type of natural numbers (built-in for convenience).
     Nat,
@@ -107,20 +120,45 @@ pub struct ProofWitness {
 // ── Helper constructors ───────────────────────────────────────────────────────
 
 impl Term {
-    pub fn var(i: usize) -> Self { Term::Var(i) }
-    pub fn con(name: impl Into<String>) -> Self { Term::Const(name.into()) }
-    pub fn app(f: Term, a: Term) -> Self { Term::App(Box::new(f), Box::new(a)) }
+    pub fn var(i: usize) -> Self {
+        Term::Var(i)
+    }
+    pub fn con(name: impl Into<String>) -> Self {
+        Term::Const(name.into())
+    }
+    pub fn app(f: Term, a: Term) -> Self {
+        Term::App(Box::new(f), Box::new(a))
+    }
     pub fn lam(name: impl Into<String>, ty: Term, body: Term) -> Self {
-        Term::Lam { name: name.into(), ty: Box::new(ty), body: Box::new(body) }
+        Term::Lam {
+            name: name.into(),
+            ty: Box::new(ty),
+            body: Box::new(body),
+        }
     }
     pub fn pi(name: impl Into<String>, domain: Term, codomain: Term) -> Self {
-        Term::Pi { name: name.into(), domain: Box::new(domain), codomain: Box::new(codomain) }
+        Term::Pi {
+            name: name.into(),
+            domain: Box::new(domain),
+            codomain: Box::new(codomain),
+        }
     }
-    pub fn sort(s: Sort) -> Self { Term::Sort(s) }
-    pub fn prop() -> Self { Term::Sort(Sort::Prop) }
-    pub fn type0() -> Self { Term::Sort(Sort::Type(0)) }
+    pub fn sort(s: Sort) -> Self {
+        Term::Sort(s)
+    }
+    pub fn prop() -> Self {
+        Term::Sort(Sort::Prop)
+    }
+    pub fn type0() -> Self {
+        Term::Sort(Sort::Type(0))
+    }
     pub fn let_in(name: impl Into<String>, ty: Term, val: Term, body: Term) -> Self {
-        Term::Let { name: name.into(), ty: Box::new(ty), val: Box::new(val), body: Box::new(body) }
+        Term::Let {
+            name: name.into(),
+            ty: Box::new(ty),
+            val: Box::new(val),
+            body: Box::new(body),
+        }
     }
 
     pub fn is_const_named(&self, name: &str) -> bool {
@@ -146,14 +184,23 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_axiom(&mut self, name: impl Into<String>, ty: Term) {
-        self.decls.insert(name.into(), Declaration { ty, body: None });
+        self.decls
+            .insert(name.into(), Declaration { ty, body: None });
     }
 
     pub fn add_def(&mut self, name: impl Into<String>, ty: Term, body: Term) {
-        self.decls.insert(name.into(), Declaration { ty, body: Some(body) });
+        self.decls.insert(
+            name.into(),
+            Declaration {
+                ty,
+                body: Some(body),
+            },
+        );
     }
 
     pub fn lookup(&self, name: &str) -> Option<&Declaration> {
@@ -171,7 +218,9 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn push(&self, name: impl Into<String>, ty: Term) -> Self {
         let mut c = self.clone();
@@ -181,11 +230,19 @@ impl Context {
 
     pub fn lookup(&self, i: usize) -> Option<&(String, Term)> {
         let n = self.entries.len();
-        if i < n { Some(&self.entries[n - 1 - i]) } else { None }
+        if i < n {
+            Some(&self.entries[n - 1 - i])
+        } else {
+            None
+        }
     }
 
-    pub fn len(&self) -> usize { self.entries.len() }
-    pub fn is_empty(&self) -> bool { self.entries.is_empty() }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }
 
 // ── Type errors ───────────────────────────────────────────────────────────────
@@ -195,10 +252,17 @@ pub enum KernelError {
     UnboundVariable(usize),
     UnknownConst(String),
     NotAFunction(Box<Term>),
-    TypeMismatch { expected: Box<Term>, got: Box<Term> },
+    TypeMismatch {
+        expected: Box<Term>,
+        got: Box<Term>,
+    },
     SortExpected(Box<Term>),
     CannotProve(String),
-    ApplicationTypeMismatch { arg: Box<Term>, expected: Box<Term>, got: Box<Term> },
+    ApplicationTypeMismatch {
+        arg: Box<Term>,
+        expected: Box<Term>,
+        got: Box<Term>,
+    },
 }
 
 impl fmt::Display for KernelError {
@@ -207,12 +271,16 @@ impl fmt::Display for KernelError {
             KernelError::UnboundVariable(i) => write!(f, "unbound variable: #{}", i),
             KernelError::UnknownConst(n) => write!(f, "unknown constant: {}", n),
             KernelError::NotAFunction(t) => write!(f, "not a function type: {:?}", t),
-            KernelError::TypeMismatch { expected, got } =>
-                write!(f, "type mismatch: expected {:?}, got {:?}", expected, got),
+            KernelError::TypeMismatch { expected, got } => {
+                write!(f, "type mismatch: expected {:?}, got {:?}", expected, got)
+            }
             KernelError::SortExpected(t) => write!(f, "expected a sort, got {:?}", t),
             KernelError::CannotProve(msg) => write!(f, "cannot prove: {}", msg),
-            KernelError::ApplicationTypeMismatch { arg, expected, got } =>
-                write!(f, "argument {:?} has type {:?} but expected {:?}", arg, got, expected),
+            KernelError::ApplicationTypeMismatch { arg, expected, got } => write!(
+                f,
+                "argument {:?} has type {:?} but expected {:?}",
+                arg, got, expected
+            ),
         }
     }
 }
@@ -223,10 +291,16 @@ pub type KernelResult<T> = Result<T, KernelError>;
 
 /// Lift all free De Bruijn indices ≥ `cutoff` by `amount`.
 pub fn lift(term: &Term, cutoff: usize, amount: usize) -> Term {
-    if amount == 0 { return term.clone(); }
+    if amount == 0 {
+        return term.clone();
+    }
     match term {
         Term::Var(i) => {
-            if *i >= cutoff { Term::Var(i + amount) } else { Term::Var(*i) }
+            if *i >= cutoff {
+                Term::Var(i + amount)
+            } else {
+                Term::Var(*i)
+            }
         }
         Term::Const(_) | Term::Sort(_) | Term::Nat => term.clone(),
         Term::App(f, a) => Term::app(lift(f, cutoff, amount), lift(a, cutoff, amount)),
@@ -235,12 +309,21 @@ pub fn lift(term: &Term, cutoff: usize, amount: usize) -> Term {
             lift(ty, cutoff, amount),
             lift(body, cutoff + 1, amount),
         ),
-        Term::Pi { name, domain, codomain } => Term::pi(
+        Term::Pi {
+            name,
+            domain,
+            codomain,
+        } => Term::pi(
             name,
             lift(domain, cutoff, amount),
             lift(codomain, cutoff + 1, amount),
         ),
-        Term::Let { name, ty, val, body } => Term::let_in(
+        Term::Let {
+            name,
+            ty,
+            val,
+            body,
+        } => Term::let_in(
             name,
             lift(ty, cutoff, amount),
             lift(val, cutoff, amount),
@@ -256,26 +339,31 @@ pub fn lift(term: &Term, cutoff: usize, amount: usize) -> Term {
 /// Substitute `sub` for De Bruijn index 0, adjusting other indices.
 pub fn subst(term: &Term, sub: &Term, depth: usize) -> Term {
     match term {
-        Term::Var(i) => {
-            match i.cmp(&depth) {
-                std::cmp::Ordering::Equal => lift(sub, 0, depth),
-                std::cmp::Ordering::Greater => Term::Var(i - 1),
-                std::cmp::Ordering::Less => Term::Var(*i),
-            }
-        }
+        Term::Var(i) => match i.cmp(&depth) {
+            std::cmp::Ordering::Equal => lift(sub, 0, depth),
+            std::cmp::Ordering::Greater => Term::Var(i - 1),
+            std::cmp::Ordering::Less => Term::Var(*i),
+        },
         Term::Const(_) | Term::Sort(_) | Term::Nat => term.clone(),
         Term::App(f, a) => Term::app(subst(f, sub, depth), subst(a, sub, depth)),
-        Term::Lam { name, ty, body } => Term::lam(
+        Term::Lam { name, ty, body } => {
+            Term::lam(name, subst(ty, sub, depth), subst(body, sub, depth + 1))
+        }
+        Term::Pi {
             name,
-            subst(ty, sub, depth),
-            subst(body, sub, depth + 1),
-        ),
-        Term::Pi { name, domain, codomain } => Term::pi(
+            domain,
+            codomain,
+        } => Term::pi(
             name,
             subst(domain, sub, depth),
             subst(codomain, sub, depth + 1),
         ),
-        Term::Let { name, ty, val, body } => Term::let_in(
+        Term::Let {
+            name,
+            ty,
+            val,
+            body,
+        } => Term::let_in(
             name,
             subst(ty, sub, depth),
             subst(val, sub, depth),
@@ -317,17 +405,13 @@ pub fn normalize(term: &Term, env: &Environment) -> Term {
             }
         }
 
-        Term::Lam { name, ty, body } => Term::lam(
-            name,
-            normalize(ty, env),
-            normalize(body, env),
-        ),
+        Term::Lam { name, ty, body } => Term::lam(name, normalize(ty, env), normalize(body, env)),
 
-        Term::Pi { name, domain, codomain } => Term::pi(
+        Term::Pi {
             name,
-            normalize(domain, env),
-            normalize(codomain, env),
-        ),
+            domain,
+            codomain,
+        } => Term::pi(name, normalize(domain, env), normalize(codomain, env)),
 
         Term::Let { val, body, .. } => {
             // ζ-reduction: substitute val into body
@@ -357,12 +441,40 @@ fn alpha_eq(a: &Term, b: &Term) -> bool {
         (Term::Sort(s1), Term::Sort(s2)) => s1 == s2,
         (Term::Nat, Term::Nat) => true,
         (Term::App(f1, a1), Term::App(f2, a2)) => alpha_eq(f1, f2) && alpha_eq(a1, a2),
-        (Term::Lam { ty: t1, body: b1, .. }, Term::Lam { ty: t2, body: b2, .. }) =>
-            alpha_eq(t1, t2) && alpha_eq(b1, b2),
-        (Term::Pi { domain: d1, codomain: c1, .. }, Term::Pi { domain: d2, codomain: c2, .. }) =>
-            alpha_eq(d1, d2) && alpha_eq(c1, c2),
-        (Term::Let { ty: t1, val: v1, body: b1, .. }, Term::Let { ty: t2, val: v2, body: b2, .. }) =>
-            alpha_eq(t1, t2) && alpha_eq(v1, v2) && alpha_eq(b1, b2),
+        (
+            Term::Lam {
+                ty: t1, body: b1, ..
+            },
+            Term::Lam {
+                ty: t2, body: b2, ..
+            },
+        ) => alpha_eq(t1, t2) && alpha_eq(b1, b2),
+        (
+            Term::Pi {
+                domain: d1,
+                codomain: c1,
+                ..
+            },
+            Term::Pi {
+                domain: d2,
+                codomain: c2,
+                ..
+            },
+        ) => alpha_eq(d1, d2) && alpha_eq(c1, c2),
+        (
+            Term::Let {
+                ty: t1,
+                val: v1,
+                body: b1,
+                ..
+            },
+            Term::Let {
+                ty: t2,
+                val: v2,
+                body: b2,
+                ..
+            },
+        ) => alpha_eq(t1, t2) && alpha_eq(v1, v2) && alpha_eq(b1, b2),
         _ => false,
     }
 }
@@ -376,9 +488,15 @@ pub struct AxiomKernel {
 }
 
 impl AxiomKernel {
-    pub fn new() -> Self { Self { env: Environment::new() } }
+    pub fn new() -> Self {
+        Self {
+            env: Environment::new(),
+        }
+    }
 
-    pub fn with_env(env: Environment) -> Self { Self { env } }
+    pub fn with_env(env: Environment) -> Self {
+        Self { env }
+    }
 
     /// Expose definitional equality as a method.
     pub fn definitionally_equal(&self, a: &Term, b: &Term, _ctx: &Context) -> bool {
@@ -390,16 +508,22 @@ impl AxiomKernel {
         // Add nat constructors as axioms
         k.env.add_axiom("zero", Term::Nat);
         k.env.add_axiom("succ", Term::pi("n", Term::Nat, Term::Nat));
-        k.env.add_axiom("nat_rec", Term::pi(
-            "P", Term::pi("_", Term::Nat, Term::type0()),
+        k.env.add_axiom(
+            "nat_rec",
             Term::pi(
-                "z", Term::app(Term::var(0), Term::con("zero")),
+                "P",
+                Term::pi("_", Term::Nat, Term::type0()),
                 Term::pi(
-                    "s", Term::pi("n", Term::Nat, Term::app(Term::var(2), Term::var(0))),
-                    Term::pi("n", Term::Nat, Term::app(Term::var(3), Term::var(0))),
-                )
-            )
-        ));
+                    "z",
+                    Term::app(Term::var(0), Term::con("zero")),
+                    Term::pi(
+                        "s",
+                        Term::pi("n", Term::Nat, Term::app(Term::var(2), Term::var(0))),
+                        Term::pi("n", Term::Nat, Term::app(Term::var(3), Term::var(0))),
+                    ),
+                ),
+            ),
+        );
         k
     }
 
@@ -412,7 +536,9 @@ impl AxiomKernel {
             }
 
             Term::Const(name) => {
-                let decl = self.env.lookup(name)
+                let decl = self
+                    .env
+                    .lookup(name)
                     .ok_or_else(|| KernelError::UnknownConst(name.clone()))?;
                 Ok(decl.ty.clone())
             }
@@ -425,7 +551,9 @@ impl AxiomKernel {
                 let f_ty = self.infer(f, ctx)?;
                 let f_ty_n = normalize(&f_ty, &self.env);
                 match f_ty_n {
-                    Term::Pi { domain, codomain, .. } => {
+                    Term::Pi {
+                        domain, codomain, ..
+                    } => {
                         self.check(a, &domain, ctx)?;
                         let a_n = normalize(a, &self.env);
                         Ok(subst(&codomain, &a_n, 0))
@@ -442,14 +570,23 @@ impl AxiomKernel {
                 Ok(Term::pi(name, *ty.clone(), body_ty))
             }
 
-            Term::Pi { name, domain, codomain } => {
+            Term::Pi {
+                name,
+                domain,
+                codomain,
+            } => {
                 let d_sort = self.infer_sort(domain, ctx)?;
                 let ctx2 = ctx.push(name, *domain.clone());
                 let c_sort = self.infer_sort(codomain, &ctx2)?;
                 Ok(Term::Sort(Sort::pi_result(&d_sort, &c_sort)))
             }
 
-            Term::Let { name, ty, val, body } => {
+            Term::Let {
+                name,
+                ty,
+                val,
+                body,
+            } => {
                 self.check_is_sort(ty, ctx)?;
                 self.check(val, ty, ctx)?;
                 let val_n = normalize(val, &self.env);
@@ -472,7 +609,10 @@ impl AxiomKernel {
         let expected_n = normalize(expected, &self.env);
         let inferred_n = normalize(&inferred, &self.env);
         if !alpha_eq(&inferred_n, &expected_n) {
-            Err(KernelError::TypeMismatch { expected: Box::new(expected_n), got: Box::new(inferred_n) })
+            Err(KernelError::TypeMismatch {
+                expected: Box::new(expected_n),
+                got: Box::new(inferred_n),
+            })
         } else {
             Ok(())
         }
@@ -484,12 +624,7 @@ impl AxiomKernel {
     }
 
     /// Construct a `Proof` witness if `proof_term : proposition` type-checks.
-    pub fn prove(
-        &self,
-        proposition: Term,
-        proof_term: Term,
-        ctx: &Context,
-    ) -> KernelResult<Term> {
+    pub fn prove(&self, proposition: Term, proof_term: Term, ctx: &Context) -> KernelResult<Term> {
         self.check(&proof_term, &proposition, ctx)?;
         Ok(Term::Proof(Box::new(ProofWitness {
             proposition,
@@ -519,7 +654,9 @@ impl AxiomKernel {
 }
 
 impl Default for AxiomKernel {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -528,7 +665,9 @@ impl Default for AxiomKernel {
 mod tests {
     use super::*;
 
-    fn ctx() -> Context { Context::new() }
+    fn ctx() -> Context {
+        Context::new()
+    }
 
     #[test]
     fn zero_has_type_nat() {
@@ -562,7 +701,8 @@ mod tests {
         // id : Π(A : Type). Π(x : A). A
         // = λ A. λ x. x
         let id = Term::lam(
-            "A", Term::type0(),
+            "A",
+            Term::type0(),
             Term::lam("x", Term::var(0), Term::var(0)),
         );
         let ty = k.infer(&id, &ctx()).unwrap();
@@ -577,10 +717,7 @@ mod tests {
     fn beta_normalization() {
         let k = AxiomKernel::new();
         // (λ x : Nat. x) applied to Nat  →  Nat
-        let app = Term::app(
-            Term::lam("x", Term::Nat, Term::var(0)),
-            Term::Nat,
-        );
+        let app = Term::app(Term::lam("x", Term::Nat, Term::var(0)), Term::Nat);
         let normal = k.normalize(&app);
         assert_eq!(normal, Term::Nat);
     }

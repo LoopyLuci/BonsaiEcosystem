@@ -1,11 +1,14 @@
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use std::net::IpAddr;
+use reqwest::get;
 use std::collections::HashMap;
+use std::net::IpAddr;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use reqwest::get;
 
-pub async fn announce_peer(port: u16, model_list: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn announce_peer(
+    port: u16,
+    model_list: Vec<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mdns = ServiceDaemon::new()?;
     let service_type = "_bonsai._tcp.local.";
     let instance_name = format!("bonsai-{}", uuid::Uuid::new_v4());
@@ -33,7 +36,8 @@ pub async fn request_model(url: &str, local_path: &str) -> Result<(), Box<dyn st
     Ok(())
 }
 
-pub async fn discover_peers() -> Result<Vec<(String, u16, Vec<String>)>, Box<dyn std::error::Error>> {
+pub async fn discover_peers() -> Result<Vec<(String, u16, Vec<String>)>, Box<dyn std::error::Error>>
+{
     let mdns = ServiceDaemon::new()?;
     let browser = mdns.browse("_bonsai._tcp.local.")?;
     let mut peers = Vec::new();
@@ -46,7 +50,9 @@ pub async fn discover_peers() -> Result<Vec<(String, u16, Vec<String>)>, Box<dyn
                 let props = info.get_properties();
                 let models: Vec<String> = if let Some(m) = props.get("models") {
                     m.to_string().split(',').map(|s| s.to_string()).collect()
-                } else { Vec::new() };
+                } else {
+                    Vec::new()
+                };
                 peers.push((info.get_hostname().to_string(), info.get_port(), models));
             }
         }
