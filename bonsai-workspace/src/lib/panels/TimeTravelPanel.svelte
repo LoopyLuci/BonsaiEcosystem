@@ -76,6 +76,13 @@
     Checkpoint: '📸', Reversion: '⏪',
   };
 
+  function categoryIcon(cat: string): string {
+    return (CATEGORY_ICONS as Record<string, string>)[cat] ?? '●';
+  }
+  function categoryColor(cat: string): string {
+    return (CATEGORY_COLORS as Record<string, string>)[cat] ?? '#888';
+  }
+
   function formatNs(ns: number): string {
     const ms = Math.floor(ns / 1_000_000);
     return new Date(ms).toLocaleString();
@@ -186,7 +193,7 @@
       <select bind:value={categoryFilter} on:change={loadTimeline}>
         <option value="">All categories</option>
         {#each Object.keys(CATEGORY_ICONS) as cat}
-          <option value={cat}>{CATEGORY_ICONS[cat as EventCategory]} {cat}</option>
+          <option value={cat}>{categoryIcon(cat)} {cat}</option>
         {/each}
       </select>
       <input
@@ -213,9 +220,9 @@
           >
             <span
               class="ev-dot"
-              style="background:{CATEGORY_COLORS[ev.category] ?? '#888'}"
+              style="background:{categoryColor(ev.category)}"
             >
-              {CATEGORY_ICONS[ev.category] ?? '●'}
+              {categoryIcon(ev.category)}
             </span>
             <div class="ev-body">
               <div class="ev-summary">{ev.summary}</div>

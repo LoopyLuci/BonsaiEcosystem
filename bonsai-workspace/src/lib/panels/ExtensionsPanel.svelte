@@ -52,6 +52,13 @@
   // ── State ─────────────────────────────────────────────────────────────────
 
   let activeTab: 'browse' | 'installed' | 'import' | 'submit' = 'browse';
+  function setTab(t: string) { activeTab = t as typeof activeTab; }
+  function fieldSchema(f: unknown): { type?: string; description?: string; default?: unknown } {
+    return (f as { type?: string; description?: string; default?: unknown }) ?? {};
+  }
+  function inputValue(e: Event): string {
+    return (e.target as HTMLInputElement)?.value ?? '';
+  }
   let browseCards: ExtensionCard[] = [];
   let installedExts: InstalledExtension[] = [];
   let selectedExt: InstalledExtension | null = null;
@@ -233,7 +240,7 @@
         <button
           class="tab-btn"
           class:active={activeTab === tab}
-          on:click={() => activeTab = tab as typeof activeTab}
+          on:click={() => setTab(tab)}
         >{label}{tab === 'installed' ? ` (${installedExts.length})` : ''}</button>
       {/each}
     </div>
@@ -327,7 +334,10 @@
             <div
               class="installed-row"
               class:selected={selectedExt?.extension_id === ext.extension_id}
+              role="button"
+              tabindex="0"
               on:click={() => selectedExt = ext}
+              on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectedExt = ext; }}
             >
               <span class="verdict-dot" style="background:{verdictColor(ext.verdict)}"></span>
               <div class="row-info">
@@ -394,7 +404,7 @@
               <div class="config-section">
                 <h4>Configuration</h4>
                 {#each Object.entries(ext.config_schema) as [key, field]}
-                  {@const schema = field as { type?: string; description?: string; default?: unknown }}
+                  {@const schema = fieldSchema(field)}
                   <div class="config-row">
                     <label class="config-label">
                       {key}
@@ -407,7 +417,7 @@
                         await invoke('ext_set_config', {
                           extensionId: ext.extension_id,
                           key,
-                          value: (e.target as HTMLInputElement).value
+                          value: inputValue(e)
                         });
                       }}
                     />
