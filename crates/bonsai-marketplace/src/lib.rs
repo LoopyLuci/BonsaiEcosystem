@@ -1,63 +1,64 @@
-use libp2p::{
-    kad::{Kademlia, store::MemoryStore},
-    mdns,
-    identity,
-    swarm::NetworkBehaviour,
-};
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
-use tokio::sync::mpsc;
+pub mod registry;
+pub mod listing;
+pub mod reservation;
+pub mod free_tier;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Asset {
-    pub cid: String,
-    pub asset_type: String,
-    pub name: String,
-    pub version: String,
-    pub description: String,
-    pub tags: Vec<String>,
-    pub publisher: Vec<u8>,
-    pub signature: Vec<u8>,
-    pub size_bytes: u64,
-}
+pub use registry::DeviceRegistry;
+pub use reservation::ReservationManager;
+pub use free_tier::FreeTierOrchestrator;
 
-#[derive(NetworkBehaviour)]
-struct MarketBehaviour {
-    kademlia: Kademlia<MemoryStore>,
-    mdns: mdns::tokio::Behaviour,
-}
+use std::sync::Arc;
 
-pub struct Marketplace {
-    // swarm omitted for brevity
-    assets: HashMap<String, Asset>,
-    event_tx: mpsc::Sender<MarketEvent>,
-}
-
+/// Top-level error type for the marketplace crate.
 #[derive(Debug)]
-pub enum MarketEvent {
-    AssetDiscovered(Asset),
-    AssetInstalled(String),
+pub enum MarketplaceError {
+    NotFound(uuid::Uuid),
+    AlreadyExists(uuid::Uuid),
+    InvalidArgument(String),
+    Credits(bonsai_credits::CreditError),
 }
 
-impl Marketplace {
-    pub async fn new() -> Result<(Self, mpsc::Receiver<MarketEvent>), Box<dyn std::error::Error>> {
-        let id = identity::Keypair::generate_ed25519();
-        let peer_id = libp2p::PeerId::from(id.public());
-        // For simplicity we do not build a full swarm here
-        let (tx, rx) = mpsc::channel(256);
-        Ok((Self { assets: HashMap::new(), event_tx: tx }, rx))
+impl std::fmt::Display for MarketplaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MarketplaceError::NotFound(id) => write!(f, "not found: {}", id),
+            MarketplaceError::AlreadyExists(id) => write!(f, "already exists: {}", id),
+            MarketplaceError::InvalidArgument(s) => write!(f, "invalid argument: {}", s),
+            MarketplaceError::Credits(e) => write!(f, "credit error: {}", e),
+        }
     }
+}
 
-    pub async fn publish(&mut self, asset: Asset) {
-        self.assets.insert(asset.cid.clone(), asset.clone());
-        // In real code: announce via DHT
+impl std::error::Error for MarketplaceError {}
+
+impl From<bonsai_credits::CreditError> for MarketplaceError {
+    fn from(e: bonsai_credits::CreditError) -> Self {
+        MarketplaceError::Credits(e)
     }
+}
 
-    pub async fn search(&self, query: &str) -> Vec<Asset> {
-        self.assets
-            .values()
-            .filter(|a| a.tags.iter().any(|t| t.contains(query)) || a.name.contains(query))
-            .cloned()
-            .collect()
+/// Composite state object suitable for storage in Tauri app state.
+pub struct MarketplaceState {
+    pub registry: Arc<DeviceRegistry>,
+    pub reservations: Arc<ReservationManager>,
+    pub free_tier: Arc<FreeTierOrchestrator>,
+}
+
+impl MarketplaceState {
+    pub fn new() -> Self {
+        let registry = Arc::new(DeviceRegistry::new());
+        let reservations = Arc::new(ReservationManager::new());
+        let free_tier = Arc::new(FreeTierOrchestrator::new(Arc::clone(&registry)));
+        MarketplaceState {
+            registry,
+            reservations,
+            free_tier,
+        }
+    }
+}
+
+impl Default for MarketplaceState {
+    fn default() -> Self {
+        Self::new()
     }
 }

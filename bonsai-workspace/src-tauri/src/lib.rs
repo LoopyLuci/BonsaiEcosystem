@@ -60,17 +60,14 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-mod agent;
-mod agent_host;
-mod agents;
-mod features;
+mod a2a_server;
 mod action_parser;
-mod error;
-mod memory_store;
-mod context_builder;
-mod skill_executor;
-mod tool_health;
-mod mcp_bridge;
+mod agent;
+mod agent_connect;
+mod agent_host;
+mod agent_store;
+mod agents;
+mod api_server;
 mod assistant_audit_log;
 mod assistant_backup;
 mod assistant_commands;
@@ -79,87 +76,91 @@ mod assistant_metrics;
 mod assistant_policy;
 mod assistant_store;
 mod assistant_tools;
-mod tool_cache;
-mod tool_core;
-mod tool_selector;
 mod avatar_validator;
-mod secrets_store;
-mod tts_manager;
-mod agent_connect;
-mod agent_store;
-mod api_server;
-mod buddy_api_server;
+pub mod bonsai_core;
 mod bootstrap;
+mod buddy_api_server;
+mod capability_commands;
 mod chat_sessions;
 mod cluster_orchestrator;
 mod commands;
-mod capability_commands;
-mod thoughts;
-mod thoughts_commands;
 mod config;
+mod context_builder;
+pub mod data_curator;
+mod dual_inference;
+mod error;
+mod features;
+mod gpu_layer;
+mod gpu_model_loader;
+mod gpu_telemetry;
+mod hybrid_engine;
+mod image_generation;
 mod inference_mode;
+mod launcher;
+mod management_api;
+mod mcp_bridge;
+mod memory_store;
 mod model_data;
-mod model_data_store;
 mod model_data_generator;
+mod model_data_store;
 mod model_orchestrator;
 mod model_registry;
+mod plugin_host;
+mod plugin_loader;
+mod plugin_manifest;
 pub mod rag_store;
 mod remote;
 mod remote_input;
-mod sidecar_manager;
-mod management_api;
-pub mod bonsai_core;
-pub mod data_curator;
-pub mod telemetry;
-mod trainer;
-mod hybrid_engine;
-mod launcher;
-mod gpu_layer;
-mod gpu_telemetry;
-mod gpu_model_loader;
-mod dual_inference;
-mod training_loop;
 mod rich_markdown;
 mod sandbox_executor;
-mod image_generation;
-mod tts_engine;
+mod secrets_store;
+mod sidecar_manager;
 mod sidecar_supervisor;
-mod plugin_loader;
-mod plugin_manifest;
-mod plugin_host;
-mod a2a_server;
+mod skill_executor;
+pub mod telemetry;
+mod thoughts;
+mod thoughts_commands;
+mod tool_cache;
+mod tool_core;
+mod tool_health;
+mod tool_selector;
+mod trainer;
+mod training_loop;
+mod tts_engine;
+mod tts_manager;
 mod p2p {
     pub mod sharing;
 }
 mod collab {
     pub mod crdt;
 }
-mod collaboration_commands;
-mod fabric_commands;
-mod tool_registry;
-mod self_play;
-mod critic;
 mod adapter_manager;
-mod tool_watcher;
-mod mcp_server;
-mod tool_compose;
+mod collaboration_commands;
+mod critic;
 mod cross_training;
-mod swarm_orchestrator;
-mod shared_arena;
-mod micro_bonsai;
-mod swarm_config;
+mod expanded_tools;
+mod cluster_credits_commands;
+mod fabric_commands;
 mod gpu_controller;
+mod mcp_server;
+mod micro_bonsai;
 mod multimodal;
-mod vision_training;
-mod task_queue;
-mod tools;
 mod music_engine;
+mod self_play;
+mod shared_arena;
+mod skill_compiler_commands;
+mod skill_registry;
+mod swarm_config;
+mod swarm_orchestrator;
+mod task_queue;
+mod tool_compose;
+mod tool_registry;
+mod tool_watcher;
+mod tools;
 mod user_skills;
+mod vision_training;
 mod wal;
 mod ws_router;
-mod skill_registry;
-mod expanded_tools;
-mod skill_compiler_commands;
 
 /// Write `content` to `path` atomically: write to a `.tmp` sibling then rename.
 /// Ensures the file is either fully written or unchanged on crash.
@@ -178,12 +179,7 @@ pub fn atomic_write(path: &std::path::Path, content: &[u8]) -> std::io::Result<(
 }
 
 use std::collections::HashMap;
-use std::sync::{
-    atomic::AtomicBool,
-    Arc,
-    Mutex as StdMutex,
-    OnceLock,
-};
+use std::sync::{atomic::AtomicBool, Arc, Mutex as StdMutex, OnceLock};
 
 // Keeps the non-blocking tracing writer flushed for the lifetime of the process.
 static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
@@ -195,55 +191,55 @@ use tokio::sync::Mutex;
 
 // Workstream modules (scaffolds)
 mod auth_commands;
+mod belief_reviser;
+mod bonsai_md;
+mod brain_metadata;
+mod continuous_training;
+mod crash_recovery;
+mod device_manager;
+mod eternal_training_loop;
+mod evaluation_harness;
+mod federated_trainer;
+mod forgetting_prevention;
+mod games;
+mod hot_reload;
+mod ipc_resilience;
+mod kdb_commands;
+mod kdb_state;
+mod knowledge_tools;
 mod marketplace_commands;
 mod meeting_agent;
-mod continuous_training;
-mod unified_training_collector;
-mod evaluation_harness;
-mod promotion_gate;
-mod forgetting_prevention;
-mod eternal_training_loop;
-mod training_commands;
-mod nn_commands;
-mod orchestrator;
-mod sylva;
-mod federated_trainer;
-mod games;
-mod belief_reviser;
-mod metacognitive_monitor;
-mod reasoning_engine;
-mod knowledge_tools;
-mod omnipresent_capture;
-mod predictive_engine;
-mod omnfs;
-mod omni_desktop;
-mod omni_shell;
-mod process_manager;
-mod omni_session;
-mod device_manager;
-mod omni_boot;
-mod transfer_commands;
-mod resource_guard;
-mod ipc_resilience;
-mod crash_recovery;
-mod survival;
-mod hot_reload;
-mod training_job;
-mod brain_metadata;
-mod bonsai_md;
 mod memory_nodes;
+mod metacognitive_monitor;
 mod middleware;
-mod plan_gate;
-mod web_router;
-mod kdb_state;
-mod kdb_commands;
+mod nn_commands;
+mod omnfs;
+mod omni_boot;
+mod omni_desktop;
+mod omni_session;
+mod omni_shell;
+mod omnipresent_capture;
+mod orchestrator;
 mod package_commands;
+mod plan_gate;
+mod predictive_engine;
+mod process_manager;
+mod promotion_gate;
+mod reasoning_engine;
+mod resource_guard;
+mod survival;
+mod sylva;
+mod training_commands;
+mod training_job;
+mod transfer_commands;
+mod unified_training_collector;
+mod web_router;
 
 // Workstream types
 use crate::auth_commands::AuthState;
+use crate::continuous_training::ContinuousTrainer;
 use crate::marketplace_commands::MarketState;
 use crate::meeting_agent::MeetingAgent;
-use crate::continuous_training::ContinuousTrainer;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub struct PtySession {
@@ -256,111 +252,111 @@ pub struct PtySession;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub orchestrator:     Arc<model_orchestrator::ModelOrchestrator>,
-    pub whisper:          Arc<sidecar_manager::WhisperManager>,
-    pub wal:              Arc<wal::WAL>,
-    pub chat_sessions:    Arc<chat_sessions::ChatSessionStore>,
-    pub pty_sessions:     Arc<Mutex<std::collections::HashMap<String, PtySession>>>,
+    pub orchestrator: Arc<model_orchestrator::ModelOrchestrator>,
+    pub whisper: Arc<sidecar_manager::WhisperManager>,
+    pub wal: Arc<wal::WAL>,
+    pub chat_sessions: Arc<chat_sessions::ChatSessionStore>,
+    pub pty_sessions: Arc<Mutex<std::collections::HashMap<String, PtySession>>>,
     /// Workstream: multi-user auth & encrypted workspace state.
-    pub auth_state:       Arc<AuthState>,
+    pub auth_state: Arc<AuthState>,
     /// Workstream: marketplace state.
-    pub market_state:     Arc<MarketState>,
+    pub market_state: Arc<MarketState>,
     /// Workstream: meeting/conference agent.
-    pub meeting_agent:    Arc<MeetingAgent>,
+    pub meeting_agent: Arc<MeetingAgent>,
     /// Workstream: continuous fine-tuning trainer.
     pub continuous_trainer: Arc<ContinuousTrainer>,
     /// Set to `true` to cancel an in-progress bootstrap download.
     pub bootstrap_cancel: Arc<AtomicBool>,
     /// Set to `true` to cancel in-flight chat generation.
-    pub chat_cancel:      Arc<AtomicBool>,
+    pub chat_cancel: Arc<AtomicBool>,
     /// Set to `true` to stop active voice capture.
-    pub voice_cancel:     Arc<AtomicBool>,
+    pub voice_cancel: Arc<AtomicBool>,
     /// Agent Connect sessions and typed event timelines.
-    pub agent_connect:    Arc<StdMutex<agent_connect::AgentConnectHub>>,
+    pub agent_connect: Arc<StdMutex<agent_connect::AgentConnectHub>>,
     /// WebSocket connection registry (Android app + VSCode extension relay).
-    pub ws_router:        Arc<ws_router::WsRouter>,
+    pub ws_router: Arc<ws_router::WsRouter>,
     /// One-time pairing token displayed as a QR code in Settings.
-    pub pair_token:       String,
+    pub pair_token: String,
     /// Agent persona/config store (shared SQLite pool).
-    pub agent_store:      Arc<agent_store::AgentStore>,
+    pub agent_store: Arc<agent_store::AgentStore>,
     /// Swarm coordinator — routes leader/worker inference.
     pub swarm_orchestrator: Arc<swarm_orchestrator::SwarmOrchestrator>,
     /// Per-run per-slot cancel flags for in-flight swarm agents.
-    pub swarm_cancels:    Arc<StdMutex<HashMap<String, Vec<Arc<AtomicBool>>>>>,
+    pub swarm_cancels: Arc<StdMutex<HashMap<String, Vec<Arc<AtomicBool>>>>>,
     /// Managed API server runtime for controlled restart/shutdown.
-    pub api_server:       Arc<Mutex<Option<api_server::ApiServerHandle>>>,
+    pub api_server: Arc<Mutex<Option<api_server::ApiServerHandle>>>,
     /// Multi-device clustering coordinator and scheduler.
     pub cluster_orchestrator: Arc<Mutex<cluster_orchestrator::ClusterOrchestrator>>,
     /// Tool policy engine — evaluates allow/deny/confirm for every assistant tool call.
-    pub policy_engine:     Arc<assistant_policy::PolicyEngine>,
+    pub policy_engine: Arc<assistant_policy::PolicyEngine>,
     /// Confirmation gate — single-use tokens for high-risk action approval.
     pub confirmation_gate: Arc<assistant_policy::ConfirmationGate>,
     /// Rotating structured audit log — every tool attempt recorded.
-    pub audit_log:         Arc<assistant_audit_log::AuditLog>,
+    pub audit_log: Arc<assistant_audit_log::AuditLog>,
     /// OS keychain abstraction — SMTP credentials and future secrets.
-    pub secrets_store:     Arc<secrets_store::SecretsStore>,
+    pub secrets_store: Arc<secrets_store::SecretsStore>,
     /// Assistant SQLite CRUD store (profiles, avatars, sessions, messages).
-    pub assistant_store:   Arc<assistant_store::AssistantStore>,
+    pub assistant_store: Arc<assistant_store::AssistantStore>,
     /// Set to `true` to cancel an in-progress assistant inference turn.
-    pub assistant_cancel:  Arc<std::sync::atomic::AtomicBool>,
+    pub assistant_cancel: Arc<std::sync::atomic::AtomicBool>,
     /// Structured performance + error counters for the assistant.
-    pub asst_metrics:      Arc<assistant_metrics::AssistantMetrics>,
+    pub asst_metrics: Arc<assistant_metrics::AssistantMetrics>,
     /// Piper TTS sidecar — speech synthesis + rodio playback.
-    pub tts_manager:       Arc<tts_manager::TtsManager>,
+    pub tts_manager: Arc<tts_manager::TtsManager>,
     /// User-defined skills store (SQLite-backed, hot-reloadable into tool registry).
-    pub user_skill_store:  Arc<user_skills::UserSkillStore>,
+    pub user_skill_store: Arc<user_skills::UserSkillStore>,
     /// MCP server lifecycle manager.
-    pub mcp_manager:       Arc<mcp_bridge::McpManager>,
+    pub mcp_manager: Arc<mcp_bridge::McpManager>,
     /// Buddy API server handle (port 11420). None if startup failed.
-    pub buddy_api_server:  Arc<Mutex<Option<buddy_api_server::BuddyApiHandle>>>,
+    pub buddy_api_server: Arc<Mutex<Option<buddy_api_server::BuddyApiHandle>>>,
     /// Resolved port for the Buddy API (0 if unavailable).
-    pub buddy_api_port:    u16,
+    pub buddy_api_port: u16,
     /// Rich, persistent metadata for every model (local and cloud).
-    pub model_data_store:  Arc<model_data_store::ModelDataStore>,
+    pub model_data_store: Arc<model_data_store::ModelDataStore>,
     /// Shared inference task queue with fairness/resource gating.
-    pub task_queue:       Arc<task_queue::TaskQueue>,
+    pub task_queue: Arc<task_queue::TaskQueue>,
     /// Pluggable agent registry with built-in CodeWriter and CodeReviewer.
-    pub agent_host:       Arc<agent_host::AgentHost>,
+    pub agent_host: Arc<agent_host::AgentHost>,
     /// BonsAI-Core orchestrator — plan, execute, curate.
-    pub bonsai_core:      Arc<bonsai_core::BonsaiCore>,
+    pub bonsai_core: Arc<bonsai_core::BonsaiCore>,
     /// Telemetry store — training runs + inference metrics.
-    pub telemetry:        Arc<telemetry::TelemetryStore>,
+    pub telemetry: Arc<telemetry::TelemetryStore>,
     /// Native llama.cpp Vulkan engine (AMD 7900 XTX GPU inference).
-    pub hybrid_engine:    Arc<hybrid_engine::HybridEngineState>,
+    pub hybrid_engine: Arc<hybrid_engine::HybridEngineState>,
     /// GPU layer health tracker + VRAM estimator.
-    pub gpu:              Arc<gpu_layer::GpuLayer>,
+    pub gpu: Arc<gpu_layer::GpuLayer>,
     /// Long-lived dual model session manager for continuous training loop.
-    pub dual_session:     Arc<dual_inference::SessionManager>,
+    pub dual_session: Arc<dual_inference::SessionManager>,
     /// Controlled continuous training loop orchestrator.
-    pub training_loop:    Arc<training_loop::TrainingLoopState>,
+    pub training_loop: Arc<training_loop::TrainingLoopState>,
     /// Self-play training loop (generate → critique → correct → curate).
-    pub self_play:        Arc<self_play::SelfPlayState>,
+    pub self_play: Arc<self_play::SelfPlayState>,
     /// Unified training container (collector, loop engine, adapter registry).
-    pub training:         Arc<training_commands::TrainingState>,
+    pub training: Arc<training_commands::TrainingState>,
     /// Secure WASM/Python plugin host with capability enforcement.
-    pub plugin_host:      Arc<plugin_host::PluginHost>,
+    pub plugin_host: Arc<plugin_host::PluginHost>,
     /// Pluggable tool registry (execute_code, system_info, …).
-    pub tool_registry:    Arc<tool_registry::ToolRegistryState>,
+    pub tool_registry: Arc<tool_registry::ToolRegistryState>,
     /// Universal Capability Registry (UCR) — aggregated capability manifest
     pub capability_registry: Arc<bonsai_capability_registry::UniversalCapabilityRegistry>,
     /// Thoughts DB store — persistent model thinking capture
     pub thoughts_db: Arc<thoughts::ThoughtsStore>,
     /// Cross-training event sender — feed chat/plugin/tool events for passive data collection.
-    pub cross_training:   cross_training::CrossTrainingSender,
+    pub cross_training: cross_training::CrossTrainingSender,
     /// MCP server port (0 if startup failed). Exposes all tools to Claude Desktop, Cursor, etc.
-    pub mcp_port:         u16,
+    pub mcp_port: u16,
     /// Filesystem watcher — invalidates tool cache on workspace file changes.
-    pub tool_watcher:     Arc<Mutex<Option<tool_watcher::ToolWatcher>>>,
+    pub tool_watcher: Arc<Mutex<Option<tool_watcher::ToolWatcher>>>,
     /// Zero-copy mmap-backed cross-model memory arena.
-    pub shared_arena:     Arc<shared_arena::SharedMemoryArena>,
+    pub shared_arena: Arc<shared_arena::SharedMemoryArena>,
     /// Micro BonsAI intelligent model monitor and selector.
-    pub micro_bonsai:     Arc<micro_bonsai::MicroBonsai>,
+    pub micro_bonsai: Arc<micro_bonsai::MicroBonsai>,
     /// Custom swarm configuration store (SQLite-backed).
     pub swarm_config_store: Arc<swarm_config::SwarmConfigStore>,
     /// Unified GPU controller — layer allocation, health, invisible crash recovery.
-    pub gpu_controller:    Arc<gpu_controller::GpuController>,
+    pub gpu_controller: Arc<gpu_controller::GpuController>,
     /// Skills.sh-backed skill registry with custom-rebuild, security scanning, prompt injection.
-    pub skill_registry:    Arc<skill_registry::SkillRegistryState>,
+    pub skill_registry: Arc<skill_registry::SkillRegistryState>,
     /// Thinking settings — per-role visibility toggles, max tokens.
     pub thinking_settings: Arc<tokio::sync::RwLock<serde_json::Value>>,
     /// CAS (Content-Addressed Store) — Blake3-keyed deduplicating blob store.
@@ -416,7 +412,6 @@ pub struct AppState {
     /// Resource guard — concurrency limiter + memory pressure gate.
     pub resource_guard: Arc<resource_guard::ResourceGuard>,
 }
-
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn restore_main_window_state(app: &tauri::AppHandle, cfg: &config::AppConfig) {
@@ -484,7 +479,7 @@ fn enforce_main_window_size(main: &tauri::WebviewWindow) {
     let (target_w, target_h) = if let Some(mon) = monitor {
         let ms = mon.size();
         (
-            ((ms.width  as f64 * 0.75) as u32).max(1000),
+            ((ms.width as f64 * 0.75) as u32).max(1000),
             ((ms.height as f64 * 0.75) as u32).max(680),
         )
     } else {
@@ -525,9 +520,8 @@ fn persist_assistant_visibility(app: &tauri::AppHandle, visible: bool) {
 /// port accumulation and "connection refused" errors on restart.
 fn sweep_stale_sidecars() {
     use sysinfo::{ProcessRefreshKind, RefreshKind, System};
-    let mut sys = System::new_with_specifics(
-        RefreshKind::new().with_processes(ProcessRefreshKind::new()),
-    );
+    let mut sys =
+        System::new_with_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::new()));
     sys.refresh_processes();
     let sidecar_names = ["llama-server", "piper", "stable-diffusion"];
     let mut killed = 0u32;
@@ -1433,6 +1427,9 @@ pub fn run() {
 
             // ── Compute Fabric ────────────────────────────────────────────────
             app.manage(fabric_commands::FabricState::new());
+
+            // ── Cluster Credits & Device Rental Marketplace ───────────────────
+            app.manage(cluster_credits_commands::ClusterState::new());
 
             // ── Start Copilot Orchestrator (local REST control) ─────────────
             {
@@ -2396,6 +2393,19 @@ pub fn run() {
             collaboration_commands::execute_shared_command,
             fabric_commands::fabric_submit_and_await,
             fabric_commands::fabric_register_node,
+            cluster_credits_commands::credits_balance,
+            cluster_credits_commands::my_device_info,
+            cluster_credits_commands::set_contribution,
+            cluster_credits_commands::marketplace_list,
+            cluster_credits_commands::reserve_device,
+            cluster_credits_commands::cancel_reservation,
+            cluster_credits_commands::submit_free_project,
+            cluster_credits_commands::update_free_project_progress,
+            cluster_credits_commands::free_pool_status,
+            cluster_credits_commands::estimate_project,
+            cluster_credits_commands::earnings_history,
+            cluster_credits_commands::spending_history,
+            cluster_credits_commands::list_task_profiles,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
