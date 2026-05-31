@@ -1,13 +1,16 @@
-/// Crash recovery — detects unclean shutdown, replays WAL, emits recovery event.
+/// Crash recovery — detects unclean shutdown, replays WAL, emits recovery event,
+/// and proposes a time-travel rollback to the last known-good snapshot.
 ///
 /// On startup:
 ///   1. Check for a `crash.flag` file left by a previous unclean exit.
 ///   2. If present, replay the WAL write-ahead log to restore consistent state.
-///   3. Emit `recovery-state` Tauri event so the frontend can show a notice.
-///   4. Remove the flag so a clean second boot doesn't think it crashed.
+///   3. Query the Universe store for the last snapshot taken before the crash.
+///   4. Emit `recovery-state` Tauri event with rollback proposal.
+///   5. Remove the flag so a clean second boot doesn't think it crashed.
 ///
 /// On clean exit, `on_exit_cleanup` removes the flag.
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tracing::{info, warn};
 
@@ -33,7 +36,11 @@ pub fn arm_crash_flag(app: &AppHandle) {
 
 /// Check for a crash flag and emit recovery events if one is found.
 /// Returns `true` if a crash was detected.
-pub async fn check_and_recover(app: &AppHandle, wal: &crate::wal::WAL) -> bool {
+pub async fn check_and_recover(
+    app: &AppHandle,
+    wal: &crate::wal::WAL,
+    universe: Option<&Arc<bonsai_universe::Universe>>,
+) -> bool {
     let path = flag_path(app);
     if !path.exists() {
         return false;
@@ -51,13 +58,49 @@ pub async fn check_and_recover(app: &AppHandle, wal: &crate::wal::WAL) -> bool {
         }
     }
 
-    // Emit event so the frontend can show a non-blocking recovery notice.
+    // Query Universe for the last snapshot to propose a rollback.
+    let rollback_proposal = if let Some(uni) = universe {
+        let now_ns = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0);
+        match uni.store.last_snapshot_before(now_ns).await {
+            Ok(Some(snap)) => {
+                info!(
+                    "[crash_recovery] rollback candidate: snapshot {} ({})",
+                    snap.snapshot_id,
+                    snap.label.as_deref().unwrap_or("unlabelled")
+                );
+                Some(serde_json::json!({
+                    "snapshot_id": snap.snapshot_id,
+                    "label": snap.label,
+                    "timestamp_ns": snap.timestamp_ns,
+                    "event_count_at_creation": snap.event_count_at_creation,
+                }))
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    // Also emit a SurvivalEvent on the system bus so BotRuleEngine can react.
+    if let Some(state) = app.try_state::<crate::AppState>() {
+        state.event_bus.publish(crate::system_event_bus::SystemEvent::CrashDetected {
+            component: "bonsai-workspace".into(),
+            backtrace: "unclean shutdown detected via crash.flag".into(),
+            severity: crate::system_event_bus::CrashSeverity::Medium,
+        });
+    }
+
+    // Emit event so the frontend can show a recovery notice + rollback proposal.
     let _ = app.emit(
         "recovery-state",
         serde_json::json!({
             "crashed": true,
             "wal_replayed": true,
-            "message": "Bonsai recovered from an unexpected shutdown. Your data is intact."
+            "message": "Bonsai recovered from an unexpected shutdown. Your data is intact.",
+            "rollback_proposal": rollback_proposal,
         }),
     );
 

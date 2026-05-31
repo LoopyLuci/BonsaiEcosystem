@@ -359,6 +359,39 @@ pub async fn list_agent_profiles(state: State<'_, SwarmState>) -> Result<Vec<Age
         .collect())
 }
 
+/// Spawn a swarm from a named template, creating a time-travel checkpoint first.
+#[tauri::command]
+pub async fn spawn_swarm_from_template(
+    swarm_state: State<'_, SwarmState>,
+    app_state: State<'_, crate::AppState>,
+    template_name: String,
+    params: serde_json::Value,
+) -> Result<String, String> {
+    // 1. Emit a checkpoint so the pre-swarm state is captured in the timeline
+    app_state.event_bus.publish(crate::system_event_bus::SystemEvent::CheckpointRequested {
+        label: format!("Pre-swarm: {}", template_name),
+        trigger: format!("swarm-dispatch:{}", template_name),
+    });
+
+    // 2. Load template from the registry
+    let registry = bonsai_swarm::TemplateRegistry::new();
+    registry.load_defaults().await;
+    let template = registry.get(&template_name).await
+        .ok_or_else(|| format!("Template '{}' not found", template_name))?;
+
+    // 3. Spawn the swarm
+    let swarm_id = swarm_state.registry.spawn_from_template(&template, params).await;
+
+    // 4. Notify the bus
+    app_state.event_bus.publish(crate::system_event_bus::SystemEvent::SwarmSpawned {
+        swarm_id: swarm_id.to_string(),
+        template: template_name,
+        agent_count: template.max_agents,
+    });
+
+    Ok(swarm_id.to_string())
+}
+
 /// Get the task DAG for a swarm (for the Gantt chart view).
 #[tauri::command]
 pub async fn get_swarm_dag(

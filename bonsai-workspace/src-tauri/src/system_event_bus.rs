@@ -61,6 +61,7 @@ pub enum SystemEvent {
     ExtensionUninstalled { extension_id: String, reason: String },
     UserFeedback { context: String, rating: i8, comment: Option<String> },
     FeatureRequest { description: String, requester: String },
+    CheckpointRequested { label: String, trigger: String },
 }
 
 impl SystemEvent {
@@ -106,6 +107,7 @@ impl SystemEvent {
             SystemEvent::ExtensionUninstalled { .. } => "ExtensionUninstalled",
             SystemEvent::UserFeedback { .. } => "UserFeedback",
             SystemEvent::FeatureRequest { .. } => "FeatureRequest",
+            SystemEvent::CheckpointRequested { .. } => "CheckpointRequested",
         }
     }
 }

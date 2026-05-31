@@ -147,6 +147,7 @@ mod terminal_launcher;
 pub mod system_event_bus;
 mod upgrade_dispatcher;
 mod universe_commands;
+pub mod universe_hooks;
 mod gpu_controller;
 mod mcp_server;
 mod micro_bonsai;
@@ -425,6 +426,13 @@ pub struct AppState {
     pub universe: Arc<bonsai_universe::Universe>,
 }
 
+impl AppState {
+    /// Return the local device identifier (hostname or fallback).
+    pub fn device_id(&self) -> String {
+        self.universe.store.device_id().to_string()
+    }
+}
+
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn restore_main_window_state(app: &tauri::AppHandle, cfg: &config::AppConfig) {
     if let Some(main) = app.get_webview_window("main") {
@@ -622,8 +630,9 @@ pub fn run() {
             {
                 let ah  = app_handle.clone();
                 let wal2 = wal.clone();
+                let universe2 = app.state::<AppState>().universe.clone();
                 tauri::async_runtime::spawn(async move {
-                    crash_recovery::check_and_recover(&ah, &wal2).await;
+                    crash_recovery::check_and_recover(&ah, &wal2, Some(&universe2)).await;
                 });
             }
             // Arm flag for *this* session (removed on clean exit).
@@ -1451,6 +1460,13 @@ pub fn run() {
             {
                 let state = app.state::<AppState>();
                 app.manage(state.universe.clone());
+                // Start the SystemEventBus → Universe event bridge
+                universe_hooks::start_event_bridge(
+                    state.event_bus.clone(),
+                    state.universe.clone(),
+                );
+                // Start periodic snapshot scheduler
+                state.universe.snapshots.clone().spawn();
             }
 
             // Survival engine — self-repair with growing knowledge base
@@ -2482,6 +2498,7 @@ pub fn run() {
             swarm_commands::query_agent_capabilities,
             swarm_commands::list_agent_profiles,
             swarm_commands::get_swarm_dag,
+            swarm_commands::spawn_swarm_from_template,
             // ── Extensions System ─────────────────────────────────────────────
             extensions_commands::ext_install_from_github,
             extensions_commands::ext_install_from_path,

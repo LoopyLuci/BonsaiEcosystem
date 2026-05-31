@@ -82,11 +82,27 @@ pub async fn read_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn write_file(path: String, content: String) -> Result<(), String> {
+pub async fn write_file(
+    state: tauri::State<'_, crate::AppState>,
+    path: String,
+    content: String,
+) -> Result<(), String> {
     if has_parent_dir_component(&path) {
         return Err("Path not allowed: traversal sequences are forbidden".to_string());
     }
-    crate::atomic_write(std::path::Path::new(&path), content.as_bytes()).map_err(|e| e.to_string())
+    let p = std::path::Path::new(&path);
+    let before_hash = crate::universe_hooks::hash_file_sync(p);
+    crate::atomic_write(p, content.as_bytes()).map_err(|e| e.to_string())?;
+    let after_hash = Some(blake3::hash(content.as_bytes()).to_hex().to_string());
+    crate::universe_hooks::emit_file_change(
+        &state.universe,
+        "write",
+        &path,
+        before_hash,
+        after_hash,
+        state.device_id(),
+    );
+    Ok(())
 }
 
 #[tauri::command]
@@ -165,16 +181,29 @@ pub async fn create_directory(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn delete_file(path: String) -> Result<(), String> {
+pub async fn delete_file(
+    state: tauri::State<'_, crate::AppState>,
+    path: String,
+) -> Result<(), String> {
     if has_parent_dir_component(&path) {
         return Err("Path not allowed: traversal sequences are forbidden".to_string());
     }
     let p = std::path::Path::new(&path);
+    let before_hash = crate::universe_hooks::hash_file_sync(p);
     if p.is_dir() {
-        fs::remove_dir_all(&path).map_err(|e| e.to_string())
+        fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
     } else {
-        fs::remove_file(&path).map_err(|e| e.to_string())
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
+    crate::universe_hooks::emit_file_change(
+        &state.universe,
+        "delete",
+        &path,
+        before_hash,
+        None,
+        state.device_id(),
+    );
+    Ok(())
 }
 
 #[tauri::command]
