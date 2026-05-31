@@ -148,6 +148,7 @@ pub mod system_event_bus;
 mod upgrade_dispatcher;
 mod universe_commands;
 pub mod universe_hooks;
+mod fff_commands;
 mod gpu_controller;
 mod mcp_server;
 mod micro_bonsai;
@@ -1460,13 +1461,23 @@ pub fn run() {
             {
                 let state = app.state::<AppState>();
                 app.manage(state.universe.clone());
-                // Start the SystemEventBus → Universe event bridge
                 universe_hooks::start_event_bridge(
                     state.event_bus.clone(),
                     state.universe.clone(),
                 );
-                // Start periodic snapshot scheduler
                 state.universe.snapshots.clone().spawn();
+            }
+            // Forced Failure Finder + Sandbox Nervous System
+            {
+                let kb_path = app_handle
+                    .path()
+                    .app_data_dir()
+                    .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                    .join("survival_kb.db")
+                    .to_string_lossy()
+                    .to_string();
+                app.manage(fff_commands::F3State::new(&kb_path));
+                app.manage(fff_commands::SnsState::new());
             }
 
             // Survival engine — self-repair with growing knowledge base
@@ -2522,6 +2533,16 @@ pub fn run() {
             universe_commands::revert_preview_event,
             universe_commands::revert_preview_snapshot,
             universe_commands::revert_confirm,
+            fff_commands::fff_start_campaign,
+            fff_commands::fff_start_preset,
+            fff_commands::fff_stop_campaign,
+            fff_commands::fff_list_campaigns,
+            fff_commands::fff_list_failures,
+            fff_commands::fff_stats,
+            fff_commands::fff_export_failure,
+            fff_commands::sns_list_sandboxes,
+            fff_commands::sns_list_violations,
+            fff_commands::sns_terminate_sandbox,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

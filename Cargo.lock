@@ -1499,6 +1499,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonsai-failure-finder"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chrono",
+ "dashmap 5.5.3",
+ "rand 0.8.6",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "bonsai-go"
 version = "0.1.0"
 dependencies = [
@@ -1761,6 +1779,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonsai-sns"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chrono",
+ "dashmap 5.5.3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "bonsai-swarm"
 version = "0.1.0"
 dependencies = [
@@ -1984,6 +2017,7 @@ dependencies = [
  "bonsai-credits",
  "bonsai-extensions",
  "bonsai-fabric",
+ "bonsai-failure-finder",
  "bonsai-go",
  "bonsai-go-nn",
  "bonsai-hnsw",
@@ -1996,6 +2030,7 @@ dependencies = [
  "bonsai-package",
  "bonsai-query",
  "bonsai-skill-compiler",
+ "bonsai-sns",
  "bonsai-swarm",
  "bonsai-transfer-core",
  "bonsai-transfer-crypto",

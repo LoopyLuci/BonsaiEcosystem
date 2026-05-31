@@ -82,7 +82,7 @@ mod tests {
         let kb = make_kb();
         kb.seed_defaults().unwrap();
         let mut failures = vec![];
-        for (pattern, _) in SEEDED_FIXES {
+        for (pattern, _, _, _) in SEEDED_FIXES {
             let hits = kb.find_matching(pattern);
             if hits.is_empty() {
                 failures.push(*pattern);
