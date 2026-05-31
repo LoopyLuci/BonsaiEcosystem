@@ -60,19 +60,15 @@ impl Supervisor {
                 return;
             }
 
-            // Wait for any child to finish.
-            let mut finished_idx = None;
-            'outer: loop {
-                for (idx, (_, handle, _, _)) in handles.iter_mut().enumerate() {
+            // Wait for any child to finish, returning the index once found.
+            let idx: usize = 'outer: loop {
+                for (i, (_, handle, _, _)) in handles.iter_mut().enumerate() {
                     if handle.is_finished() {
-                        finished_idx = Some(idx);
-                        break 'outer;
+                        break 'outer i;
                     }
                 }
                 tokio::time::sleep(Duration::from_millis(50)).await;
-            }
-
-            let idx = finished_idx.unwrap();
+            };
             let (spec, handle, restarts, backoff) = handles.remove(idx);
 
             // Inspect the exit status.

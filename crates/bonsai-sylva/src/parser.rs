@@ -199,8 +199,17 @@ impl Parser {
     }
 
     fn parse_fn_def(&mut self, is_async: bool) -> ParseResult<FnDef> {
+        // Use peek_at(1) to disambiguate: consume the function name only when
+        // the current token is an Ident AND the token after it is `(`.
+        // This correctly handles anonymous lambdas like `fn(x: T) { ... }` where
+        // the Ident would actually be a parameter name, not the function name.
         let name = if let Token::Ident(_) = self.peek() {
-            Some(self.expect_ident()?)
+            if self.peek_at(1) == &Token::LParen {
+                Some(self.expect_ident()?)
+            } else {
+                // Next token after Ident is not `(` — treat as anonymous fn.
+                None
+            }
         } else { None };
         self.expect(&Token::LParen)?;
         let params = self.parse_params()?;

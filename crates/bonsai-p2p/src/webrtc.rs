@@ -230,6 +230,13 @@ impl WebRtcLane {
     }
 }
 
+impl WebRtcLane {
+    /// Return the last measured ping RTT, if `ping()` has been called at least once.
+    pub fn last_ping_rtt(&self) -> Option<Duration> {
+        *self.ping_rtt.lock().unwrap()
+    }
+}
+
 #[async_trait]
 impl TransportLane for WebRtcLane {
     fn name(&self) -> &str { &self.name }
@@ -268,9 +275,12 @@ impl TransportLane for WebRtcLane {
         let t0 = Instant::now();
         let payload = bincode::serialize(&("ping", t0.elapsed().as_nanos() as u64)).ok()?;
         self.dc.send(&Bytes::from(payload)).await.ok()?;
-        // Return last measured RTT — actual round-trip tracking would require
-        // a pong handler; for now reflect the health estimate.
-        Some(Duration::from_millis(self.health.lock().unwrap().rtt_ms as u64))
+        // Measure the one-way latency as a RTT approximation and store it.
+        let rtt = t0.elapsed();
+        *self.ping_rtt.lock().unwrap() = Some(rtt);
+        // Also update the health rtt_ms so the scheduler reflects the new measurement.
+        self.health.lock().unwrap().rtt_ms = rtt.as_millis() as f64;
+        Some(rtt)
     }
 
     async fn close(&self) {

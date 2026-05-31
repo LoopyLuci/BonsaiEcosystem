@@ -1,6 +1,5 @@
 //! High-level Transfer — orchestrates chunking, encrypting, scheduling, and sending.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
 use tokio::sync::mpsc;
@@ -10,7 +9,7 @@ use bonsai_transfer_crypto::{session::SessionKey, cipher::encrypt_chunk};
 use crate::gsn::GsnAllocator;
 use crate::scheduler::EcfRgScheduler;
 use crate::lane::TransportLane;
-use crate::error::{TransferError, TransferResult};
+use crate::error::TransferResult;
 
 /// Default chunk size: 256 KiB. Balances per-chunk overhead vs. memory use.
 pub const DEFAULT_CHUNK_SIZE: usize = 256 * 1024;

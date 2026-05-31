@@ -21,7 +21,6 @@ impl FileTransferStream {
         writer: &mut (impl tokio::io::AsyncWriteExt + Unpin),
         path: &std::path::Path,
     ) -> Result<(), String> {
-        use tokio::io::AsyncWriteExt;
         let data = tokio::fs::read(path).await.map_err(|e| e.to_string())?;
         let meta = tokio::fs::metadata(path).await.map_err(|e| e.to_string())?;
         let checksum = blake3::hash(&data).to_hex().to_string();
@@ -52,7 +51,6 @@ impl FileTransferStream {
         reader: &mut (impl tokio::io::AsyncReadExt + Unpin),
         output_dir: &std::path::Path,
     ) -> Result<std::path::PathBuf, String> {
-        use tokio::io::AsyncReadExt;
         let mut len_buf = [0u8; 4];
         reader.read_exact(&mut len_buf).await.map_err(|e| e.to_string())?;
         let hdr_len = u32::from_le_bytes(len_buf) as usize;

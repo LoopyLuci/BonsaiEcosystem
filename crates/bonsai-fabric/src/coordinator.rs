@@ -33,6 +33,17 @@ impl CoordinatorActor {
         let _ = self.tx.send(CoordMsg::RemoveNode(node_id)).await;
     }
 
+    /// Report that a remote node completed a task. The coordinator will route
+    /// the result back to the waiting `submit_task` caller.
+    pub async fn report_node_result(&self, result: TaskResult) {
+        let _ = self.tx.send(CoordMsg::NodeResult(result)).await;
+    }
+
+    /// Gracefully shut down the coordinator loop.
+    pub async fn shutdown(&self) {
+        let _ = self.tx.send(CoordMsg::Shutdown).await;
+    }
+
     pub async fn submit_task(&self, task: FabricTask, deadline_ms: u64) -> Option<TaskResult> {
         let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
         let _ = self.tx.send(CoordMsg::SubmitTask(task, resp_tx)).await;

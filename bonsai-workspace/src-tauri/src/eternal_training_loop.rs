@@ -181,11 +181,11 @@ pub struct ConstitutionalTrainer {
 }
 
 #[derive(Debug, Clone)]
-struct ViolationResult {
-    rule_id:   String,
-    tier:      ConstitutionTier,
-    weight:    f32,
-    violated:  bool,
+pub struct ViolationResult {
+    pub rule_id:   String,
+    pub tier:      ConstitutionTier,
+    pub weight:    f32,
+    pub violated:  bool,
 }
 
 impl ConstitutionalTrainer {

@@ -4,7 +4,7 @@
 //! a `.rs` file and compiled with `rustc` or `cargo build`.
 
 use crate::ops::{
-    BinOpKind, EffectHandler, IrFunction, IrLit, IrModule, IrOp, IrParam, IrType, IrTypeDef,
+    BinOpKind, IrFunction, IrLit, IrModule, IrOp, IrParam, IrType, IrTypeDef,
     IrTypeDefKind, UnOpKind,
 };
 use std::fmt::Write as _;
@@ -490,7 +490,11 @@ pub fn emit_json_schema(f: &IrFunction) -> serde_json::Value {
     let properties: serde_json::Map<String, serde_json::Value> = f.params.iter()
         .map(|p| {
             let ty_str = codegen.emit_type(&p.ty).unwrap_or_else(|_| "any".into());
-            let schema = type_to_json_schema(&p.ty);
+            let mut schema = type_to_json_schema(&p.ty);
+            // Annotate schema with the Rust type string for tooling / documentation.
+            if let serde_json::Value::Object(ref mut m) = schema {
+                m.insert("rust_type".to_string(), serde_json::Value::String(ty_str));
+            }
             (p.name.clone(), schema)
         })
         .collect();
@@ -555,7 +559,7 @@ mod tests {
 
     #[test]
     fn emit_simple_fn() {
-        let mut cg = RustCodegen::new();
+        let cg = RustCodegen::new();
         let f = make_add_fn();
         let src = cg.emit_fn(&f).unwrap();
         assert!(src.contains("pub fn add"), "missing fn signature: {src}");
@@ -579,7 +583,7 @@ mod tests {
 
     #[test]
     fn emit_if_expression() {
-        let mut cg = RustCodegen::new();
+        let cg = RustCodegen::new();
         let op = IrOp::if_(
             IrOp::lit_bool(true),
             IrOp::lit_i64(1),

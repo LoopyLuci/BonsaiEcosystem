@@ -5,7 +5,7 @@
 
 use aes_gcm::{
     Aes256Gcm, Key, Nonce,
-    aead::{Aead, AeadCore, KeyInit, OsRng},
+    aead::{Aead, KeyInit},
 };
 use serde::{Deserialize, Serialize};
 use crate::session::SessionKey;

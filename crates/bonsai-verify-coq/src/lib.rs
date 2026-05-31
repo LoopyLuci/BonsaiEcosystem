@@ -121,7 +121,10 @@ impl CoqSidecar {
         loop {
             if Instant::now() >= deadline {
                 let _ = child.kill();
-                return Err(CoqError::Other(format!("coqc timed out after {secs}s")));
+                return Err(CoqError::Other(format!(
+                    "coqc timed out after {secs}s on {}",
+                    src_path.display()
+                )));
             }
             match child.try_wait()? {
                 Some(_) => break,

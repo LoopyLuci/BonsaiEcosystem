@@ -258,6 +258,13 @@ impl TransportLayer {
         Ok(())
     }
 
+    /// Inject a message directly into the inbound queue without going over the
+    /// network (used for local-to-local actor communication on the same node).
+    pub fn deliver_local(&self, msg: InboundMessage) -> TransportResult<()> {
+        self.inbound_tx.send(msg)
+            .map_err(|_| TransportError::Other("inbound channel closed".into()))
+    }
+
     /// Broadcast gossip (our NodeInfo) to all known peers.
     pub async fn gossip_broadcast(&self) -> TransportResult<()> {
         let payload = encode_cbor(&GossipMsg::Announce(self.node.clone()))?;
@@ -308,7 +315,7 @@ impl TransportLayer {
 
 async fn handle_inbound(
     mut stream: TcpStream,
-    local_node: NodeId,
+    _local_node: NodeId,
     inbound_tx: mpsc::UnboundedSender<InboundMessage>,
     registry: GossipRegistry,
 ) -> TransportResult<()> {
@@ -351,7 +358,7 @@ async fn handle_inbound(
 async fn outbound_loop(
     mut rx: mpsc::UnboundedReceiver<Vec<u8>>,
     addr: SocketAddr,
-    target_node: NodeId,
+    _target_node: NodeId,
 ) -> TransportResult<()> {
     let mut stream = TcpStream::connect(addr).await?;
     debug!("connected to {addr}");

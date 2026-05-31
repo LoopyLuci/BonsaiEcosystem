@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use async_trait::async_trait;
 use axum::{routing::post, Json, Router as AxumRouter};
-use serde_json::{json, Value};
+use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 

@@ -165,6 +165,7 @@ impl SwarmLane {
                                         let gsn = bincode::deserialize::<ChunkCiphertext>(&request.data)
                                             .map(|c| c.gsn)
                                             .unwrap_or(0);
+                                        debug!("swarm: received chunk gsn={gsn} from {peer}");
                                         let _ = swarm.behaviour_mut().rr.send_response(
                                             channel,
                                             SwarmChunkResp { gsn, ok: true },

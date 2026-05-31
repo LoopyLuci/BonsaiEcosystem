@@ -16,7 +16,6 @@
 //!   trivial                — close a goal that is definitionally Prop with a Prop proof
 //!   admit                  — escape hatch: admits the goal with an axiom (unsound, marks proof)
 
-use std::collections::HashMap;
 use crate::kernel::{
     AxiomKernel, Term, Sort, Context, Environment, ProofWitness, KernelResult, KernelError,
     normalize, subst, lift,
@@ -137,6 +136,13 @@ impl TacticEngine {
 
     pub fn with_env(env: Environment) -> Self {
         Self { kernel: AxiomKernel::with_env(env) }
+    }
+
+    /// Check whether `term` is well-typed in the given context, returning the
+    /// inferred type. Exposes the kernel's `KernelResult` for callers that need
+    /// the raw kernel error type (e.g., tool-registry integration).
+    pub fn check_term(&self, term: &Term, ctx: &Context) -> KernelResult<Term> {
+        self.kernel.infer(term, ctx)
     }
 
     /// Begin a new proof of `proposition`.
@@ -263,9 +269,12 @@ impl TacticEngine {
         state.push_goal(Goal::new(base_ty, goal.ctx.clone(), format!("induction base: {var_name}=0")));
 
         // Step case: Π n:Nat, P[n/var] → P[S n/var]
-        let step_hyp = subst(&goal.ty, &Term::var(0), var_idx);
+        // lift raises De Bruijn indices above the new binder so the substitution
+        // target (var_idx + 1) references the correct variable after the Π-intro.
+        let lifted_ty = lift(&goal.ty, 1, 0);
+        let step_hyp = subst(&lifted_ty, &Term::var(0), var_idx + 1);
         let succ_n   = Term::app(Term::con("succ"), Term::var(0));
-        let step_concl = subst(&goal.ty, &succ_n, var_idx);
+        let step_concl = subst(&lifted_ty, &succ_n, var_idx + 1);
         let step_ty = Term::pi("n", Term::Nat,
             Term::pi("ih", step_hyp, step_concl));
         state.push_goal(Goal::new(step_ty, goal.ctx.clone(), format!("induction step: {var_name}")));

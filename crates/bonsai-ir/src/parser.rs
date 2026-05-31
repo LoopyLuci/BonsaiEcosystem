@@ -325,7 +325,11 @@ impl Parser {
         let mut module = IrModule::new(name);
         while self.peek() != &Token::Eof {
             // optional device annotation on fn
-            let device = if matches!(self.peek(), Token::DeviceCpu | Token::DeviceGpu | Token::DeviceFpga | Token::DeviceTpu | Token::DeviceAuto) {
+            // peek2() disambiguates: only consume the device token when the next
+            // token is `fn`, avoiding false positives for bare @-identifiers.
+            let device = if matches!(self.peek(), Token::DeviceCpu | Token::DeviceGpu | Token::DeviceFpga | Token::DeviceTpu | Token::DeviceAuto)
+                && self.peek2() == Some(&Token::Fn)
+            {
                 Some(self.parse_device())
             } else {
                 None

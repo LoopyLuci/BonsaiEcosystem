@@ -8,7 +8,7 @@ pub use sql::{SqlEngine, SqlError, SqlResult};
 
 use std::sync::Arc;
 
-use bonsai_capability_registry::{CapabilityEntry, CapabilityManifest, UniversalCapabilityRegistry};
+use bonsai_capability_registry::{CapabilityEntry, UniversalCapabilityRegistry};
 
 #[derive(Debug, Clone)]
 pub struct ScoredCapability {

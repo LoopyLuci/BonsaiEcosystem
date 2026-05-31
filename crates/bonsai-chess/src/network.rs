@@ -446,6 +446,7 @@ pub fn train_epoch(
         copy_back!(weights.bp);
         copy_back!(weights.wv);
         copy_back!(weights.bv);
+        let _ = off; // off is fully consumed by the copy_back! sequence above
 
         batches += 1;
     }
@@ -507,7 +508,6 @@ mod tests {
     fn train_epoch_reduces_loss() {
         let mut weights = ChessNetWeights::random();
         let mut adam = AdamState::new(TOTAL_PARAMS);
-        let pos = ChessPosition::initial();
         let positions: Vec<_> = (0..8).map(|_| ChessPosition::initial()).collect();
         let examples = teacher_distill_examples(&positions);
         let (pl0, vl0) = train_epoch(&mut weights, &mut adam, &examples, 4);

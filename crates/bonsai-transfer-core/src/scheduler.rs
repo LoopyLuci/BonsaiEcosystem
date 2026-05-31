@@ -14,7 +14,6 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use crate::lane::{TransportLane, LaneHealth, LaneKind};
 
 /// Maximum GSN gap before the reorder guard blocks a lane.
@@ -162,7 +161,7 @@ impl Default for EcfRgScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lane::{InProcessLane, LaneKind};
+    use crate::lane::InProcessLane;
 
     #[test]
     fn assigns_to_best_lane() {

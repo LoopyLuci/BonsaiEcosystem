@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 use bonsai_transfer_crypto::cipher::ChunkCiphertext;
-use crate::error::{TransferError, TransferResult};
+use crate::error::TransferResult;
 
 /// Gap timeout before a NACK is emitted (milliseconds).
 const GAP_NACK_TIMEOUT_MS: u64 = 500;

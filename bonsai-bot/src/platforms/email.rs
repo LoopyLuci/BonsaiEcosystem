@@ -140,7 +140,6 @@ impl EmailPlatform {
     ) -> Result<(), String> {
         use async_native_tls::TlsConnector;
         use async_imap::Client;
-        use futures::TryStreamExt;
         use tokio_util::compat::TokioAsyncReadCompatExt;
 
         let addr = format!("{}:{}", self.config.imap_host, self.config.imap_port);

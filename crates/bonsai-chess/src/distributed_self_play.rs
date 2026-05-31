@@ -4,7 +4,6 @@
 //! then syncs `GameRecord`s with peers via HTTP. CRDT primitives ensure
 //! convergence without coordination.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -267,7 +266,7 @@ impl PeerSyncManager {
                 // In a real deployment: POST our_state to peer, GET peer state
                 // Skipping actual HTTP here — implement via axum handler at the app layer
                 tracing::debug!(node=%self.node_id, peer=%peer_url, "sync tick (HTTP disabled in lib)");
-                drop(&our_state); // suppress unused warning in test builds
+                let _ = &our_state; // reference used to suppress move-out before loop
                 break;
             }
         }

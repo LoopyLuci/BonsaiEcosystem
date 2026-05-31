@@ -148,11 +148,11 @@ pub fn register_stdlib(vm: &mut SylvaVm) {
         }
     });
 
-    native(vm, "map", |args| {
+    native(vm, "map", |_args| {
         Err(VmError::Runtime("map(list, fn) requires calling the VM recursively — use for loop instead".into()))
     });
 
-    native(vm, "filter", |args| {
+    native(vm, "filter", |_args| {
         Err(VmError::Runtime("filter(list, fn) requires calling the VM recursively — use for loop instead".into()))
     });
 

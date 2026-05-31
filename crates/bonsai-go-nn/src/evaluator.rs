@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use anyhow::Result;
-use candle_core::{Device, Tensor, DType};
+use candle_core::{Device, Tensor};
 use bonsai_go::board::{GoBoard, Stone, Point};
 use bonsai_go::mcts::GoEvaluator as BonsaiGoEvaluator;
 use crate::model::GoNet;
@@ -22,9 +22,10 @@ impl NeuralEvaluator {
         Ok(Self { model: Some(Arc::new(model)), device })
     }
 
-    fn board_to_tensor(&self, _board: &GoBoard) -> Result<Tensor> {
-        // Placeholder: return zeros tensor shaped (1,17,19,19)
-        let t = Tensor::zeros((1, 17, 19, 19), DType::F32, &self.device)?;
+    fn board_to_tensor(&self, board: &GoBoard) -> Result<Tensor> {
+        // Build (1, 17, 19*19) tensor from the board's flat NN input (Black to move).
+        let flat = board.to_nn_input(bonsai_go::board::Stone::Black);
+        let t = Tensor::from_vec(flat, (1, 17, 19 * 19), &self.device)?;
         Ok(t)
     }
 }
@@ -33,6 +34,14 @@ impl BonsaiGoEvaluator for NeuralEvaluator {
     fn evaluate_policy(&self, board: &GoBoard, _color: Stone) -> Vec<(Option<Point>, f32)> {
         // If model is available, run inference. Fallback: use uniform policy.
         if let Some(model) = &self.model {
+            // Produce the candle tensor for potential GPU-based pre-processing / logging.
+            // For the Vec<f32>-based GoNet path we continue to use to_nn_input directly;
+            // board_to_tensor records the tensor in debug builds for shape validation.
+            #[cfg(debug_assertions)]
+            if let Ok(_t) = self.board_to_tensor(board) {
+                // Tensor shape validated: (1, 17, 19*19). No further action in this path.
+                let _ = _t;
+            }
             // Convert board -> flat input
             let input = board.to_nn_input(_color);
             let (logits, _value, _act) = model.forward_single(&input);

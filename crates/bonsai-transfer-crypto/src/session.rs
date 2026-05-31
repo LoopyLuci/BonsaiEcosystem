@@ -13,7 +13,7 @@ use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
-use crate::error::{CryptoError, CryptoResult};
+use crate::error::CryptoResult;
 
 // ── Session key ───────────────────────────────────────────────────────────────
 

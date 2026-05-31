@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use serde_json::Value;
 
@@ -16,7 +16,7 @@ use bonsai_transfer_crypto::{
 use bonsai_transfer_core::{
     lane::{InProcessLane, TransportLane},
     scheduler::EcfRgScheduler,
-    transfer::{Transfer, TransferStatus, TransferHandle},
+    transfer::{Transfer, TransferStatus},
 };
 use bonsai_array::AplEval;
 use bonsai_verify_lean::{LeanSidecar, LeanRequest};
@@ -29,8 +29,7 @@ use bonsai_capability_registry::{TrustScore, DeploymentGate};
 use bonsai_sylva::SylvaVm;
 use uuid::Uuid;
 use tokio::sync::mpsc;
-use std::collections::HashMap;
-use bonsai_ci::{PipelineDef, OrchestratorActor, RunResult};
+use bonsai_ci::{PipelineDef, OrchestratorActor};
 
 /// Dispatch a JSON-RPC method to a concrete implementation.
 /// Returns a JSON value on success or an error string on failure.
@@ -121,6 +120,19 @@ pub async fn dispatch(
                 payload["contacts"] = serde_json::json!([contact.clone()]);
             }
             state.store.save(&payload).map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({"ok": true}))
+        }
+
+        "mailbox.send" => {
+            use bonsai_mailbox::MailEnvelope;
+            let to    = params.get("to").and_then(|v| v.as_str()).ok_or("missing to")?.to_string();
+            let from  = params.get("from").and_then(|v| v.as_str()).unwrap_or("daemon").to_string();
+            let topic = params.get("topic").and_then(|v| v.as_str()).unwrap_or("message").to_string();
+            let body  = params.get("body").cloned().unwrap_or(serde_json::Value::Null);
+            let payload = serde_json::to_vec(&body).unwrap_or_default();
+            // No signature for daemon-originated messages (unsigned, trusted locally).
+            let env = MailEnvelope::new(from, to, &topic, payload, vec![]);
+            state.mailbox.deliver(env).await.map_err(|e| e.to_string())?;
             Ok(serde_json::json!({"ok": true}))
         }
 
@@ -223,11 +235,11 @@ pub async fn dispatch(
 
         "transfer.cancel" | "transfer.cancel_transfer" => {
             let id = params.get("id").and_then(|v| v.as_str()).ok_or("missing id")?;
-            let mut handles = state.transfer_handles.lock().await;
+            let handles = state.transfer_handles.lock().await;
             if let Some(handle) = handles.get(id) {
                 handle.cancel();
                 // Update status map
-                if let Some(mut status) = state.transfers.lock().await.get_mut(id) {
+                if let Some(status) = state.transfers.lock().await.get_mut(id) {
                     status.state = bonsai_transfer_core::transfer::TransferState::Cancelled;
                 }
                 Ok(serde_json::json!({"ok": true}))

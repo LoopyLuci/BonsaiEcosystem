@@ -101,8 +101,7 @@ pub struct AdminState {
     pub swarm_peers: Vec<crate::config::SwarmPeer>,
 }
 
-#[allow(dead_code)]
-pub(crate) struct RuntimeInfo {
+pub struct RuntimeInfo {
     controller: Option<Box<dyn bonsai_runtime::RuntimeController + Send + Sync>>,
     pid: Option<i64>,
     user: Option<String>,

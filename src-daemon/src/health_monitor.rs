@@ -23,6 +23,29 @@ pub async fn run_health_monitor(state: Arc<DaemonState>, cas: Arc<CasStore>) {
     let pid = sysinfo::get_current_pid().ok();
     let mut ticks: u32 = 0;
 
+    // On startup, attempt to replay the most recent checkpoint if a key was persisted.
+    // The checkpoint key is written to the platform data dir on each successful checkpoint.
+    let base = dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("bonsai");
+    let checkpoint_key_path = base.join("last_checkpoint.key");
+    if checkpoint_key_path.exists() {
+        if let Ok(key_str) = std::fs::read_to_string(&checkpoint_key_path) {
+            let key_str = key_str.trim();
+            if !key_str.is_empty() {
+                match bonsai_cas::CasKey::from_hex(key_str) {
+                    Ok(key) => {
+                        match checkpoint_impl::restore(&state, &cas, &key).await {
+                            Ok(()) => info!(cas_key = %key_str, "health-monitor: restored state from checkpoint"),
+                            Err(e) => warn!(error = %e, "health-monitor: checkpoint restore failed (ignored)"),
+                        }
+                    }
+                    Err(e) => warn!("health-monitor: invalid checkpoint key in {checkpoint_key_path:?}: {e}"),
+                }
+            }
+        }
+    }
+
     // Subscribe to CAS write events so we can trigger reactive checkpoints.
     let mut cas_watch = cas.watch();
 
@@ -55,7 +78,10 @@ pub async fn run_health_monitor(state: Arc<DaemonState>, cas: Arc<CasStore>) {
                     (CHECKPOINT_INTERVAL.as_secs() / POLL_INTERVAL.as_secs()) as u32;
                 if ticks % checkpoint_every == 0 {
                     match checkpoint_impl::checkpoint(&state, &cas).await {
-                        Ok(key) => info!(cas_key = %key, "health-monitor: periodic checkpoint"),
+                        Ok(key) => {
+                            info!(cas_key = %key, "health-monitor: periodic checkpoint");
+                            let _ = std::fs::write(&checkpoint_key_path, key.to_string());
+                        }
                         Err(e)  => warn!(error = %e, "health-monitor: checkpoint failed"),
                     }
                 }
@@ -67,7 +93,10 @@ pub async fn run_health_monitor(state: Arc<DaemonState>, cas: Arc<CasStore>) {
                     Ok(CasEvent::Inserted { key, size, .. }) if size > 1024 => {
                         debug!(cas_key = %key, "health-monitor: CAS insert → checkpoint");
                         match checkpoint_impl::checkpoint(&state, &cas).await {
-                            Ok(ck) => info!(cas_key = %ck, "health-monitor: reactive checkpoint"),
+                            Ok(ck) => {
+                                info!(cas_key = %ck, "health-monitor: reactive checkpoint");
+                                let _ = std::fs::write(&checkpoint_key_path, ck.to_string());
+                            }
                             Err(e) => warn!(error = %e, "health-monitor: reactive checkpoint failed"),
                         }
                     }

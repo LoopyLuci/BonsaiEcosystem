@@ -85,13 +85,15 @@ impl GoNetWeights {
         let floats: Vec<f32> = buf.chunks_exact(4)
             .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
             .collect();
-        let mut off = 0;
+        let mut off = 0usize;
         macro_rules! take { ($n:expr) => {{ let v = floats[off..off+$n].to_vec(); off += $n; v }}; }
-        Ok(Self {
+        let result = Ok(Self {
             w1: take!(W1_LEN), b1: take!(B1_LEN),
             wp: take!(WP_LEN), bp: take!(BP_LEN),
             wv: take!(WV_LEN), bv: take!(BV_LEN),
-        })
+        });
+        let _ = off; // off is fully consumed by the take! sequence above
+        result
     }
 
     pub fn hidden(&self, input: &[f32]) -> Vec<f32> {
@@ -427,6 +429,7 @@ pub fn train_epoch(
         copy_back!(weights.w1); copy_back!(weights.b1);
         copy_back!(weights.wp); copy_back!(weights.bp);
         copy_back!(weights.wv); copy_back!(weights.bv);
+        let _ = off; // off is fully consumed by the copy_back! sequence above
 
         batches += 1;
     }

@@ -12,7 +12,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex};
 use tracing::{info, warn};
 use crate::error::{RelayError, RelayResult};
-use crate::token::{RegisterRequest, RelayToken};
+use crate::token::RegisterRequest;
 
 const SESSION_TTL: Duration = Duration::from_secs(300); // 5 minutes
 const MAX_FRAME: usize = 18 * 1024 * 1024; // 18 MiB
@@ -120,6 +120,10 @@ async fn handle_connection(mut stream: TcpStream, sessions: Sessions) -> RelayRe
         let session = map.entry(token_key).or_insert_with(Session::new);
         if session.is_expired() {
             *session = Session::new();
+        }
+        // Reject a third peer — sessions only allow two participants.
+        if session.is_full() {
+            return Err(RelayError::SessionFull);
         }
         session.join(out_tx.clone())?
     };

@@ -51,7 +51,7 @@ pub trait Actor: Send + 'static {
     type Msg: Send + 'static;
 
     /// Called once when the actor is started.
-    async fn on_start(&mut self, ctx: &mut ActorContext) {}
+    async fn on_start(&mut self, _ctx: &mut ActorContext) {}
 
     /// Called for every incoming message. Must not block.
     async fn receive(&mut self, msg: Self::Msg, ctx: &mut ActorContext);
@@ -59,9 +59,9 @@ pub trait Actor: Send + 'static {
     /// Called when a child actor fails. Returns the directive for the supervisor.
     async fn on_child_failed(
         &mut self,
-        child_id: ActorId,
-        error: String,
-        ctx: &mut ActorContext,
+        _child_id: ActorId,
+        _error: String,
+        _ctx: &mut ActorContext,
     ) -> SupervisionDirective {
         SupervisionDirective::Restart
     }
@@ -155,6 +155,14 @@ impl ActorContext {
     /// Emit a Tauri-style event (payload as JSON). No-op if no emitter is wired.
     pub fn emit(&self, channel: &str, payload: serde_json::Value) {
         self.system.emit_event(channel, payload);
+    }
+
+    /// Notify the parent supervisor of a child failure (actor escalation).
+    /// This is the correct way to propagate errors up the supervision tree.
+    pub fn escalate_to_parent(&self, child_id: ActorId, error: impl Into<String>) {
+        if let Some(ref notify) = self.parent_tx {
+            notify((child_id, error.into()));
+        }
     }
 }
 
@@ -274,7 +282,7 @@ impl ActorSystem {
         drop(stoppers);
     }
 
-    fn get_stopper(&self, id: ActorId) -> Option<impl Fn()> {
+    fn get_stopper(&self, _id: ActorId) -> Option<impl Fn()> {
         // Synchronous path — returns a closure that sends Stop
         // This is a simplified version; in production you'd cache the tx
         None::<fn()>
@@ -314,6 +322,19 @@ impl<CM: Send + 'static> SupervisorActor<CM> {
 
     pub fn register_child(&mut self, name: impl Into<String>, r: ActorRef<CM>) {
         self.children.insert(name.into(), r);
+    }
+
+    /// Record a restart for `child_id`. Returns `true` if the child is allowed
+    /// to restart, `false` if it has exceeded `max_restarts`.
+    pub fn record_restart(&mut self, child_id: ActorId) -> bool {
+        let count = self.restart_counts.entry(child_id).or_insert(0);
+        *count += 1;
+        *count <= self.max_restarts
+    }
+
+    /// How many times `child_id` has been restarted.
+    pub fn restart_count(&self, child_id: ActorId) -> u32 {
+        self.restart_counts.get(&child_id).copied().unwrap_or(0)
     }
 }
 
