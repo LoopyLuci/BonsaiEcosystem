@@ -132,7 +132,24 @@ pub fn load_config(app_handle: &AppHandle) -> Result<AppConfig, String> {
 
 pub fn save_config(app_handle: &AppHandle, config: &AppConfig) -> Result<AppConfig, String> {
     let path = config_path(app_handle)?;
+
+    // Capture before hash for the Universe event
+    let before_hash = std::fs::read(&path)
+        .ok()
+        .map(|b| blake3::hash(&b).to_hex().to_string());
+
     let content = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     crate::atomic_write(&path, content.as_bytes()).map_err(|e| e.to_string())?;
+
+    // Emit ConfigChanged on the SystemEventBus (best-effort, non-blocking)
+    if let Some(state) = app_handle.try_state::<crate::AppState>() {
+        let after_hash = blake3::hash(content.as_bytes()).to_hex().to_string();
+        state.event_bus.publish(crate::system_event_bus::SystemEvent::ConfigChanged {
+            key: "bonsai-config.json".into(),
+            old_value: before_hash.unwrap_or_default(),
+            new_value: after_hash,
+        });
+    }
+
     Ok(config.clone())
 }

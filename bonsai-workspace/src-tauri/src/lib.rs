@@ -2521,6 +2521,7 @@ pub fn run() {
             universe_commands::universe_event_count,
             universe_commands::revert_preview_event,
             universe_commands::revert_preview_snapshot,
+            universe_commands::revert_confirm,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

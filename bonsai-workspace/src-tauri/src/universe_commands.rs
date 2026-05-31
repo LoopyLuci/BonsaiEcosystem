@@ -157,6 +157,47 @@ pub async fn revert_preview_snapshot(
     })
 }
 
+/// Confirm a revert operation. Records a Reversion event in the timeline.
+/// Full file/state restoration is wired in Phase 2; this records the intent
+/// and marks the reversion in the audit trail.
+#[tauri::command]
+pub async fn revert_confirm(
+    universe: State<'_, UniverseState>,
+    target_event_id: Option<String>,
+    target_snapshot_id: Option<String>,
+) -> Result<String, String> {
+    use bonsai_universe::{EventCategory, EventSource, UniverseEvent};
+
+    let target = target_event_id
+        .as_deref()
+        .or(target_snapshot_id.as_deref())
+        .unwrap_or("unknown");
+
+    let mut ev = UniverseEvent::new(
+        EventSource::User { peer_id: universe.store.device_id().to_string() },
+        EventCategory::Reversion,
+        format!("Reverted to: {}", target),
+        target.to_string(),
+        universe.store.device_id().to_string(),
+    );
+    ev.metadata = serde_json::json!({
+        "target_event_id": target_event_id,
+        "target_snapshot_id": target_snapshot_id,
+        "status": "recorded",
+        "note": "Full restoration wired in Phase 2",
+    });
+
+    universe.emitter.emit(ev);
+
+    // Create a post-revert snapshot so the timeline shows the new baseline
+    let snap = universe
+        .snapshots
+        .take_snapshot(Some(format!("Post-revert: {}", target)), target.to_string())
+        .await?;
+
+    Ok(snap.snapshot_id)
+}
+
 fn parse_category(s: &str) -> Option<EventCategory> {
     match s {
         "FileChange" => Some(EventCategory::FileChange),
