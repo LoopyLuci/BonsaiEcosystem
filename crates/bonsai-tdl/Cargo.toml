@@ -1,0 +1,25 @@
+[package]
+name = "bonsai-tdl"
+version = "0.1.0"
+edition = "2021"
+description = "BonsAI Training Data Library — production-grade SQLite-backed training dataset management"
+
+[dependencies]
+sqlx             = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+libsqlite3-sys   = { version = "0.30", features = ["bundled"] }
+tokio            = { version = "1", features = ["full"] }
+serde            = { version = "1.0", features = ["derive"] }
+serde_json       = "1.0"
+thiserror        = "1"
+uuid             = { version = "1", features = ["v4", "serde"] }
+chrono           = { version = "0.4", features = ["serde"] }
+tracing          = "0.1"
+anyhow           = "1.0"
+blake3           = "1"
+hex              = "0.4"
+zip              = { version = "0.6", default-features = false, features = ["deflate"] }
+parquet          = "52"
+arrow            = "52"
+
+[dev-dependencies]
+tempfile = "3"

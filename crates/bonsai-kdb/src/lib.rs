@@ -1,7 +1,9 @@
+pub mod manager;
 pub mod module;
 pub mod retriever;
 pub mod store;
 
+pub use manager::KdbManager;
 pub use module::{LoadedModule, ModuleInfo, ModuleManifest};
 pub use retriever::KdbRetriever;
 pub use store::KdbStore;
@@ -24,6 +26,26 @@ pub enum KdbError {
     Json(#[from] serde_json::Error),
     #[error("invalid module: {0}")]
     Invalid(String),
+    #[error("zip error: {0}")]
+    Zip(#[from] zip::result::ZipError),
 }
 
 pub type Result<T> = std::result::Result<T, KdbError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_retriever_creation() {
+        let retriever = KdbRetriever::new(768, 10);
+        assert!(retriever.is_empty());
+    }
+
+    #[test]
+    fn test_module_list() {
+        let retriever = KdbRetriever::new(768, 10);
+        let modules = retriever.list_modules();
+        assert_eq!(modules.len(), 0);
+    }
+}
