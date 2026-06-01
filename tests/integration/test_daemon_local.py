@@ -58,6 +58,23 @@ async def main():
         list2_resp = await call(ws, "contacts.list", {}, 5)
         print("6. CONTACTS LIST (after add):", list2_resp)
 
+        # 6.5 Generate a simple UI manifest
+        gen_resp = await call(ws, "ui.generate", {"description": "Generate a simple transfer dashboard with three cards and a natural language input."}, 100)
+        print("6.5 UI GENERATE:", gen_resp)
+
+        # 6.6 Publish the manifest to CAS
+        gen_manifest = gen_resp.get("result", {})
+        pub_resp = await call(ws, "ui.publish", {"manifest": gen_manifest}, 101)
+        print("6.6 UI PUBLISH:", pub_resp)
+
+        # 6.7 Hot-reload the published manifest
+        hot_resp = await call(ws, "ui.hot_reload", {"manifest": gen_manifest}, 102)
+        print("6.7 UI HOT RELOAD:", hot_resp)
+
+        # 6.8 Rollback (attempt)
+        rollback_resp = await call(ws, "ui.rollback", {"id": gen_manifest.get("id")}, 103)
+        print("6.8 UI ROLLBACK:", rollback_resp)
+
         # 7. Transfer: send file (loopback). Server expects `file_path` param.
         test_file = Path("test_transfer.txt")
         test_file.write_text("Hello, Bonsai transfer test!")

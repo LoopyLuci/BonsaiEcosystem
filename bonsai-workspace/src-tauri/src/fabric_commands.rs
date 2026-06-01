@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
+use bonsai_fabric::catalog;
 
 pub struct FabricState {
     pub coordinator: Arc<bonsai_fabric::CoordinatorActor>,
@@ -103,4 +104,70 @@ pub async fn fabric_register_node(
         })
         .await;
     Ok(())
+}
+
+// ─── Task Catalog commands ────────────────────────────────────────────────────
+
+/// List all registered distributed-computing task profiles.
+#[tauri::command]
+pub async fn fabric_list_catalog() -> Result<Vec<catalog::TaskProfile>, String> {
+    Ok(catalog::CATALOG.to_vec())
+}
+
+/// List task profiles in a single category.
+#[tauri::command]
+pub async fn fabric_catalog_by_category(category: String) -> Result<Vec<catalog::TaskProfile>, String> {
+    use catalog::TaskCategory::*;
+    let cat = match category.as_str() {
+        "ai_ml" => AiMl,
+        "build_ci" => BuildCi,
+        "multimedia" => Multimedia,
+        "simulation" => Simulation,
+        "data_analytics" => DataAnalytics,
+        "cryptography" => Cryptography,
+        "security" => Security,
+        "edge_iot" => EdgeIot,
+        "bonsai_native" => BonsaiNative,
+        "interop" => Interop,
+        other => return Err(format!("unknown category: {other}")),
+    };
+    Ok(catalog::by_category(cat).into_iter().cloned().collect())
+}
+
+/// List task profiles a node with the given resources can run.
+#[tauri::command]
+pub async fn fabric_catalog_runnable(
+    cores: u32,
+    memory_mb: u64,
+    has_gpu: bool,
+) -> Result<Vec<catalog::TaskProfile>, String> {
+    Ok(catalog::runnable_on(cores, memory_mb, has_gpu).into_iter().cloned().collect())
+}
+
+/// (category, count) summary across the catalog.
+#[tauri::command]
+pub async fn fabric_catalog_summary() -> Result<serde_json::Value, String> {
+    let summary: Vec<_> = catalog::category_summary()
+        .into_iter()
+        .map(|(name, n)| serde_json::json!({ "category": name, "count": n }))
+        .collect();
+    Ok(serde_json::json!({ "total": catalog::count(), "categories": summary }))
+}
+
+/// Submit a catalog task by its id, instantiating a FabricTask from the profile.
+#[tauri::command]
+pub async fn fabric_submit_catalog_task(
+    state: State<'_, FabricState>,
+    profile_id: String,
+    project_id: String,
+    payload: Vec<u8>,
+    priority: u8,
+) -> Result<String, String> {
+    let profile = catalog::get(&profile_id)
+        .ok_or_else(|| format!("unknown task profile: {profile_id}"))?;
+    let task = profile.to_fabric_task(project_id, payload, priority);
+    match state.coordinator.submit_task(task, 30_000).await {
+        Some(r) => Ok(serde_json::to_string(&r).unwrap_or_default()),
+        None => Err("task timed out or no capable node".to_string()),
+    }
 }

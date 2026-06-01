@@ -1,5 +1,6 @@
 <script lang="ts">
   import browser from '../lib/browser';
+  import BigButton from '../lib/components/BigButton.svelte';
 
   let prompt = '';
   let response = '';
@@ -81,9 +82,9 @@
   </section>
 
   <section class="card" style="display: grid; gap: 8px;">
-    <button on:click={connect} disabled={busy}>Connect To Bonsai</button>
-    <button class="secondary" on:click={summarizePage} disabled={busy}>Summarize This Page</button>
-    <button class="secondary" on:click={openWorkspace}>Open Workspace</button>
+    <BigButton on:click={connect} disabled={busy}>Connect To Bonsai</BigButton>
+    <BigButton variant="secondary" on:click={summarizePage} disabled={busy}>Summarize This Page</BigButton>
+    <BigButton variant="secondary" on:click={openWorkspace}>Open Workspace</BigButton>
   </section>
 
   <section class="card" style="display: grid; gap: 8px;">

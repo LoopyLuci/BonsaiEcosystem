@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
   // ── Types ──────────────────────────────────────────────────────────────────
   interface TransferStatusDto {
@@ -22,6 +23,7 @@
   let chunkSizeKib = 256;
   let busy = false;
   let pollInterval: ReturnType<typeof setInterval>;
+  let unlisteners: UnlistenFn[] = [];
 
   const STATE_COLORS: Record<string, string> = {
     complete: '#4ade80',
@@ -51,6 +53,19 @@
     }
   }
 
+  function upsertTransfer(status: TransferStatusDto) {
+    const idx = transfers.findIndex(t => t.id === status.id);
+    if (idx === -1) {
+      transfers = [status, ...transfers];
+      return;
+    }
+    transfers = [
+      ...transfers.slice(0, idx),
+      status,
+      ...transfers.slice(idx + 1),
+    ];
+  }
+
   // ── Send ───────────────────────────────────────────────────────────────────
   async function sendLoopback() {
     if (!filePath) { error = 'Enter a file path.'; return; }
@@ -67,12 +82,18 @@
     } finally { busy = false; }
   }
 
-  onMount(() => {
-    loadTransfers();
+  onMount(async () => {
+    await loadTransfers();
     pollInterval = setInterval(loadTransfers, 2000);
+    unlisteners.push(await listen<TransferStatusDto>('transfer-progress', event => {
+      upsertTransfer(event.payload);
+    }));
   });
 
-  onDestroy(() => clearInterval(pollInterval));
+  onDestroy(() => {
+    clearInterval(pollInterval);
+    unlisteners.forEach(u => u());
+  });
 </script>
 
 <div class="transfer-panel">

@@ -19,6 +19,7 @@ bonsai-verify-lean     = { path = "../crates/bonsai-verify-lean" }
 bonsai-verify-fstar    = { path = "../crates/bonsai-verify-fstar" }
 bonsai-verify-tla      = { path = "../crates/bonsai-verify-tla" }
 bonsai-ci              = { path = "../crates/bonsai-ci" }
+bonsai-ui-orchestrator = { path = "../crates/bonsai-ui-orchestrator" }
 
 tokio        = { version = "1", features = ["full"] }
 axum         = { version = "0.7", features = ["ws", "macros"] }

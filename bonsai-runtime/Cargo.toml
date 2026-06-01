@@ -28,7 +28,7 @@ wasmtime-wasi = { version = "8", optional = true }
 tempdir = "0.3"
 
 [features]
-default = []
+default = ["wasmtime-host"]
 wasmtime-host = ["wasmtime", "wasmtime-wasi"]
 
 [lib]

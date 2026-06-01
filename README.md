@@ -2,6 +2,61 @@
 
  Local-first AI development workspace built with Tauri 2, Svelte, Rust, and on-device model sidecars.
 
+🏛️ The Guiding Philosophy: Sovereignty, Privacy, and Resilience
+
+
+Sovereignty by Design: The ultimate goal is a software stack with zero external dependencies, meaning every single library is written and audited by the Bonsai project itself. This is a direct counter to concerns about supply chain attacks and abandoned or changing APIs, giving the user full control and auditability over every line of code they run.
+
+Privacy by Default: Nothing leaves your machine without your explicit action. There is no "phone home", no telemetry, and no cloud-based model API calls. On a typical day with no peer connections, the app makes zero outbound network requests, a claim you could verify with a network monitor. This is fundamentally different from cloud-based IDEs like GitHub Codespaces or AI assistants like GitHub Copilot.
+
+Resilience & Self-Healing: The system is designed to "run forever without human intervention". Through a dedicated "Watchdog" process, it automatically detects crashes, applies fixes from a "Survival Knowledge Base," and restarts components, aiming for zero downtime.
+
+Modularity & User Control: Every component is replaceable, models are swappable at runtime, and features are gated behind flags. The TrustGuard capability system ensures you have granular control over which capabilities—like reading/writing files or running shell commands—are granted to BonsAI.
+
+🧩 Core Functionality and Architecture
+Bonsai's functionality is organized into logical layers, all built on a modern Rust and Svelte foundation.
+
+The BonsAI Assistant: The heart of the ecosystem is BonsAI, a local LLM that can interact with your development environment through tool calls. These tool calls are capabilities like read_file or Execute(cmd), and their use is governed by the TrustGuard system. BonsAI also features "chain-of-thought" for reasoning models and can be accessed via a detached "Buddy" window that even supports voice interaction.
+
+The Model Trainer & Personalization Pipeline: Bonsai enables you to fine-tune models locally on your own data, a key part of its "your AI, your rules" philosophy. The training pipeline is a multi-stage process that includes:
+
+Safety & Survival DPO: Teaching the model to refuse harmful requests and to diagnose software errors.
+
+Tool Use DPO: Improving the model's ability to correctly formulate and select tool calls.
+
+Distillation & Merging: Learning from a more powerful "teacher" model to compress its knowledge into the local model.
+This is all orchestrated through a UI that tracks "Brain Age" and provides both full training runs and quick incremental updates.
+
+The Knowledge Database (KDB): This is a powerful concept. Instead of retraining a monolithic model for new information, Bonsai uses retrieval-augmented generation (RAG). It separates the base model from "knowledge modules" (*.kmod files), which are searchable databases of facts, rules, or code patterns. At inference time, relevant passages from these modules are retrieved and injected into the model's context, making the AI knowledgeable without wasted context or constant retraining.
+
+The TransferDaemon: Bonsai's networking layer is a peer-to-peer protocol that powers all collaboration, file transfer, and sync features. It can dynamically select the best transport lane (WebRTC, libp2p/QUIC, Tor, or even Bluetooth) and handles NAT traversal automatically, all with end-to-end encryption.
+
+The Compute Fabric: This feature allows you to pool computational resources from all your devices (including phones and tablets) for a "distributed supercomputer". A "Coordinator" on your main device splits large jobs and distributes them to "Worker" devices on your network.
+
+Security & Hardening: Security is implemented in multiple layers. Encryption at rest is handled by Argon2id and AES-256-GCM for your keys and training data. Encryption in transit uses the Noise_XX protocol for session establishment, with each message signed and encrypted. The Watchdog and Survival Engine automatically monitor for and attempt to fix faults, from process crashes to runtime errors, often using BonsAI itself to generate novel fixes.
+
+💡 The Road to Sovereignty: The "USOS" Concept
+The provided documentation doesn't mention "USOS" explicitly, but the concept is clearly embedded in docs/10-SOVEREIGNTY.md. The "Sovereignty" roadmap outlines a 6-phase plan to replace all external dependencies with custom bonsai-* crates.
+
+Phase 0: Vendor all dependencies and ensure CI runs offline (Completed).
+
+Phase 1: Replace core functionality like error handling, logging, RNG, and IDs (In Progress).
+
+Phase 2-6: Gradually replace everything from crypto and databases to ML inference, git functionality, and finally, the entire async runtime and the Tauri/Svelte app framework (Planned).
+
+The Unnamed Sovereign Operating System (USOS) is almost certainly the final stage of this roadmap. It represents the long-term vision where Bonsai is not just an application but a foundational layer that replaces the operating system's own dependencies, creating a fully self-contained, auditable, and sovereign computing environment.
+
+🤔 How Bonsai Workspace Stands Out
+Bonsai's philosophy leads to a very different feature set compared to mainstream tools:
+
+True Local-First vs. Cloud-Dependent: Unlike Cursor or Copilot, Bonsai is designed to work completely offline, a core selling point for users concerned about privacy and vendor lock-in.
+
+Radical Modularity vs. Monolithic Models: The separation of base models from knowledge modules is more flexible than standard fine-tuning or RAG implementations seen in projects like PrivateGPT.
+
+Peer-to-Peer Collaboration vs. Client-Server: Instead of relying on a central server for collaboration features, Bonsai's TransferDaemon creates direct, secure connections between users, a concept not found in mainstream IDEs.
+
+Resilience as a Core Feature vs. an Afterthought: The integrated Watchdog and self-healing mechanisms are features typically reserved for enterprise server software, not a desktop development environment.
+
  This repository bundles a full desktop IDE, a native Rust backend for local automation and device tooling, and optional on-device model sidecars so you can iterate without cloud credentials.
 
  This README summarizes the product features, developer quick-starts, and where to find detailed docs in the repository.

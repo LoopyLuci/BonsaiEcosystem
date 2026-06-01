@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use bonsai_ci::OrchestratorActor;
+use bonsai_ui_orchestrator::UIOrchestrator;
 use bonsai_creator::CreatorOrchestrator;
 use bonsai_mailbox::AgentMailbox;
 use bonsai_p2p::WebRtcLane;
@@ -30,6 +31,8 @@ pub struct DaemonState {
     pub transfer_handles: Mutex<HashMap<String, TransferHandle>>,
     /// Optional CI orchestrator (Phase 1 lightweight actor)
     pub orchestrator: Mutex<Option<OrchestratorActor>>,
+    /// Optional UI orchestrator for generative UI workflows
+    pub ui_orchestrator: Mutex<Option<Arc<UIOrchestrator>>>,
     /// In-memory SQL engine (per-session; not persisted).
     pub sql: Mutex<SqlEngine>,
     /// Hot-swappable tool/skill registry.
@@ -55,6 +58,7 @@ impl DaemonState {
             transfers: Mutex::new(HashMap::new()),
             transfer_handles: Mutex::new(HashMap::new()),
             orchestrator: Mutex::new(None),
+            ui_orchestrator: Mutex::new(None),
             sql: Mutex::new(sql),
             tools: Arc::new(ToolRegistry::new()),
             p2p_lanes: Mutex::new(HashMap::new()),

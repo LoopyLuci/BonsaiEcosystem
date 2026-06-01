@@ -1,0 +1,59 @@
+[package]
+name = "bonsai-android-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Production-grade Android Bridge for the Bonsai Ecosystem with zero-trust capabilities, screen streaming, input injection, and file synchronization"
+
+[dependencies]
+# Core async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Cryptography & Security
+bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
+bonsai-capability-registry = { path = "../bonsai-capability-registry" }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+aes-gcm = "0.10"
+blake3 = "1"
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+
+# Content Addressing System & Storage
+bonsai-cas = { path = "../bonsai-cas" }
+
+# Event logging & observability
+bonsai-universe = { path = "../bonsai-universe" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+bytes = "1"
+async-trait = "0.1"
+once_cell = "1"
+hex = "0.4"
+
+# Networking & WebRTC
+tokio-tungstenite = "0.23"
+futures = "0.3"
+parking_lot = "0.12"
+
+# Media & codec support (optional, feature-gated)
+[features]
+default = ["rtc-support"]
+rtc-support = []
+h264-support = []
+h265-support = []
+
+[dev-dependencies]
+tempfile = "3"

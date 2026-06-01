@@ -349,6 +349,8 @@ impl ToolRegistryState {
                     args: vec![],
                     requires_approval: false,
                     is_custom: false,
+                    proof_hash: None,
+                    proof_verified: false,
                     script_path: None,
                     trigger_phrases: triggers,
                     capability_tags: vec!["tool".into(), "registry".into()],

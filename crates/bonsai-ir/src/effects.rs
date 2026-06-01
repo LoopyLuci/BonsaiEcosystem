@@ -48,9 +48,10 @@ pub enum BonsaiEffect {
 #[serde(rename_all = "snake_case")]
 pub enum TrustLevel {
     Untrusted = 0,
-    Sandboxed = 1,
-    Trusted = 2,
-    System = 3,
+    ProofRequired = 1,
+    Sandboxed = 2,
+    Trusted = 3,
+    System = 4,
 }
 
 // ── Effect row (audit log entry) ─────────────────────────────────────────────
@@ -216,6 +217,26 @@ impl TrustGuard {
 impl Default for TrustGuard {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trust_required_blocks_higher_levels() {
+        let policy = EffectPolicy::restrictive(vec!["read_file"], TrustLevel::ProofRequired);
+        let effect = BonsaiEffect::ReadFile { path: "/tmp/test.txt".into() };
+
+        let (allowed, reason) = policy.check(&effect, TrustLevel::Untrusted);
+        assert!(allowed, "Untrusted should be allowed if max trust is ProofRequired");
+        assert!(reason.is_none());
+
+        let (allowed, reason) = policy.check(&effect, TrustLevel::Sandboxed);
+        assert!(!allowed, "Sandboxed should be blocked when max trust is ProofRequired");
+        assert!(reason.is_some());
+        assert!(reason.unwrap().contains("exceeds max"));
     }
 }
 

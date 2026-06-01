@@ -67,6 +67,7 @@ mod agent_connect;
 mod agent_host;
 mod agent_store;
 mod agents;
+mod android_bridge_commands;
 mod api_server;
 mod assistant_audit_log;
 mod assistant_backup;
@@ -96,6 +97,7 @@ mod gpu_telemetry;
 mod hybrid_engine;
 mod image_generation;
 mod inference_mode;
+mod inference_commands;
 mod launcher;
 mod management_api;
 mod mcp_bridge;
@@ -125,6 +127,7 @@ mod tool_core;
 mod tool_health;
 mod tool_selector;
 mod trainer;
+mod ui_orchestrator;
 mod training_loop;
 mod tts_engine;
 mod tts_manager;
@@ -151,6 +154,7 @@ pub mod universe_hooks;
 mod fff_commands;
 mod gpu_controller;
 mod mcp_server;
+mod mcp_telemetry;
 mod micro_bonsai;
 mod multimodal;
 mod music_engine;
@@ -313,6 +317,8 @@ pub struct AppState {
     pub tts_manager: Arc<tts_manager::TtsManager>,
     /// User-defined skills store (SQLite-backed, hot-reloadable into tool registry).
     pub user_skill_store: Arc<user_skills::UserSkillStore>,
+    /// UI orchestrator for generated panels and reload events.
+    pub ui_orchestrator: Arc<ui_orchestrator::UiOrchestrator>,
     /// MCP server lifecycle manager.
     pub mcp_manager: Arc<mcp_bridge::McpManager>,
     /// Buddy API server handle (port 11420). None if startup failed.
@@ -1324,6 +1330,12 @@ pub fn run() {
                 router: web_router.clone(),
             }));
 
+            let event_bus = Arc::new(system_event_bus::SystemEventBus::new(1024));
+            let ui_orchestrator = Arc::new(ui_orchestrator::UiOrchestrator::new(
+                event_bus.clone(),
+                cas_store.clone(),
+            ));
+
             app.manage(AppState {
                 orchestrator:     orchestrator.clone(),
                 whisper:          whisper.clone(),
@@ -1419,10 +1431,8 @@ pub fn run() {
                 web_router:          web_router,
                 training_jobs:       training_jobs,
                 resource_guard:      resource_guard::ResourceGuard::new(resource_guard::GuardConfig::default()),
-                event_bus:           {
-                    let bus = std::sync::Arc::new(system_event_bus::SystemEventBus::new(1024));
-                    bus
-                },
+                event_bus:           event_bus.clone(),
+                ui_orchestrator:     ui_orchestrator.clone(),
                 upgrade_dispatcher:  {
                     // Placeholder — real UpgradeDispatcher wired after event_bus is in state
                     let bus = std::sync::Arc::new(system_event_bus::SystemEventBus::new(16));
@@ -1454,9 +1464,19 @@ pub fn run() {
                     })
                 },
             });
+
+            // Start in-process MCP server and forward SystemEventBus events
+            {
+                let bus = event_bus.clone();
+                tauri::async_runtime::spawn(async move {
+                    mcp_telemetry::start_mcp_server(bus).await;
+                });
+            }
+
             app.manage(remote_manager.clone());
             app.manage(features::FeatureFlags::global());
             app.manage(transfer_commands::TransferState::new());
+            app.manage(android_bridge_commands::AndroidBridgeState::new());
             // Universe time-travel ledger
             {
                 let state = app.state::<AppState>();
@@ -1905,6 +1925,10 @@ pub fn run() {
             commands::resume_tool_call,
             commands::stop_chat_generation,
             commands::list_available_chat_tools,
+            inference_commands::list_models,
+            inference_commands::submit_inference,
+            inference_commands::get_inference_status,
+            inference_commands::cancel_inference,
             commands::generate_inline_completion,
             commands::execute_tool_call,
             commands::list_chat_sessions,
@@ -2475,8 +2499,13 @@ pub fn run() {
             collaboration_commands::set_media_mute,
             collaboration_commands::toggle_screen_share,
             collaboration_commands::execute_shared_command,
-            fabric_commands::fabric_submit_and_await,
-            fabric_commands::fabric_register_node,
+            fabric_commands::fabric_list_catalog,
+            fabric_commands::fabric_catalog_by_category,
+            fabric_commands::fabric_catalog_runnable,
+            fabric_commands::fabric_catalog_summary,
+            fabric_commands::fabric_submit_catalog_task,
+            // fabric_commands::fabric_submit_and_await,
+            // fabric_commands::fabric_register_node,
             cluster_credits_commands::credits_balance,
             cluster_credits_commands::my_device_info,
             cluster_credits_commands::set_contribution,
@@ -2543,6 +2572,15 @@ pub fn run() {
             fff_commands::sns_list_sandboxes,
             fff_commands::sns_list_violations,
             fff_commands::sns_terminate_sandbox,
+            // ── Android Bridge ────────────────────────────────────────────────
+            android_bridge_commands::android_list_devices,
+            android_bridge_commands::android_connect,
+            android_bridge_commands::android_start_screen_stream,
+            android_bridge_commands::android_stop_screen_stream,
+            android_bridge_commands::android_inject_touch,
+            android_bridge_commands::android_inject_key,
+            android_bridge_commands::android_install_app,
+            android_bridge_commands::android_hot_reload,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -243,6 +243,38 @@ pub async fn list_project_files(workspace_path: String) -> Result<Vec<serde_json
     Ok(entries)
 }
 
+#[tauri::command]
+pub async fn generate_ui_panel(
+    state: tauri::State<'_, crate::AppState>,
+    description: String,
+) -> Result<crate::ui_orchestrator::UiPanel, String> {
+    state
+        .ui_orchestrator
+        .generate_panel(description)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_ui_panels(
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<Vec<crate::ui_orchestrator::UiPanel>, String> {
+    Ok(state.ui_orchestrator.list_panels().await)
+}
+
+#[tauri::command]
+pub async fn reload_ui_panel(
+    state: tauri::State<'_, crate::AppState>,
+    panel_id: String,
+) -> Result<serde_json::Value, String> {
+    state
+        .ui_orchestrator
+        .reload_panel(&panel_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(json!({"ok": true, "panel_id": panel_id}))
+}
+
 // ─── Git ─────────────────────────────────────────────────────────────────────
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]

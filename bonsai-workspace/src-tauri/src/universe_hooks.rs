@@ -119,6 +119,11 @@ fn convert_system_event(sys: &SystemEvent, universe: &Universe) -> Option<Univer
             format!("Upgrade rolled back: {} — {}", component, reason),
             format!("component:{}", component),
         ),
+        SystemEvent::ProofVerificationFailed { tool, reason } => (
+            EventCategory::SurvivalEvent,
+            format!("Proof verification failed for tool {}: {}", tool, reason),
+            format!("tool:{}", tool),
+        ),
         SystemEvent::ExtensionInstalled { extension_id, version, .. } => (
             EventCategory::ExtensionEvent,
             format!("Extension installed: {} v{}", extension_id, version),
@@ -199,7 +204,9 @@ fn convert_system_event(sys: &SystemEvent, universe: &Universe) -> Option<Univer
         | SystemEvent::UpgradeDeploying { .. }
         | SystemEvent::CheckpointRequested { .. }
         | SystemEvent::TestStarted { .. }
-        | SystemEvent::DreamCycleStarted { .. } => return None,
+        | SystemEvent::DreamCycleStarted { .. }
+        | SystemEvent::UiPanelGenerated { .. }
+        | SystemEvent::UiPanelReloadRequested { .. } => return None,
     };
 
     let mut ev = UniverseEvent::new(source, category, summary, target, device);

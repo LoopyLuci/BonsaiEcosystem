@@ -13,6 +13,7 @@ bonsai-credits           = { path = "../../crates/bonsai-credits" }
 bonsai-marketplace       = { path = "../../crates/bonsai-marketplace" }
 bonsai-swarm             = { path = "../../crates/bonsai-swarm" }
 bonsai-universe          = { path = "../../crates/bonsai-universe" }
+bonsai-fabric            = { path = "../../crates/bonsai-fabric" }
 bonsai-failure-finder    = { path = "../../crates/bonsai-failure-finder" }
 bonsai-sns               = { path = "../../crates/bonsai-sns" }
 bonsai-extensions        = { path = "../../crates/bonsai-extensions" }
@@ -136,6 +137,8 @@ bonsai-hnsw    = { path = "../../crates/bonsai-hnsw" }
 bonsai-kdb     = { path = "../../crates/bonsai-kdb" }
 bonsai-package = { path = "../../crates/bonsai-package" }
 bonsai-fabric  = { path = "../../crates/bonsai-fabric" }
+bonsai-mcp-server = { path = "../../crates/bonsai-mcp-server" }
+bonsai-android-bridge = { path = "../../crates/bonsai-android-bridge" }
 
 [[bin]]
 name = "bonsai-music-worker"

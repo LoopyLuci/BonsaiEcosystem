@@ -18,3 +18,7 @@ log = "0.4"
 # local workspace crates (keep as path deps so the workspace links cleanly)
 bonsai-capability-registry = { path = "../bonsai-capability-registry" }
 bonsai-actors = { path = "../bonsai-actors" }
+bonsai-cas = { path = "../bonsai-cas" }
+bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
+hex = "0.4"
+walkdir = "2"

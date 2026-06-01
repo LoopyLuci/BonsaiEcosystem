@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 
 use bonsai_mailbox::{AgentMailbox, MailEnvelope};
@@ -39,7 +39,7 @@ pub struct TransferState {
     /// Agent mailbox — local delivery hub.
     pub mailbox: AgentMailbox,
     /// In-progress transfers keyed by transfer ID.
-    pub transfers: Mutex<HashMap<String, TransferStatus>>,
+    pub transfers: Arc<Mutex<HashMap<String, TransferStatus>>>,
 }
 
 impl TransferState {
@@ -49,7 +49,7 @@ impl TransferState {
             identity: Mutex::new(None),
             store: EncryptedStore::open(store_path, b"bonsai-default-store-key"),
             mailbox: AgentMailbox::new(),
-            transfers: Mutex::new(HashMap::new()),
+            transfers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -62,7 +62,7 @@ pub struct IdentityDto {
     pub public_key_hex: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferStatusDto {
     pub id: String,
     pub direction: String,
@@ -271,6 +271,7 @@ pub async fn transfer_mailbox_agent_count(ts: State<'_, TransferState>) -> Resul
 /// benchmarking the chunking/encryption pipeline without a real remote peer.
 #[tauri::command]
 pub async fn transfer_send_file_loopback(
+    app_handle: AppHandle,
     file_path: String,
     chunk_size: Option<usize>,
     ts: State<'_, TransferState>,
@@ -311,14 +312,24 @@ pub async fn transfer_send_file_loopback(
         .min(MAX_CHUNK_SIZE)
         .max(1);
 
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel();
+
     let transfer = Transfer::new();
     let handle = transfer
-        .send_data(data.clone(), session_key, scheduler, lanes, cs, None)
+        .send_data(data.clone(), session_key, scheduler, lanes, cs, Some(progress_tx))
         .await
         .map_err(|e| e.to_string())?;
 
-    // Give the spawned task a moment to complete
-    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    let transfers = Arc::clone(&ts.transfers);
+    let app_handle = app_handle.clone();
+    tokio::spawn(async move {
+        while let Some(status) = progress_rx.recv().await {
+            let dto = TransferStatusDto::from(&status);
+            let _ = app_handle.emit("transfer-progress", dto);
+            let mut map = transfers.lock().await;
+            map.insert(status.id.to_string(), status);
+        }
+    });
 
     let status = TransferStatus {
         id: handle.id,

@@ -62,6 +62,9 @@ pub enum SystemEvent {
     UserFeedback { context: String, rating: i8, comment: Option<String> },
     FeatureRequest { description: String, requester: String },
     CheckpointRequested { label: String, trigger: String },
+    UiPanelGenerated { panel_id: String, description: String, cas_hash: String },
+    UiPanelReloadRequested { panel_id: String, cas_hash: String },
+    ProofVerificationFailed { tool: String, reason: String },
 }
 
 impl SystemEvent {
@@ -108,6 +111,9 @@ impl SystemEvent {
             SystemEvent::UserFeedback { .. } => "UserFeedback",
             SystemEvent::FeatureRequest { .. } => "FeatureRequest",
             SystemEvent::CheckpointRequested { .. } => "CheckpointRequested",
+            SystemEvent::UiPanelGenerated { .. } => "UiPanelGenerated",
+            SystemEvent::UiPanelReloadRequested { .. } => "UiPanelReloadRequested",
+            SystemEvent::ProofVerificationFailed { .. } => "ProofVerificationFailed",
         }
     }
 }

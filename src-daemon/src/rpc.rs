@@ -11,6 +11,7 @@ use crate::state::DaemonState;
 use bonsai_array::AplEval;
 use bonsai_capability_registry::{DeploymentGate, TrustScore};
 use bonsai_ci::{OrchestratorActor, PipelineDef};
+use bonsai_ui_orchestrator::{UIOrchestrator, ComponentManifest};
 use bonsai_sylva::SylvaVm;
 use bonsai_transfer_core::{
     lane::{InProcessLane, TransportLane},
@@ -616,6 +617,113 @@ pub async fn dispatch(
             }
         }
 
+        "ui.generate" | "ui.generate_ui" => {
+            let desc = params
+                .get("description")
+                .or_else(|| params.get("prompt"))
+                .and_then(|v| v.as_str())
+                .ok_or("missing description")?;
+
+            // Ensure UI orchestrator exists
+            let mut ui_lock = state.ui_orchestrator.lock().await;
+            if ui_lock.is_none() {
+                *ui_lock = Some(Arc::new(UIOrchestrator::new(state.creator.cas.clone(), None)));
+            }
+            let ui = ui_lock.as_ref().unwrap();
+
+            let manifest = ui
+                .generate_ui(desc)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            let out = serde_json::to_value(&manifest).map_err(|e| e.to_string())?;
+            Ok(out)
+        }
+        "ui.publish" => {
+            let manifest_val = params.get("manifest").ok_or("missing manifest")?.clone();
+            let manifest: ComponentManifest = serde_json::from_value(manifest_val.clone()).map_err(|e| e.to_string())?;
+
+            // Persist manifest JSON to CAS
+            let bytes = serde_json::to_vec(&manifest_val).map_err(|e| e.to_string())?;
+            let cas_key = state.creator.cas.put(&bytes, "application/json").await.map_err(|e| e.to_string())?;
+            // Pin the manifest so it survives GC
+            let _ = state.creator.cas.pin(&cas_key).await.map_err(|e| e.to_string())?;
+
+            let mut ui_lock = state.ui_orchestrator.lock().await;
+            if ui_lock.is_none() {
+                *ui_lock = Some(Arc::new(UIOrchestrator::new(state.creator.cas.clone(), None)));
+            }
+            let ui = ui_lock.as_ref().unwrap();
+            ui.publish_manifest(manifest.clone()).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({"ok": true, "id": manifest.id, "cas_key": cas_key.hex()}))
+        }
+
+        "ui.start_rollout" | "ui.start_staged_rollout" => {
+            // Expect a manifest describing the canary to deploy
+            let manifest_val = params.get("manifest").ok_or("missing manifest")?.clone();
+            let manifest: ComponentManifest = serde_json::from_value(manifest_val.clone()).map_err(|e| e.to_string())?;
+
+            // Persist manifest JSON to CAS and pin it
+            let bytes = serde_json::to_vec(&manifest_val).map_err(|e| e.to_string())?;
+            let cas_key = state.creator.cas.put(&bytes, "application/json").await.map_err(|e| e.to_string())?;
+            let _ = state.creator.cas.pin(&cas_key).await.map_err(|e| e.to_string())?;
+
+            // parameters
+            let component_id = manifest.id.clone();
+            let target_percent = params.get("target_percent").and_then(|v| v.as_u64()).map(|v| v as u8).unwrap_or(10u8);
+            let duration_secs = params.get("duration_secs").and_then(|v| v.as_u64()).unwrap_or(60u64);
+            let step_secs = params.get("step_secs").and_then(|v| v.as_u64()).unwrap_or(10u64);
+
+            // Ensure UI orchestrator exists
+            let mut ui_lock = state.ui_orchestrator.lock().await;
+            if ui_lock.is_none() {
+                *ui_lock = Some(Arc::new(UIOrchestrator::new(state.creator.cas.clone(), None)));
+            }
+            let ui_arc = ui_lock.as_ref().unwrap().clone();
+
+            // Start staged rollout (background task)
+            ui_arc
+                .start_staged_rollout(&component_id, manifest.clone(), target_percent, duration_secs, step_secs)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            Ok(serde_json::json!({"ok": true, "component_id": component_id, "cas_key": cas_key.hex(), "target_percent": target_percent}))
+        }
+
+        "ui.abort_rollout" | "ui.abort_staged_rollout" => {
+            let component_id = params.get("component_id").and_then(|v| v.as_str()).ok_or("missing component_id")?.to_string();
+            let mut ui_lock = state.ui_orchestrator.lock().await;
+            if ui_lock.is_none() {
+                return Err("no ui orchestrator".to_string());
+            }
+            let ui_arc = ui_lock.as_ref().unwrap().clone();
+            ui_arc.abort_rollout(&component_id).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({"ok": true, "component_id": component_id}))
+        }
+
+        "ui.hot_reload" => {
+            let manifest_val = params.get("manifest").ok_or("missing manifest")?.clone();
+            let manifest: ComponentManifest = serde_json::from_value(manifest_val).map_err(|e| e.to_string())?;
+            let mut ui_lock = state.ui_orchestrator.lock().await;
+            if ui_lock.is_none() {
+                *ui_lock = Some(Arc::new(UIOrchestrator::new(state.creator.cas.clone(), None)));
+            }
+            let ui = ui_lock.as_ref().unwrap();
+            ui.hot_reload(manifest.clone()).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({"ok": true, "id": manifest.id}))
+        }
+
+        "ui.rollback" => {
+            let id = params.get("id").and_then(|v| v.as_str()).ok_or("missing id")?;
+            let mut ui_lock = state.ui_orchestrator.lock().await;
+            if ui_lock.is_none() {
+                return Err("no ui orchestrator".to_string());
+            }
+            let ui = ui_lock.as_ref().unwrap();
+            let rolled = ui.rollback(id).await.map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({"rolled_back": rolled}))
+        }
+
         "tools.call" => {
             let name = params
                 .get("name")
@@ -935,5 +1043,88 @@ pub async fn dispatch(
         }
 
         _ => Err(format!("unknown method: {}", method)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+    use bonsai_cas::CasStore;
+    use bonsai_creator::CreatorOrchestrator;
+    use bonsai_mailbox::AgentMailbox;
+    use bonsai_query::sql::SqlEngine;
+    use bonsai_tool_registry::ToolRegistry;
+    use bonsai_transfer_store::EncryptedStore;
+
+    async fn build_test_state() -> Arc<DaemonState> {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("cas.db");
+        let blob_dir = dir.path().join("blobs");
+        let cas = Arc::new(CasStore::open(&db_path, &blob_dir).await.unwrap());
+        let store_file = dir.path().join("store.bin");
+        let store = EncryptedStore::open(store_file, b"test-passphrase");
+
+        Arc::new(DaemonState {
+            token: "test-token".to_string(),
+            identity: Mutex::new(None),
+            store,
+            mailbox: AgentMailbox::new(),
+            transfers: Mutex::new(HashMap::new()),
+            transfer_handles: Mutex::new(HashMap::new()),
+            orchestrator: Mutex::new(None),
+            ui_orchestrator: Mutex::new(None),
+            sql: Mutex::new(SqlEngine::in_memory().expect("SQLite in-memory")),
+            tools: Arc::new(ToolRegistry::new()),
+            p2p_lanes: Mutex::new(HashMap::new()),
+            webrtc_lanes: Mutex::new(HashMap::new()),
+            creator: Arc::new(CreatorOrchestrator::new(cas.clone())),
+        })
+    }
+
+    #[tokio::test]
+    async fn test_ui_rollout_rpc_start_and_abort() {
+        let temp_dir = tempdir().unwrap();
+        let orig_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&temp_dir).unwrap();
+
+        let state = build_test_state().await;
+
+        let wasm_bytes = b"\0asm\x01\0\0\0";
+        let cas_key = state
+            .creator
+            .cas
+            .put(wasm_bytes, "application/wasm")
+            .await
+            .unwrap();
+
+        let params = serde_json::json!({
+            "manifest": {
+                "id": "test-ui-component",
+                "version": "0.1.0",
+                "cas_key": cas_key.hex(),
+                "entrypoint": "module.wasm",
+                "host_capabilities": [],
+            },
+            "target_percent": 50,
+            "duration_secs": 1,
+            "step_secs": 1,
+        });
+
+        let result = dispatch("ui.start_rollout", &params, &state)
+            .await
+            .expect("start_rollout should succeed");
+        assert_eq!(result["ok"], serde_json::Value::Bool(true));
+        assert_eq!(result["component_id"], "test-ui-component");
+
+        let abort_params = serde_json::json!({"component_id": "test-ui-component"});
+        let abort_result = dispatch("ui.abort_rollout", &abort_params, &state)
+            .await
+            .expect("abort_rollout should succeed");
+        assert_eq!(abort_result["ok"], serde_json::Value::Bool(true));
+
+        std::env::set_current_dir(orig_dir).unwrap();
     }
 }
