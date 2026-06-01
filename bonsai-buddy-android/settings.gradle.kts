@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "BonsaiBuddyAndroid"
 include(":app")
+include(":app-remote")
+include(":library-bonsai-shared")
