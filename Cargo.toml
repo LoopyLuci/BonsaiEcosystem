@@ -12,6 +12,7 @@ members = [
     "crates/bonsai-bedf-enhancements",
     "crates/bonsai-survival-system-ext",
     "crates/bonsai-kdb-ext",
+    "crates/bonsai-profiler",
 ]
 resolver = "2"
 
