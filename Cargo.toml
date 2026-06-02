@@ -15,6 +15,7 @@ members = [
     "crates/bonsai-profiler",
     "crates/bonsai-observability",
     "crates/bonsai-coverage",
+    "crates/bonsai-resilience",
 ]
 resolver = "2"
 
