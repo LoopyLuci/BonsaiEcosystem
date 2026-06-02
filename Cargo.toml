@@ -17,6 +17,8 @@ members = [
     "crates/bonsai-coverage",
     "crates/bonsai-resilience",
     "crates/bonsai-bcf",
+    "crates/bonsai-security-hardening",
+    "crates/bonsai-algorithm-optimization",
 ]
 resolver = "2"
 

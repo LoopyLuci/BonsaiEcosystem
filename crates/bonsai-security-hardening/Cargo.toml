@@ -1,0 +1,47 @@
+[package]
+name = "bonsai-security-hardening"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Security hardening: SBOM generation, supply chain verification, secret scanning, encryption"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+# Cryptography
+blake3 = "1.5"
+ed25519-dalek = "2.1"
+sha2 = "0.10"
+ring = "0.17"
+aes-gcm = "0.10"
+argon2 = "0.5"
+
+# Serialization
+serde_json.workspace = true
+toml = "0.8"
+
+# CycloneDX SBOM support
+cyclonedx = "0.3"
+cargo-metadata = "0.18"
+
+# Vulnerability database
+rustsec = "0.18"
+
+# Secret detection
+regex = "1.10"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true
