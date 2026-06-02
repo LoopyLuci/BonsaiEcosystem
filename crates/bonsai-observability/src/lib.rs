@@ -12,9 +12,9 @@ pub mod sla;
 pub mod alerts;
 pub mod dashboard;
 
-pub use metrics::{MetricsCollector, PrometheusExporter};
+pub use metrics::{MetricsCollector, MetricPoint};
 pub use sla::{SLATracker, SLATarget, SLACompliance};
-pub use alerts::{AlertRule, AlertEngine, AlertSeverity};
+pub use alerts::{AlertRule, AlertEngine, AlertSeverity, Alert};
 pub use dashboard::DashboardConfig;
 
 use std::sync::Arc;
