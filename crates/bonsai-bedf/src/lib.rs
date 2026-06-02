@@ -16,6 +16,7 @@ pub mod metrics;
 pub mod ci_orchestrator;
 pub mod ecosystem_integration;
 pub mod unified_commands;
+pub mod bonsai_bot;
 
 pub use interfaces::*;
 pub use orchestrator::{BEDFOrchestrator, OrchestrationConfig};
@@ -23,6 +24,7 @@ pub use metrics::MetricsCollector;
 pub use ci_orchestrator::{BonsaiCIOrchestrator, CIOrchestratorConfig, CIPipeline, TeamJob, PipelineStatus};
 pub use ecosystem_integration::{BonsaiEcosystemOrchestrator, EcosystemConfig, SystemStatus, UnifiedMetrics, EventBus};
 pub use unified_commands::{UnifiedCommand, UnifiedCommandHandler, CommandResult};
+pub use bonsai_bot::{BonsaiBot, BotTask, BotCapabilities, IntelligenceLevel, AutonomyLevel, AutomationType, TaskStatus};
 
 use std::sync::Arc;
 use dashmap::DashMap;
