@@ -13,10 +13,12 @@ pub mod interfaces;
 pub mod config;
 pub mod orchestrator;
 pub mod metrics;
+pub mod ci_orchestrator;
 
 pub use interfaces::*;
 pub use orchestrator::{BEDFOrchestrator, OrchestrationConfig};
 pub use metrics::MetricsCollector;
+pub use ci_orchestrator::{BonsaiCIOrchestrator, CIOrchestratorConfig, CIPipeline, TeamJob, PipelineStatus};
 
 use std::sync::Arc;
 use dashmap::DashMap;
