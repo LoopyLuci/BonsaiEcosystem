@@ -1,0 +1,36 @@
+[package]
+name = "bonsai-observability"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Advanced observability stack: OpenTelemetry, Prometheus, SLA tracking, alerting"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+# OpenTelemetry
+opentelemetry = { version = "0.21", features = ["rt-tokio"] }
+opentelemetry-jaeger = "0.21"
+opentelemetry-prometheus = "0.13"
+prometheus = "0.13"
+tracing-opentelemetry = "0.21"
+
+# Metrics
+statrs = "0.16"
+ndarray = "0.15"
+
+# Utilities
+parking_lot = "0.12"
+dashmap.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true
