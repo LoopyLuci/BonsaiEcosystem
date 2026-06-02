@@ -13,6 +13,8 @@ members = [
     "crates/bonsai-survival-system-ext",
     "crates/bonsai-kdb-ext",
     "crates/bonsai-profiler",
+    "crates/bonsai-observability",
+    "crates/bonsai-coverage",
 ]
 resolver = "2"
 
