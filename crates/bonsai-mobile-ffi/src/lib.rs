@@ -25,6 +25,7 @@ pub mod decoder;
 pub mod error;
 pub mod ffi;
 pub mod metrics;
+pub mod llm_jni;
 
 pub use codec::{CodecFormat, MediaFormat};
 pub use decoder::{Decoder, DecoderConfig, DecodeResult, FrameBuffer};

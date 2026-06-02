@@ -65,6 +65,13 @@ pub enum SystemEvent {
     UiPanelGenerated { panel_id: String, description: String, cas_hash: String },
     UiPanelReloadRequested { panel_id: String, cas_hash: String },
     ProofVerificationFailed { tool: String, reason: String },
+    // Linting & ETL Events
+    RuleConfidenceUpdated { rule_id: String, old_confidence: f64, new_confidence: f64, action: String },
+    RuleMutationProposed { rule_id: String, expected_improvement: f64, proposal_id: String },
+    EtlCycleStarted { cycle_id: String },
+    EtlCycleCompleted { cycle_id: String, feedback_events: usize, rules_updated: usize, duration_ms: u64 },
+    EtlCycleFailed { cycle_id: String, error: String },
+    DiagnosticFeedbackReceived { rule_id: String, file: String, line: u32, feedback_type: String },
 }
 
 impl SystemEvent {
@@ -114,6 +121,12 @@ impl SystemEvent {
             SystemEvent::UiPanelGenerated { .. } => "UiPanelGenerated",
             SystemEvent::UiPanelReloadRequested { .. } => "UiPanelReloadRequested",
             SystemEvent::ProofVerificationFailed { .. } => "ProofVerificationFailed",
+            SystemEvent::RuleConfidenceUpdated { .. } => "RuleConfidenceUpdated",
+            SystemEvent::RuleMutationProposed { .. } => "RuleMutationProposed",
+            SystemEvent::EtlCycleStarted { .. } => "EtlCycleStarted",
+            SystemEvent::EtlCycleCompleted { .. } => "EtlCycleCompleted",
+            SystemEvent::EtlCycleFailed { .. } => "EtlCycleFailed",
+            SystemEvent::DiagnosticFeedbackReceived { .. } => "DiagnosticFeedbackReceived",
         }
     }
 }

@@ -1,112 +1,59 @@
 [workspace]
 members = [
-  "bonsai-bot",
-  "bonsai-native",
-  "bonsai-runtime",
-  "bonsai-workspace/src-tauri",
-  "crates/bonsai-capability-registry",
-  "crates/bonsai-query",
-  "crates/bonsai-ir",
-  "crates/bonsai-cas",
-  "crates/bonsai-verify",
-  "crates/bonsai-crdt",
-  "crates/bonsai-actors",
-  "crates/bonsai-skill-compiler",
-  "crates/bonsai-chess",
-  "crates/bonsai-go",
-  "crates/bonsai-go-nn",
-  "crates/bonsai-knowledge",
-  "crates/bonsai-sylva",
-  "crates/bonsai-dataframe",
-  "crates/bonsai-array",
-  "crates/bonsai-verify-lean",
-  "crates/bonsai-verify-fstar",
-  "crates/bonsai-verify-tla",
-  "crates/bonsai-transfer-crypto",
-  "crates/bonsai-transfer-core",
-  "crates/bonsai-transfer-store",
-  "crates/bonsai-relay",
-  "crates/bonsai-mailbox",
-  "crates/bonsai-ci",
-  "crates/bonsai-tool-registry",
-    "crates/bonsai-ui-utils",
-    "crates/bonsai-ui-orchestrator",
-  "crates/bonsai-skills",
-  "crates/bonsai-verify-coq",
-  "crates/bonsai-verify-agda",
-  "crates/bonsai-verify-isabelle",
-  "crates/bonsai-ring",
-  "crates/bonsai-p2p",
-  "crates/bonsai-creator",
-  "crates/eternal-workshop",
-  "crates/bonsai-coordinator",
-  "crates/bonsai-error",
-  "crates/bonsai-fabric",
-  "crates/bonsai-mcp-server",
-  "crates/bonsai-testing",
-  "crates/bonsai-model-registry",
-  "crates/bonsai-inference",
-  "crates/bonsai-api-gateway",
-  "crates/bonsai-tool-registry-vault",
-  "crates/bonsai-structured-output",
-  "crates/bonsai-kv-cache",
-  "crates/bonsai-inference-telemetry",
-  "src-daemon", "crates/bonsai-hnsw", "crates/bonsai-kdb", "crates/bonsai-tdl", "crates/bonsai-package",
-  "crates/bonsai-bkp", "crates/bonsai-model-converter",
-  "crates/bonsai-credits", "crates/bonsai-marketplace",
-  "crates/bonsai-swarm",
-  "crates/bonsai-tui",
-  "crates/bonsai-extensions",
-  "crates/bonsai-extension-converter",
-  "crates/bonsai-universe",
-  "crates/bonsai-failure-finder",
-  "crates/bonsai-sns",
-  "crates/bonsai-android-bridge",
-  "crates/bonsai-mobile-ffi",
-  "crates/bonsai-remote-desktop",
-  # bonsai-watchdog is intentionally excluded from the workspace members list.
-  # It uses rusqlite 0.31 which links libsqlite3-sys 0.28, conflicting with
-  # sqlx's libsqlite3-sys 0.30 requirement elsewhere in the workspace.
-  # Build separately: cargo build --manifest-path crates/bonsai-watchdog/Cargo.toml --release
+    "crates/bonsai-bedf",
+    "crates/bonsai-bedf-fuzzing",
+    "crates/bonsai-bedf-concurrency",
+    "crates/bonsai-bedf-sanitizers",
+    "crates/bonsai-bedf-property",
+    "crates/bonsai-bedf-pentest",
+    "crates/bonsai-bedf-sandbox",
+    "crates/bonsai-bedf-triage",
+    "crates/bonsai-bedf-mcp",
+    "crates/bonsai-bedf-enhancements",
+    "crates/bonsai-survival-system-ext",
+    "crates/bonsai-kdb-ext",
 ]
 resolver = "2"
 
-# Workspace-level dependency alignment: single libsqlite3-sys version prevents
-# native-link conflicts when all three crates are built together.
+[workspace.lints.rust]
+unsafe_code = "warn"
+unused_results = "warn"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Bonsai Team <team@bonsai.sh>"]
+license = "Apache-2.0"
+repository = "https://github.com/bonsai/bonsai-bedf"
+
 [workspace.dependencies]
-libsqlite3-sys = { version = "0.30", features = ["bundled"] }
-
-# Profiles must live in the workspace root; per-package profiles are ignored.
-# dev: reduce debug info to line tables (debug=1) to avoid rustc OOM on
-# machines with limited RAM. Full DWARF (debug=2, the default) can consume
-# several GB for a crate with this many dependencies. Line tables still give
-# useful file:line backtraces for panics and Tauri crashes.
-[profile.dev]
-debug         = 1        # line tables only; =2 (default) doubles rustc peak RSS
-codegen-units = 4        # limit parallel codegen units; default can spike RSS further
-incremental   = true
-opt-level     = 0
-
-# Dependencies: no debug info, no optimisation, single codegen unit.
-# opt-level=1 requires optimisation passes that consume extra memory; keeping
-# it at 0 minimises per-crate RSS. codegen-units=1 prevents each dep rustc
-# invocation from spawning internal parallel threads on top of cargo's own
-# job parallelism (capped at 2 via .cargo/config.toml).
-[profile.dev.package."*"]
-opt-level     = 0
-debug         = false
-codegen-units = 1
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+blake3 = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1"
+dashmap = "5"
+once_cell = "1"
+regex = "1"
 
 [profile.release]
-opt-level     = 3
-lto           = true
+opt-level = 3
+lto = true
 codegen-units = 1
-panic         = "abort"
-strip         = true
+panic = "abort"
+strip = true
 
-[profile.ci-local]
-inherits      = "test"
-debug         = 0
-incremental   = true
-codegen-units = 16
-opt-level     = 0
+[profile.dev]
+debug = 1
+opt-level = 0
+codegen-units = 256
+
+[profile.test]
+debug = 1
+opt-level = 1
+codegen-units = 256

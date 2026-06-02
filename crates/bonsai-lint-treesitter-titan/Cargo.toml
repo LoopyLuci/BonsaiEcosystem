@@ -1,0 +1,20 @@
+[package]
+name = "bonsai-lint-treesitter-titan"
+version = "0.1.0"
+edition = "2021"
+description = "Tree-sitter grammar bindings for Omnisystem Titan language"
+
+[dependencies]
+tree-sitter = "0.22"
+
+[build-dependencies]
+cc = "1.0"
+tree-sitter-cli = { version = "0.22", optional = true }
+
+[features]
+default = ["generate"]
+generate = ["tree-sitter-cli"]
+
+[[example]]
+name = "parse"
+path = "examples/parse.rs"

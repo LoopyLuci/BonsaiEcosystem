@@ -3,6 +3,190 @@ use serde_json::json;
 
 pub fn list_tools() -> Vec<McpTool> {
     vec![
+        // Linting tools (NEW)
+        McpTool {
+            name: "bonsai_lint_file".into(),
+            description: "Lint a single file and return diagnostics (errors, warnings, hints)".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to file (relative to workspace root)"
+                    },
+                    "confidence_threshold": {
+                        "type": "number",
+                        "description": "Minimum confidence (0.0-1.0) for accepting diagnostics",
+                        "default": 0.7
+                    }
+                },
+                "required": ["path"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_lint_repo".into(),
+            description: "Lint the entire repository and return all diagnostics".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "exclude_patterns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Glob patterns to exclude (e.g., ['target/**', 'node_modules/**'])"
+                    },
+                    "confidence_threshold": {
+                        "type": "number",
+                        "description": "Minimum confidence (0.0-1.0)",
+                        "default": 0.7
+                    },
+                    "ai_filtering": {
+                        "type": "boolean",
+                        "description": "Enable AI-powered false positive filtering",
+                        "default": true
+                    },
+                    "spell_check": {
+                        "type": "boolean",
+                        "description": "Enable spell checking and grammar checking",
+                        "default": true
+                    }
+                },
+                "required": []
+            }),
+        },
+        McpTool {
+            name: "bonsai_generate_lint_rule".into(),
+            description: "Generate a linting rule from a natural language description".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the linting rule you want to create"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "Programming language(s) the rule applies to",
+                        "default": "rust"
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["note", "hint", "warning", "error", "fatal"],
+                        "description": "Severity level",
+                        "default": "warning"
+                    },
+                    "example_good": {
+                        "type": "string",
+                        "description": "Example of code that passes the rule"
+                    },
+                    "example_bad": {
+                        "type": "string",
+                        "description": "Example of code that violates the rule"
+                    }
+                },
+                "required": ["description"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_explain_diagnostic".into(),
+            description: "Get an AI-generated explanation for why a diagnostic was generated".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "rule_id": {
+                        "type": "string",
+                        "description": "ID of the linting rule"
+                    },
+                    "code_snippet": {
+                        "type": "string",
+                        "description": "The code that triggered the diagnostic"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "Programming language"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "The diagnostic message"
+                    }
+                },
+                "required": ["rule_id", "code_snippet"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_report_false_positive".into(),
+            description: "Report that a diagnostic is a false positive (helps improve rule accuracy)".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "rule_id": {
+                        "type": "string",
+                        "description": "ID of the linting rule"
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "File path where the diagnostic was reported"
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "Line number"
+                    },
+                    "explanation": {
+                        "type": "string",
+                        "description": "Explanation of why this is a false positive"
+                    }
+                },
+                "required": ["rule_id", "file", "line", "explanation"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_dismiss_diagnostic".into(),
+            description: "Dismiss a diagnostic without action (helps track user preferences)".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "rule_id": {
+                        "type": "string",
+                        "description": "ID of the linting rule"
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "File path where the diagnostic was reported"
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "Line number"
+                    }
+                },
+                "required": ["rule_id", "file", "line"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_apply_fix".into(),
+            description: "Apply a fix suggestion to code (helps track successful rule usage)".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "rule_id": {
+                        "type": "string",
+                        "description": "ID of the linting rule"
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "File path where the fix was applied"
+                    },
+                    "line": {
+                        "type": "integer",
+                        "description": "Line number"
+                    },
+                    "fix": {
+                        "type": "string",
+                        "description": "The fix suggestion that was applied"
+                    }
+                },
+                "required": ["rule_id", "file", "line"]
+            }),
+        },
+        // Original tools follow
         McpTool {
             name: "read_file".into(),
             description: "Read the contents of a file in the Bonsai workspace.".into(),
@@ -261,6 +445,133 @@ pub fn list_tools() -> Vec<McpTool> {
                     }
                 },
                 "required": []
+            }),
+        },
+        // DevKit tools
+        McpTool {
+            name: "bonsai_setup".into(),
+            description: "Run Bonsai DevKit setup (idempotent environment bootstrap).".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "fix": {"type": "boolean", "description": "Attempt auto-fixes during setup"}
+                }
+            }),
+        },
+        McpTool {
+            name: "bonsai_build".into(),
+            description: "Build Bonsai components using DevKit.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string", "description": "desktop, android, web, workspace, or crate"},
+                    "release": {"type": "boolean"},
+                    "crates": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional explicit crate list"
+                    }
+                }
+            }),
+        },
+        McpTool {
+            name: "bonsai_test".into(),
+            description: "Run Bonsai tests using DevKit.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "suite": {"type": "string", "enum": ["unit", "integration", "e2e", "performance", "workspace"]},
+                    "crate": {"type": "string"}
+                }
+            }),
+        },
+        McpTool {
+            name: "bonsai_run".into(),
+            description: "Start a Bonsai service using DevKit.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "service": {
+                        "type": "string",
+                        "enum": ["desktop", "buddy", "ecosystem", "mcp-server", "uacs", "remote-desktop", "tui"]
+                    },
+                    "detach": {"type": "boolean", "description": "Run service in background"},
+                    "port": {"type": "number", "description": "Optional service port override"}
+                },
+                "required": ["service"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_logs".into(),
+            description: "Read or follow logs for a DevKit-managed service.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "service": {"type": "string"},
+                    "follow": {"type": "boolean"}
+                },
+                "required": ["service"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_stop".into(),
+            description: "Stop a DevKit-managed detached service.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "service": {"type": "string"}
+                },
+                "required": ["service"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_list_detached".into(),
+            description: "List detached services started by DevKit.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        McpTool {
+            name: "bonsai_clean".into(),
+            description: "Clean build artifacts and optional DevKit cache.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cache": {"type": "boolean"}
+                }
+            }),
+        },
+        McpTool {
+            name: "bonsai_deploy".into(),
+            description: "Deploy Bonsai artifacts (model/app/extension) using DevKit.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string", "enum": ["windows", "android", "macos", "usos", "extension", "marketplace"]},
+                    "input": {"type": "string"},
+                    "output": {"type": "string"}
+                },
+                "required": ["target"]
+            }),
+        },
+        McpTool {
+            name: "bonsai_docs".into(),
+            description: "Generate and optionally serve Bonsai docs.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "serve": {"type": "boolean"},
+                    "port": {"type": "number"}
+                }
+            }),
+        },
+        McpTool {
+            name: "bonsai_status".into(),
+            description: "Get DevKit status summary (build/test/service state).".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
             }),
         },
     ]

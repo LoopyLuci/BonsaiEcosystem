@@ -1,11 +1,11 @@
 # Bonsai Workspace — common tasks
 # Install: cargo install just
-# Usage:   just <recipe>
+# Usage:   just --justfile scripts/devkit/justfile <recipe>
 #
 # Works on Windows (PowerShell), macOS, and Linux.
 # On Windows, recipes that use shell scripts fall back to PowerShell equivalents.
 
-workspace_root := justfile_directory()
+workspace_root := justfile_directory() + "/../.."
 os := os()
 
 # List available recipes
@@ -83,15 +83,15 @@ launch-buddy:
 
 # Start the Tauri dev server with HMR (workspace mode)
 dev:
-    cd bonsai-workspace/src && npx tauri dev
+    cd {{workspace_root}}/bonsai-workspace/src && npx tauri dev
 
 # Start the Tauri dev server in buddy mode
 dev-buddy:
-    cd bonsai-workspace/src && BONSAI_LAUNCH_MODE=buddy npx tauri dev
+    cd {{workspace_root}}/bonsai-workspace/src && BONSAI_LAUNCH_MODE=buddy npx tauri dev
 
 # Start the Tauri dev server in ecosystem mode
 dev-ecosystem:
-    cd bonsai-workspace/src && BONSAI_LAUNCH_MODE=ecosystem npx tauri dev
+    cd {{workspace_root}}/bonsai-workspace/src && BONSAI_LAUNCH_MODE=ecosystem npx tauri dev
 
 # Start the headless daemon
 daemon:
@@ -109,11 +109,11 @@ test-watchdog:
 
 # Run frontend tests
 test-frontend:
-    npm --prefix bonsai-workspace/src run test
+    npm --prefix {{workspace_root}}/bonsai-workspace/src run test
 
 # Run integration tests
 test-integration:
-    python tests/integration/test_daemon_local.py
+    python {{workspace_root}}/tests/integration/test_daemon_local.py
 
 # ── Lint / Check ──────────────────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ check:
 lint:
     cargo fmt --all -- --check
     cargo clippy --workspace -- -D warnings
-    npm --prefix bonsai-workspace/src run lint
+    npm --prefix {{workspace_root}}/bonsai-workspace/src run lint
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -252,14 +252,14 @@ deploy-windows ADAPTER_PATH="":
 
 # Full training cycle: export → SFT → DPO (use train-mlx on M1 instead)
 train-full:
-    just export-data
-    just train
-    just train-dpo
+    just --justfile scripts/devkit/justfile export-data
+    just --justfile scripts/devkit/justfile train
+    just --justfile scripts/devkit/justfile train-dpo
 
 # Full training cycle for Apple Silicon (M1/M2/M3)
 train-full-mlx:
-    just export-data
-    just train-mlx
+    just --justfile scripts/devkit/justfile export-data
+    just --justfile scripts/devkit/justfile train-mlx
 
 # Step 3: Evaluate the latest adapter against all 12 dimensions
 # (triggers EvaluationHarness via Tauri — app must be running)
@@ -345,19 +345,19 @@ out = export / 'bonsai_combined_final.jsonl'
 with open(out, 'w', encoding='utf-8') as f:
     for r in all_data[:20000]:
         f.write(json.dumps(r) + '\n')
-print(f'Combined {min(len(all_data), 20000)} / {len(all_data)} examples → {out}')
+print(f'Combined {min(len(all_data), 20000)} / {len(all_data)} examples -> {out}')
 "
 
 # Full Phase 7: combine data + SFT fine-tune into bonsai-final adapter
 train-final:
-    just combine-training-data
-    just finetune-sft \
+    just --justfile scripts/devkit/justfile combine-training-data
+    just --justfile scripts/devkit/justfile finetune-sft \
         data="$HOME/.bonsai/training_export/bonsai_combined_final.jsonl" \
         output="$HOME/.bonsai/adapters/bonsai-final-v1"
 
 # Full Phase 8: fuse bonsai-final adapter and hot-reload
 deploy-final llama-cpp-dir="~/llama.cpp":
-    just convert-to-gguf \
+    just --justfile scripts/devkit/justfile convert-to-gguf \
         adapter="$HOME/.bonsai/adapters/bonsai-final-v1" \
         output="$HOME/.bonsai/models/bonsai-latest.gguf" \
         llama-cpp-dir="{{llama-cpp-dir}}"
@@ -375,13 +375,13 @@ generate-dreamagent-data:
 
 # Fine-tune the DreamAgent model for memory consolidation
 train-dreamagent:
-    just finetune-sft \
+    just --justfile scripts/devkit/justfile finetune-sft \
         data="$HOME/.bonsai/training_export/dreamagent.jsonl" \
         output="$HOME/.bonsai/adapters/bonsai-dreamagent-v1"
 
 # Convert DreamAgent adapter to GGUF and deploy to port 8082 path
 deploy-dreamagent llama-cpp-dir="~/llama.cpp":
-    just convert-to-gguf \
+    just --justfile scripts/devkit/justfile convert-to-gguf \
         adapter="$HOME/.bonsai/adapters/bonsai-dreamagent-v1" \
         output="D:/Models/bonsai-dreamagent.gguf" \
         llama-cpp-dir="{{llama-cpp-dir}}"

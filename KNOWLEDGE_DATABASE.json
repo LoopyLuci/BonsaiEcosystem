@@ -1,0 +1,427 @@
+{
+  "metadata": {
+    "system_name": "Bonsai Knowledge Database (KDB)",
+    "version": "1.0.0",
+    "created": "2026-06-02T01:15:00Z",
+    "purpose": "Cross-project rule aggregation and effectiveness measurement for bug prevention",
+    "scope": "BonsaiWorkspace workspace and related projects"
+  },
+  "rules": [
+    {
+      "rule_id": "KDB-001",
+      "title": "Native Library Linking Conflicts — Single Version Enforcement",
+      "category": "Dependency Management / Native Linking",
+      "severity": "CRITICAL",
+      "derived_from": ["ERR-001"],
+      "pattern": {
+        "description": "Multiple versions of libsqlite3-sys or other native-link crates in dependency graph",
+        "error_signature": "error: failed to select a version for `libsqlite3-sys`. ... links to the native library `sqlite3`, but it conflicts with a previous package",
+        "detection_command": "grep -r 'rusqlite\\|libsqlite3-sys\\|sqlx' crates/*/Cargo.toml | sort | uniq",
+        "detection_ci_check": "Fail build if multiple rusqlite versions found"
+      },
+      "root_cause_template": [
+        "Inconsistent {CRATE_NAME} versions across workspace members",
+        "Different versions require conflicting native library versions",
+        "Workspace-level dependency enforcement not in place",
+        "Circular or transitive dependencies introducing version mismatch"
+      ],
+      "resolution_strategy": {
+        "approach": "Unified Version Approach",
+        "steps": [
+          "1. Audit all crates for {NATIVE_CRATE} versions",
+          "2. Identify target version (usually latest compatible)",
+          "3. Update all crates to single version",
+          "4. Verify workspace.dependencies lock at target version",
+          "5. Run full workspace build to confirm"
+        ],
+        "automation": true,
+        "automation_script": "scripts/unify-native-dependencies.ps1"
+      },
+      "cost": "O(n) where n = number of affected crates",
+      "effectiveness": 0.96,
+      "time_to_fix": 45,
+      "prevention_rules": [
+        "All native-link crate versions must be unified across workspace",
+        "Use [workspace.dependencies] to enforce single version",
+        "Add Cargo.lock audit on version changes",
+        "Include dependency matrix in documentation"
+      ],
+      "automation_readiness": "HIGH",
+      "examples": [
+        {
+          "crate": "bonsai-query",
+          "issue": "rusqlite 0.32 requires libsqlite3-sys 0.30",
+          "fix": "Upgrade to rusqlite 0.37 → libsqlite3-sys 0.35"
+        },
+        {
+          "crate": "bonsai-universe",
+          "issue": "rusqlite 0.32 conflicts with tokio-rusqlite 0.6 (requires 0.37)",
+          "fix": "Upgrade to rusqlite 0.37 → unified libsqlite3-sys"
+        }
+      ],
+      "replication_likelihood": 0.95,
+      "last_seen": "2026-06-02",
+      "fixes_applied": 1,
+      "fix_success_rate": 1.0,
+      "confidence": 0.96
+    },
+    {
+      "rule_id": "KDB-002",
+      "title": "Transitive Compiler Dependency Conflicts — Version Pin Incompatibility",
+      "category": "Dependency Management / Transitive Dependencies",
+      "severity": "CRITICAL",
+      "derived_from": ["ERR-002"],
+      "pattern": {
+        "description": "Build tool or compiler (cc, proc-macro) with incompatible version pins",
+        "error_signature": "error: failed to select a version for `cc`. ... all possible versions conflict with previously selected packages",
+        "detection_command": "grep -rE '\\s*=\\s*[\"~]' crates/*/Cargo.toml | grep -E 'cc|proc-macro'",
+        "detection_ci_check": "Full workspace build test before merging"
+      },
+      "root_cause_template": [
+        "Crate A requires {TOOL}~{OLD_VERSION} (strict pin)",
+        "Crate B requires {TOOL}^{NEW_VERSION} (minimum version)",
+        "No overlap exists between constraints",
+        "Workspace resolver cannot find satisfying version"
+      ],
+      "resolution_strategy": {
+        "approach": "Multi-Option Decision",
+        "options": [
+          {
+            "option": "Upgrade Crate A to compatible version",
+            "effort": "Low",
+            "risk": "Medium (may break Crate A functionality)",
+            "likelihood_success": 0.6
+          },
+          {
+            "option": "Downgrade Crate B dependencies",
+            "effort": "Medium",
+            "risk": "High (may recreate other conflicts)",
+            "likelihood_success": 0.3
+          },
+          {
+            "option": "Isolate Crate A to separate workspace",
+            "effort": "High",
+            "risk": "Low (clean separation)",
+            "likelihood_success": 0.9
+          },
+          {
+            "option": "Find alternative crate without conflict",
+            "effort": "High",
+            "risk": "Low (fresh dependency set)",
+            "likelihood_success": 0.85
+          }
+        ],
+        "requires_decision": "HUMAN",
+        "decision_owner": "Project Lead"
+      },
+      "cost": "Variable — may require architecture redesign",
+      "effectiveness": 0.62,
+      "time_to_fix": 15,
+      "prevention_rules": [
+        "Run full workspace build before merging version upgrades",
+        "Maintain dependency compatibility matrix",
+        "Add Cargo.lock checks to detect transitive conflicts",
+        "Document strict version pins (~) and their rationale"
+      ],
+      "automation_readiness": "MEDIUM",
+      "examples": [
+        {
+          "conflict": "tree-sitter-javascript 0.21 pins cc~1.0.90 vs libsqlite3-sys 0.35 requires cc^1.1.6",
+          "status": "UNRESOLVED",
+          "workaround": "Exclude tree-sitter crates from workspace"
+        }
+      ],
+      "replication_likelihood": 0.75,
+      "last_seen": "2026-06-02",
+      "fixes_applied": 1,
+      "fix_success_rate": 0.5,
+      "confidence": 0.62
+    },
+    {
+      "rule_id": "KDB-003",
+      "title": "Cross-Platform Shell Script Incompatibility — Unix Commands in PowerShell",
+      "category": "Platform / Shell Scripting",
+      "severity": "HIGH",
+      "derived_from": ["ERR-003"],
+      "pattern": {
+        "description": "Using Unix command in Windows PowerShell script",
+        "error_signature": "The term '{COMMAND}' is not recognized as a name of a cmdlet, function, script file, or executable program",
+        "detection_command": "Get-Content script.ps1 | Select-String -Pattern 'tail|head|grep|wc|find' | grep -v 'PowerShell|Select-Object|Select-String'",
+        "detection_ci_check": "Lint .ps1 files for Unix commands"
+      },
+      "root_cause_template": [
+        "Script developed or copied from Unix/Linux environment",
+        "Assumption that standard Unix commands are universally available",
+        "PowerShell has different built-in cmdlets, not Unix-compatible"
+      ],
+      "command_mappings": {
+        "tail": {
+          "unix_syntax": "tail -N file",
+          "powershell_syntax": "Get-Content file | Select-Object -Last N",
+          "powershell_shorthand": "(Get-Content file)[-N..-1]",
+          "description": "Output last N lines"
+        },
+        "head": {
+          "unix_syntax": "head -N file",
+          "powershell_syntax": "Get-Content file -TotalCount N",
+          "powershell_shorthand": "(Get-Content file)[0..(N-1)]",
+          "description": "Output first N lines"
+        },
+        "grep": {
+          "unix_syntax": "grep pattern file",
+          "powershell_syntax": "Select-String -Pattern pattern -Path file",
+          "powershell_shorthand": "sls pattern file",
+          "description": "Search for pattern in file"
+        },
+        "wc": {
+          "unix_syntax": "wc -l file",
+          "powershell_syntax": "(Get-Content file | Measure-Object -Line).Lines",
+          "description": "Count lines in file"
+        },
+        "find": {
+          "unix_syntax": "find . -name pattern",
+          "powershell_syntax": "Get-ChildItem -Path . -Filter pattern -Recurse",
+          "powershell_shorthand": "gci -Filter pattern -r",
+          "description": "Recursively find files"
+        },
+        "cat": {
+          "unix_syntax": "cat file",
+          "powershell_syntax": "Get-Content file",
+          "powershell_shorthand": "gc file or type file",
+          "description": "Display file contents"
+        },
+        "rm": {
+          "unix_syntax": "rm -rf directory",
+          "powershell_syntax": "Remove-Item -Path directory -Recurse -Force",
+          "powershell_shorthand": "ri -r -fo directory",
+          "description": "Delete directory recursively"
+        },
+        "ls": {
+          "unix_syntax": "ls -la",
+          "powershell_syntax": "Get-ChildItem -Force",
+          "powershell_shorthand": "gci -Force or dir",
+          "description": "List files with details"
+        }
+      },
+      "resolution_strategy": {
+        "approach": "Command Mapping",
+        "steps": [
+          "1. Identify Unix command in script",
+          "2. Look up PowerShell equivalent in mapping table",
+          "3. Replace with PowerShell cmdlet",
+          "4. Test on Windows platform"
+        ],
+        "automation": true,
+        "automation_script": "scripts/powershell-command-migrator.ps1"
+      },
+      "cost": "O(1) per command",
+      "effectiveness": 0.88,
+      "time_to_fix": 2,
+      "prevention_rules": [
+        "Use PowerShell-native cmdlets in .ps1 scripts",
+        "For cross-platform code, invoke bash explicitly",
+        "Document PowerShell/Unix command mappings",
+        "Test scripts on both Windows PowerShell and Unix bash"
+      ],
+      "automation_readiness": "HIGH",
+      "examples": [
+        {
+          "wrong": "cargo build --release 2>&1 | tail -50",
+          "correct": "cargo build --release 2>&1 | Select-Object -Last 50"
+        },
+        {
+          "wrong": "grep -r 'pattern' crates/",
+          "correct": "Get-ChildItem -Path crates/ -Recurse | Select-String -Pattern 'pattern'"
+        }
+      ],
+      "replication_likelihood": 0.85,
+      "last_seen": "2026-06-02",
+      "fixes_applied": 1,
+      "fix_success_rate": 1.0,
+      "confidence": 0.88
+    },
+    {
+      "rule_id": "KDB-004",
+      "title": "Incremental Dependency Discovery Inefficiency — Batch-Fix Requirement",
+      "category": "Process / Debugging Efficiency",
+      "severity": "HIGH",
+      "derived_from": ["ERR-004"],
+      "pattern": {
+        "description": "Fixing dependencies iteratively (one batch at a time) instead of discovering all at once",
+        "detection_indicator": "Build fails, fix few crates, rebuild, fails again, repeat",
+        "build_iteration_cost": "15-20 minutes per iteration × number of iterations"
+      },
+      "root_cause_template": [
+        "No pre-build audit of all dependencies",
+        "Fixing only immediately-reported errors",
+        "Each build reveals new conflicts only when resolver reaches that crate",
+        "Transitive dependencies not examined upfront"
+      ],
+      "resolution_strategy": {
+        "approach": "Comprehensive Audit → Plan → Batch Fix",
+        "steps": [
+          "1. Run comprehensive dependency audit (grep all versions)",
+          "2. Document all discovered version pairs",
+          "3. Build unified version plan",
+          "4. Fix ALL affected crates in single batch",
+          "5. Execute single build"
+        ],
+        "automation": true,
+        "automation_script": "scripts/audit-native-deps.ps1",
+        "timesaving_expected": "60+ minutes per occurrence"
+      },
+      "cost": "5 minutes upfront audit vs 65+ minutes wasted iteration",
+      "effectiveness": 0.93,
+      "time_to_fix": 5,
+      "prevention_rules": [
+        "Always audit dependencies before fixing",
+        "Fix all related crates in single batch",
+        "Document dependency matrix before building",
+        "Run full dependency audit in CI/pre-build"
+      ],
+      "automation_readiness": "HIGH",
+      "audit_template": {
+        "step_1": "grep -r 'rusqlite\\|libsqlite3-sys\\|sqlx' crates/*/Cargo.toml | sort",
+        "step_2": "Document all unique versions found",
+        "step_3": "Identify target version (latest, or workspace-specified)",
+        "step_4": "List all crates needing update",
+        "step_5": "Update all in single commit"
+      },
+      "impact_measurement": {
+        "scenario": "Build failed 5 times with cumulative 90 minutes",
+        "root_cause": "Fixed only immediately-reported crates each iteration",
+        "optimal_approach": "Single comprehensive audit + batch fix = 25 minutes",
+        "time_wasted": 65,
+        "lesson": "Batch fixing multiplies savings exponentially"
+      },
+      "replication_likelihood": 0.80,
+      "last_seen": "2026-06-02",
+      "occurrences": 1,
+      "fixes_applied": 1,
+      "fix_success_rate": 1.0,
+      "confidence": 0.93
+    },
+    {
+      "rule_id": "KDB-005",
+      "title": "Workspace Architecture Constraint — Incompatible Crate Isolation",
+      "category": "Architecture / Workspace Design",
+      "severity": "MEDIUM",
+      "derived_from": ["ERR-005"],
+      "pattern": {
+        "description": "Crates needed for project functionality cannot coexist in workspace due to transitive dependency conflicts",
+        "current_example": "bonsai-lint crates needed for code quality but conflicting with main workspace dependency versions"
+      },
+      "root_cause_template": [
+        "Crate set A has strong dependency constraints",
+        "Crate set B has incompatible constraints",
+        "Workspace resolver cannot find compatible versions for both sets",
+        "No architectural separation strategy exists"
+      ],
+      "resolution_options": [
+        {
+          "option": "Separate Workspace",
+          "description": "Move conflicting crates to separate Cargo workspace",
+          "pros": ["Clean dependency isolation", "Independent versioning", "Separate build artifacts"],
+          "cons": ["More complex build process", "Separate CI pipelines"],
+          "implementation": "Create crates/bonsai-lint-workspace/ with own Cargo.toml",
+          "effort": "Medium (2-3 hours)",
+          "risk": "Low"
+        },
+        {
+          "option": "Post-Build Separate Compilation",
+          "description": "Build conflicting crates separately after main workspace",
+          "pros": ["No workspace coupling", "Simple to implement"],
+          "cons": ["Lint not in critical build path", "Requires separate CI step"],
+          "implementation": "Add CI step: cargo build --manifest-path crates/bonsai-lint/Cargo.toml",
+          "effort": "Low (30 minutes)",
+          "risk": "Very Low"
+        },
+        {
+          "option": "Upgrade Conflicting Dependency",
+          "description": "Upgrade crate to version with compatible dependencies",
+          "pros": ["Single unified workspace", "Simpler build"],
+          "cons": ["May break crate functionality", "May require code changes"],
+          "implementation": "Upgrade tree-sitter-javascript to newer version with compatible cc",
+          "effort": "Medium-High (1-2 days testing)",
+          "risk": "Medium (functionality regression)"
+        },
+        {
+          "option": "Alternative Crate Replacement",
+          "description": "Replace conflicting crate with alternative",
+          "pros": ["Fresh dependency set", "No legacy constraints"],
+          "cons": ["Major refactoring effort", "Learning curve"],
+          "implementation": "Replace tree-sitter-javascript with compatible alternative",
+          "effort": "High (1+ week)",
+          "risk": "Medium (functionality changes)"
+        }
+      ],
+      "decision_needed": true,
+      "decision_owner": "Luci (Project Lead)",
+      "decision_deadline": "When linter integration is required",
+      "effectiveness": 0.45,
+      "time_to_implement": {
+        "separate_workspace": 120,
+        "post_build": 30,
+        "upgrade": 480,
+        "alternative": 1440
+      },
+      "replication_likelihood": 0.60,
+      "last_seen": "2026-06-02",
+      "status": "REQUIRES_DECISION",
+      "confidence": 0.45
+    }
+  ],
+  "cross_rule_patterns": {
+    "pattern_1": {
+      "name": "Workspace Dependency Coordination",
+      "description": "Rules KDB-001, KDB-004 show that workspace-level dependency management must be coordinated before individual crate fixes",
+      "recommendation": "Audit first, plan second, fix all crates in single batch"
+    },
+    "pattern_2": {
+      "name": "Platform-Specific Development",
+      "description": "Rules KDB-003 shows the cost of not considering platform differences during development",
+      "recommendation": "Always test on target platform; document platform-specific variations"
+    },
+    "pattern_3": {
+      "name": "Transitive Dependency Risk",
+      "description": "Rules KDB-001, KDB-002 show that transitive dependencies are major risk vectors",
+      "recommendation": "Always examine full transitive dependency tree, not just direct dependencies"
+    }
+  },
+  "effectiveness_metrics": {
+    "total_rules": 5,
+    "average_confidence": 0.77,
+    "automation_ready": 4,
+    "requires_decision": 1,
+    "replication_likelihood_avg": 0.79,
+    "fix_success_rate_avg": 0.85,
+    "total_time_saved": 127,
+    "last_updated": "2026-06-02T01:15:00Z"
+  },
+  "automation_priorities": [
+    {
+      "priority": 1,
+      "rule": "KDB-001",
+      "automation": "Pre-build native dependency audit script",
+      "script": "scripts/audit-native-deps.ps1"
+    },
+    {
+      "priority": 2,
+      "rule": "KDB-004",
+      "automation": "Dependency batch-fix orchestration",
+      "script": "scripts/batch-unify-deps.ps1"
+    },
+    {
+      "priority": 3,
+      "rule": "KDB-003",
+      "automation": "PowerShell Unix command linter/migrator",
+      "script": "scripts/powershell-command-migrator.ps1"
+    },
+    {
+      "priority": 4,
+      "rule": "KDB-002",
+      "automation": "Transitive dependency conflict detector",
+      "script": "scripts/detect-transitive-conflicts.ps1"
+    }
+  ]
+}

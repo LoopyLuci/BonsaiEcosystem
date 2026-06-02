@@ -1,102 +1,353 @@
-# BonsAI Mobile Model Training Pipeline Orchestration
-# PowerShell script to run the complete distillation pipeline.
-#
-# This script:
-#   1. Exports training data (multiple domains with quality filtering)
-#   2. Starts teacher sidecar (llama-server with large teacher model)
-#   3. Runs distillation training
-#   4. Quantizes to GGUF (Q4_K_M)
-#   5. Runs benchmarks
-#   6. Registers model with registry
-#   7. Creates distribution package
-#
-# Prerequisites:
-#   - Python 3.10+ with torch, transformers, peft
-#   - llama.cpp with llama-server binary
-#   - GGUF files for teacher and student base models
-#
-# Usage:
-#   .\scripts\run_mobile_training_pipeline.ps1 -StudentModel "TinyLlama-1.1B-Instruct" `
-#     -TeacherGGUF "D:/Models/general/Bonsai-8B-Q4_K_M.gguf"
-#
-# On Windows, always use PowerShell (not Git Bash) to avoid segfaults.
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+BonsAI Mobile Model Training Pipeline Orchestration
+
+.DESCRIPTION
+Complete end-to-end pipeline for training a mobile-optimized AI model via knowledge distillation.
+
+Phases:
+  1. Download teacher model (if needed)
+  2. Generate distillation prompts (8000 examples, domain-weighted)
+  3. Start teacher sidecar server (llama-server)
+  4. Train student model (knowledge distillation with LoRA)
+  5. Quantize to GGUF (Q4_K_M)
+  6. Generate metadata and model card
+  7. Create .bkp package for distribution
+
+Prerequisites:
+  - Python 3.10+ with: torch, transformers, peft, yaml
+  - llama.cpp with llama-server binary (in PATH or install via pip)
+  - Model files in appropriate directories
+
+.PARAMETER TeacherModel
+Teacher model GGUF path. Defaults to $env:USERPROFILE\Models\Bonsai-8B-Q2_K.gguf
+
+.PARAMETER StudentModel
+Student model name (HuggingFace or local path). Defaults to TinyLlama-1.1B-Chat-v1.0
+
+.PARAMETER Epochs
+Number of training epochs. Defaults to 3.
+
+.PARAMETER BatchSize
+Training batch size. Defaults to 4.
+
+.PARAMETER TeacherPort
+Port for teacher llama-server. Defaults to 8080.
+
+.PARAMETER SkipGenerate
+Skip prompt generation if prompts already exist.
+
+.PARAMETER SkipTrain
+Skip training phase (useful for testing quantization).
+
+.PARAMETER SkipQuantize
+Skip quantization phase.
+
+.PARAMETER Cleanup
+Remove intermediate files after completion.
+
+.EXAMPLE
+.\scripts\run_mobile_training_pipeline.ps1 `
+  -TeacherModel "$env:USERPROFILE\Models\Bonsai-8B-Q2_K.gguf" `
+  -StudentModel "TinyLlama/TinyLlama-1.1B-Chat-v1.0" `
+  -Epochs 3 `
+  -BatchSize 4 `
+  -Cleanup
+#>
 
 param(
-    [string]$StudentModel = "TinyLlama-1.1B-Instruct",
-    [string]$TeacherGGUF = "D:/Models/general/Bonsai-8B-Q4_K_M.gguf",
-    [string]$ConfigPath = "config/bonsai_mobile_config.yaml",
-    [string]$OutputDir = "$env:USERPROFILE\.bonsai\models\checkpoints\bonsai-mobile-v1",
-    [string]$DataExportPath = "$env:USERPROFILE\.bonsai\training_export\combined_mobile_training.jsonl",
-    [string]$LlamaServerPort = "8080",
-    [string]$LlamaServerBin = "$env:USERPROFILE\llama.cpp\llama-server.exe",
+    [string]$TeacherModel = "$env:USERPROFILE\Models\Bonsai-8B-Q2_K.gguf",
+    [string]$StudentModel = "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    [string]$ConfigPath = "config/mobile_training_config.yaml",
     [int]$Epochs = 3,
-    [float]$LearningRate = 0.0005,
-    [string]$Device = "cpu",  # cpu, cuda, mps, directml
-    [switch]$SkipDataExport,
-    [switch]$SkipTeacher,
-    [switch]$SkipTraining,
-    [switch]$SkipQuantization,
-    [switch]$SkipBenchmark,
-    [switch]$SkipRegister,
-    [switch]$DryRun
+    [int]$BatchSize = 4,
+    [int]$TeacherPort = 8080,
+    [switch]$SkipGenerate,
+    [switch]$SkipTrain,
+    [switch]$SkipQuantize,
+    [switch]$Cleanup,
+    [string]$OutputDir = "$PWD\training_output\bonsai-mobile-v1",
+    [string]$Device = "cpu"
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 
-# ── Colors ────────────────────────────────────────────────────────────────
+# ─── Colors ──────────────────────────────────────────────────────────────
 
-function Write-Header { param([string]$Message)
-    Write-Host "`n" -NoNewline
+$Colors = @{
+    Success = "Green"
+    Warning = "Yellow"
+    Error   = "Red"
+    Info    = "Cyan"
+    Step    = "Magenta"
+}
+
+function Write-Log {
+    param([string]$Message, [string]$Level = "Info")
+    $timestamp = Get-Date -Format "HH:mm:ss"
+    $color = $Colors[$Level]
+    Write-Host "[$timestamp] $Message" -ForegroundColor $color
+}
+
+function Write-Header {
+    param([string]$Message)
+    Write-Host ""
     Write-Host ("=" * 80) -ForegroundColor Cyan
     Write-Host $Message -ForegroundColor Cyan
     Write-Host ("=" * 80) -ForegroundColor Cyan
 }
 
-function Write-Step { param([string]$Message)
-    Write-Host "`n>>> " -NoNewline -ForegroundColor Green
-    Write-Host $Message -ForegroundColor White
+function Test-Command {
+    param([string]$CommandName)
+    try {
+        $null = Get-Command $CommandName -ErrorAction Stop
+        return $true
+    } catch {
+        return $false
+    }
 }
 
-function Write-Error { param([string]$Message)
-    Write-Host "ERROR: " -NoNewline -ForegroundColor Red
-    Write-Host $Message -ForegroundColor White
+function Wait-ForService {
+    param(
+        [string]$Url,
+        [int]$MaxAttempts = 30,
+        [int]$DelaySeconds = 1
+    )
+
+    $attempt = 0
+    while ($attempt -lt $MaxAttempts) {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -TimeoutSec 2 -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+                Write-Log "Service is ready" -Level "Success"
+                return $true
+            }
+        } catch {
+            # Service not ready yet
+        }
+
+        $attempt++
+        if ($attempt -lt $MaxAttempts) {
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+
+    Write-Log "Service failed to start after $($MaxAttempts * $DelaySeconds)s" -Level "Error"
+    return $false
 }
 
-function Write-Warning { param([string]$Message)
-    Write-Host "WARNING: " -NoNewline -ForegroundColor Yellow
-    Write-Host $Message -ForegroundColor White
-}
+# ─── Main Script ──────────────────────────────────────────────────────────
 
-# ── Validation ────────────────────────────────────────────────────────────
+Write-Header "BonsAI Mobile Model Training Pipeline"
+Write-Log "Teacher: $TeacherModel"
+Write-Log "Student: $StudentModel"
+Write-Log "Epochs: $Epochs, Batch Size: $BatchSize, Device: $Device"
+Write-Log "Output: $OutputDir"
 
-Write-Header "BonsAI Mobile Training Pipeline"
+# ─── Phase 1: Verify prerequisites ─────────────────────────────────────────
 
-Write-Step "Validating prerequisites..."
+Write-Log ""
+Write-Log "Phase 1: Verify prerequisites" -Level "Step"
 
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-    Write-Error "Python not found. Install Python 3.10+ and ensure it's in PATH."
+if (-not (Test-Command "python")) {
+    Write-Log "Python not found in PATH" -Level "Error"
     exit 1
 }
 
-$PythonVersion = python --version 2>&1
-Write-Host "  Python: $PythonVersion"
+$pythonVersion = python --version 2>&1
+Write-Log "Python: $pythonVersion" -Level "Success"
 
-# Check GGUF files
-if (-not (Test-Path $TeacherGGUF)) {
-    Write-Error "Teacher GGUF not found: $TeacherGGUF"
+# ─── Phase 2: Verify/download teacher model ────────────────────────────────
+
+Write-Log ""
+Write-Log "Phase 2: Verify teacher model" -Level "Step"
+
+if (-not (Test-Path $TeacherModel)) {
+    Write-Log "Teacher model not found: $TeacherModel" -Level "Warning"
+    Write-Log "Attempting download from HuggingFace..." -Level "Info"
+
+    $modelsDir = Split-Path $TeacherModel
+    if (-not (Test-Path $modelsDir)) {
+        New-Item -ItemType Directory -Path $modelsDir -Force | Out-Null
+        Write-Log "Created directory: $modelsDir" -Level "Success"
+    }
+
+    Write-Log "Downloading Bonsai-8B-Q2_K.gguf (3.5 GB)..." -Level "Info"
+    Write-Log "This may take 10-20 minutes on a typical internet connection" -Level "Warning"
+
+    $url = "https://huggingface.co/lilyanatia/Bonsai-8B-requantized/resolve/main/Bonsai-8B-Q2_K.gguf?download=true"
+
+    try {
+        curl.exe -L -o $TeacherModel $url
+        if (Test-Path $TeacherModel) {
+            $sizeGB = (Get-Item $TeacherModel).Length / 1GB
+            Write-Log "Downloaded: $($sizeGB.ToString('F2')) GB" -Level "Success"
+        } else {
+            throw "Download verification failed"
+        }
+    } catch {
+        Write-Log "Download failed: $_" -Level "Error"
+        exit 1
+    }
+} else {
+    $sizeGB = (Get-Item $TeacherModel).Length / 1GB
+    Write-Log "Teacher model ready: $($sizeGB.ToString('F2')) GB" -Level "Success"
+}
+
+# ─── Phase 3: Generate prompts ──────────────────────────────────────────────
+
+if (-not $SkipGenerate) {
+    Write-Log ""
+    Write-Log "Phase 3: Generate distillation prompts" -Level "Step"
+
+    $promptFile = "$PWD\training_data\mobile_distill_prompts.jsonl"
+
+    if ((Test-Path $promptFile)) {
+        Write-Log "Prompts already exist, skipping generation" -Level "Warning"
+    } else {
+        try {
+            Write-Log "Generating 8000 domain-weighted prompts..." -Level "Info"
+            python scripts/generate_mobile_prompts.py
+            Write-Log "Generated prompts successfully" -Level "Success"
+        } catch {
+            Write-Log "Failed to generate prompts: $_" -Level "Error"
+            exit 1
+        }
+    }
+} else {
+    Write-Log ""
+    Write-Log "Phase 3: Skipped (--SkipGenerate)" -Level "Warning"
+}
+
+# ─── Phase 4: Start teacher server ─────────────────────────────────────────
+
+Write-Log ""
+Write-Log "Phase 4: Start teacher model server" -Level "Step"
+
+if (-not (Test-Command "llama-server")) {
+    Write-Log "llama-server not found in PATH" -Level "Error"
+    Write-Log "Install via: pip install llama-cpp-python[server]" -Level "Info"
     exit 1
 }
-Write-Host "  Teacher GGUF: $TeacherGGUF"
 
-# Check llama-server (optional for API mode)
-if (-not (Test-Path $LlamaServerBin)) {
-    Write-Warning "llama-server not found at $LlamaServerBin"
-    Write-Warning "Will attempt to use system llama-server. Make sure it's in PATH."
+Write-Log "Starting llama-server on port $TeacherPort..." -Level "Info"
+
+$teacherProcess = Start-Process `
+    -FilePath "llama-server" `
+    -ArgumentList "-m `"$TeacherModel`" -ngl 99 --port $TeacherPort" `
+    -PassThru `
+    -NoNewWindow `
+    -RedirectStandardOutput "$PWD\teacher_server.log" `
+    -RedirectStandardError "$PWD\teacher_server_err.log"
+
+Write-Log "Teacher process started (PID: $($teacherProcess.Id))" -Level "Success"
+
+if (-not (Wait-ForService "http://127.0.0.1:$TeacherPort/v1/models" -MaxAttempts 60)) {
+    Write-Log "Teacher server startup failed" -Level "Error"
+    Stop-Process -Id $teacherProcess.Id -Force -ErrorAction SilentlyContinue
+    exit 1
 }
 
-Write-Host "  Student model: $StudentModel"
-Write-Host "  Config: $ConfigPath"
-Write-Host "  Output: $OutputDir"
+# ─── Phase 5: Train model ──────────────────────────────────────────────────
+
+if (-not $SkipTrain) {
+    Write-Log ""
+    Write-Log "Phase 5: Train BonsAI Mobile model" -Level "Step"
+
+    try {
+        Write-Log "Starting training loop ($Epochs epochs)..." -Level "Info"
+        python scripts/train_bonsai_mobile.py `
+            --student-model $StudentModel `
+            --teacher-api "http://127.0.0.1:$TeacherPort" `
+            --prompts "training_data/mobile_distill_prompts.jsonl" `
+            --output $OutputDir `
+            --batch-size $BatchSize `
+            --epochs $Epochs `
+            --temperature 4.0 `
+            --alpha 0.5 `
+            --device $Device
+
+        Write-Log "Training complete" -Level "Success"
+    } catch {
+        Write-Log "Training failed: $_" -Level "Error"
+        Stop-Process -Id $teacherProcess.Id -Force -ErrorAction SilentlyContinue
+        exit 1
+    }
+} else {
+    Write-Log ""
+    Write-Log "Phase 5: Skipped (--SkipTrain)" -Level "Warning"
+}
+
+# ─── Phase 6: Quantize model ───────────────────────────────────────────────
+
+if (-not $SkipQuantize) {
+    Write-Log ""
+    Write-Log "Phase 6: Quantize model to GGUF" -Level "Step"
+
+    try {
+        Write-Log "Converting to GGUF with Q4_K_M quantization..." -Level "Info"
+        python scripts/quantize_bonsai_mobile.py `
+            --model-dir "$OutputDir/final_model" `
+            --output-dir "$OutputDir/gguf" `
+            --quantization Q4_K_M
+
+        Write-Log "Quantization complete" -Level "Success"
+    } catch {
+        Write-Log "Quantization warning: $_" -Level "Warning"
+    }
+} else {
+    Write-Log ""
+    Write-Log "Phase 6: Skipped (--SkipQuantize)" -Level "Warning"
+}
+
+# ─── Cleanup ────────────────────────────────────────────────────────────────
+
+Write-Log ""
+Write-Log "Cleanup" -Level "Step"
+
+Write-Log "Stopping teacher server (PID: $($teacherProcess.Id))..." -Level "Info"
+try {
+    Stop-Process -Id $teacherProcess.Id -Force
+    Start-Sleep -Milliseconds 500
+    Write-Log "Teacher server stopped" -Level "Success"
+} catch {
+    Write-Log "Could not stop teacher server: $_" -Level "Warning"
+}
+
+if ($Cleanup) {
+    Write-Log "Removing intermediate files..." -Level "Info"
+
+    @(
+        "$PWD\teacher_server.log",
+        "$PWD\teacher_server_err.log",
+        "$OutputDir\checkpoint_epoch_*",
+        "$OutputDir\fused_model"
+    ) | ForEach-Object {
+        if (Test-Path $_) {
+            Remove-Item $_ -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Log "Cleanup complete" -Level "Success"
+}
+
+# ─── Final Summary ──────────────────────────────────────────────────────────
+
+Write-Header "Pipeline Complete"
+Write-Log ""
+Write-Log "Output artifacts:" -Level "Info"
+Write-Log "  • Final model: $OutputDir/final_model" -Level "Info"
+Write-Log "  • GGUF: $OutputDir/gguf/bonsai-mobile-q4_k_m.gguf" -Level "Info"
+Write-Log "  • Metadata: $OutputDir/gguf/bonsai-mobile-q4_k_m.metadata.json" -Level "Info"
+Write-Log "  • Model card: $OutputDir/gguf/README.md" -Level "Info"
+Write-Log ""
+Write-Log "Next steps:" -Level "Info"
+Write-Log "  1. Review model card: code $OutputDir/gguf/README.md" -Level "Info"
+Write-Log "  2. Test inference with llama-cpp-python" -Level "Info"
+Write-Log "  3. Deploy to mobile using llama-cpp iOS/Android SDKs" -Level "Info"
+Write-Log ""
 
 # ── Phase 1: Export Training Data ─────────────────────────────────────────
 

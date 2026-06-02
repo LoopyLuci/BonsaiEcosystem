@@ -1,0 +1,26 @@
+[package]
+name = "bonsai-collaboration"
+version = "0.1.0"
+edition = "2021"
+description = "Collaborative linting - team profiles, rule voting, shared libraries"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+tracing = "0.1"
+dashmap = "5.5"
+parking_lot = "0.12"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+
+# Integration
+bonsai-etl = { path = "../bonsai-etl" }
+bonsai-lint = { path = "../bonsai-lint" }
+
+[dev-dependencies]
+tempfile = "3"

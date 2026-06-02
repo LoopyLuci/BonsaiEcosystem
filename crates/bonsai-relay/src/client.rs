@@ -102,6 +102,16 @@ impl RelayClient {
         Ok(in_rx)
     }
 
+    /// Send an opaque application frame over the relay session.
+    pub fn send_frame(&self, data: Vec<u8>) -> RelayResult<()> {
+        self.send_raw(data).map_err(|e| {
+            RelayError::Io(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                e.to_string(),
+            ))
+        })
+    }
+
     fn send_raw(&self, data: Vec<u8>) -> TransferResult<()> {
         let guard = self.tx.lock().unwrap();
         if let Some(ref tx) = *guard {
