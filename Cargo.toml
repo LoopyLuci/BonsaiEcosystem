@@ -1,13 +1,28 @@
 [workspace]
-# NOTE: Most crates listed here are in-progress or experimental.
-# For building the Bonsai Workspace desktop app, use: cd bonsai-workspace && cargo tauri build
-# The crates below are intentionally minimal to avoid loading broken/incomplete members.
+# BACE-optimized workspace structure:
+# - Foundation crates (BACE + core infrastructure)
+# - Subsystems in their own workspaces (avoid circular dependencies)
+# For the Tauri app: cd bonsai-workspace && cargo tauri build
+# For BACE-accelerated builds: cargo bace build
+
+resolver = "2"
+
 members = [
+    # ========== BACE Foundation (Function-Level Compilation) ==========
+    "crates/bonsai-buir",              # Bonsai Unified Intermediate Representation
+    "crates/bonsai-bco",               # Bonsai Compiled Objects (serialized functions)
+    "crates/bonsai-compile-cache",     # Local compilation cache
+    "crates/bonsai-cas-ext",           # CAS extensions for BACE
+    "crates/bonsai-hotreload",         # Hot-reload macro and runtime
+    "crates/bace-rustc",               # BACE Rust compiler wrapper
+    "crates/bace-rt",                  # BACE runtime and proc-macro
+    "crates/cargo-bace",               # cargo-bace CLI subcommand
+
+    # ========== Legacy Foundation (keep for compatibility) ==========
     "bonsai-runtime",
     "src-daemon",
     "bonsai-bot",
 ]
-resolver = "2"
 
 [workspace.lints.rust]
 unsafe_code = "warn"
@@ -65,3 +80,14 @@ opt-level = 1
 codegen-units = 256
 incremental = true
 split-debuginfo = "packed"
+
+# ============================================================================
+# BACE Profile — Optimized for function-level incremental compilation
+# ============================================================================
+[profile.bace-dev]
+inherits = "dev"
+codegen-units = 1            # Required for BACE function extraction
+lto = false                  # BACE needs unoptimized code for hot-reload
+opt-level = 0
+debug = 2                    # Full debug info for BACE to map functions
+incremental = true
