@@ -1,11 +1,10 @@
 //! High-level KDB Manager for module lifecycle management.
 
-use crate::module::{LoadedModule, ModuleManifest};
+use crate::module::ModuleManifest;
 use crate::retriever::KdbRetriever;
 use crate::store::KdbStore;
 use crate::{KdbError, Result};
 use chrono::Utc;
-use serde_json::json;
 use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -41,13 +40,16 @@ impl KdbManager {
         let mut archive = ZipArchive::new(file)?;
 
         // Extract manifest
-        let mut manifest_file = archive
-            .by_name("manifest.json")
-            .map_err(|_| KdbError::Invalid("missing manifest.json in module".into()))?;
+        let manifest_json = {
+            let mut manifest_file = archive
+                .by_name("manifest.json")
+                .map_err(|_| KdbError::Invalid("missing manifest.json in module".into()))?;
 
-        let mut manifest_json = String::new();
-        use std::io::Read;
-        manifest_file.read_to_string(&mut manifest_json)?;
+            let mut manifest_json = String::new();
+            use std::io::Read;
+            manifest_file.read_to_string(&mut manifest_json)?;
+            manifest_json
+        };
 
         let manifest: ModuleManifest = serde_json::from_str(&manifest_json)?;
 
@@ -56,7 +58,8 @@ impl KdbManager {
         fs::create_dir_all(&module_dir)?;
 
         // Extract all files from ZIP to the module directory
-        for i in 0..archive.len() {
+        let file_count = archive.len();
+        for i in 0..file_count {
             let mut file = archive.by_index(i)?;
             let outpath = module_dir.join(file.name());
 
@@ -67,7 +70,6 @@ impl KdbManager {
                     fs::create_dir_all(p)?;
                 }
                 let mut outfile = fs::File::create(&outpath)?;
-                use std::io::Write;
                 std::io::copy(&mut file, &mut outfile)?;
             }
         }
@@ -98,9 +100,6 @@ impl KdbManager {
 
     /// Reload a module without interrupting inference.
     pub fn reload_module(&self, name: &str, module_path: &Path) -> Result<()> {
-        // Load the new module with a temporary name first
-        let temp_name = format!("{}_reload_tmp", name);
-
         // Temporarily unload from memory but keep on disk
         self.retriever.unload_module(name);
 
@@ -180,10 +179,10 @@ impl KdbManager {
 
         let dim = embeddings[0].len();
 
-        // Create HNSW index
-        let index = bonsai_hnsw::HnswIndex::new(dim)?;
-        for (i, emb) in embeddings.iter().enumerate() {
-            index.add(i, emb)?;
+        // Create HNSW index (m=16, ef_construction=200, cosine distance)
+        let mut index = bonsai_hnsw::HnswIndex::new(dim, 16, 200, bonsai_hnsw::Distance::Cosine);
+        for emb in embeddings.iter() {
+            index.insert(emb.clone())?;
         }
 
         // Create module directory
