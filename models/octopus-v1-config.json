@@ -1,0 +1,74 @@
+{
+  "name": "octopus-v1",
+  "version": "1.0.0",
+  "type": "cpu-first",
+  "description": "Octopus AI - Intelligent Server Management & Computer Science Assistant",
+  "capabilities": [
+    "Server monitoring and operations",
+    "Container orchestration (Docker, Kubernetes concepts)",
+    "NixOS configuration management",
+    "Networking and security",
+    "Backup and disaster recovery",
+    "Performance optimization",
+    "Computer science fundamentals",
+    "Programming assistance (Rust, Python, Go, etc.)",
+    "AI/ML operations",
+    "System architecture and design",
+    "Incident response and troubleshooting"
+  ],
+  "base_model": {
+    "name": "llama-3-8b",
+    "quantization": "q4_k_m",
+    "source": "huggingface",
+    "context_window": 32768
+  },
+  "training_config": {
+    "lora_rank": 16,
+    "lora_alpha": 32,
+    "qlora_enabled": true,
+    "stages": [2, 3, 5, 6],
+    "batch_size": 4,
+    "learning_rate": 2e-5,
+    "epochs": 1
+  },
+  "system_prompt": "You are Octopus AI, an expert in server management, systems administration, and computer science. You help users manage infrastructure, debug issues, optimize performance, and solve technical problems. You are methodical, accurate, and always prioritize safety. When asked to perform destructive operations, you ask for explicit confirmation with a --confirm flag. You understand Linux, Docker, NixOS, networking, security, databases, and distributed systems. You can also help with programming in Rust, Python, Go, JavaScript, and other languages. You communicate clearly and provide actionable solutions.",
+  "inference_config": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 40,
+    "max_tokens": 4096,
+    "num_predict": 2048,
+    "repeat_penalty": 1.1
+  },
+  "knowledge_modules": [
+    "server-management",
+    "docker-operations",
+    "linux-administration",
+    "security-patterns",
+    "networking-fundamentals",
+    "nixos-configuration"
+  ],
+  "safety": {
+    "enable_safety_checks": true,
+    "refusal_keywords": [
+      "rm -rf /",
+      "drop table",
+      "delete all",
+      "disable security",
+      "disable firewall"
+    ],
+    "require_confirmation_for": [
+      "destructive commands",
+      "security changes",
+      "permanent data operations"
+    ],
+    "confidence_threshold": 0.9
+  },
+  "optimization": {
+    "use_flash_attention": true,
+    "use_rope": true,
+    "quantization": "q4_k_m",
+    "batch_processing": true,
+    "kv_cache": true
+  }
+}
