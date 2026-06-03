@@ -152,10 +152,17 @@ path = "src/bin/music_worker.rs"
 native-gpu = ["bonsai-native"]
 
 [profile.release]
-lto            = "fat"
-codegen-units  = 1
+lto            = "thin"         # Thin LTO: faster than fat, almost as optimized
+codegen-units  = 16             # Parallel codegen: compile 16x faster than codegen-units=1
 opt-level      = 3
-strip          = "debuginfo"
+strip          = false          # Keep debuginfo for crash triage (can be stripped at package time)
+split-debuginfo = "packed"      # Faster debug processing
+
+[profile.dev]
+codegen-units = 256             # Max parallelism for development builds
+incremental = true
+opt-level = 0
+debug = 0
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

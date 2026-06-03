@@ -35,19 +35,33 @@ dashmap = "5"
 once_cell = "1"
 regex = "1"
 
+# ============================================================================
+# Release Profile — Optimized for deployment
+# ============================================================================
 [profile.release]
 opt-level = 3
-lto = true
-codegen-units = 1
+lto = "thin"
+codegen-units = 16              # Balance: compile fast, link fast
 panic = "abort"
-strip = true
+strip = false                   # Keep symbols for crash triage
+split-debuginfo = "packed"
 
+# ============================================================================
+# Development Profile — Optimized for instant feedback
+# ============================================================================
 [profile.dev]
 debug = 1
-opt-level = 0
-codegen-units = 256
+opt-level = 0                   # No optimization, just compile
+codegen-units = 256             # Max parallelism: 1 unit per core
+incremental = true
+split-debuginfo = "packed"
 
+# ============================================================================
+# Test Profile — Balance speed and coverage
+# ============================================================================
 [profile.test]
 debug = 1
 opt-level = 1
 codegen-units = 256
+incremental = true
+split-debuginfo = "packed"

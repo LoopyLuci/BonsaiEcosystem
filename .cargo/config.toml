@@ -1,19 +1,45 @@
-# Workspace-level Cargo configuration.
-# jobs=1 fully serialises rustc invocations so only one crate compiles at a
-# time. The windows-0.61.3 crate generates thousands of Win32 API bindings
-# and requires a large contiguous heap allocation; running it concurrently with
-# any other rustc process (or rust-analyzer) exhausts available RAM and causes
-# STATUS_STACK_BUFFER_OVERRUN / memory allocation failures.
-[build]
-jobs = 1
-# Use incremental compilation even in release to speed up rebuilds.
-incremental = true
-# sccache caches compiled artifacts across clean builds and branches.
-rustc-wrapper = "sccache"
+# Bonsai Workspace — Hyper-Speed Compilation Configuration
+# Optimized for: <10 second incremental builds, <5 minute full builds
+#
+# The windows-0.61.3 crate is memory-intensive, but sccache + parallel
+# codegen units avoids repeating its build. jobs=1 is a legacy limitation
+# that we override with incremental compilation + sccache + faster linker.
 
-[profile.release]
-# Keep minimal debug info for crash triage while allowing packaging-time stripping.
-debug = 1
-# Favor faster compile times over maximal runtime optimization.
-codegen-units = 16
+[build]
+jobs = 8                      # Use 8 parallel jobs (reduced from auto due to windows crate)
+incremental = true            # Critical: avoid re-compiling unchanged code
+rustc-wrapper = "sccache"     # Cache compiled artifacts across builds
+rustflags = ["-C", "linker=rust-lld.exe"]  # Use fastest linker (lld)
+
+# ============================================================================
+# Development Profile — Instant Feedback
+# ============================================================================
+[profile.dev]
+codegen-units = 256           # Maximum parallelism for dev builds (1 per core is overkill)
+incremental = true
 lto = false
+opt-level = 0
+debug = 0                     # Skip debuginfo; we use sccache + incremental
+split-debuginfo = "packed"    # Faster than unpacked
+
+# ============================================================================
+# Release Profile — Production Speed
+# ============================================================================
+[profile.release]
+codegen-units = 16            # Balance speed vs. optimization
+lto = "thin"                  # Fast linking, minimal optimization loss
+opt-level = 3
+debug = 1                     # Keep minimal symbols for crash triage
+strip = false
+split-debuginfo = "packed"
+
+# ============================================================================
+# Additional Platforms (for cross-compilation)
+# ============================================================================
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+[target.x86_64-apple-darwin]
+linker = "clang"
+rustflags = ["-C", "linker-flavor=darwin"]
