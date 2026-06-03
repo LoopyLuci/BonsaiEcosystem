@@ -2,8 +2,13 @@
 name = "bonsai-workspace"
 version = "0.2.0"
 edition = "2021"
+default-run = "bonsai-workspace"
 
 [workspace]
+
+[[bin]]
+name = "bonsai-workspace"
+path = "src/main.rs"
 
 [lib]
 name = "bonsai_workspace_lib"
