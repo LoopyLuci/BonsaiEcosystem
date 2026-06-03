@@ -1,0 +1,12 @@
+[package]
+name = "bonsai-bmf-p2p"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+bincode = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+bonsai-bmf-core = { path = "../bonsai-bmf-core" }

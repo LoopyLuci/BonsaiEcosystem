@@ -22,6 +22,16 @@ members = [
     "bonsai-runtime",
     "src-daemon",
     "bonsai-bot",
+
+    # ========== BPCF-Pre (Pre-Compilation Fabric) ==========
+    "crates/bonsai-prec",               # Speculative pre-compilation with AI hints
+
+    # ========== BMF (Bonsai Messaging Fabric) ==========
+    "crates/bonsai-bmf-core",           # Core messaging types and encryption
+    "crates/bonsai-bmf-smtp",           # SMTP server
+    "crates/bonsai-bmf-imap",           # IMAP server
+    "crates/bonsai-bmf-p2p",            # P2P delivery via TransferDaemon
+    "crates/bonsai-bmf-server",         # Unified BMF server
 ]
 
 [workspace.lints.rust]
