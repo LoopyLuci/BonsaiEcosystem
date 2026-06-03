@@ -176,6 +176,14 @@ daemon_test_output.txt
 .deno/
 
 # ============================================================================
+# LOCAL REFERENCE DOCUMENTATION (Never commit)
+# ============================================================================
+# Contains sensitive structure information about private models
+LOCAL_REFERENCE_DOCS/
+**/*_PRIVATE_REFERENCE.md
+**/*_LOCAL_ONLY.md
+
+# ============================================================================
 # PRIVATE MODELS — EXTERNAL STORAGE (D:\Models\Custom)
 # ============================================================================
 # Private models are stored externally on D: drive, NOT in repository
