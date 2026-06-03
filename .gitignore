@@ -1,6 +1,101 @@
 .claude/
 
-# Root-level build artifacts and installers
+# ============================================================================
+# OBSOLETE FILES & DIRECTORIES (from prior phases, no longer maintained)
+# ============================================================================
+
+# Old documentation files (replaced by COMPLETE_ECOSYSTEM_DOCUMENTATION.md)
+ALL_MODELS_EXTRACTION_REPORT.md
+BMCS_DEPLOYMENT.md
+BMCS_README.md
+BMN_BLUEPRINT.md
+BMN_PROGRESS.md
+BOCE-DOCUMENTATION-INDEX.md
+BONSAI-COMPLETE-ECOSYSTEM-VISION.md
+BPCF-IMPLEMENTATION-ROADMAP.md
+BUG-HUNTER-DEPLOYMENT-SUMMARY.md
+BWE_IMPLEMENTATION_SUMMARY.md
+COMPILATION-SYSTEMS-INDEX.md
+COMPLETE-BONSAI-VISION.md
+COMPLETE_IMPLEMENTATION_SUMMARY.md
+DELIVERABLES_INDEX.md
+DEPLOYMENT-CERTIFICATION-FINAL.md
+ECOSYSTEM-EXPANSION-VISION.md
+EXTRACTION_SUMMARY_REPORT.md
+FINAL-12-ROUND-CAMPAIGN-SUMMARY.md
+INTEGRATED-SYSTEM-DEPLOYMENT.md
+OCTOPUS_AI_BLUEPRINT.md
+PENETRATION-TEST-SUMMARY.md
+PHASE5_6_INTEGRATION_SUMMARY.md
+PHASE5_TECHNICAL_FIXES.md
+QUICK_START_PHASES_5_6.md
+START_HERE.md
+"\360\237\216\211-ACHIEVEMENT-UNLOCKED.md"
+
+# Old configuration files
+bmcs.config.toml
+Dockerfile.bmcs
+docker-compose.bmcs.yml
+
+# Old documentation directory
+docs/
+
+# Old extraction and build output directories
+extraction-output/
+kdb-modules/
+poe-ai/
+
+# Old crate directories (incomplete implementations)
+crates/bace-rt/
+crates/bace-rustc/
+crates/bmcs-*/
+crates/bmn-*/
+crates/bonsai-bco/
+crates/bonsai-buir/
+crates/bonsai-buse-*/
+crates/bonsai-cas-ext/
+crates/bonsai-compile-cache/
+crates/bonsai-echo-ext/
+crates/bonsai-emulator/
+crates/bonsai-hdl/
+crates/bonsai-hotreload/
+crates/bonsai-model-scanner/
+crates/bonsai-omnibot/
+crates/bonsai-trmkd/
+crates/bwe-core/
+crates/cargo-bace/
+crates/poe-*/
+crates/bonsai-bug-hunter/
+
+# Stray files (emoji files, temporary test outputs, log files)
+*ACHIEVEMENT-UNLOCKED.md
+golang.go.Go.log
+
+# Old build and extraction scripts
+scripts/COMPLETE_EXTRACTION.ps1
+scripts/EXECUTE_EXTRACTION.ps1
+scripts/PHASE5_DEDUP_FIXED.ps1
+scripts/PHASE6_BUILD_KDB.ps1
+scripts/RUN_COMPLETE_EXTRACTION_ALL_MODELS.ps1
+scripts/RUN_FULL_EXTRACTION.ps1
+scripts/RUN_PHASES_5_6.ps1
+scripts/build_kdb_module.py
+scripts/extract_activations.py
+scripts/extract_all_knowledge.ps1
+scripts/extract_behavioral.py
+scripts/extract_synthetic_qa.py
+scripts/generate_sample_modules.py
+scripts/merge_and_dedup.py
+scripts/phase1_scan.py
+scripts/phase2_extract_all.py
+scripts/phase5_merge_dedup.py
+scripts/phase6_build_kdb.py
+scripts/setup_tdl.py
+scripts/train_poe_full.py
+
+# ============================================================================
+# ROOT-LEVEL BUILD ARTIFACTS AND INSTALLERS
+# ============================================================================
 /*.exe
 /*.zip
 rustup-init.exe
