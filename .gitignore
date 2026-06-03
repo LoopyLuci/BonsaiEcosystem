@@ -176,6 +176,40 @@ daemon_test_output.txt
 .deno/
 
 # ============================================================================
+# PRIVATE MODELS — EXTERNAL STORAGE (D:\Models\Custom)
+# ============================================================================
+# Private models are stored externally on D: drive, NOT in repository
+# This ensures complete separation and prevents accidental GitHub uploads
+
+# Never track external model directories
+D:\Models\*
+/D:/Models/*
+D:/Models/*
+
+# Never track private model files in the repository
+psychopathy-octopus-merged/
+psychopathy-octopus-lora/
+octopus-ai-model/
+octopus-ai-lora/
+
+# Never track model checkpoints
+**/checkpoint-*/
+**/.checkpoints/
+**/training_artifacts/
+
+# Never track raw model files (these should be in D:\Models\Custom)
+adapter_model.bin
+pytorch_model.bin
+*.gguf
+*.safetensors
+model_weights.*
+
+# Never track private model training artifacts
+training-data/**/private_*
+training-data/**/*_private.jsonl
+training-data/**/*_proprietary.jsonl
+
+# ============================================================================
 # PRIVATE MODEL NAMES — NEVER UPLOAD TO GITHUB
 # ============================================================================
 # Internal naming conventions that must remain confidential
@@ -185,42 +219,11 @@ daemon_test_output.txt
 *flowers*
 *Psychopathy*
 *psychopathy*
-*Octopus*octopus*
-
-# Private model files and directories
-psychopathy-octopus-merged/
-psychopathy-octopus-lora/
-psychopathy-octopus-v1/
-**/checkpoint-*/
-adapter_model.bin
-pytorch_model.bin
-*.gguf
-
-# Training artifacts with private names
-training-data/psychopathy*
-training-data/guardrail*
-training-data/flowers*
+*octopus-private*
+*octopus-custom*
 
 # KDB modules with private names
 kdb-modules/psychopathy*
 kdb-modules/guardrail*
 kdb-modules/flowers*
 kdb-modules/*-knowledge.json
-
-# Scripts mentioning private models
-scripts/*psychopathy*
-scripts/*guardrail*
-scripts/*flowers*
-*.ps1
-WINDOWS*.md
-BUILD*.ps1
-WATCH*.md
-FINAL*.md
-LIVE*.md
-START*.md
-auto-build*.ps1
-*-train*.ps1
-*-setup*.ps1
-*-build*.ps1
-simple-*.ps1
-fix-*.ps1
