@@ -79,9 +79,6 @@ globset   = "0.4"
 rand      = "0.8"
 
 sqlx             = { version = "0.9", features = ["runtime-tokio", "sqlite"] }
-# Provide a statically-linked SQLite so we don't depend on a system installation.
-# In sqlx 0.8+ the "bundled" flag moved here from sqlx itself.
-libsqlite3-sys   = { version = "0.37", features = ["bundled"] }
 
 cpal  = "0.15"
 hound    = "3.5"
