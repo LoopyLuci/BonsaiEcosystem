@@ -1,0 +1,62 @@
+{
+  "model": {
+    "id": "bonsai-foundation",
+    "name": "BonsAI Foundation Model System",
+    "version": "1.0.0",
+    "description": "Central model registry, discovery, and allocation system for all BonsAI models",
+    "type": "model-registry-system",
+    "framework": "rust",
+    "model_location": "models/base-models/",
+    "components": {
+      "registry": "crates/bonsai-model-registry/",
+      "scanner": "crates/bonsai-model-scanner/",
+      "converter": "crates/bonsai-model-converter/",
+      "inference": "crates/bonsai-inference/",
+      "inference_telemetry": "crates/bonsai-inference-telemetry/"
+    },
+    "capabilities": [
+      "model-discovery",
+      "model-registration",
+      "format-conversion",
+      "metadata-management",
+      "hardware-aware-allocation",
+      "performance-monitoring",
+      "version-tracking"
+    ],
+    "features": {
+      "auto_discovery": true,
+      "format_conversion": true,
+      "metadata_extraction": true,
+      "bueb_integration": true,
+      "hardware_optimization": true,
+      "telemetry": true
+    },
+    "supported_formats": [
+      "pytorch",
+      "onnx",
+      "gguf",
+      "ggml",
+      "tflite",
+      "tensorrt"
+    ],
+    "integration": {
+      "bueb": true,
+      "kdb": true,
+      "bmf": true,
+      "model_selector": true,
+      "dynamic_hardware_allocation": true
+    },
+    "inference_engines": [
+      "torch",
+      "onnx-runtime",
+      "llama.cpp",
+      "ggml",
+      "tvm"
+    ],
+    "status": "production-ready",
+    "tags": ["model-system", "registry", "infrastructure", "inference"],
+    "license": "Apache-2.0",
+    "authors": ["BonsAI Team"],
+    "last_updated": "2026-06-03"
+  }
+}
