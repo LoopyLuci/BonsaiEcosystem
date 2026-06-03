@@ -3,6 +3,8 @@ name = "bonsai-workspace"
 version = "0.2.0"
 edition = "2021"
 
+[workspace]
+
 [lib]
 name = "bonsai_workspace_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
