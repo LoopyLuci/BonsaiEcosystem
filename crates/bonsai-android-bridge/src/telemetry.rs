@@ -114,7 +114,8 @@ impl TelemetryCollector {
 
         // Trim old events if buffer gets too large
         if events.len() > self.max_buffer_size {
-            events.drain(0..(events.len() - self.max_buffer_size));
+            let drain_count = events.len() - self.max_buffer_size;
+            events.drain(0..drain_count);
         }
     }
 

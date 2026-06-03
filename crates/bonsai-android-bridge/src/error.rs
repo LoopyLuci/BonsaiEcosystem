@@ -45,6 +45,12 @@ pub enum Error {
     #[error("UUID error: {0}")]
     UuidError(#[from] uuid::Error),
 
+    #[error("System time error: {0}")]
+    SystemTimeError(#[from] std::time::SystemTimeError),
+
+    #[error("Path error: {0}")]
+    PathError(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

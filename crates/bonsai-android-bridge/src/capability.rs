@@ -1,6 +1,6 @@
 use crate::error::Result;
 use chrono::{DateTime, Utc};
-use ed25519_dalek::{SigningKey, VerifyingKey};
+use ed25519_dalek::{SigningKey, Signer, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

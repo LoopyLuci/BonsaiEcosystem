@@ -838,6 +838,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "walkdir",
  "x25519-dalek",
  "zeroize",
 ]

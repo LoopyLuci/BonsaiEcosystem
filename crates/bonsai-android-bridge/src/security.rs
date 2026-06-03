@@ -1,8 +1,9 @@
 use crate::error::Result;
 use aes_gcm::aead::Aead;
-use aes_gcm::Aes256Gcm;
+use aes_gcm::{Aes256Gcm, KeyInit};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::sync::Arc;
 use x25519_dalek::{PublicKey, StaticSecret};
 use zeroize::Zeroize;
@@ -95,7 +96,7 @@ impl Drop for SessionKey {
 }
 
 /// Device identity with public/private key pair
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DeviceIdentity {
     /// Device fingerprint (public key hash)
     pub fingerprint: String,
@@ -103,6 +104,16 @@ pub struct DeviceIdentity {
     pub secret_key: Arc<parking_lot::Mutex<StaticSecret>>,
     /// Public key
     pub public_key: PublicKey,
+}
+
+impl fmt::Debug for DeviceIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DeviceIdentity")
+            .field("fingerprint", &self.fingerprint)
+            .field("secret_key", &"<secret>")
+            .field("public_key", &"<public>")
+            .finish()
+    }
 }
 
 impl DeviceIdentity {

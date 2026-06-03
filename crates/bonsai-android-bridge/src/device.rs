@@ -25,7 +25,7 @@ pub enum DeviceStatus {
 }
 
 /// Device information and state
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Device {
     /// Unique device ID
     pub id: String,

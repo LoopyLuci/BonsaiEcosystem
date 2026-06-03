@@ -24,7 +24,7 @@ pub enum FileSyncEventType {
 }
 
 /// CAS (Content-Addressable Storage) blob reference
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BlobRef {
     /// BLAKE3 hash of blob content
     pub hash: String,
@@ -139,7 +139,8 @@ impl FileSynchronizer {
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            let relative = path.strip_prefix(&self.sync_root)?;
+            let relative = path.strip_prefix(&self.sync_root)
+                .map_err(|e| crate::error::Error::PathError(e.to_string()))?;
 
             let metadata = std::fs::metadata(path)?;
             let file_meta = FileMetadata {
@@ -307,5 +308,3 @@ mod tests {
     }
 }
 
-// Re-export walkdir for directory traversal
-pub use walkdir;
