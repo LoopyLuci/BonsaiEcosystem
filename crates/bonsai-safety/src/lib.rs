@@ -23,14 +23,14 @@ impl Default for SafetyConfig {
     }
 }
 
-pub struct GuardrailEngine {
+pub struct SafetyEngine {
     config: SafetyConfig,
     classifier: refusal_classifier::RefusalClassifier,
     redactor: pii_redactor::PiiRedactor,
     watermarker: watermark::Watermarker,
 }
 
-impl GuardrailEngine {
+impl SafetyEngine {
     pub fn new(config: SafetyConfig) -> anyhow::Result<Self> {
         Ok(Self {
             classifier: refusal_classifier::RefusalClassifier::new()?,

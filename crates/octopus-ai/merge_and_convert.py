@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Phase 5: Merge LoRA adapter and convert to GGUF format
-Output: psychopathy-octopus-v1.Q4_K_M.gguf
+Output: server-expert-model-v1.Q4_K_M.gguf
 """
 
 import torch
@@ -19,9 +19,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 base_model_id = "distilgpt2"
-lora_path = "./psychopathy-octopus-lora"
-merged_output = "./psychopathy-octopus-merged"
-gguf_output = "./psychopathy-octopus-v1.Q4_K_M.gguf"
+lora_path = "./server-expert-lora"
+merged_output = "./server-expert-merged"
+gguf_output = "./server-expert-model-v1.Q4_K_M.gguf"
 
 logger.info(f"Base model: {base_model_id}")
 logger.info(f"LoRA adapter: {lora_path}")
