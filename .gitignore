@@ -168,6 +168,10 @@ Thumbs.db
 **/.cache/
 **/.tmp/
 target/
+.venv/
+.venv-*/
+venv/
+env/
 
 # CI / local test artifacts
 ci_artifacts/
