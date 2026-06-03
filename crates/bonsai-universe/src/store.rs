@@ -1,8 +1,7 @@
-use crate::event::{EventCategory, TimelineFilter, UniverseEvent, UniverseSnapshot};
+use crate::event::{TimelineFilter, UniverseEvent, UniverseSnapshot};
 use std::path::Path;
 use std::sync::Arc;
 use tokio_rusqlite::Connection;
-use tracing::{info, warn};
 
 pub struct UniverseStore {
     conn: Arc<Connection>,
@@ -22,7 +21,7 @@ impl UniverseStore {
 
     async fn init_schema(&self) -> Result<(), String> {
         self.conn
-            .call(|conn| {
+            .call(|conn| -> Result<(), String> {
                 conn.execute_batch(
                     "PRAGMA journal_mode=WAL;
                      PRAGMA synchronous=NORMAL;
@@ -48,7 +47,7 @@ impl UniverseStore {
                      );
                      CREATE INDEX IF NOT EXISTS idx_snaps_ts ON universe_snapshots (timestamp_ns DESC);
                     ",
-                ).map_err(|e| tokio_rusqlite::Error::Rusqlite(e))
+                ).map_err(|e| e.to_string())
             })
             .await
             .map_err(|e| e.to_string())
@@ -64,14 +63,13 @@ impl UniverseStore {
         let data_json = serde_json::to_string(event).map_err(|e| e.to_string())?;
 
         self.conn
-            .call(move |conn| {
+            .call(move |conn| -> Result<(), String> {
                 conn.execute(
                     "INSERT OR IGNORE INTO universe_events
                      (event_id, timestamp_ns, category, target, summary, source_json, data_json)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                     rusqlite::params![event_id, timestamp_ns, category, target, summary, source_json, data_json],
-                ).map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
-                Ok(())
+                ).map(|_| ()).map_err(|e| e.to_string())
             })
             .await
             .map_err(|e| e.to_string())
@@ -85,7 +83,7 @@ impl UniverseStore {
         let limit = filter.limit.unwrap_or(500) as i64;
 
         self.conn
-            .call(move |conn| {
+            .call(move |conn| -> Result<Vec<UniverseEvent>, String> {
                 let mut stmt = conn.prepare(
                     "SELECT data_json FROM universe_events
                      WHERE timestamp_ns >= ?1
@@ -94,17 +92,17 @@ impl UniverseStore {
                        AND (?4 IS NULL OR target LIKE ?4)
                      ORDER BY timestamp_ns DESC
                      LIMIT ?5"
-                ).map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                ).map_err(|e| e.to_string())?;
 
                 let target_pattern = target_prefix.map(|p| format!("{}%", p));
                 let rows = stmt.query_map(
                     rusqlite::params![since_ns, until_ns, category, target_pattern, limit],
                     |row| row.get::<_, String>(0),
-                ).map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                ).map_err(|e| e.to_string())?;
 
                 let mut events = Vec::new();
                 for row in rows {
-                    let json = row.map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    let json = row.map_err(|e| e.to_string())?;
                     if let Ok(event) = serde_json::from_str::<UniverseEvent>(&json) {
                         events.push(event);
                     }
@@ -127,7 +125,7 @@ impl UniverseStore {
                 match result {
                     Ok(json) => Ok(serde_json::from_str(&json).ok()),
                     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                    Err(e) => Err(tokio_rusqlite::Error::Rusqlite(e)),
+                    Err(e) => Err(e.to_string()),
                 }
             })
             .await
@@ -141,13 +139,12 @@ impl UniverseStore {
         let data_json = serde_json::to_string(snap).map_err(|e| e.to_string())?;
 
         self.conn
-            .call(move |conn| {
+            .call(move |conn| -> Result<(), String> {
                 conn.execute(
                     "INSERT OR IGNORE INTO universe_snapshots (snapshot_id, timestamp_ns, label, data_json)
                      VALUES (?1, ?2, ?3, ?4)",
                     rusqlite::params![snapshot_id, timestamp_ns, label, data_json],
-                ).map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
-                Ok(())
+                ).map(|_| ()).map_err(|e| e.to_string())
             })
             .await
             .map_err(|e| e.to_string())
@@ -156,15 +153,15 @@ impl UniverseStore {
     pub async fn list_snapshots(&self, limit: usize) -> Result<Vec<UniverseSnapshot>, String> {
         let limit = limit as i64;
         self.conn
-            .call(move |conn| {
+            .call(move |conn| -> Result<Vec<UniverseSnapshot>, String> {
                 let mut stmt = conn.prepare(
                     "SELECT data_json FROM universe_snapshots ORDER BY timestamp_ns DESC LIMIT ?1"
-                ).map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                ).map_err(|e| e.to_string())?;
                 let rows = stmt.query_map(rusqlite::params![limit], |row| row.get::<_, String>(0))
-                    .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    .map_err(|e| e.to_string())?;
                 let mut snaps = Vec::new();
                 for row in rows {
-                    let json = row.map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    let json = row.map_err(|e| e.to_string())?;
                     if let Ok(snap) = serde_json::from_str::<UniverseSnapshot>(&json) {
                         snaps.push(snap);
                     }
@@ -175,7 +172,6 @@ impl UniverseStore {
             .map_err(|e| e.to_string())
     }
 
-    /// Snapshot taken before a timestamp — for crash recovery.
     pub async fn last_snapshot_before(&self, timestamp_ns: u64) -> Result<Option<UniverseSnapshot>, String> {
         let ts = timestamp_ns as i64;
         self.conn
@@ -188,7 +184,7 @@ impl UniverseStore {
                 match result {
                     Ok(json) => Ok(serde_json::from_str(&json).ok()),
                     Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                    Err(e) => Err(tokio_rusqlite::Error::Rusqlite(e)),
+                    Err(e) => Err(e.to_string()),
                 }
             })
             .await
@@ -197,9 +193,9 @@ impl UniverseStore {
 
     pub async fn event_count(&self) -> u64 {
         self.conn
-            .call(|conn| {
+            .call(|conn| -> Result<u64, String> {
                 let n: i64 = conn.query_row("SELECT COUNT(*) FROM universe_events", [], |r| r.get(0))
-                    .map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    .map_err(|e| e.to_string())?;
                 Ok(n as u64)
             })
             .await
@@ -210,13 +206,13 @@ impl UniverseStore {
         let cutoff = cutoff_ns as i64;
         let cats: Vec<String> = categories.iter().map(|s| s.to_string()).collect();
         self.conn
-            .call(move |conn| {
+            .call(move |conn| -> Result<u64, String> {
                 let mut deleted = 0u64;
                 for cat in &cats {
                     let n = conn.execute(
                         "DELETE FROM universe_events WHERE timestamp_ns < ?1 AND category = ?2",
                         rusqlite::params![cutoff, cat],
-                    ).map_err(|e| tokio_rusqlite::Error::Rusqlite(e))?;
+                    ).map_err(|e| e.to_string())?;
                     deleted += n as u64;
                 }
                 Ok(deleted)
