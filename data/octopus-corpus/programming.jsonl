@@ -1,0 +1,2 @@
+{"query": "How do I write a loop in Rust?", "response": "Use `for item in collection { }` or `loop { }` with break.", "source": "simulated", "quality": 0.7, "domain": "programming"}
+{"query": "How do I handle errors in Python?", "response": "Use try/except blocks to catch exceptions.", "source": "simulated", "quality": 0.7, "domain": "programming"}

@@ -1,0 +1,1000 @@
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I resource-limit a container?", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I resource-limit a container??", "input": "", "output": "Use `-m <memory>` and `--cpus <count>` in docker run"}
+{"instruction": "How do I check open ports?", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I check open ports??", "input": "", "output": "Use `ss -tuln` or `netstat -tuln` to list listening ports"}
+{"instruction": "How do I set up a firewall?", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I set up a firewall??", "input": "", "output": "Use ufw on Ubuntu: `ufw enable` then `ufw allow <port>`"}
+{"instruction": "How do I generate SSH keys?", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I generate SSH keys??", "input": "", "output": "Use `ssh-keygen -t rsa -b 4096` to generate public/private key pair"}
+{"instruction": "How do I check if a service is running?", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "How do I check if a service is running??", "input": "", "output": "Use `systemctl status <service>` or `ps aux | grep <service>`"}
+{"instruction": "What command shows memory usage?", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "What command shows memory usage??", "input": "", "output": "Use `free -h` for total memory or `top` for per-process usage"}
+{"instruction": "How do I check disk space?", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I check disk space??", "input": "", "output": "Use `df -h` for filesystem usage or `du -sh /path` for directory size"}
+{"instruction": "How do I list running containers?", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I list running containers??", "input": "", "output": "Use `docker ps` for running or `docker ps -a` for all containers"}
+{"instruction": "How do I check container logs?", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}
+{"instruction": "How do I check container logs??", "input": "", "output": "Use `docker logs <container_id>` or `docker logs -f` to follow"}

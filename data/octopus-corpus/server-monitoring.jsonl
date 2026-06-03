@@ -1,0 +1,2 @@
+{"query": "How do I check CPU usage?", "response": "Use `top` or `htop` to monitor CPU in real time.", "source": "simulated", "quality": 0.7, "domain": "server-monitoring"}
+{"query": "What's the command to see disk usage?", "response": "Run `df -h` to see disk usage per filesystem.", "source": "simulated", "quality": 0.7, "domain": "server-monitoring"}

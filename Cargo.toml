@@ -18,6 +18,9 @@ members = [
     "crates/bace-rt",                  # BACE runtime and proc-macro
     "crates/cargo-bace",               # cargo-bace CLI subcommand
 
+    # ========== USOS Bare-Metal Kernel ==========
+    "crates/usos-kernel",              # USOS Co-OS x86_64 bare-metal kernel
+
     # ========== Legacy Foundation (keep for compatibility) ==========
     "bonsai-runtime",
     "src-daemon",

@@ -174,3 +174,40 @@ ci_artifacts/
 daemon_check_output.txt
 daemon_test_output.txt
 .deno/
+
+# ============================================================================
+# PRIVATE MODEL NAMES — NEVER UPLOAD TO GITHUB
+# ============================================================================
+# Internal naming conventions that must remain confidential
+*Guardrail*
+*guardrail*
+*Flowers*
+*flowers*
+*Psychopathy*
+*psychopathy*
+*Octopus*octopus*
+
+# Private model files and directories
+psychopathy-octopus-merged/
+psychopathy-octopus-lora/
+psychopathy-octopus-v1/
+**/checkpoint-*/
+adapter_model.bin
+pytorch_model.bin
+*.gguf
+
+# Training artifacts with private names
+training-data/psychopathy*
+training-data/guardrail*
+training-data/flowers*
+
+# KDB modules with private names
+kdb-modules/psychopathy*
+kdb-modules/guardrail*
+kdb-modules/flowers*
+kdb-modules/*-knowledge.json
+
+# Scripts mentioning private models
+scripts/*psychopathy*
+scripts/*guardrail*
+scripts/*flowers*
