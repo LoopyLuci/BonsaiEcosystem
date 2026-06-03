@@ -211,3 +211,16 @@ kdb-modules/*-knowledge.json
 scripts/*psychopathy*
 scripts/*guardrail*
 scripts/*flowers*
+*.ps1
+WINDOWS*.md
+BUILD*.ps1
+WATCH*.md
+FINAL*.md
+LIVE*.md
+START*.md
+auto-build*.ps1
+*-train*.ps1
+*-setup*.ps1
+*-build*.ps1
+simple-*.ps1
+fix-*.ps1
