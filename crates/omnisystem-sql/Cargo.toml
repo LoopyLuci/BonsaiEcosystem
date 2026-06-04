@@ -14,3 +14,4 @@ sqlparser = "0.44"
 bonsai-lair = { path = "../bonsai-lair" }
 bonsai-language-frontend = { path = "../bonsai-language-frontend" }
 async-trait = "0.1"
+tracing = "0.1"

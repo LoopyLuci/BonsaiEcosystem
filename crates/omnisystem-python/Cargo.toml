@@ -15,3 +15,4 @@ bonsai-language-frontend = { path = "../bonsai-language-frontend" }
 tokio = { version = "1", features = ["process", "io-util"] }
 uuid = { version = "1", features = ["v4"] }
 async-trait = "0.1"
+tracing = "0.1"

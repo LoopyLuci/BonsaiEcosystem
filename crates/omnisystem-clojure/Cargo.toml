@@ -1,16 +1,15 @@
 [package]
-name = "omnisystem-axiom"
+name = "omnisystem-clojure"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Axiom: Formal proof layer for the Bonsai Ecosystem"
+description = "Clojure language integration for the Bonsai Ecosystem"
 
 [dependencies]
 anyhow = "1"
-serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 bonsai-lair = { path = "../bonsai-lair" }
 bonsai-language-frontend = { path = "../bonsai-language-frontend" }
-thiserror = "1"
+async-trait = "0.1"
 tracing = "0.1"
