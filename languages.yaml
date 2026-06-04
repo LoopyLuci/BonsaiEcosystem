@@ -814,3 +814,414 @@ languages:
   - name: Skip
     extensions: ["sk"]
     parser: "regex-fallback"
+
+  # ============================================================
+  # HISTORICAL & PIONEERING LANGUAGES
+  # ============================================================
+  - name: Plankalkül
+    extensions: ["pk"]
+    parser: "regex-fallback"
+  - name: FLOW-MATIC
+    extensions: ["flw"]
+    parser: "regex-fallback"
+  - name: COMTRAN
+    extensions: ["comtran"]
+    parser: "regex-fallback"
+  - name: FACT
+    extensions: ["fact"]
+    parser: "regex-fallback"
+  - name: JOSS
+    extensions: ["joss"]
+    parser: "regex-fallback"
+  - name: TELCOMP
+    extensions: ["telcomp"]
+    parser: "regex-fallback"
+  - name: CORAL
+    extensions: ["coral"]
+    parser: "regex-fallback"
+  - name: "CMS-2"
+    extensions: ["cms2"]
+    parser: "regex-fallback"
+  - name: SYMPL
+    extensions: ["sympl"]
+    parser: "regex-fallback"
+  - name: DIBOL
+    extensions: ["dbl"]
+    parser: "regex-fallback"
+  - name: MIMIC
+    extensions: ["mimic"]
+    parser: "regex-fallback"
+  - name: SIMSCRIPT
+    extensions: ["simscript"]
+    parser: "regex-fallback"
+  - name: GPSS
+    extensions: ["gps"]
+    parser: "regex-fallback"
+  - name: DYNAMO
+    extensions: ["dynamo"]
+    parser: "regex-fallback"
+  - name: CSMP
+    extensions: ["csmp"]
+    parser: "regex-fallback"
+  - name: ACSL
+    extensions: ["acsl"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # BUSINESS & ACCOUNTING LANGUAGES
+  # ============================================================
+  - name: DATABUS
+    extensions: ["dbl"]
+    parser: "regex-fallback"
+  - name: DATAFLEX
+    extensions: ["flex"]
+    parser: "dataflex-lsp"
+  - name: PowerHouse
+    extensions: ["ph"]
+    parser: "regex-fallback"
+  - name: "Progress 4GL"
+    extensions: ["p"]
+    parser: "progress-lsp"
+  - name: xBase
+    extensions: ["prg"]
+    parser: "xbase-lsp"
+  - name: FoxPro
+    extensions: ["scx"]
+    parser: "foxpro-lsp"
+  - name: Clipper
+    extensions: ["ch"]
+    parser: "xbase-lsp"
+  - name: Harbour
+    extensions: ["hb"]
+    parser: "harbour-lsp"
+  - name: Magic
+    extensions: ["mcf"]
+    parser: "regex-fallback"
+  - name: Clarion
+    extensions: ["clw"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # NICHE SPECIALIZED LANGUAGES
+  # ============================================================
+  - name: PostScript
+    extensions: ["ps", "eps"]
+    parser: "postscript-lsp"
+  - name: Ghostscript
+    extensions: ["gs"]
+    parser: "regex-fallback"
+  - name: XSLT
+    extensions: ["xsl"]
+    parser: "xslt-lsp"
+  - name: XPath
+    extensions: ["xpath"]
+    parser: "xpath-lsp"
+  - name: XProc
+    extensions: ["xpl"]
+    parser: "regex-fallback"
+  - name: "RELAX NG"
+    extensions: ["rng"]
+    parser: "regex-fallback"
+  - name: Schematron
+    extensions: ["sch"]
+    parser: "regex-fallback"
+  - name: MathML
+    extensions: ["mml"]
+    parser: "regex-fallback"
+  - name: OWL
+    extensions: ["owl"]
+    parser: "regex-fallback"
+  - name: RuleML
+    extensions: ["ruleml"]
+    parser: "regex-fallback"
+  - name: Drools
+    extensions: ["drl"]
+    parser: "drools-lsp"
+  - name: RIF
+    extensions: ["rif"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMMAND & CONTROL LANGUAGES
+  # ============================================================
+  - name: DCL
+    extensions: ["com"]
+    parser: "regex-fallback"
+  - name: UCL
+    extensions: ["ucl"]
+    parser: "regex-fallback"
+  - name: OCL
+    extensions: ["ocl"]
+    parser: "regex-fallback"
+  - name: TACL
+    extensions: ["tacl"]
+    parser: "regex-fallback"
+  - name: TAL
+    extensions: ["tal"]
+    parser: "regex-fallback"
+  - name: pTAL
+    extensions: ["ptal"]
+    parser: "regex-fallback"
+  - name: TRANSACT
+    extensions: ["transact"]
+    parser: "regex-fallback"
+  - name: SPL
+    extensions: ["spl"]
+    parser: "regex-fallback"
+  - name: SCOBOL
+    extensions: ["scobol"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # ROBOTICS & CONTROL LANGUAGES
+  # ============================================================
+  - name: KRL
+    extensions: ["krl"]
+    parser: "regex-fallback"
+  - name: RAPID
+    extensions: ["rapid"]
+    parser: "regex-fallback"
+  - name: "UR Script"
+    extensions: ["urp"]
+    parser: "regex-fallback"
+  - name: VAL
+    extensions: ["val"]
+    parser: "regex-fallback"
+  - name: "V+"
+    extensions: ["v+"]
+    parser: "regex-fallback"
+  - name: AML
+    extensions: ["aml"]
+    parser: "regex-fallback"
+  - name: INFORM
+    extensions: ["inform"]
+    parser: "regex-fallback"
+  - name: M-code
+    extensions: ["mcode"]
+    parser: "regex-fallback"
+  - name: HPGL
+    extensions: ["hpgl"]
+    parser: "regex-fallback"
+  - name: DXF
+    extensions: ["dxf"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # TYPESETTING & FORMATTING
+  # ============================================================
+  - name: troff
+    extensions: ["tr"]
+    parser: "regex-fallback"
+  - name: groff
+    extensions: ["roff"]
+    parser: "regex-fallback"
+  - name: nroff
+    extensions: ["nr"]
+    parser: "regex-fallback"
+  - name: SGML
+    extensions: ["sgml"]
+    parser: "regex-fallback"
+  - name: RTF
+    extensions: ["rtf"]
+    parser: "regex-fallback"
+  - name: FrameMaker
+    extensions: ["fm"]
+    parser: "regex-fallback"
+  - name: Ventura
+    extensions: ["vp"]
+    parser: "regex-fallback"
+  - name: QuarkXPress
+    extensions: ["qxd"]
+    parser: "regex-fallback"
+  - name: InDesign
+    extensions: ["indd"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # AUDIO & SIGNAL PROCESSING
+  # ============================================================
+  - name: "Pure Data"
+    extensions: ["pd"]
+    parser: "regex-fallback"
+  - name: "Max/MSP"
+    extensions: ["maxpat"]
+    parser: "regex-fallback"
+  - name: Nyquist
+    extensions: ["ny"]
+    parser: "regex-fallback"
+  - name: CLM
+    extensions: ["clm"]
+    parser: "regex-fallback"
+  - name: CMusic
+    extensions: ["cmusic"]
+    parser: "regex-fallback"
+  - name: SAOL
+    extensions: ["saol"]
+    parser: "regex-fallback"
+  - name: MusicXML
+    extensions: ["musicxml"]
+    parser: "regex-fallback"
+  - name: GUIDO
+    extensions: ["guido"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # VISUAL & FLOW-BASED LANGUAGES
+  # ============================================================
+  - name: Max
+    extensions: ["max"]
+    parser: "regex-fallback"
+  - name: vvvv
+    extensions: ["v4p"]
+    parser: "regex-fallback"
+  - name: "Node-RED"
+    extensions: ["flows"]
+    parser: "node-red-lsp"
+  - name: n8n
+    extensions: ["json"]
+    parser: "regex-fallback"
+  - name: TouchDesigner
+    extensions: ["toe"]
+    parser: "regex-fallback"
+  - name: Grasshopper
+    extensions: ["gh"]
+    parser: "regex-fallback"
+  - name: Dynamo
+    extensions: ["dyn"]
+    parser: "regex-fallback"
+  - name: Blueprint
+    extensions: ["uasset"]
+    parser: "regex-fallback"
+  - name: Bubble
+    extensions: ["bubble"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # QUANTUM COMPUTING LANGUAGES
+  # ============================================================
+  - name: Qiskit
+    extensions: ["py"]
+    parser: "qiskit-lsp"
+  - name: Cirq
+    extensions: ["py"]
+    parser: "regex-fallback"
+  - name: Quil
+    extensions: ["quil"]
+    parser: "quil-lsp"
+  - name: OpenQASM
+    extensions: ["qasm"]
+    parser: "qasm-lsp"
+  - name: cQASM
+    extensions: ["cqasm"]
+    parser: "regex-fallback"
+  - name: Silq
+    extensions: ["slq"]
+    parser: "regex-fallback"
+  - name: QMOD
+    extensions: ["qmod"]
+    parser: "regex-fallback"
+  - name: QIR
+    extensions: ["qir"]
+    parser: "regex-fallback"
+  - name: Blackbird
+    extensions: ["xbb"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # RULE & POLICY LANGUAGES
+  # ============================================================
+  - name: Rego
+    extensions: ["rego"]
+    parser: "rego-lsp"
+  - name: OPA
+    extensions: ["opa"]
+    parser: "opa-lsp"
+  - name: Sentinel
+    extensions: ["sentinel"]
+    parser: "regex-fallback"
+  - name: Cedar
+    extensions: ["cedar"]
+    parser: "cedar-lsp"
+  - name: XACML
+    extensions: ["xml"]
+    parser: "regex-fallback"
+  - name: ALFA
+    extensions: ["alfa"]
+    parser: "regex-fallback"
+  - name: PERMIS
+    extensions: ["permis"]
+    parser: "regex-fallback"
+  - name: Ponder
+    extensions: ["ponder"]
+    parser: "regex-fallback"
+  - name: "IAM Policy"
+    extensions: ["json"]
+    parser: "iam-lsp"
+
+  # ============================================================
+  # BLOCKCHAIN & SMART CONTRACTS
+  # ============================================================
+  - name: Yul
+    extensions: ["yul"]
+    parser: "regex-fallback"
+  - name: Fe
+    extensions: ["fe"]
+    parser: "regex-fallback"
+  - name: Ligo
+    extensions: ["ligo"]
+    parser: "ligo-lsp"
+  - name: Scilla
+    extensions: ["scilla"]
+    parser: "regex-fallback"
+  - name: Michelson
+    extensions: ["tz"]
+    parser: "regex-fallback"
+  - name: Archetype
+    extensions: ["arl"]
+    parser: "regex-fallback"
+  - name: SmartPy
+    extensions: ["py"]
+    parser: "smartpy-lsp"
+  - name: Cadence
+    extensions: ["cdc"]
+    parser: "cadence-lsp"
+
+  # ============================================================
+  # SECURITY & EXPLOIT LANGUAGES
+  # ============================================================
+  - name: NASL
+    extensions: ["nasl"]
+    parser: "regex-fallback"
+  - name: OVAL
+    extensions: ["oval"]
+    parser: "regex-fallback"
+  - name: OCIL
+    extensions: ["ocil"]
+    parser: "regex-fallback"
+  - name: YARA
+    extensions: ["yar"]
+    parser: "yara-lsp"
+  - name: Sigma
+    extensions: ["sigma"]
+    parser: "sigma-lsp"
+  - name: Snort
+    extensions: ["rules"]
+    parser: "regex-fallback"
+  - name: Suricata
+    extensions: ["suricata"]
+    parser: "regex-fallback"
+  - name: Zeek
+    extensions: ["zeek"]
+    parser: "zeek-lsp"
+  - name: ModSecurity
+    extensions: ["modsec"]
+    parser: "regex-fallback"
+  - name: Nuclei Template
+    extensions: ["nuclei"]
+    parser: "nuclei-lsp"
+  - name: Semgrep
+    extensions: ["sgrep"]
+    parser: "semgrep-lsp"
+  - name: CodeQL
+    extensions: ["ql"]
+    parser: "codeql-lsp"
