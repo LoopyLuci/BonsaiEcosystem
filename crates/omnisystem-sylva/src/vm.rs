@@ -1,80 +1,28 @@
-//! Sylva Bytecode Virtual Machine
-//!
-//! Executes Sylva bytecode instructions with a stack-based architecture.
-//! Supports both interpretation and JIT compilation for hot code paths.
+use crate::compiler::OpCode;
 
-use crate::compiler::{Bytecode, Value};
-use anyhow::Result;
-use std::collections::HashMap;
-
-/// The Sylva VM execution engine
-pub struct SylvaVm {
-    stack: Vec<Value>,
-    variables: HashMap<String, Value>,
-    instructions: Vec<Bytecode>,
-    pc: usize, // Program counter
+#[derive(Debug, Clone)]
+pub enum Value {
+    Int(i64),
+    Nil,
 }
 
-impl SylvaVm {
-    /// Create a new VM instance
-    pub fn new() -> Self {
-        Self {
-            stack: Vec::with_capacity(1024),
-            variables: HashMap::new(),
-            instructions: Vec::new(),
-            pc: 0,
-        }
+pub struct Vm {
+    code: Vec<OpCode>,
+    stack: Vec<Value>,
+}
+
+impl Vm {
+    pub fn new(code: Vec<OpCode>) -> Self {
+        Self { code, stack: Vec::new() }
     }
-
-    /// Load bytecode into the VM
-    pub fn load_bytecode(&mut self, bytecode: Vec<Bytecode>) {
-        self.instructions = bytecode;
-        self.pc = 0;
-    }
-
-    /// Execute bytecode until completion
-    pub fn run(&mut self) -> Result<Value> {
-        while self.pc < self.instructions.len() {
-            let instr = self.instructions[self.pc].clone();
-
-            match instr {
-                Bytecode::Push(val) => {
-                    self.stack.push(val);
-                    self.pc += 1;
-                }
-                Bytecode::Pop => {
-                    self.stack.pop();
-                    self.pc += 1;
-                }
-                Bytecode::Return => {
-                    return Ok(self.stack.pop().unwrap_or(Value::Unit));
-                }
-                Bytecode::Add => {
-                    let b = self.stack.pop().ok_or_else(|| anyhow::anyhow!("Stack underflow"))?;
-                    let a = self.stack.pop().ok_or_else(|| anyhow::anyhow!("Stack underflow"))?;
-
-                    let result = match (a, b) {
-                        (Value::Integer(x), Value::Integer(y)) => Value::Integer(x + y),
-                        (Value::Float(x), Value::Float(y)) => Value::Float(x + y),
-                        _ => anyhow::bail!("Type error in Add"),
-                    };
-
-                    self.stack.push(result);
-                    self.pc += 1;
-                }
-                _ => {
-                    tracing::warn!("Unimplemented instruction: {:?}", instr);
-                    self.pc += 1;
-                }
+    
+    pub fn run(&mut self) -> anyhow::Result<Value> {
+        for op in &self.code {
+            match op {
+                OpCode::PushInt(v) => self.stack.push(Value::Int(*v)),
+                OpCode::Halt => break,
             }
         }
-
-        Ok(self.stack.pop().unwrap_or(Value::Unit))
-    }
-}
-
-impl Default for SylvaVm {
-    fn default() -> Self {
-        Self::new()
+        Ok(self.stack.pop().unwrap_or(Value::Nil))
     }
 }

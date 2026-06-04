@@ -18,7 +18,7 @@ tracing = "0.1"
 pest = "2.7"
 pest_derive = "2.7"
 tokio = { version = "1", features = ["macros", "rt"] }
-inkwell = "0.20"  # LLVM bindings for native code generation
+# inkwell = { version = "0.9", features = ["llvm15-0"] }  # LLVM bindings - optional LLVM support
 
 [dev-dependencies]
 tokio-test = "0.4"

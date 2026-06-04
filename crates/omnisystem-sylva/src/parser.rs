@@ -1,18 +1,24 @@
-//! Sylva Parser
-//!
-//! Parses Sylva source code into an Abstract Syntax Tree (AST)
-//! using a Pest-based PEG grammar.
+#[derive(Debug, Clone)]
+pub enum Expr {
+    IntLiteral(i64),
+    FloatLiteral(f64),
+    StringLiteral(String),
+    BoolLiteral(bool),
+    Nil,
+    Identifier(String),
+}
 
-use crate::ast::*;
-use anyhow::Result;
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub statements: Vec<Expr>,
+}
 
-/// Parse Sylva source code into a Program AST
-pub fn parse_sylva(source: &str) -> Result<Program> {
-    // TODO: Implement full Sylva parser with Pest
-    // For now, return an empty program
-    tracing::debug!("Parsing Sylva code ({} bytes)", source.len());
-
-    Ok(Program {
-        statements: Vec::new(),
-    })
+pub fn parse(source: &str) -> anyhow::Result<Program> {
+    let mut statements = Vec::new();
+    for line in source.lines() {
+        if let Ok(num) = line.trim().parse::<i64>() {
+            statements.push(Expr::IntLiteral(num));
+        }
+    }
+    Ok(Program { statements })
 }

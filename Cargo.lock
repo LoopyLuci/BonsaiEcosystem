@@ -6214,6 +6214,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnisystem-aether"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bonsai-lair",
+ "bonsai-language-frontend",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "omnisystem-sylva"
 version = "0.1.0"
 dependencies = [
@@ -6223,6 +6236,24 @@ dependencies = [
  "bonsai-language-frontend",
  "inventory",
  "once_cell",
+ "pest",
+ "pest_derive",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
+
+[[package]]
+name = "omnisystem-titan"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bonsai-lair",
+ "bonsai-language-frontend",
  "pest",
  "pest_derive",
  "serde",
