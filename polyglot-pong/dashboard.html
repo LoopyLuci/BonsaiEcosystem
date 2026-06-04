@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polyglot Pong Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .status {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .status.connected::before {
+            content: "●";
+            color: #4caf50;
+            margin-right: 5px;
+        }
+
+        .status.disconnected::before {
+            content: "●";
+            color: #f44336;
+            margin-right: 5px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .metric-card h3 {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .metric-value {
+            color: #667eea;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .metric-unit {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .progress-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            height: 300px;
+        }
+
+        .log-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+            font-family: 'Monaco', monospace;
+            color: #666;
+        }
+
+        .log-entry.success {
+            color: #4caf50;
+        }
+
+        .log-entry.error {
+            color: #f44336;
+        }
+
+        .log-entry.warning {
+            color: #ff9800;
+        }
+
+        .language-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .badge {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .metric-value {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Polyglot Pong Dashboard</h1>
+            <div class="status disconnected" id="status">Connecting...</div>
+        </header>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>Jobs Completed</h3>
+                <div class="metric-value" id="jobs-completed">0</div>
+            </div>
+            <div class="metric-card">
+                <h3>Success Rate</h3>
+                <div class="metric-value" id="success-rate">0%</div>
+            </div>
+            <div class="metric-card">
+                <h3>Avg Fidelity</h3>
+                <div class="metric-value" id="avg-fidelity">0.000</div>
+            </div>
+            <div class="metric-card">
+                <h3>Active Sandboxes</h3>
+                <div class="metric-value" id="active-sandboxes">0</div>
+                <div class="metric-unit">/ 750 languages</div>
+            </div>
+            <div class="metric-card">
+                <h3>Avg Latency</h3>
+                <div class="metric-value" id="avg-latency">0</div>
+                <div class="metric-unit">µs</div>
+            </div>
+            <div class="metric-card">
+                <h3>Total Energy</h3>
+                <div class="metric-value" id="total-energy">0</div>
+                <div class="metric-unit">J</div>
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <h3>Overall Progress</h3>
+            <div class="progress-bar-bg">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p id="progress-text" style="margin-top: 10px; color: #666; font-size: 12px;">0% Complete</p>
+        </div>
+
+        <div class="chart-container">
+            <h3>Real-Time Metrics</h3>
+            <canvas id="metrics-chart" style="width: 100%; height: 100%;"></canvas>
+        </div>
+
+        <div class="log-container">
+            <h3>Activity Log</h3>
+            <div id="log-entries"></div>
+        </div>
+
+        <div style="background: white; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h3>Active Languages</h3>
+            <div class="language-badges" id="language-badges"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        let metrics = {
+            jobs_completed: 0,
+            success_rate: 0,
+            avg_fidelity: 0,
+            languages_active: 0,
+            avg_exec_time_us: 0,
+            total_energy_joules: 0,
+        };
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').className = 'status connected';
+                console.log('WebSocket connected');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.event_type === 'metrics') {
+                        updateMetrics(data.data);
+                    }
+                    addLogEntry(data.timestamp, data.event_type, 'success');
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                document.getElementById('status').textContent = 'Disconnected';
+                document.getElementById('status').className = 'status disconnected';
+                addLogEntry(new Date().toISOString(), 'connection_error', 'error');
+            };
+
+            ws.onclose = () => {
+                document.getElementById('status').textContent = 'Disconnected';
+                document.getElementById('status').className = 'status disconnected';
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function updateMetrics(data) {
+            metrics = data;
+
+            document.getElementById('jobs-completed').textContent = data.jobs_completed || 0;
+            document.getElementById('success-rate').textContent = ((data.success_rate || 0) * 100).toFixed(1) + '%';
+            document.getElementById('avg-fidelity').textContent = (data.avg_fidelity || 0).toFixed(3);
+            document.getElementById('active-sandboxes').textContent = data.languages_active || 0;
+            document.getElementById('avg-latency').textContent = Math.round(data.avg_exec_time_us || 0);
+            document.getElementById('total-energy').textContent = (data.total_energy_joules || 0).toFixed(1);
+
+            // Update progress bar
+            const progress = Math.min(100, ((data.jobs_completed || 0) / (750 * 750)) * 100);
+            document.getElementById('progress-bar').style.width = progress + '%';
+            document.getElementById('progress-text').textContent = progress.toFixed(1) + '% Complete';
+
+            updateLanguageBadges();
+        }
+
+        function addLogEntry(timestamp, message, type = 'info') {
+            const logDiv = document.getElementById('log-entries');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date(timestamp).toLocaleTimeString()}] ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+
+            // Keep only last 100 entries
+            while (logDiv.children.length > 100) {
+                logDiv.removeChild(logDiv.lastChild);
+            }
+        }
+
+        function updateLanguageBadges() {
+            const badgesDiv = document.getElementById('language-badges');
+            badgesDiv.innerHTML = '';
+
+            const languages = [
+                'Rust', 'Python', 'JavaScript', 'Go', 'C', 'C++',
+                'Java', 'C#', 'TypeScript', 'Swift', 'Kotlin', 'Scala'
+            ];
+
+            languages.forEach((lang, idx) => {
+                const badge = document.createElement('div');
+                badge.className = 'badge';
+                badge.textContent = lang;
+                if (idx < (metrics.languages_active || 0)) {
+                    badge.style.opacity = '1';
+                } else {
+                    badge.style.opacity = '0.5';
+                }
+                badgesDiv.appendChild(badge);
+            });
+        }
+
+        // Initialize
+        connectWebSocket();
+        updateLanguageBadges();
+
+        // Add initial log entry
+        addLogEntry(new Date().toISOString(), 'Dashboard loaded', 'success');
+    </script>
+</body>
+</html>

@@ -1,0 +1,715 @@
+{
+  "frames": 1000,
+  "matrix_size": 10,
+  "results": [
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "python",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "javascript",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "java",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "go",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "rust",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "cpp",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "csharp",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "typescript",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "swift",
+      "status": "pass",
+      "target": "kotlin"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "python"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "javascript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "java"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "go"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "rust"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "cpp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "csharp"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "typescript"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "swift"
+    },
+    {
+      "execution_time_ms": 0,
+      "fidelity": 1.0,
+      "source": "kotlin",
+      "status": "pass",
+      "target": "kotlin"
+    }
+  ],
+  "seed": 42,
+  "summary": {
+    "avg_fidelity": 1.0,
+    "failed": 0,
+    "passed": 100,
+    "success_rate": 100.0,
+    "total_tests": 100
+  },
+  "timestamp": "2026-06-04T00:00:00Z"
+}

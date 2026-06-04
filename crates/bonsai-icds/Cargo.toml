@@ -1,0 +1,82 @@
+[package]
+name = "bonsai-icds"
+version = "0.1.0"
+edition = "2021"
+description = "Infinite Context Database System - provides AI agents with unbounded, associative memory"
+
+[dependencies]
+# Core async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
+
+# Data structures
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Vector search & indexing
+hnswlib = "0.3"  # or equivalent HNSW implementation
+ndarray = "0.15"  # for vector operations
+ndarray-linalg = "0.15"
+
+# Text processing
+tantivy = "0.21"  # full-text search
+unicode-segmentation = "1"  # for chunking
+
+# Compression
+zstd = "0.13"
+buce = { path = "../bonsai-compression", optional = true }  # placeholder
+
+# Content addressing & CAS
+blake3 = "1"
+cas = { path = "../bonsai-cas", optional = true }  # placeholder
+
+# Distributed coordination
+echo = { path = "../bonsai-echo", optional = true }  # P2P mesh
+transfer-daemon = { path = "../bonsai-transfer-core", optional = true }
+
+# Database for metadata
+aridb = { path = "../bonsai-aridb", optional = true }  # placeholder
+
+# AI-optional fallback
+bonsai-ai-fallback = { path = "../bonsai-ai-fallback", optional = true }
+
+# Logging & observability
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Utilities
+parking_lot = "0.12"  # for efficient locking
+dashmap = "5"  # concurrent hashmap
+futures = "0.3"
+lazy_static = "1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = "0.5"
+
+[features]
+default = ["deterministic-core"]
+deterministic-core = []
+ai-enhancements = ["bonsai-ai-fallback"]
+distributed = ["echo", "transfer-daemon"]
+cas-integration = ["cas"]
+compression-integration = ["buce"]
+metadata-db = ["aridb"]
+all-features = ["ai-enhancements", "distributed", "cas-integration", "compression-integration", "metadata-db"]
+
+[[bench]]
+name = "retrieval_benchmarks"
+harness = false
+
+[lib]
+name = "bonsai_icds"
+path = "src/lib.rs"

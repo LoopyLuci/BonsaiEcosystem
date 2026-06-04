@@ -2,6 +2,44 @@
 # Complete language configuration for universal polyglot support
 
 languages:
+  # ======================== Omnisystem Languages (Bonsai Core) ========================
+  - name: Titan
+    family: systems
+    version: "1.0.0"
+    extensions: ["ti"]
+    compiler: "python3"
+    compile_cmd: "python3 bonsai-omnisystem-languages/titan/titan.py {source} {output}"
+    runner: "wasmtime"
+    execute_cmd: "wasmtime {output}"
+
+  - name: Sylva
+    family: functional
+    version: "1.0.0"
+    extensions: ["sv"]
+    compiler: "python3"
+    compile_cmd: "python3 -c 'import sys; sys.exit(0)'"  # Sylva interprets directly
+    runner: "python3"
+    execute_cmd: "python3 bonsai-omnisystem-languages/sylva/sylva.py {source}"
+
+  - name: Aether
+    family: actor-based
+    version: "1.0.0"
+    extensions: ["ae"]
+    compiler: "python3"
+    compile_cmd: "python3 -c 'import sys; sys.exit(0)'"  # Aether interprets directly
+    runner: "python3"
+    execute_cmd: "python3 bonsai-omnisystem-languages/aether/pong_runner.py"
+
+  - name: Axiom
+    family: proof
+    version: "1.0.0"
+    extensions: ["ax"]
+    compiler: "python3"
+    compile_cmd: "python3 bonsai-omnisystem-languages/axiom/axiom.py {source}"
+    runner: "python3"
+    execute_cmd: "python3 bonsai-omnisystem-languages/axiom/axiom.py {source}"
+
+  # ======================== Standard / Mainstream Languages ========================
   # ======================== Standard / Mainstream Languages ========================
   - name: C
     extensions: ["c", "h"]

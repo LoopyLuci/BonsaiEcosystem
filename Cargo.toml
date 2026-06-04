@@ -57,6 +57,12 @@ members = [
     "crates/bonsai-bmf-imap",           # IMAP server
     "crates/bonsai-bmf-p2p",            # P2P delivery via TransferDaemon
     "crates/bonsai-bmf-server", "crates/bonsai-model-workshop", "crates/bonsai-mcp-manager",         # Unified BMF server
+
+    # ========== BONSAI ENCLAVE (Universal Environment Manager) ==========
+    "crates/bonsai-enclave",            # Universal dependency and environment manager
+
+    # ========== UBVM (Universal Bonsai Validation Mesh) ==========
+    "crates/bonsai-utof",               # Unified Test Orchestration Fabric
 ]
 
 [workspace.lints.rust]

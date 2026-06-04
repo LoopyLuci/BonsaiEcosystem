@@ -1,0 +1,92 @@
+// Titan Pong – compiled to WebAssembly
+// This is a Titan language source file demonstrating Pong game logic
+
+const WIDTH: i32 = 80;
+const HEIGHT: i32 = 24;
+const PADDLE_H: i32 = 4;
+const BALL_SPEED_X: i32 = 1;
+const BALL_SPEED_Y: i32 = 1;
+
+struct Game {
+    ball_x: i32, ball_y: i32,
+    ball_dx: i32, ball_dy: i32,
+    paddle1_y: i32, paddle2_y: i32,
+    score1: i32, score2: i32
+}
+
+fn new_game() -> Game {
+    Game {
+        ball_x: WIDTH / 2, ball_y: HEIGHT / 2,
+        ball_dx: BALL_SPEED_X, ball_dy: BALL_SPEED_Y,
+        paddle1_y: HEIGHT / 2 - PADDLE_H / 2,
+        paddle2_y: HEIGHT / 2 - PADDLE_H / 2,
+        score1: 0, score2: 0
+    }
+}
+
+fn clamp(val: i32, lo: i32, hi: i32) -> i32 {
+    if val < lo { lo } else if val > hi { hi } else { val }
+}
+
+fn update(game: Game, up1: bool, down1: bool, up2: bool, down2: bool) -> Game {
+    var paddle1 = clamp(game.paddle1_y + (if up1 { -1 } else if down1 { 1 } else { 0 }),
+                        0, HEIGHT - PADDLE_H);
+    var paddle2 = clamp(game.paddle2_y + (if up2 { -1 } else if down2 { 1 } else { 0 }),
+                        0, HEIGHT - PADDLE_H);
+    var ball_x = game.ball_x + game.ball_dx;
+    var ball_y = game.ball_y + game.ball_dy;
+    var ball_dx = game.ball_dx;
+    var ball_dy = game.ball_dy;
+
+    if ball_y <= 0 || ball_y >= HEIGHT - 1 {
+        ball_dy = -ball_dy;
+    }
+    if ball_x <= 2 && ball_y >= paddle1 && ball_y <= paddle1 + PADDLE_H {
+        ball_dx = -ball_dx;
+    }
+    if ball_x >= WIDTH - 3 && ball_y >= paddle2 && ball_y <= paddle2 + PADDLE_H {
+        ball_dx = -ball_dx;
+    }
+
+    var score1 = game.score1;
+    var score2 = game.score2;
+    var reset = false;
+
+    if ball_x <= 0 {
+        score2 = score2 + 1;
+        reset = true;
+    } else if ball_x >= WIDTH - 1 {
+        score1 = score1 + 1;
+        reset = true;
+    }
+
+    if reset {
+        ball_x = WIDTH / 2;
+        ball_y = HEIGHT / 2;
+        ball_dx = BALL_SPEED_X;
+        ball_dy = BALL_SPEED_Y;
+    }
+
+    Game { ball_x, ball_y, ball_dx, ball_dy, paddle1_y: paddle1, paddle2_y: paddle2, score1, score2 }
+}
+
+fn draw(game: Game) {
+    print_i32(game.score1);
+    print_str(100, 3);
+    print_i32(game.score2);
+}
+
+fn main() {
+    var game = new_game();
+    loop {
+        draw(game);
+        var key = get_key();
+        var up1 = key == 'w';
+        var down1 = key == 's';
+        var up2 = key == 'o';
+        var down2 = key == 'l';
+        if key == 'q' { break; }
+        game = update(game, up1, down1, up2, down2);
+        sleep(50);
+    }
+}
