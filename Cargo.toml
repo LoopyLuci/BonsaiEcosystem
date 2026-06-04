@@ -45,6 +45,12 @@ members = [
     # ========== BPCF-Pre (Pre-Compilation Fabric) ==========
     "crates/bonsai-prec",               # Speculative pre-compilation with AI hints
 
+    # ========== TransferDaemon v2 (Sovereign P2P Transport) ==========
+    "crates/bonsai-transfer-identity",  # Self-certifying identity (Iroh-inspired)
+    "crates/bonsai-transfer-crypto",    # Post-quantum hybrid cryptography
+    "crates/bonsai-transfer-core",      # Deterministic core (no AI required)
+    "crates/bonsai-transfer-ai",        # Optional AI enhancements (feature-gated)
+
     # ========== BMF (Bonsai Messaging Fabric) ==========
     "crates/bonsai-bmf-core",           # Core messaging types and encryption
     "crates/bonsai-bmf-smtp",           # SMTP server

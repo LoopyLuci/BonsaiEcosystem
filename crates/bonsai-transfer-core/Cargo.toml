@@ -1,9 +1,11 @@
 [package]
 name    = "bonsai-transfer-core"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2021"
+description = "Deterministic core of TransferDaemon v2 – connection state machine, scheduler, congestion control"
 
 [dependencies]
+bonsai-transfer-identity = { path = "../bonsai-transfer-identity" }
 bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
 tokio     = { version = "1", features = ["full"] }
 serde     = { version = "1", features = ["derive"] }
@@ -14,3 +16,17 @@ blake3     = "1"
 uuid       = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
 bytes      = "1"
+dashmap    = "5"
+parking_lot = "0.12"
+anyhow     = "1"
+
+# Optional AI enhancements (feature-gated)
+bonsai-transfer-ai = { path = "../bonsai-transfer-ai", optional = true }
+
+[features]
+default = ["deterministic-core"]
+deterministic-core = []
+ai-enhancements = ["bonsai-transfer-ai"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
