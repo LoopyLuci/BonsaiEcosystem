@@ -37,7 +37,7 @@ members = [
     "crates/bonsai-bmf-smtp",           # SMTP server
     "crates/bonsai-bmf-imap",           # IMAP server
     "crates/bonsai-bmf-p2p",            # P2P delivery via TransferDaemon
-    "crates/bonsai-bmf-server",         # Unified BMF server
+    "crates/bonsai-bmf-server", "crates/bonsai-model-workshop", "crates/bonsai-mcp-manager",         # Unified BMF server
 ]
 
 [workspace.lints.rust]
