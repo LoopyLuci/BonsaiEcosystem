@@ -1,7 +1,6 @@
-use anyhow::Result;
 use async_trait::async_trait;
-use bonsai_lair::{LairModule, LairFunction, FunctionSignature, BuirType, Effect, ModuleMetadata};
-use bonsai_language_frontend::LanguageFrontend;
+use bonsai_lair::{LairModule, LairFunction, LairValueType, LairValue, LairLiteral, ModuleMetadata, Effect};
+use bonsai_language_frontend::{LanguageFrontend, Result};
 use regex::Regex;
 use std::path::Path;
 
@@ -113,13 +112,11 @@ impl LanguageFrontend for RegexFrontend {
                     if seen.insert(func_name.clone()) && func_name.len() <= 50 {
                         functions.push(LairFunction {
                             name: func_name,
-                            signature: FunctionSignature {
-                                params: vec![],
-                                return_type: BuirType::Dynamic,
-                            },
-                            body: vec![],
+                            params: vec![],
+                            return_type: LairValueType::Unit,
+                            body: LairValue::Literal(LairLiteral::Unit),
                             effects: vec![Effect::Io],
-                            metadata: Default::default(),
+                            hot_reload_enabled: false,
                         });
                     }
                 }

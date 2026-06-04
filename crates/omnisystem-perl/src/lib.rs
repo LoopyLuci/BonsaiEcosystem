@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::PerlFrontend;
 
-pub fn register_perl() {
-    tracing::info!("Perl language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Perl",
+        factory: || Box::new(PerlFrontend::new()),
+    }
 }

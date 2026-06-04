@@ -1,7 +1,11 @@
-pub mod frontend;
-
 use bonsai_language_frontend::LanguageFrontend;
+use frontend::RubyFrontend;
 
-pub fn register_ruby() {
-    tracing::info!("Ruby language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Ruby",
+        factory: || Box::new(RubyFrontend::new()),
+    }
 }

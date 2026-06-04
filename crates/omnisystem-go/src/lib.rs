@@ -1,7 +1,11 @@
-pub mod frontend;
-
 use bonsai_language_frontend::LanguageFrontend;
+use frontend::GoFrontend;
 
-pub fn register_go() {
-    tracing::info!("Go language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Go",
+        factory: || Box::new(GoFrontend::new()),
+    }
 }

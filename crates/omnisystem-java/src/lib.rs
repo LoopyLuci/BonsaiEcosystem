@@ -1,7 +1,11 @@
-pub mod frontend;
-
 use bonsai_language_frontend::LanguageFrontend;
+use frontend::JavaFrontend;
 
-pub fn register_java() {
-    tracing::info!("Java language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Java",
+        factory: || Box::new(JavaFrontend::new()),
+    }
 }

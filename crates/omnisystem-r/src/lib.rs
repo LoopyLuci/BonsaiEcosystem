@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::RFrontend;
 
-pub fn register_r() {
-    tracing::info!("R language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "R",
+        factory: || Box::new(RFrontend::new()),
+    }
 }

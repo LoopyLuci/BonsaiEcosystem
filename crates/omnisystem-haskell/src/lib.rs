@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::HaskellFrontend;
 
-pub fn register_haskell() {
-    tracing::info!("Haskell language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Haskell",
+        factory: || Box::new(HaskellFrontend::new()),
+    }
 }

@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::OCamlFrontend;
 
-pub fn register_ocaml() {
-    tracing::info!("OCaml language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "OCaml",
+        factory: || Box::new(OCamlFrontend::new()),
+    }
 }

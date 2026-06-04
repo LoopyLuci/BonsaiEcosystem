@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::ScalaFrontend;
 
-pub fn register_scala() {
-    tracing::info!("Scala language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Scala",
+        factory: || Box::new(ScalaFrontend::new()),
+    }
 }

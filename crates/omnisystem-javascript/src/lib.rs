@@ -1,7 +1,11 @@
-pub mod frontend;
-
 use bonsai_language_frontend::LanguageFrontend;
+use frontend::JavaScriptFrontend;
 
-pub fn register_javascript() {
-    tracing::info!("JavaScript language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "JavaScript",
+        factory: || Box::new(JavaScriptFrontend::new()),
+    }
 }

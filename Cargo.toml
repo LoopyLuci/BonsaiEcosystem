@@ -23,6 +23,8 @@ members = [
 
     # ========== Bonsai Polyglot Language System (BPLIS) ==========
     "crates/bonsai-language-frontend", # Language frontend trait & registry
+    "crates/bonsai-regex-frontend",    # Regex fallback frontend for languages without LSP
+    "bonsai-lang-gen",                 # Meta-generator tool for creating language crates
 
     # ========== Omnisystem Languages ==========
     "crates/omnisystem-sylva",         # Sylva scripting language

@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::TypeScriptFrontend;
 
-pub fn register_typescript() {
-    tracing::info!("TypeScript language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "TypeScript",
+        factory: || Box::new(TypeScriptFrontend::new()),
+    }
 }

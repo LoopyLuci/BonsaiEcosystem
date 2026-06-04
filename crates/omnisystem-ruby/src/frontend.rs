@@ -1,9 +1,9 @@
-use async_trait::async_trait;
 use bonsai_language_frontend::LanguageFrontend;
-use bonsai_lair::{LairModule, ModuleMetadata};
+use bonsai_lair::*;
 use std::path::Path;
+use anyhow::Result;
+use async_trait::async_trait;
 
-#[derive(Clone)]
 pub struct RubyFrontend;
 
 impl RubyFrontend {
@@ -13,15 +13,15 @@ impl RubyFrontend {
 #[async_trait]
 impl LanguageFrontend for RubyFrontend {
     fn language_name(&self) -> &str { "Ruby" }
-    fn file_extensions(&self) -> &[&str] { &["ruby"] }
-    
-    async fn parse(&self, _source: &str, _path: &Path) -> bonsai_language_frontend::Result<LairModule> {
+    fn file_extensions(&self) -> &[&str] { &["rb", "rbw"] }
+
+    async fn parse(&self, _source: &str, _path: &Path) -> Result<LairModule> {
         Ok(LairModule {
             name: "ruby_module".into(),
             functions: vec![],
             types: vec![],
             constants: vec![],
-            metadata: ModuleMetadata {
+            metadata: bonsai_lair::ModuleMetadata {
                 imports: vec![],
                 exports: vec![],
                 source_language: Some("Ruby".into()),

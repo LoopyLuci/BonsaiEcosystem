@@ -1,7 +1,11 @@
-pub mod frontend;
-
 use bonsai_language_frontend::LanguageFrontend;
+use frontend::SQLFrontend;
 
-pub fn register_sql() {
-    tracing::info!("SQL language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "SQL",
+        factory: || Box::new(SQLFrontend::new()),
+    }
 }

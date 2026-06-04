@@ -1360,6 +1360,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonsai-lang-gen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
 name = "bonsai-language-frontend"
 version = "0.1.0"
 dependencies = [
@@ -1473,6 +1483,17 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "bonsai-regex-frontend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bonsai-lair",
+ "bonsai-language-frontend",
+ "regex",
 ]
 
 [[package]]

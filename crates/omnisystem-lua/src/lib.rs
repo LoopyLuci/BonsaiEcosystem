@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::LuaFrontend;
 
-pub fn register_lua() {
-    tracing::info!("Lua language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Lua",
+        factory: || Box::new(LuaFrontend::new()),
+    }
 }

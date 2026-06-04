@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::KotlinFrontend;
 
-pub fn register_kotlin() {
-    tracing::info!("Kotlin language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Kotlin",
+        factory: || Box::new(KotlinFrontend::new()),
+    }
 }

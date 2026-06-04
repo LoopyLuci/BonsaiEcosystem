@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::ErlangFrontend;
 
-pub fn register_erlang() {
-    tracing::info!("Erlang language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Erlang",
+        factory: || Box::new(ErlangFrontend::new()),
+    }
 }

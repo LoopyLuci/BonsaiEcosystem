@@ -1,14 +1,10 @@
 [package]
 name = "omnisystem-graphql"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-description = "Graphql language integration for the Bonsai Ecosystem"
+version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 anyhow = "1"
-serde_json = "1"
 bonsai-lair = { path = "../bonsai-lair" }
 bonsai-language-frontend = { path = "../bonsai-language-frontend" }
 async-trait = "0.1"

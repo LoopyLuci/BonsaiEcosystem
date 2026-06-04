@@ -1,7 +1,11 @@
-pub mod frontend;
-
 use bonsai_language_frontend::LanguageFrontend;
+use frontend::PythonFrontend;
 
-pub fn register_python() {
-    tracing::info!("Python language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Python",
+        factory: || Box::new(PythonFrontend::new()),
+    }
 }

@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::NimFrontend;
 
-pub fn register_nim() {
-    tracing::info!("Nim language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Nim",
+        factory: || Box::new(NimFrontend::new()),
+    }
 }

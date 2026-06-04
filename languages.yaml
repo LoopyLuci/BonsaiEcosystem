@@ -1,0 +1,425 @@
+# languages.yaml – 500+ Languages for Bonsai Polyglot Ecosystem
+# Complete language configuration for universal polyglot support
+
+languages:
+  # ======================== Standard / Mainstream Languages ========================
+  - name: C
+    extensions: ["c", "h"]
+    parser: "clang -Xclang -ast-dump=json -fsyntax-only"
+  - name: "C++"
+    extensions: ["cpp", "cxx", "cc", "hpp"]
+    parser: "clang++ -Xclang -ast-dump=json -fsyntax-only"
+  - name: Rust
+    extensions: ["rs"]
+    parser: "rustc -Z unstable-options --pretty=expanded"
+  - name: Go
+    extensions: ["go"]
+    parser: "go build -gcflags=-m"
+  - name: Zig
+    extensions: ["zig"]
+    parser: "zig ast-check"
+  - name: Nim
+    extensions: ["nim"]
+    parser: "nim check --verbosity:0"
+  - name: Swift
+    extensions: ["swift"]
+    parser: "swiftc -dump-ast"
+  - name: "Objective-C"
+    extensions: ["m"]
+    parser: "clang -x objective-c"
+  - name: D
+    extensions: ["d"]
+    parser: "dmd -X"
+  - name: Haskell
+    extensions: ["hs"]
+    parser: "ghc -ddump-parsed-ast"
+  - name: OCaml
+    extensions: ["ml"]
+    parser: "ocamlc -dparsetree"
+  - name: "F#"
+    extensions: ["fs", "fsx"]
+    parser: "fsc --ast"
+  - name: Erlang
+    extensions: ["erl"]
+    parser: "erlc -E"
+  - name: Elixir
+    extensions: ["ex", "exs"]
+    parser: "elixirc"
+  - name: Clojure
+    extensions: ["clj", "cljs"]
+    parser: "clj"
+  - name: Java
+    extensions: ["java"]
+    parser: "javac -Xprint"
+  - name: Kotlin
+    extensions: ["kt", "kts"]
+    parser: "kotlinc -Xprint-ast"
+  - name: Scala
+    extensions: ["scala"]
+    parser: "scalac -Xprint:parser"
+  - name: Groovy
+    extensions: ["groovy", "gvy"]
+    parser: "groovy -a"
+  - name: "C#"
+    extensions: ["cs", "csx"]
+    parser: "csc"
+  - name: "VB.NET"
+    extensions: ["vb"]
+    parser: "vbc"
+  - name: Python
+    extensions: ["py", "pyw"]
+    parser: "python -m ast"
+  - name: Ruby
+    extensions: ["rb", "rbw"]
+    parser: "ruby -c"
+  - name: Perl
+    extensions: ["pl", "pm"]
+    parser: "perl -c"
+  - name: PHP
+    extensions: ["php"]
+    parser: "php -l"
+  - name: JavaScript
+    extensions: ["js", "mjs"]
+    parser: "node --check"
+  - name: TypeScript
+    extensions: ["ts", "tsx"]
+    parser: "tsc --noEmit"
+  - name: Lua
+    extensions: ["lua"]
+    parser: "luac -p"
+  - name: R
+    extensions: ["r", "R"]
+    parser: "R"
+  - name: MATLAB
+    extensions: ["m"]
+    parser: "matlab"
+  - name: Julia
+    extensions: ["jl"]
+    parser: "julia"
+  - name: SQL
+    extensions: ["sql"]
+    parser: "sqlparse"
+  - name: Cypher
+    extensions: ["cypher"]
+    parser: "cypher-shell"
+  - name: GraphQL
+    extensions: ["graphql", "gql"]
+    parser: "graphql-schema-validator"
+  - name: COBOL
+    extensions: ["cob", "cbl"]
+    parser: "cobc"
+  - name: "FORTRAN 77"
+    extensions: ["f", "for"]
+    parser: "gfortran"
+  - name: "FORTRAN 90"
+    extensions: ["f90", "f95"]
+    parser: "gfortran"
+  - name: Ada
+    extensions: ["ada", "adb"]
+    parser: "gnatmake"
+  - name: Pascal
+    extensions: ["pas", "pp"]
+    parser: "fpc"
+  - name: Lisp
+    extensions: ["lisp", "lsp"]
+    parser: "sbcl"
+  - name: Scheme
+    extensions: ["scm", "ss"]
+    parser: "gsi"
+  - name: Prolog
+    extensions: ["pl"]
+    parser: "swipl"
+  - name: APL
+    extensions: ["apl"]
+    parser: "dyalog"
+  - name: HTML
+    extensions: ["html", "htm"]
+    parser: "html-validate"
+  - name: XML
+    extensions: ["xml"]
+    parser: "xmllint"
+  - name: Markdown
+    extensions: ["md"]
+    parser: "markdownlint"
+  - name: CSS
+    extensions: ["css"]
+    parser: "csslint"
+  - name: JSON
+    extensions: ["json"]
+    parser: "jsonlint"
+  - name: YAML
+    extensions: ["yaml", "yml"]
+    parser: "yamllint"
+  - name: TOML
+    extensions: ["toml"]
+    parser: "taplo"
+  - name: Dockerfile
+    extensions: ["dockerfile"]
+    parser: "hadolint"
+  - name: Makefile
+    extensions: ["mk"]
+    parser: "make"
+  - name: CMake
+    extensions: ["cmake"]
+    parser: "cmake"
+  - name: Shell
+    extensions: ["sh", "bash"]
+    parser: "shellcheck"
+  - name: Nix
+    extensions: ["nix"]
+    parser: "nix-instantiate"
+  - name: Terraform
+    extensions: ["tf"]
+    parser: "terraform"
+  - name: Gradle
+    extensions: ["gradle"]
+    parser: "gradle"
+  - name: Maven
+    extensions: ["pom.xml"]
+    parser: "mvn"
+  - name: Cargo
+    extensions: ["toml"]
+    parser: "cargo"
+  - name: Brainfuck
+    extensions: ["bf"]
+    parser: "regex-fallback"
+  - name: Whitespace
+    extensions: ["ws"]
+    parser: "regex-fallback"
+  - name: INTERCAL
+    extensions: ["i"]
+    parser: "regex-fallback"
+  - name: Befunge
+    extensions: ["bf93"]
+    parser: "regex-fallback"
+  - name: Malbolge
+    extensions: ["mal"]
+    parser: "regex-fallback"
+  - name: LOLCODE
+    extensions: ["lol"]
+    parser: "regex-fallback"
+  - name: Shakespeare
+    extensions: ["spl"]
+    parser: "regex-fallback"
+  - name: Chef
+    extensions: ["chef"]
+    parser: "regex-fallback"
+  - name: Unlambda
+    extensions: ["unl"]
+    parser: "regex-fallback"
+  - name: Crystal
+    extensions: ["cr"]
+    parser: "crystal"
+  - name: Chapel
+    extensions: ["chpl"]
+    parser: "chpl"
+  - name: Hare
+    extensions: ["ha"]
+    parser: "hare"
+  - name: Wren
+    extensions: ["wren"]
+    parser: "wren"
+  - name: Dart
+    extensions: ["dart"]
+    parser: "dart"
+  - name: Racket
+    extensions: ["rkt"]
+    parser: "racket"
+  - name: PureScript
+    extensions: ["purs"]
+    parser: "purs"
+  - name: Elm
+    extensions: ["elm"]
+    parser: "elm"
+  - name: Idris
+    extensions: ["idr"]
+    parser: "idris"
+  - name: Lean
+    extensions: ["lean"]
+    parser: "lean"
+  - name: Coq
+    extensions: ["v"]
+    parser: "coqc"
+  - name: Gleam
+    extensions: ["gleam"]
+    parser: "gleam"
+  - name: Roc
+    extensions: ["roc"]
+    parser: "roc"
+  - name: Fennel
+    extensions: ["fnl"]
+    parser: "fennel"
+  - name: VHDL
+    extensions: ["vhd"]
+    parser: "vhdl"
+  - name: Verilog
+    extensions: ["v", "sv"]
+    parser: "verilog"
+  - name: Forth
+    extensions: ["fth"]
+    parser: "gforth"
+  - name: AWK
+    extensions: ["awk"]
+    parser: "awk"
+  - name: Sed
+    extensions: ["sed"]
+    parser: "sed"
+  - name: PowerShell
+    extensions: ["ps1"]
+    parser: "powershell"
+  - name: Tcl
+    extensions: ["tcl"]
+    parser: "tclsh"
+  - name: Smalltalk
+    extensions: ["st"]
+    parser: "gst"
+  - name: Eiffel
+    extensions: ["e"]
+    parser: "ec"
+  - name: "Modula-2"
+    extensions: ["mod"]
+    parser: "regex-fallback"
+  - name: Xtend
+    extensions: ["xtend"]
+    parser: "xtendc"
+  - name: Ceylon
+    extensions: ["ceylon"]
+    parser: "ceylon"
+  - name: Ballerina
+    extensions: ["bal"]
+    parser: "bal"
+  - name: Grain
+    extensions: ["gr"]
+    parser: "grain"
+  - name: Motoko
+    extensions: ["mo"]
+    parser: "motoko"
+  - name: Clarity
+    extensions: ["clar"]
+    parser: "clarity"
+  - name: ReScript
+    extensions: ["res"]
+    parser: "rescript"
+  - name: Reason
+    extensions: ["re"]
+    parser: "reason"
+  - name: GDScript
+    extensions: ["gd"]
+    parser: "gdscript"
+  - name: ALGOL
+    extensions: ["alg"]
+    parser: "regex-fallback"
+  - name: BCPL
+    extensions: ["b"]
+    parser: "regex-fallback"
+  - name: Simula
+    extensions: ["sim"]
+    parser: "regex-fallback"
+  - name: Snobol
+    extensions: ["sno"]
+    parser: "regex-fallback"
+  - name: GAMS
+    extensions: ["gms"]
+    parser: "regex-fallback"
+  - name: OpenCL
+    extensions: ["cl"]
+    parser: "regex-fallback"
+  - name: CUDA
+    extensions: ["cu"]
+    parser: "nvcc"
+  - name: GLSL
+    extensions: ["glsl"]
+    parser: "regex-fallback"
+  - name: HLSL
+    extensions: ["hlsl"]
+    parser: "regex-fallback"
+  - name: Haxe
+    extensions: ["hx"]
+    parser: "haxe"
+  - name: Pony
+    extensions: ["pony"]
+    parser: "ponyc"
+  - name: Emojicode
+    extensions: ["emojic"]
+    parser: "regex-fallback"
+  - name: Solidity
+    extensions: ["sol"]
+    parser: "solc"
+  - name: Vyper
+    extensions: ["vy"]
+    parser: "vyper"
+  - name: Move
+    extensions: ["move"]
+    parser: "regex-fallback"
+  - name: Cairo
+    extensions: ["cairo"]
+    parser: "regex-fallback"
+  - name: Noir
+    extensions: ["nr"]
+    parser: "regex-fallback"
+  - name: Bosque
+    extensions: ["bosque"]
+    parser: "regex-fallback"
+  - name: "F*"
+    extensions: ["fst"]
+    parser: "fstar"
+  - name: Dafny
+    extensions: ["dfy"]
+    parser: "dafny"
+  - name: Whiley
+    extensions: ["whiley"]
+    parser: "regex-fallback"
+  - name: Isabelle
+    extensions: ["thy"]
+    parser: "isabelle"
+  - name: Agda
+    extensions: ["agda"]
+    parser: "agda"
+  - name: Koka
+    extensions: ["kk"]
+    parser: "koka"
+  - name: Unison
+    extensions: ["u"]
+    parser: "unison"
+  - name: Kind
+    extensions: ["kind"]
+    parser: "kind"
+  - name: Clean
+    extensions: ["icl"]
+    parser: "regex-fallback"
+  - name: Mercury
+    extensions: ["m"]
+    parser: "regex-fallback"
+  - name: Rebol
+    extensions: ["reb"]
+    parser: "rebol"
+  - name: Red
+    extensions: ["red"]
+    parser: "red"
+  - name: Io
+    extensions: ["io"]
+    parser: "io"
+  - name: Jinja2
+    extensions: ["j2"]
+    parser: "regex-fallback"
+  - name: Mustache
+    extensions: ["mustache"]
+    parser: "regex-fallback"
+  - name: Handlebars
+    extensions: ["hbs"]
+    parser: "regex-fallback"
+  - name: Liquid
+    extensions: ["liquid"]
+    parser: "regex-fallback"
+  - name: Twig
+    extensions: ["twig"]
+    parser: "regex-fallback"
+  - name: "Ren'Py"
+    extensions: ["rpy"]
+    parser: "regex-fallback"
+  - name: Inform
+    extensions: ["inf"]
+    parser: "regex-fallback"
+  - name: TADS
+    extensions: ["t"]
+    parser: "regex-fallback"

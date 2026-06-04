@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::CFrontend;
 
-pub fn register_c() {
-    tracing::info!("C language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "C",
+        factory: || Box::new(CFrontend::new()),
+    }
 }

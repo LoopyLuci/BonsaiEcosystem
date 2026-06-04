@@ -1,9 +1,9 @@
-use async_trait::async_trait;
 use bonsai_language_frontend::LanguageFrontend;
-use bonsai_lair::{LairModule, ModuleMetadata};
+use bonsai_lair::*;
 use std::path::Path;
+use anyhow::Result;
+use async_trait::async_trait;
 
-#[derive(Clone)]
 pub struct GroovyFrontend;
 
 impl GroovyFrontend {
@@ -13,15 +13,15 @@ impl GroovyFrontend {
 #[async_trait]
 impl LanguageFrontend for GroovyFrontend {
     fn language_name(&self) -> &str { "Groovy" }
-    fn file_extensions(&self) -> &[&str] { &["groovy"] }
-    
-    async fn parse(&self, _source: &str, file_path: &Path) -> bonsai_language_frontend::Result<LairModule> {
+    fn file_extensions(&self) -> &[&str] { &["groovy", "gvy"] }
+
+    async fn parse(&self, _source: &str, _path: &Path) -> Result<LairModule> {
         Ok(LairModule {
-            name: file_path.file_stem().unwrap().to_string_lossy().to_string(),
+            name: "groovy_module".into(),
             functions: vec![],
             types: vec![],
             constants: vec![],
-            metadata: ModuleMetadata {
+            metadata: bonsai_lair::ModuleMetadata {
                 imports: vec![],
                 exports: vec![],
                 source_language: Some("Groovy".into()),

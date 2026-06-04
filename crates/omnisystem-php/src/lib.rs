@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::PHPFrontend;
 
-pub fn register_php() {
-    tracing::info!("PHP language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "PHP",
+        factory: || Box::new(PHPFrontend::new()),
+    }
 }

@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::GraphQLFrontend;
 
-pub fn register_graphql() {
-    tracing::info!("GraphQL language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "GraphQL",
+        factory: || Box::new(GraphQLFrontend::new()),
+    }
 }

@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::GroovyFrontend;
 
-pub fn register_groovy() {
-    tracing::info!("Groovy language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Groovy",
+        factory: || Box::new(GroovyFrontend::new()),
+    }
 }

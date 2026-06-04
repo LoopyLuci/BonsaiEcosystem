@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::ClojureFrontend;
 
-pub fn register_clojure() {
-    tracing::info!("Clojure language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Clojure",
+        factory: || Box::new(ClojureFrontend::new()),
+    }
 }

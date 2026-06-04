@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::CypherFrontend;
 
-pub fn register_cypher() {
-    tracing::info!("Cypher language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Cypher",
+        factory: || Box::new(CypherFrontend::new()),
+    }
 }

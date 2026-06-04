@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::C#Frontend;
 
-pub fn register_csharp() {
-    tracing::info!("C# language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "C#",
+        factory: || Box::new(C#Frontend::new()),
+    }
 }

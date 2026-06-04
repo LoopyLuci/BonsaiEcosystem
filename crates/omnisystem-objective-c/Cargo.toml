@@ -1,0 +1,11 @@
+[package]
+name = "omnisystem-objective-c"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+bonsai-lair = { path = "../bonsai-lair" }
+bonsai-language-frontend = { path = "../bonsai-language-frontend" }
+async-trait = "0.1"
+tracing = "0.1"

@@ -1,5 +1,11 @@
-pub mod frontend;
+use bonsai_language_frontend::LanguageFrontend;
+use frontend::ElixirFrontend;
 
-pub fn register_elixir() {
-    tracing::info!("Elixir language support initialized");
+mod frontend;
+
+inventory::submit! {
+    bonsai_language_frontend::LanguageRegistration {
+        name: "Elixir",
+        factory: || Box::new(ElixirFrontend::new()),
+    }
 }
