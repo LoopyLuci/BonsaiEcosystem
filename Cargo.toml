@@ -8,6 +8,9 @@
 resolver = "2"
 
 members = [
+    # ========== LAIR (Language-Agnostic IR) ==========
+    "crates/bonsai-lair",              # Language-Agnostic Intermediate Representation
+
     # ========== BACE Foundation (Function-Level Compilation) ==========
     "crates/bonsai-buir",              # Bonsai Unified Intermediate Representation
     "crates/bonsai-bco",               # Bonsai Compiled Objects (serialized functions)
@@ -18,11 +21,17 @@ members = [
     "crates/bace-rt",                  # BACE runtime and proc-macro
     "crates/cargo-bace",               # cargo-bace CLI subcommand
 
+    # ========== Bonsai Polyglot Language System (BPLIS) ==========
+    "crates/bonsai-language-frontend", # Language frontend trait & registry
+
+    # ========== Omnisystem Languages ==========
+    "crates/omnisystem-sylva",         # Sylva scripting language
+
     # ========== BUEB (Universal Execution Backend) ==========
     "crates/bonsai-backend",           # Hardware abstraction & device allocation
 
     # ========== USOS Bare-Metal Kernel ==========
-    "crates/usos-kernel",              # USOS Co-OS x86_64 bare-metal kernel
+    # "crates/usos-kernel",              # USOS Co-OS x86_64 bare-metal kernel (disabled: x86_64 crate has unstable features)
 
     # ========== Legacy Foundation (keep for compatibility) ==========
     "bonsai-runtime",

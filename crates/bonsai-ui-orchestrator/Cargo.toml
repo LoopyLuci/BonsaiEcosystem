@@ -20,6 +20,7 @@ bonsai-runtime = { path = "../../bonsai-runtime" }
 wasmtime = { version = "8", optional = true, features = ["wat"] }
 wasmtime-wasi = { version = "8", optional = true }
 rand = "0.8"
+tempfile = "3"
 
 [features]
 default = ["wasmtime-host"]

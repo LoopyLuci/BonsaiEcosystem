@@ -6,7 +6,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-x86_64 = "0.14"
+x86_64 = "0.15"
 
 [build-dependencies]
 cc = "1.0"

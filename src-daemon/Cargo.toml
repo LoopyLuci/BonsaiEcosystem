@@ -48,3 +48,4 @@ bonsai-p2p      = { path = "../crates/bonsai-p2p" }
 bonsai-creator  = { path = "../crates/bonsai-creator" }
 arc-swap      = "1"
 sysinfo       = "0.30"
+tempfile      = "3"

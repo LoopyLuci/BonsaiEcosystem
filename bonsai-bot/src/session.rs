@@ -11,10 +11,11 @@ fn now_secs() -> i64 {
 }
 
 pub type Db = Arc<Connection>;
+pub type DbResult<T> = Result<T, String>;
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
-pub async fn migrate(db: &Db) -> Result<(), tokio_rusqlite::Error> {
+pub async fn migrate(db: &Db) -> DbResult<()> {
     db.call(|conn| {
         conn.execute_batch(
             r#"PRAGMA journal_mode=WAL;
@@ -75,9 +76,10 @@ pub async fn migrate(db: &Db) -> Result<(), tokio_rusqlite::Error> {
             CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
             CREATE INDEX IF NOT EXISTS idx_sessions_last_active ON bot_sessions(last_active);"#,
         )
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
 /// Insert or update a runtime record
@@ -91,7 +93,7 @@ pub async fn upsert_runtime_record(
     status: &str,
     started_at: i64,
     timeout_secs: Option<i64>,
-) -> Result<(), tokio_rusqlite::Error> {
+) -> DbResult<()> {
     let id_s = id.to_string();
     let kind_s = kind.to_string();
     let script_s = script.to_string();
@@ -122,9 +124,10 @@ pub async fn upsert_runtime_record(
             ],
         )
         .map(|_| ())
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
 pub async fn update_runtime_status(
@@ -132,7 +135,7 @@ pub async fn update_runtime_status(
     id: &str,
     status: &str,
     pid: Option<i64>,
-) -> Result<(), tokio_rusqlite::Error> {
+) -> DbResult<()> {
     let id_s = id.to_string();
     let status_s = status.to_string();
     let p = pid;
@@ -142,16 +145,17 @@ pub async fn update_runtime_status(
             rusqlite::params![status_s, p, id_s],
         )
         .map(|_| ())
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
 pub async fn list_runtime_records(db: &Db) -> Vec<serde_json::Value> {
     db.call(move |conn| {
         let mut stmt = conn.prepare(
             "SELECT id, kind, script, user, pid, status, started_at, timeout_secs FROM runtime_records ORDER BY started_at DESC",
-        )?;
+        ).map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
             Ok(serde_json::json!({
                 "id": row.get::<_, String>(0)?,
@@ -163,10 +167,10 @@ pub async fn list_runtime_records(db: &Db) -> Vec<serde_json::Value> {
                 "started_at": row.get::<_, i64>(6)?,
                 "timeout_secs": row.get::<_, Option<i64>>(7)?,
             }))
-        })?
+        }).map_err(|e| e.to_string())?
         .filter_map(|r| r.ok())
         .collect();
-        Ok(rows)
+        Ok::<_, String>(rows)
     })
     .await
     .unwrap_or_default()
@@ -189,7 +193,7 @@ pub async fn get_runtime_record(db: &Db, id: &str) -> Option<serde_json::Value> 
                 "started_at": row.get::<_, i64>(6)?,
                 "timeout_secs": row.get::<_, Option<i64>>(7)?,
             }))
-        ).optional().map_err(tokio_rusqlite::Error::from)
+        ).optional().map_err(|e| e.to_string())
     })
     .await
     .ok()
@@ -212,7 +216,7 @@ pub async fn find_active_session(
             rusqlite::params![platform, user_id, chat_id],
             |row| row.get::<_, String>(0),
         )
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
     .ok()
@@ -225,7 +229,7 @@ pub async fn upsert_session(
     chat_id: String,
     display_name: String,
     buddy_session_id: String,
-) -> Result<(), tokio_rusqlite::Error> {
+) -> DbResult<()> {
     let ts = now_secs();
     let id = format!("{platform}_{chat_id}_{user_id}");
     db.call(move |conn| {
@@ -250,9 +254,10 @@ pub async fn upsert_session(
             ],
         )
         .map(|_| ())
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
 pub async fn touch_session(db: &Db, platform: String, user_id: String, chat_id: String) {
@@ -265,7 +270,7 @@ pub async fn touch_session(db: &Db, platform: String, user_id: String, chat_id: 
                 rusqlite::params![ts, platform, user_id, chat_id],
             )
             .map(|_| ())
-            .map_err(tokio_rusqlite::Error::from)
+            .map_err(|e| e.to_string())
         })
         .await;
 }
@@ -275,7 +280,7 @@ pub async fn list_active_sessions(db: &Db) -> Vec<serde_json::Value> {
         let mut stmt = conn.prepare(
             "SELECT platform, platform_user_id, platform_chat_id, display_name, last_active
              FROM bot_sessions WHERE is_archived = 0 ORDER BY last_active DESC LIMIT 200",
-        )?;
+        ).map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([], |row| {
                 Ok(serde_json::json!({
@@ -285,10 +290,10 @@ pub async fn list_active_sessions(db: &Db) -> Vec<serde_json::Value> {
                     "display_name":  row.get::<_, Option<String>>(3)?,
                     "last_active":   row.get::<_, i64>(4)?,
                 }))
-            })?
+            }).map_err(|e| e.to_string())?
             .filter_map(|r| r.ok())
             .collect();
-        Ok(rows)
+        Ok::<_, String>(rows)
     })
     .await
     .unwrap_or_default()
@@ -304,7 +309,7 @@ pub async fn purge_old_sessions(db: &Db, days: u64) -> usize {
             rusqlite::params![cutoff],
         )
         .map(|n| n)
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
     .unwrap_or(0)
@@ -314,18 +319,18 @@ pub async fn cleanup_stale(db: &Db) {
     let now = now_secs();
     let soft = now - 30 * 86400;
     let hard = now - 90 * 86400;
-    let _ = db
+    let _: Result<(), _> = db
         .call(move |conn: &mut rusqlite::Connection| {
             conn.execute(
             "UPDATE bot_sessions SET is_archived = 1 WHERE last_active < ?1 AND is_archived = 0",
             rusqlite::params![soft],
-        ).map(|_| ())?;
+        ).map(|_| ()).map_err(|e| e.to_string())?;
             conn.execute(
                 "DELETE FROM bot_sessions WHERE is_archived = 1 AND last_active < ?1",
                 rusqlite::params![hard],
             )
-            .map(|_| ())?;
-            Ok(())
+            .map(|_| ()).map_err(|e| e.to_string())?;
+            Ok::<_, String>(())
         })
         .await;
 }
@@ -356,7 +361,7 @@ pub async fn insert_confirm(
     args_json: String,
     prompt: String,
     expires_at: i64,
-) -> Result<(), tokio_rusqlite::Error> {
+) -> DbResult<()> {
     db.call(move |conn| {
         conn.execute(
             r#"INSERT OR IGNORE INTO pending_confirms
@@ -368,39 +373,42 @@ pub async fn insert_confirm(
             ],
         )
         .map(|_| ())
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
-pub async fn mark_prompted(db: &Db, token: String) -> Result<i64, tokio_rusqlite::Error> {
+pub async fn mark_prompted(db: &Db, token: String) -> DbResult<i64> {
     db.call(move |conn| {
         conn.execute(
             "UPDATE pending_confirms
              SET prompt_state = 'prompted', prompt_nonce = prompt_nonce + 1
              WHERE token = ?1",
             rusqlite::params![token],
-        )?;
+        ).map_err(|e| e.to_string())?;
         let nonce: i64 = conn.query_row(
             "SELECT prompt_nonce FROM pending_confirms WHERE token = ?1",
             rusqlite::params![token],
             |row| row.get(0),
-        )?;
-        Ok(nonce)
+        ).map_err(|e| e.to_string())?;
+        Ok::<_, String>(nonce)
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
-pub async fn resolve_confirm(db: &Db, token: String) -> Result<(), tokio_rusqlite::Error> {
+pub async fn resolve_confirm(db: &Db, token: String) -> DbResult<()> {
     db.call(move |conn| {
         conn.execute(
             "UPDATE pending_confirms SET prompt_state = 'resolved' WHERE token = ?1",
             rusqlite::params![token],
         )
         .map(|_| ())
-        .map_err(tokio_rusqlite::Error::from)
+        .map_err(|e| e.to_string())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
 pub async fn load_unresolved_confirms(db: &Db) -> Vec<PendingConfirm> {
@@ -411,7 +419,7 @@ pub async fn load_unresolved_confirms(db: &Db) -> Vec<PendingConfirm> {
                       expires_at, prompt_state, prompt_nonce
                FROM pending_confirms
                WHERE prompt_state IN ('created', 'prompted') AND expires_at > ?1"#,
-        )?;
+        ).map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map(rusqlite::params![now], |row| {
                 Ok(PendingConfirm {
@@ -426,10 +434,10 @@ pub async fn load_unresolved_confirms(db: &Db) -> Vec<PendingConfirm> {
                     prompt_state: row.get(8)?,
                     prompt_nonce: row.get(9)?,
                 })
-            })?
+            }).map_err(|e| e.to_string())?
             .filter_map(|r| r.ok())
             .collect();
-        Ok(rows)
+        Ok::<_, String>(rows)
     })
     .await
     .unwrap_or_default()
@@ -595,7 +603,7 @@ pub struct SkillRecord {
     pub updated_at: i64,
 }
 
-pub async fn upsert_skill(db: &Db, rec: SkillRecord) -> Result<(), tokio_rusqlite::Error> {
+pub async fn upsert_skill(db: &Db, rec: SkillRecord) -> DbResult<()> {
     db.call(move |conn| {
         conn.execute(
             r#"INSERT INTO skills (id, name, description, language, script_path, version, enabled, created_at, updated_at)
@@ -612,9 +620,10 @@ pub async fn upsert_skill(db: &Db, rec: SkillRecord) -> Result<(), tokio_rusqlit
                 rec.script_path, rec.version, rec.enabled as i64,
                 rec.created_at, rec.updated_at,
             ],
-        ).map(|_| ())?;
-        Ok(())
+        ).map(|_| ()).map_err(|e| e.to_string())?;
+        Ok::<_, String>(())
     }).await
+    .map_err(|e| e.to_string())
 }
 
 pub async fn list_skills(db: &Db) -> Vec<SkillRecord> {
@@ -622,7 +631,7 @@ pub async fn list_skills(db: &Db) -> Vec<SkillRecord> {
         let mut stmt = conn.prepare(
             "SELECT id, name, description, language, script_path, version, enabled, created_at, updated_at
              FROM skills ORDER BY name"
-        )?;
+        ).map_err(|e| e.to_string())?;
         let rows = stmt.query_map([], |row| {
             Ok(SkillRecord {
                 id:          row.get(0)?,
@@ -635,31 +644,33 @@ pub async fn list_skills(db: &Db) -> Vec<SkillRecord> {
                 created_at:  row.get(7)?,
                 updated_at:  row.get(8)?,
             })
-        })?;
-        Ok(rows.flatten().collect())
+        }).map_err(|e| e.to_string())?;
+        Ok::<_, String>(rows.flatten().collect())
     }).await.unwrap_or_default()
 }
 
-pub async fn toggle_skill(db: &Db, id: String, enabled: bool) -> Result<(), tokio_rusqlite::Error> {
+pub async fn toggle_skill(db: &Db, id: String, enabled: bool) -> DbResult<()> {
     let now = now_secs();
     db.call(move |conn| {
         conn.execute(
             "UPDATE skills SET enabled = ?1, updated_at = ?2 WHERE id = ?3",
             rusqlite::params![enabled as i64, now, id],
         )
-        .map(|_| ())?;
-        Ok(())
+        .map(|_| ()).map_err(|e| e.to_string())?;
+        Ok::<_, String>(())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
-pub async fn delete_skill(db: &Db, id: String) -> Result<(), tokio_rusqlite::Error> {
+pub async fn delete_skill(db: &Db, id: String) -> DbResult<()> {
     db.call(move |conn| {
         conn.execute("DELETE FROM skills WHERE id = ?1", rusqlite::params![id])
-            .map(|_| ())?;
-        Ok(())
+            .map(|_| ()).map_err(|e| e.to_string())?;
+        Ok::<_, String>(())
     })
     .await
+    .map_err(|e| e.to_string())
 }
 
 /// Scan manifest files under `base_dirs` and sync them into the skills table.
@@ -712,20 +723,20 @@ pub async fn sync_skills_from_disk(db: &Db, base_dirs: Vec<String>) {
 pub async fn purge_expired_confirms(db: &Db) {
     let now = now_secs();
     let stale = now - 3600;
-    let _ = db
+    let _: Result<(), _> = db
         .call(move |conn: &mut rusqlite::Connection| {
             conn.execute(
                 "UPDATE pending_confirms SET prompt_state = 'expired'
              WHERE expires_at < ?1 AND prompt_state IN ('created', 'prompted')",
                 rusqlite::params![now],
             )
-            .map(|_| ())?;
+            .map(|_| ()).map_err(|e| e.to_string())?;
             conn.execute(
                 "DELETE FROM pending_confirms WHERE prompt_state = 'expired' AND expires_at < ?1",
                 rusqlite::params![stale],
             )
-            .map(|_| ())?;
-            Ok(())
+            .map(|_| ()).map_err(|e| e.to_string())?;
+            Ok::<_, String>(())
         })
         .await;
 }
@@ -744,13 +755,13 @@ pub async fn audit(
     let platform = platform.map(str::to_string);
     let user_id = user_id.map(str::to_string);
     let detail = detail.map(str::to_string);
-    let _ = db
+    let _: Result<(), _> = db
         .call(move |conn| {
             conn.execute(
             "INSERT INTO audit_log (ts, event, platform, user_id, detail) VALUES (?1,?2,?3,?4,?5)",
             rusqlite::params![ts, event, platform, user_id, detail],
-        ).map(|_| ())?;
-            Ok(())
+        ).map(|_| ()).map_err(|e| e.to_string())?;
+            Ok::<_, String>(())
         })
         .await;
 }
@@ -769,7 +780,7 @@ pub async fn list_audit(db: &Db, limit: usize) -> Vec<AuditEntry> {
     db.call(move |conn| {
         let mut stmt = conn.prepare(
             "SELECT id, ts, event, platform, user_id, detail FROM audit_log ORDER BY ts DESC LIMIT ?1"
-        )?;
+        ).map_err(|e| e.to_string())?;
         let rows = stmt.query_map(rusqlite::params![limit], |row| {
             Ok(AuditEntry {
                 id:       row.get(0)?,
@@ -779,8 +790,8 @@ pub async fn list_audit(db: &Db, limit: usize) -> Vec<AuditEntry> {
                 user_id:  row.get(4)?,
                 detail:   row.get(5)?,
             })
-        })?;
-        Ok(rows.filter_map(|r| r.ok()).collect())
+        }).map_err(|e| e.to_string())?;
+        Ok::<_, String>(rows.filter_map(|r| r.ok()).collect())
     })
     .await
     .unwrap_or_default()
