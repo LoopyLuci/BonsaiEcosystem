@@ -26,6 +26,8 @@ members = [
 
     # ========== Omnisystem Languages ==========
     "crates/omnisystem-sylva",         # Sylva scripting language
+    "crates/omnisystem-titan",         # Titan systems language
+    "crates/omnisystem-aether",        # Aether actor language
 
     # ========== BUEB (Universal Execution Backend) ==========
     "crates/bonsai-backend",           # Hardware abstraction & device allocation
