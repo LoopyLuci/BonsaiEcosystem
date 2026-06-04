@@ -1,0 +1,11 @@
+[package]
+name = "bonsai-regex-frontend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+regex = "1"
+async-trait = "0.1"
+bonsai-lair = { path = "../bonsai-lair" }
+bonsai-language-frontend = { path = "../bonsai-language-frontend" }
