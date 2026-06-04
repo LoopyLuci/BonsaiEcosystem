@@ -1225,3 +1225,584 @@ languages:
   - name: CodeQL
     extensions: ["ql"]
     parser: "codeql-lsp"
+
+  # ============================================================
+  # COMPLETE HISTORICAL LANGUAGES
+  # ============================================================
+  - name: "Short Code"
+    extensions: ["shortcode"]
+    parser: "regex-fallback"
+  - name: Speedcoding
+    extensions: ["speedcoding"]
+    parser: "regex-fallback"
+  - name: IPL
+    extensions: ["ipl"]
+    parser: "regex-fallback"
+  - name: MATH-MATIC
+    extensions: ["mathmatic"]
+    parser: "regex-fallback"
+  - name: AIMACO
+    extensions: ["aimaco"]
+    parser: "regex-fallback"
+  - name: NELLAC
+    extensions: ["nellac"]
+    parser: "regex-fallback"
+  - name: BAL
+    extensions: ["bal"]
+    parser: "regex-fallback"
+  - name: SLEEP
+    extensions: ["sleep"]
+    parser: "regex-fallback"
+  - name: ALGOL 58
+    extensions: ["algol58"]
+    parser: "regex-fallback"
+  - name: ALGOL 68
+    extensions: ["a68"]
+    parser: "algol68-lsp"
+
+  # ============================================================
+  # COMPLETE LISP FAMILY
+  # ============================================================
+  - name: Interlisp
+    extensions: ["lisp", "il"]
+    parser: "regex-fallback"
+  - name: Maclisp
+    extensions: ["lisp"]
+    parser: "regex-fallback"
+  - name: "Franz Lisp"
+    extensions: ["lisp"]
+    parser: "regex-fallback"
+  - name: ZetaLisp
+    extensions: ["lisp"]
+    parser: "regex-fallback"
+  - name: "Le Lisp"
+    extensions: ["ll"]
+    parser: "regex-fallback"
+  - name: "Standard Lisp"
+    extensions: ["sl"]
+    parser: "regex-fallback"
+  - name: XLISP
+    extensions: ["lisp"]
+    parser: "regex-fallback"
+  - name: AutoLISP
+    extensions: ["lsp"]
+    parser: "autolisp-lsp"
+  - name: "Visual LISP"
+    extensions: ["fas"]
+    parser: "regex-fallback"
+  - name: ISLISP
+    extensions: ["isl"]
+    parser: "regex-fallback"
+  - name: EuLisp
+    extensions: ["em"]
+    parser: "regex-fallback"
+  - name: newLISP
+    extensions: ["nl"]
+    parser: "regex-fallback"
+  - name: Arc
+    extensions: ["arc"]
+    parser: "regex-fallback"
+  - name: PicoLisp
+    extensions: ["l"]
+    parser: "picolisp-lsp"
+  - name: Wisp
+    extensions: ["wisp"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE PROLOG FAMILY
+  # ============================================================
+  - name: "SWI-Prolog"
+    extensions: ["pro"]
+    parser: "prolog-lsp"
+  - name: "GNU Prolog"
+    extensions: ["gpl"]
+    parser: "prolog-lsp"
+  - name: "SICStus Prolog"
+    extensions: ["sicstus"]
+    parser: "prolog-lsp"
+  - name: YAP
+    extensions: ["yap"]
+    parser: "prolog-lsp"
+  - name: XSB
+    extensions: ["P"]
+    parser: "regex-fallback"
+  - name: Ciao
+    extensions: ["ciao"]
+    parser: "regex-fallback"
+  - name: ECLiPSe
+    extensions: ["ecl"]
+    parser: "regex-fallback"
+  - name: "B-Prolog"
+    extensions: ["bp"]
+    parser: "regex-fallback"
+  - name: "Visual Prolog"
+    extensions: ["vip"]
+    parser: "regex-fallback"
+  - name: tuProlog
+    extensions: ["2p"]
+    parser: "regex-fallback"
+  - name: ProbLog
+    extensions: ["problog"]
+    parser: "regex-fallback"
+  - name: "Qu-Prolog"
+    extensions: ["ql"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE ML FAMILY
+  # ============================================================
+  - name: "Standard ML"
+    extensions: ["sml", "sig"]
+    parser: "sml-lsp"
+  - name: MLton
+    extensions: ["mlb"]
+    parser: "sml-lsp"
+  - name: "Moscow ML"
+    extensions: ["mosml"]
+    parser: "sml-lsp"
+  - name: "Poly/ML"
+    extensions: ["ML"]
+    parser: "regex-fallback"
+  - name: "Alice ML"
+    extensions: ["aml"]
+    parser: "regex-fallback"
+  - name: Futhark
+    extensions: ["fut"]
+    parser: "futhark-lsp"
+
+  # ============================================================
+  # COMPLETE APL FAMILY
+  # ============================================================
+  - name: "GNU APL"
+    extensions: ["gnu-apl"]
+    parser: "apl-lsp"
+  - name: APL2
+    extensions: ["apl2"]
+    parser: "regex-fallback"
+  - name: NARS2000
+    extensions: ["nars"]
+    parser: "regex-fallback"
+  - name: "ngn/apl"
+    extensions: ["ngnapl"]
+    parser: "regex-fallback"
+  - name: Kona
+    extensions: ["kona"]
+    parser: "regex-fallback"
+  - name: oK
+    extensions: ["ok"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE BASIC FAMILY
+  # ============================================================
+  - name: "GW-BASIC"
+    extensions: ["bas"]
+    parser: "basic-lsp"
+  - name: QuickBASIC
+    extensions: ["bi"]
+    parser: "basic-lsp"
+  - name: QB64
+    extensions: ["bm"]
+    parser: "basic-lsp"
+  - name: FreeBASIC
+    extensions: ["freebasic"]
+    parser: "basic-lsp"
+  - name: PureBasic
+    extensions: ["pb", "pbi"]
+    parser: "purebasic-lsp"
+  - name: "True BASIC"
+    extensions: ["tru"]
+    parser: "regex-fallback"
+  - name: "TI-BASIC"
+    extensions: ["8xp"]
+    parser: "regex-fallback"
+  - name: "BBC BASIC"
+    extensions: ["bbc"]
+    parser: "regex-fallback"
+  - name: AMOS
+    extensions: ["amos"]
+    parser: "regex-fallback"
+  - name: "Blitz BASIC"
+    extensions: ["bb"]
+    parser: "regex-fallback"
+  - name: BlitzMax
+    extensions: ["bmx"]
+    parser: "regex-fallback"
+  - name: Monkey
+    extensions: ["monkey"]
+    parser: "regex-fallback"
+  - name: "Cerberus X"
+    extensions: ["cxs"]
+    parser: "regex-fallback"
+  - name: Xojo
+    extensions: ["xojo_code"]
+    parser: "regex-fallback"
+  - name: Gambas
+    extensions: ["gambas", "class"]
+    parser: "gambas-lsp"
+  - name: SmallBASIC
+    extensions: ["smallbasic"]
+    parser: "regex-fallback"
+  - name: thinBasic
+    extensions: ["tbasic"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE SHELL FAMILY
+  # ============================================================
+  - name: csh
+    extensions: ["csh"]
+    parser: "regex-fallback"
+  - name: tcsh
+    extensions: ["tcsh"]
+    parser: "regex-fallback"
+  - name: ksh
+    extensions: ["ksh"]
+    parser: "regex-fallback"
+  - name: ash
+    extensions: ["ash"]
+    parser: "regex-fallback"
+  - name: dash
+    extensions: ["dash"]
+    parser: "regex-fallback"
+  - name: rc
+    extensions: ["rc"]
+    parser: "regex-fallback"
+  - name: nushell
+    extensions: ["nu"]
+    parser: "nu-lsp"
+  - name: elvish
+    extensions: ["elv"]
+    parser: "elvish-lsp"
+  - name: oil
+    extensions: ["osh"]
+    parser: "regex-fallback"
+  - name: xonsh
+    extensions: ["xsh"]
+    parser: "xonsh-lsp"
+  - name: scsh
+    extensions: ["scsh"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE SMALLTALK FAMILY
+  # ============================================================
+  - name: Pharo
+    extensions: ["pharo"]
+    parser: "smalltalk-lsp"
+  - name: Squeak
+    extensions: ["squeak"]
+    parser: "smalltalk-lsp"
+  - name: "GNU Smalltalk"
+    extensions: ["gst"]
+    parser: "smalltalk-lsp"
+  - name: Amber
+    extensions: ["amber"]
+    parser: "regex-fallback"
+  - name: Cuis
+    extensions: ["cuis"]
+    parser: "regex-fallback"
+  - name: Self
+    extensions: ["self"]
+    parser: "regex-fallback"
+  - name: Newspeak
+    extensions: ["ns"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE DATABASE & QUERY LANGUAGES
+  # ============================================================
+  - name: "SQL:2016"
+    extensions: ["sql2016"]
+    parser: "sql-language-server"
+  - name: HiveQL
+    extensions: ["hql"]
+    parser: "regex-fallback"
+  - name: "Pig Latin"
+    extensions: ["pig"]
+    parser: "regex-fallback"
+  - name: Impala
+    extensions: ["impala"]
+    parser: "regex-fallback"
+  - name: Drill
+    extensions: ["drill"]
+    parser: "regex-fallback"
+  - name: Presto
+    extensions: ["presto"]
+    parser: "presto-lsp"
+  - name: Trino
+    extensions: ["trino"]
+    parser: "trino-lsp"
+  - name: BigQuery
+    extensions: ["bq"]
+    parser: "bigquery-lsp"
+  - name: Snowflake
+    extensions: ["snowflake"]
+    parser: "snowflake-lsp"
+  - name: Redshift
+    extensions: ["redshift"]
+    parser: "redshift-lsp"
+  - name: "MongoDB MQL"
+    extensions: ["mql"]
+    parser: "regex-fallback"
+  - name: Redis
+    extensions: ["redis"]
+    parser: "regex-fallback"
+  - name: Memcached
+    extensions: ["memcached"]
+    parser: "regex-fallback"
+  - name: "CouchDB Mango"
+    extensions: ["mango"]
+    parser: "regex-fallback"
+  - name: "Couchbase N1QL"
+    extensions: ["n1ql"]
+    parser: "regex-fallback"
+  - name: "ArangoDB AQL"
+    extensions: ["aql"]
+    parser: "aql-lsp"
+  - name: "OrientDB SQL"
+    extensions: ["osql"]
+    parser: "regex-fallback"
+  - name: InfluxQL
+    extensions: ["influxql"]
+    parser: "regex-fallback"
+  - name: Flux
+    extensions: ["flux"]
+    parser: "flux-lsp"
+  - name: PromQL
+    extensions: ["promql"]
+    parser: "promql-lsp"
+  - name: LogQL
+    extensions: ["logql"]
+    parser: "logql-lsp"
+  - name: Kusto
+    extensions: ["kusto"]
+    parser: "kql-lsp"
+  - name: "Splunk SPL"
+    extensions: ["spl"]
+    parser: "regex-fallback"
+  - name: "Elasticsearch DSL"
+    extensions: ["es"]
+    parser: "elasticsearch-lsp"
+  - name: LINQ
+    extensions: ["linq"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE MARKUP & DOCUMENTATION
+  # ============================================================
+  - name: CommonMark
+    extensions: ["commonmark"]
+    parser: "marksman"
+  - name: "GitHub Flavored Markdown"
+    extensions: ["gfmd"]
+    parser: "marksman"
+  - name: MultiMarkdown
+    extensions: ["mmd"]
+    parser: "regex-fallback"
+  - name: Djot
+    extensions: ["dj"]
+    parser: "regex-fallback"
+  - name: BBCode
+    extensions: ["bbcode"]
+    parser: "regex-fallback"
+  - name: Wikitext
+    extensions: ["wiki"]
+    parser: "regex-fallback"
+  - name: TiddlyWiki
+    extensions: ["tid"]
+    parser: "regex-fallback"
+  - name: Muse
+    extensions: ["muse"]
+    parser: "regex-fallback"
+  - name: ConTeXt
+    extensions: ["mkiv"]
+    parser: "texlab"
+  - name: Texinfo
+    extensions: ["texi"]
+    parser: "regex-fallback"
+  - name: Scribe
+    extensions: ["mss"]
+    parser: "regex-fallback"
+  - name: Lout
+    extensions: ["lt"]
+    parser: "regex-fallback"
+
+  # ============================================================
+  # COMPLETE NICHE & MODERN LANGUAGES (70+)
+  # ============================================================
+  - name: Ante
+    extensions: ["ante"]
+    parser: "regex-fallback"
+  - name: Bosque
+    extensions: ["bosque"]
+    parser: "bosque-lsp"
+  - name: Crumb
+    extensions: ["crumb"]
+    parser: "regex-fallback"
+  - name: Dice
+    extensions: ["dice"]
+    parser: "regex-fallback"
+  - name: Dyon
+    extensions: ["dyon"]
+    parser: "regex-fallback"
+  - name: Encore
+    extensions: ["enc"]
+    parser: "regex-fallback"
+  - name: Ermine
+    extensions: ["ermine"]
+    parser: "regex-fallback"
+  - name: Fuzion
+    extensions: ["fz"]
+    parser: "regex-fallback"
+  - name: Golem
+    extensions: ["golem"]
+    parser: "regex-fallback"
+  - name: Gravity
+    extensions: ["gravity"]
+    parser: "regex-fallback"
+  - name: Hush
+    extensions: ["hush"]
+    parser: "regex-fallback"
+  - name: Inko
+    extensions: ["inko"]
+    parser: "regex-fallback"
+  - name: Jakt
+    extensions: ["jakt"]
+    parser: "regex-fallback"
+  - name: Kitten
+    extensions: ["ktn"]
+    parser: "regex-fallback"
+  - name: Leaf
+    extensions: ["leaf"]
+    parser: "regex-fallback"
+  - name: Linenoise
+    extensions: ["ln"]
+    parser: "regex-fallback"
+  - name: Lobster
+    extensions: ["lobster"]
+    parser: "lobster-lsp"
+  - name: Luna
+    extensions: ["luna"]
+    parser: "regex-fallback"
+  - name: Mochi
+    extensions: ["mochi"]
+    parser: "regex-fallback"
+  - name: Mun
+    extensions: ["mun"]
+    parser: "mun-lsp"
+  - name: Myrddin
+    extensions: ["myr"]
+    parser: "regex-fallback"
+  - name: Nelua
+    extensions: ["nelua"]
+    parser: "regex-fallback"
+  - name: Never
+    extensions: ["nev"]
+    parser: "regex-fallback"
+  - name: Nimskull
+    extensions: ["nimskull"]
+    parser: "regex-fallback"
+  - name: Noctua
+    extensions: ["noct"]
+    parser: "regex-fallback"
+  - name: Oak
+    extensions: ["oak"]
+    parser: "regex-fallback"
+  - name: Oden
+    extensions: ["oden"]
+    parser: "regex-fallback"
+  - name: Pikelet
+    extensions: ["pikelet"]
+    parser: "regex-fallback"
+  - name: Pinafore
+    extensions: ["pinafore"]
+    parser: "regex-fallback"
+  - name: Plume
+    extensions: ["plume"]
+    parser: "regex-fallback"
+  - name: Popr
+    extensions: ["popr"]
+    parser: "regex-fallback"
+  - name: ProgsBase
+    extensions: ["pb"]
+    parser: "regex-fallback"
+  - name: Pyret
+    extensions: ["arr"]
+    parser: "regex-fallback"
+  - name: QED
+    extensions: ["qed"]
+    parser: "regex-fallback"
+  - name: Raku
+    extensions: ["raku", "rakumod"]
+    parser: "raku-lsp"
+  - name: Raptor
+    extensions: ["raptor"]
+    parser: "regex-fallback"
+  - name: Reia
+    extensions: ["reia"]
+    parser: "regex-fallback"
+  - name: Rho
+    extensions: ["rho"]
+    parser: "regex-fallback"
+  - name: Ribbon
+    extensions: ["ribbon"]
+    parser: "regex-fallback"
+  - name: Rune
+    extensions: ["rn"]
+    parser: "rune-lsp"
+  - name: Sibilant
+    extensions: ["sibilant"]
+    parser: "regex-fallback"
+  - name: Snout
+    extensions: ["snout"]
+    parser: "regex-fallback"
+  - name: Sourcerer
+    extensions: ["src"]
+    parser: "regex-fallback"
+  - name: Spry
+    extensions: ["spry"]
+    parser: "regex-fallback"
+  - name: Star
+    extensions: ["star"]
+    parser: "regex-fallback"
+  - name: Stroscot
+    extensions: ["stroscot"]
+    parser: "regex-fallback"
+  - name: Suneido
+    extensions: ["su"]
+    parser: "regex-fallback"
+  - name: Tao
+    extensions: ["tao"]
+    parser: "regex-fallback"
+  - name: Terra
+    extensions: ["terra"]
+    parser: "regex-fallback"
+  - name: Toy
+    extensions: ["toy"]
+    parser: "regex-fallback"
+  - name: Umka
+    extensions: ["um"]
+    parser: "regex-fallback"
+  - name: VimScript
+    extensions: ["vim"]
+    parser: "vim-lsp"
+  - name: Wu
+    extensions: ["wu"]
+    parser: "regex-fallback"
+  - name: XPL
+    extensions: ["xpl"]
+    parser: "regex-fallback"
+  - name: Yew
+    extensions: ["yew"]
+    parser: "regex-fallback"
+  - name: Yuescript
+    extensions: ["yue"]
+    parser: "regex-fallback"
+  - name: Z2
+    extensions: ["z2"]
+    parser: "regex-fallback"
+  - name: Zimbu
+    extensions: ["zu"]
+    parser: "regex-fallback"
