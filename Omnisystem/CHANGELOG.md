@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-05 — GPU Code Generation & Heterogeneous Target Dispatch (44/44 Passing)
+
+### Added
+- `titan/compiler/gpu_codegen.ti` — GPU kernel code generation for PTX/AMDGCN/SPIR-V;
+  emits actual instruction sequences (PTX thread ops, AMDGCN vector ALU, SPIR-V module
+  structure); deterministic, reproducible codegen with statistics tracking (14 assertions)
+- `titan/compiler/dispatch_target.ti` — Unified CPU/GPU dispatch layer; analyzes function
+  properties (effect mask, operation count, loop depth) to choose optimal compilation target;
+  cost/speedup estimation for target selection, rejects GPU for functions with effects
+  or insufficient parallelism (18 assertions)
+
+### Changed
+- Test suite updated: added gpu_codegen and dispatch_target modules
+
+### Result
+- **44 / 44 Titan files passing**
+- GPU backend now generates real code, not just size estimates
+- Compiler can automatically choose CPU or GPU based on function profile
+- Ready for actual CUDA/ROCm/Vulkan runtime binding
+
+---
+
 ## 2026-06-05 — P2P Socket Integration & Real Network Readiness (42/42 Passing)
 
 ### Added

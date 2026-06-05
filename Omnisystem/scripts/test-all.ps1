@@ -54,7 +54,9 @@ $sources = [ordered]@{
         "build\ir\ir.ti"
     )
     "Compiler Verification" = @(
-        "titan\compiler\self_host_verify.ti"
+        "titan\compiler\self_host_verify.ti",
+        "titan\compiler\gpu_codegen.ti",
+        "titan\compiler\dispatch_target.ti"
     )
     "Gap Closures (Phase 5)" = @(
         "aether\transport_p2p.ti",

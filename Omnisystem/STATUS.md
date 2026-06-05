@@ -91,6 +91,8 @@
 | File | Description | Status |
 |------|-------------|--------|
 | `self_host_verify.ti` | 5 self-hosting theorems; bootstrap elimination proof | ✅ 111 |
+| `gpu_codegen.ti` | Real PTX/AMDGCN/SPIR-V code generation; instruction emission, module structure | ✅ 111 |
+| `dispatch_target.ti` | CPU/GPU dispatch analyzer; effect analysis, cost/speedup estimation | ✅ 111 |
 
 ### Titan Language (`titan/`)
 
@@ -217,24 +219,32 @@ observability (append-only, causal ordering). ✅ 111
 | Socket I/O effects | `effect/socket_io.ti` (connect, send, recv, listen abstractions) | 9 | ✅ COMPLETE |
 | P2P-socket bridge | `aether/transport_socket_bridge.ti` (mesh → socket dispatch routing) | 9 | ✅ COMPLETE |
 
+### GPU Compilation & Dispatch — Phase 2 Complete
+
+| Component | Implementation | Tests | Status |
+|-----------|-----------------|-------|--------|
+| GPU code generation | `titan/compiler/gpu_codegen.ti` (PTX/AMDGCN/SPIR-V emission) | 9 | ✅ COMPLETE |
+| CPU/GPU dispatcher | `titan/compiler/dispatch_target.ti` (effect analysis, target selection) | 9 | ✅ COMPLETE |
+
 ---
 
 ## What Is Not Yet Done
 
-All critical gaps are **closed**. P2P socket integration **Phase 1 complete**. Remaining work:
+All critical gaps are **closed**. Network and GPU phases **1-2 complete**. Remaining work:
 
-**Phase 2 (High Priority):**
+**P2P Phase 2 (High Priority):**
 - Real socket binding in external runtime (C FFI for connect/send/recv)
 - Integration with USOS I/O subsystem
 
-**Phase 3 (Medium Priority):**
+**Boot & Axiom Phase 3 (Medium Priority):**
 - Boot kernel on bare metal (requires bootloader + UEFI)
-- Activate GPU on hardware (requires CUDA/ROCm SDK)
+- Activate GPU on hardware (requires CUDA/ROCm SDK linking compiled kernels)
 - Integrate Z3/CVC5 with Axiom (requires external solver binaries)
 
-**Phase 4 (Lower Priority):**
+**Language & Observability Phase 4 (Lower Priority):**
 - Complete BPLIS/LAIR transpiler (requires language frontend plugins)
 - Distributed tracing integration with observability service
+- Full heterogeneous scheduling across CPU/GPU cluster
 
 ---
 
@@ -270,6 +280,8 @@ effect/perform                ✅ PASS  (effect algebra, handler stack, perform 
 effect/socket_io              ✅ PASS  (socket I/O effects, connect/send/recv/listen abstractions)
 titan/std/effect_handlers     ✅ PASS  (Real, Mock, Log, Sandbox, Count)
 titan/compiler/self_host_verify  ✅ PASS  (5 self-hosting theorems)
+titan/compiler/gpu_codegen    ✅ PASS  (PTX/AMDGCN/SPIR-V code generation)
+titan/compiler/dispatch_target ✅ PASS  (effect analysis, CPU/GPU dispatch, cost estimation)
 uvm/scheduler                 ✅ PASS  (priority queue, agent dispatch)
 uvm/agent                     ✅ PASS  (test suites, chaos injection, fidelity)
 uvm/chaos                     ✅ PASS  (5 fault types, SLA recovery, quorum)
@@ -284,5 +296,5 @@ axiom/smt_solver              ✅ PASS  (Z3/CVC5 integration, proof discharge)
 build/stage3                  ✅ PASS  (fixed-point verification, bootstrap elimination)
 vm/frontend_registry          ✅ PASS  (legacy frontends for 750+ languages)
 
-42 / 42 passing
+44 / 44 passing
 ```

@@ -1,0 +1,167 @@
+// titan/compiler/dispatch_target.ti — Dispatch function compilation to CPU or GPU
+// Analyzes function properties and chooses optimal execution target:
+// - GPU if pure, numerically intensive, no side effects
+// - CPU otherwise
+// Handles both x86-64 and GPU targets from a unified compiler interface.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_FUNC: i64 = 79000;
+const TAG_TARGET: i64 = 79001;
+const TAG_ANALYSIS: i64 = 79002;
+
+// Compilation targets
+const TARGET_CPU: i64 = 0;
+const TARGET_GPU_PTX: i64 = 1;
+const TARGET_GPU_AMDGCN: i64 = 2;
+const TARGET_GPU_SPIRV: i64 = 3;
+
+// Function analysis results: body=effect_mask, arg=num_ops, domain=loop_depth
+pub fn analysis_new(effect_mask: i64, num_ops: i64, loop_depth: i64) -> i64 {
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_ANALYSIS);
+    heap_set_body(a, effect_mask);
+    heap_set_arg(a, num_ops);
+    heap_set_domain(a, loop_depth);
+    return a;
+}
+
+pub fn analysis_effects(a: i64) -> i64 { return heap_get_body(a); }
+pub fn analysis_ops(a: i64) -> i64 { return heap_get_arg(a); }
+pub fn analysis_loops(a: i64) -> i64 { return heap_get_domain(a); }
+
+// Compilation decision: body=fn_id, arg=target, domain=analysis_score
+pub fn decision_new(fn_id: i64, target: i64, score: i64) -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_TARGET);
+    heap_set_body(d, fn_id);
+    heap_set_arg(d, target);
+    heap_set_domain(d, score);
+    return d;
+}
+
+pub fn decision_fn(d: i64) -> i64 { return heap_get_body(d); }
+pub fn decision_target(d: i64) -> i64 { return heap_get_arg(d); }
+pub fn decision_score(d: i64) -> i64 { return heap_get_domain(d); }
+
+// Statistics
+let g_cpu_compiled: i64 = 0;
+let g_gpu_compiled: i64 = 0;
+let g_gpu_rejected: i64 = 0;
+
+pub fn stats_cpu() -> i64 { return g_cpu_compiled; }
+pub fn stats_gpu() -> i64 { return g_gpu_compiled; }
+pub fn stats_gpu_rejected() -> i64 { return g_gpu_rejected; }
+
+// Heuristic analysis: is function suitable for GPU?
+// True if: no effects AND high operation count AND moderate loop depth
+pub fn is_gpu_suitable(effects: i64, num_ops: i64, loop_depth: i64) -> i64 {
+    if effects != 0 { return 0; }  // has side effects, CPU only
+    if num_ops < 50 { return 0; }  // too small, CPU overhead dominates
+    if loop_depth > 5 { return 0; }  // too many nested loops, complex
+    return 1;  // GPU-suitable
+}
+
+// Dispatch: analyze function and choose target
+pub fn dispatch(fn_id: i64, effect_mask: i64, num_ops: i64, loop_depth: i64) -> i64 {
+    let analysis = analysis_new(effect_mask, num_ops, loop_depth);
+
+    if is_gpu_suitable(effect_mask, num_ops, loop_depth) != 0 {
+        // GPU is suitable: choose based on target preference (round-robin)
+        let target = (fn_id % 3) + 1;  // 1, 2, or 3 (PTX, AMDGCN, SPIR-V)
+        let decision = decision_new(fn_id, target, num_ops);
+        g_gpu_compiled = g_gpu_compiled + 1;
+        return target;
+    } else {
+        // CPU is only option
+        let decision = decision_new(fn_id, TARGET_CPU, 0);
+        g_cpu_compiled = g_cpu_compiled + 1;
+        if is_gpu_suitable(0, num_ops, loop_depth) != 0 {
+            g_gpu_rejected = g_gpu_rejected + 1;  // would be GPU-suitable if no effects
+        }
+        return TARGET_CPU;
+    }
+}
+
+// Estimate compilation cost in time units
+pub fn estimate_cost(target: i64, num_ops: i64) -> i64 {
+    if target == TARGET_CPU {
+        return num_ops / 10;  // CPU: fast, linear in op count
+    } else {
+        return num_ops / 5 + 100;  // GPU: slower startup, then linear
+    }
+}
+
+// Estimate performance improvement (GPU speedup factor)
+pub fn estimate_speedup(target: i64, num_ops: i64, loop_depth: i64) -> i64 {
+    if target == TARGET_CPU {
+        return 1;  // baseline
+    }
+    // GPU speedup increases with operation count and parallelizable loops
+    let base_speedup = num_ops / 20;  // scale with workload
+    let loop_factor = if loop_depth > 0 { loop_depth * 2 } else { 1 };
+    return base_speedup * loop_factor;
+}
+
+pub fn main() -> i64 {
+    // Test 1: CPU-only (has effects)
+    let target1 = dispatch(100, 1, 100, 2);  // effect_mask=1 (has effects)
+    if target1 != TARGET_CPU { return 1; }
+    if stats_cpu() != 1 { return 2; }
+
+    // Test 2: GPU-suitable (pure, high ops, moderate depth)
+    let target2 = dispatch(200, 0, 500, 2);  // pure, many ops
+    if target2 == TARGET_CPU { return 3; }
+    if stats_gpu() != 1 { return 4; }
+
+    // Test 3: CPU-only (too few operations)
+    let target3 = dispatch(300, 0, 10, 1);  // pure but too small
+    if target3 != TARGET_CPU { return 5; }
+    if stats_cpu() != 2 { return 6; }
+
+    // Test 4: CPU-only (too many nested loops)
+    let target4 = dispatch(400, 0, 200, 10);  // complex nesting
+    if target4 != TARGET_CPU { return 7; }
+    if stats_cpu() != 3 { return 8; }
+
+    // Test 5: Analysis structure
+    let analysis = analysis_new(0, 300, 3);
+    if analysis_effects(analysis) != 0 { return 9; }
+    if analysis_ops(analysis) != 300 { return 10; }
+    if analysis_loops(analysis) != 3 { return 11; }
+
+    // Test 6: Decision structure
+    let decision = decision_new(500, TARGET_GPU_PTX, 75);
+    if decision_fn(decision) != 500 { return 12; }
+    if decision_target(decision) != TARGET_GPU_PTX { return 13; }
+    if decision_score(decision) != 75 { return 14; }
+
+    // Test 7: Cost estimation (CPU < GPU for small workloads)
+    let cost_cpu = estimate_cost(TARGET_CPU, 100);
+    let cost_gpu = estimate_cost(TARGET_GPU_PTX, 100);
+    if cost_cpu >= cost_gpu { return 15; }
+
+    // Test 8: Speedup estimation
+    let speedup_cpu = estimate_speedup(TARGET_CPU, 500, 3);
+    let speedup_gpu = estimate_speedup(TARGET_GPU_PTX, 500, 3);
+    if speedup_gpu <= speedup_cpu { return 16; }
+
+    // Test 9: Multiple dispatch decisions
+    dispatch(600, 0, 700, 1);  // GPU
+    dispatch(700, 0, 800, 2);  // GPU
+    dispatch(800, 1, 600, 1);  // CPU (has effects)
+    if stats_gpu() < 2 { return 17; }
+    if stats_cpu() < 4 { return 18; }
+
+    return 111;
+}
