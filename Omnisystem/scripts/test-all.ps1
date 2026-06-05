@@ -15,7 +15,8 @@ $sources = [ordered]@{
     "Kernel" = @(
         "kernel\capability.ti",
         "kernel\memory.ti",
-        "kernel\scheduler.ti"
+        "kernel\scheduler.ti",
+        "kernel\boot_integration.ti"
     )
     "Services" = @(
         "services\p2p\p2p.ti",

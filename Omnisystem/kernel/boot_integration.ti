@@ -1,0 +1,186 @@
+// kernel/boot_integration.ti — Integration layer for bootable kernel system
+// Combines boot sequence stages with UEFI firmware handoff and kernel entry.
+// Represents the full transition from bootloader → protected mode → kernel running.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_BOOTLOADER: i64 = 80000;
+const TAG_FIRMWARE: i64 = 80001;
+const TAG_KERNEL_INIT: i64 = 80002;
+const TAG_BOOT_STATE: i64 = 80003;
+
+// Boot state machine: 0=firmware, 1=bootloader, 2=protected_mode, 3=kernel_running
+const STATE_FIRMWARE: i64 = 0;
+const STATE_BOOTLOADER: i64 = 1;
+const STATE_PROTECTED_MODE: i64 = 2;
+const STATE_KERNEL: i64 = 3;
+
+// Firmware state: body=uefi_version, arg=memory_size_mb, domain=state
+pub fn firmware_new(uefi_version: i64, memory_mb: i64) -> i64 {
+    let fw = heap_alloc_term();
+    heap_set_tag(fw, TAG_FIRMWARE);
+    heap_set_body(fw, uefi_version);
+    heap_set_arg(fw, memory_mb);
+    heap_set_domain(fw, STATE_FIRMWARE);
+    return fw;
+}
+
+pub fn firmware_version(fw: i64) -> i64 { return heap_get_body(fw); }
+pub fn firmware_memory(fw: i64) -> i64 { return heap_get_arg(fw); }
+pub fn firmware_state(fw: i64) -> i64 { return heap_get_domain(fw); }
+pub fn firmware_set_state(fw: i64, state: i64) { heap_set_domain(fw, state); return; }
+
+// Bootloader: body=entry_point, arg=kernel_load_addr, domain=state
+pub fn bootloader_new(entry_point: i64, kernel_addr: i64) -> i64 {
+    let bl = heap_alloc_term();
+    heap_set_tag(bl, TAG_BOOTLOADER);
+    heap_set_body(bl, entry_point);
+    heap_set_arg(bl, kernel_addr);
+    heap_set_domain(bl, STATE_BOOTLOADER);
+    return bl;
+}
+
+pub fn bootloader_entry(bl: i64) -> i64 { return heap_get_body(bl); }
+pub fn bootloader_kernel_addr(bl: i64) -> i64 { return heap_get_arg(bl); }
+pub fn bootloader_state(bl: i64) -> i64 { return heap_get_domain(bl); }
+pub fn bootloader_set_state(bl: i64, state: i64) { heap_set_domain(bl, state); return; }
+
+// Kernel init: body=gdt_addr, arg=idt_addr, domain=paging_root
+pub fn kernel_init_new(gdt_addr: i64, idt_addr: i64, paging_root: i64) -> i64 {
+    let ki = heap_alloc_term();
+    heap_set_tag(ki, TAG_KERNEL_INIT);
+    heap_set_body(ki, gdt_addr);
+    heap_set_arg(ki, idt_addr);
+    heap_set_domain(ki, paging_root);
+    return ki;
+}
+
+pub fn kernel_init_gdt(ki: i64) -> i64 { return heap_get_body(ki); }
+pub fn kernel_init_idt(ki: i64) -> i64 { return heap_get_arg(ki); }
+pub fn kernel_init_paging(ki: i64) -> i64 { return heap_get_domain(ki); }
+
+// Statistics
+let g_boots_initiated: i64 = 0;
+let g_boots_successful: i64 = 0;
+let g_boots_failed: i64 = 0;
+
+pub fn stats_boots() -> i64 { return g_boots_initiated; }
+pub fn stats_successful() -> i64 { return g_boots_successful; }
+pub fn stats_failed() -> i64 { return g_boots_failed; }
+
+// Boot sequence: firmware → bootloader → protected mode → kernel running
+pub fn boot_sequence_run(uefi_version: i64, memory_mb: i64) -> i64 {
+    g_boots_initiated = g_boots_initiated + 1;
+
+    // Stage 1: Firmware verification
+    if uefi_version < 2 { g_boots_failed = g_boots_failed + 1; return -1; }  // too old
+
+    let fw = firmware_new(uefi_version, memory_mb);
+    firmware_set_state(fw, STATE_FIRMWARE);
+
+    // Stage 2: Bootloader transition
+    let entry = 0x7C00;  // BIOS boot sector address
+    let kernel_addr = 0x100000;  // 1MB (protected mode kernel load)
+    let bl = bootloader_new(entry, kernel_addr);
+    bootloader_set_state(bl, STATE_BOOTLOADER);
+
+    // Stage 3: Protected mode setup
+    let gdt_addr = 0x500;
+    let idt_addr = 0x600;
+    bootloader_set_state(bl, STATE_PROTECTED_MODE);
+
+    // Stage 4: Kernel initialization
+    let paging_root = 0x1000;
+    let ki = kernel_init_new(gdt_addr, idt_addr, paging_root);
+    bootloader_set_state(bl, STATE_KERNEL);
+    firmware_set_state(fw, STATE_KERNEL);
+
+    g_boots_successful = g_boots_successful + 1;
+    return 1;  // success
+}
+
+// Bootloader handoff: firmware passes control to bootloader
+pub fn handoff_to_bootloader(fw: i64, bl: i64) -> i64 {
+    if firmware_state(fw) != STATE_FIRMWARE { return -1; }
+    bootloader_set_state(bl, STATE_BOOTLOADER);
+    return bootloader_entry(bl);
+}
+
+// Bootloader handoff: bootloader passes control to kernel
+pub fn handoff_to_kernel(bl: i64, ki: i64) -> i64 {
+    if bootloader_state(bl) != STATE_PROTECTED_MODE { return -1; }
+    bootloader_set_state(bl, STATE_KERNEL);
+    return kernel_init_gdt(ki);
+}
+
+// UEFI boot protocol verification: check required structures
+pub fn verify_uefi_boot(fw: i64, bl: i64, ki: i64) -> i64 {
+    if firmware_version(fw) < 2 { return -1; }
+    if bootloader_entry(bl) <= 0 { return -2; }
+    if kernel_init_gdt(ki) <= 0 { return -3; }
+    return 1;  // valid
+}
+
+pub fn main() -> i64 {
+    // Test 1: firmware creation
+    let fw = firmware_new(2, 256);  // UEFI 2.0, 256MB RAM
+    if firmware_version(fw) != 2 { return 1; }
+    if firmware_memory(fw) != 256 { return 2; }
+    if firmware_state(fw) != STATE_FIRMWARE { return 3; }
+
+    // Test 2: bootloader creation
+    let bl = bootloader_new(0x7C00, 0x100000);
+    if bootloader_entry(bl) != 0x7C00 { return 4; }
+    if bootloader_state(bl) != STATE_BOOTLOADER { return 5; }
+
+    // Test 3: kernel init creation
+    let ki = kernel_init_new(0x500, 0x600, 0x1000);
+    if kernel_init_gdt(ki) != 0x500 { return 6; }
+    if kernel_init_idt(ki) != 0x600 { return 7; }
+    if kernel_init_paging(ki) != 0x1000 { return 8; }
+
+    // Test 4: full boot sequence
+    let result = boot_sequence_run(2, 512);
+    if result != 1 { return 9; }
+    if stats_boots() != 1 { return 10; }
+    if stats_successful() != 1 { return 11; }
+
+    // Test 5: failed boot (old firmware)
+    let result_fail = boot_sequence_run(1, 128);  // UEFI 1.0 too old
+    if result_fail != -1 { return 12; }
+    if stats_boots() != 2 { return 13; }
+    if stats_failed() != 1 { return 14; }
+
+    // Test 6: firmware->bootloader handoff
+    let entry_point = handoff_to_bootloader(fw, bl);
+    if entry_point != 0x7C00 { return 15; }
+
+    // Test 7: bootloader state transitions
+    bootloader_set_state(bl, STATE_PROTECTED_MODE);
+    if bootloader_state(bl) != STATE_PROTECTED_MODE { return 16; }
+    let gdt_addr = handoff_to_kernel(bl, ki);
+    if gdt_addr != 0x500 { return 17; }
+    if bootloader_state(bl) != STATE_KERNEL { return 18; }
+
+    // Test 8: UEFI verification
+    let verify = verify_uefi_boot(fw, bl, ki);
+    if verify != 1 { return 19; }
+
+    // Test 9: multiple boot attempts
+    boot_sequence_run(2, 384);
+    boot_sequence_run(2, 512);
+    if stats_boots() != 4 { return 20; }
+    if stats_successful() < 3 { return 21; }
+
+    return 111;
+}
