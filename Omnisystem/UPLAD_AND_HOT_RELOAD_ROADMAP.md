@@ -300,12 +300,24 @@ Omnisystem/
 
 ## Timeline
 
-- **Week 1** (Done) – UPLAD foundation (schema, storage, inference, CLI)
-- **Week 2** – Kernel integration, language registry (Aether actor)
-- **Week 3** – Language specs population (start with top 50)
-- **Week 4** – Verification proofs (Axiom), frontend loader
-- **Week 5** – Integration testing, real-world hot-reload scenarios
-- **Week 6** – Performance tuning, stress testing, documentation
+- **Week 1** ✅ **DONE** – UPLAD foundation (schema, storage, inference, CLI)
+  - schema.ti (canonical language specs)
+  - storage.ti (CAS backend)
+  - similarity.ti (deterministic discovery)
+  - inference.ti (property inference)
+  - cli.ti (command-line interface)
+
+- **Week 2** ✅ **DONE** – Kernel integration, language registry (Aether actor)
+  - registry.ae (distributed Aether actor)
+  - registry_client.ti (Titan RPC client)
+  - hot_reload_integration.ti (kernel bridging)
+  - verify.ti (Axiom verification framework)
+  - 4 initial language specs (Rust, Python, Haskell, JavaScript)
+
+- **Week 3** – Language specs population (continue with top 50)
+- **Week 4** – Frontend loader, Axiom proofs, integration testing
+- **Week 5** – Real-world hot-reload scenarios, stress testing
+- **Week 6** – Performance tuning, documentation, deployment
 
 ---
 
