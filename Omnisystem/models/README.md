@@ -8,8 +8,8 @@ Complete reference guide to all models within the Omnisystem ecosystem.
 
 | Model | Type | Status | Location |
 |-------|------|--------|----------|
-| **Octopus** | Vision-Language Fine-tuned | ✅ Ready | `D:\Models\Custom\octopus-ai-model/` |
-| **Poe** | Personality-based Agent | 🔄 Training | `Omnisystem/omni-ai/poe/` |
+| **Octopus** | Vision-Language Fine-tuned | ✅ Ready | `Z:\Projects\BonsaiWorkspace\models\trained-models\octopus-ai/` |
+| **Poe** | Personality-based Agent | 🔄 Training | `Z:\Projects\BonsaiWorkspace\models\trained-models\poe-ai/` |
 | **Omni-AI Registry** | Model Management System | ✅ Ready | `Omnisystem/omni-ai/registry/` |
 
 ---
@@ -21,8 +21,8 @@ Fine-tuned vision-language model based on instruction-following architecture. Or
 
 ### Files & Location
 ```
-Private Storage (NOT in repo):
-  D:\Models\Custom\octopus-ai-model/
+Bonsai Ecosystem (workspace-local):
+  Z:\Projects\BonsaiWorkspace\models\trained-models\octopus-ai/
     ├── pytorch_model.bin         (312 MB)
     ├── config.json               (Model config)
     ├── tokenizer.json            (BPE tokenizer)
@@ -75,7 +75,7 @@ pub fn perform_reasoning(query_hash: i64) -> i64 {
 ```python
 from omnisystem.omni_ai.octopus import OctopusModel
 
-model = OctopusModel.load("D:\\Models\\Custom\\octopus-ai-model")
+model = OctopusModel.load("Z:\\Projects\\BonsaiWorkspace\\models\\trained-models\\octopus-ai")
 output = model.infer("What is the Omnisystem?", max_tokens=256)
 ```
 
@@ -109,13 +109,13 @@ Omni-AI Poe System:
 - **Communication Style**: Socratic, question-driven
 - **Knowledge Base**: Integrated with Omnisystem proof tactics
 
-**Knowledge Modules** (`Omnisystem/omni-ai/poe/kdb-modules/`)
+**Knowledge Modules** (`Z:\Projects\BonsaiWorkspace\models\trained-models\poe-ai\kdb-modules/`)
 - Axiom proof techniques
 - Formal verification patterns
 - Distributed system reasoning
 - Security properties verification
 
-**Core Implementation** (`Omnisystem/omni-ai/poe/src/`)
+**Core Implementation** (`Z:\Projects\BonsaiWorkspace\models\trained-models\poe-ai\src/`)
 - Reasoning pipeline
 - Context management
 - Response generation

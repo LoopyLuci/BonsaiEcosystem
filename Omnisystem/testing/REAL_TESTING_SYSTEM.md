@@ -14,7 +14,7 @@
 This is a **real, production-grade testing system** written entirely in **pure Titan**. It executes actual models from disk against comprehensive test suites with persistent data collection. **No simulation. All results are genuine execution data.**
 
 ```
-Real Models on Disk (D:\Models\Custom\)
+Real Models on Disk (Z:\Projects\BonsaiWorkspace\models\trained-models\)
     ↓
 Titan Test Harness (model_test_harness.ti)
     ↓
