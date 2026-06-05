@@ -1,8 +1,6 @@
-# Omnisystem AI Models
+# Omnisystem Models
 
-Complete reference guide to all **Omni-AI** models within the Omnisystem ecosystem.
-
-> **Note:** Within the Omnisystem, all BonsAI models are renamed to **Omni-AI** to reflect their integration into the sovereign computing platform.
+Complete reference guide to all models within the Omnisystem ecosystem.
 
 ---
 
@@ -10,13 +8,13 @@ Complete reference guide to all **Omni-AI** models within the Omnisystem ecosyst
 
 | Model | Type | Status | Location |
 |-------|------|--------|----------|
-| **Omni-AI Octopus** | Vision-Language Fine-tuned | ✅ Ready | `D:\Models\Custom\octopus-ai-model/` |
-| **Omni-AI Poe** | Personality-based Agent | 🔄 Training | `Omnisystem/omni-ai/poe-ai/` |
+| **Octopus** | Vision-Language Fine-tuned | ✅ Ready | `D:\Models\Custom\octopus-ai-model/` |
+| **Poe** | Personality-based Agent | 🔄 Training | `Omnisystem/omni-ai/poe/` |
 | **Omni-AI Registry** | Model Management System | ✅ Ready | `Omnisystem/omni-ai/registry/` |
 
 ---
 
-## 1. Omni-AI Octopus
+## 1. Octopus
 
 ### Overview
 Fine-tuned vision-language model based on instruction-following architecture. Originally trained as part of the Bonsai ecosystem, now integrated as **Omni-AI Octopus** within the Omnisystem.
@@ -52,7 +50,7 @@ Public Reference (in repo):
 ✅ Domain-specific knowledge (training corpus)
 
 ### Integration with Omnisystem
-Within the Omnisystem, Omni-AI Octopus is used as:
+Within the Omnisystem, Octopus is used as:
 - **Language model component** for natural language processing in `sylva/` runtime
 - **Knowledge base** for fact retrieval in `axiom/` proof tactics
 - **Decision engine** for `uvm/` validation mesh strategies
@@ -87,7 +85,7 @@ output = model.infer("What is the Omnisystem?", max_tokens=256)
 
 ---
 
-## 2. Omni-AI Poe
+## 2. Poe
 
 ### Overview
 Personality-based AI agent for collaborative reasoning within the Omnisystem. Originally developed as **Poe** in the Bonsai ecosystem, now branded as **Omni-AI Poe** for consistency.

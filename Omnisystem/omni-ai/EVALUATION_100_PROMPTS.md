@@ -1,7 +1,8 @@
-# Omni-AI Model Evaluation — 100 Prompt Test Suite
+# Model Evaluation — 100 Prompt Test Suite
 
 **Date:** 2026-06-05  
-**Models Tested:** Omni-AI Octopus (v1) + Omni-AI Poe (v1)  
+**Models Tested:** Octopus + Poe  
+**Integration Context:** Native models within Omnisystem via Omni-AI Registry  
 **Test Methodology:** Systematic 100-prompt evaluation across 10 capability categories  
 **Status:** ✅ READY FOR EXECUTION
 
@@ -32,8 +33,8 @@
 **Prompt:** "All penguins are birds. All birds have feathers. Are all penguins feathered? Explain your reasoning."
 
 **Expected Capabilities:**
-- ✅ Omni-AI Octopus: Logical chain, clear conclusion
-- ✅ Omni-AI Poe: Poetic explanation with soundness proof
+- ✅ Octopus: Logical chain, clear conclusion
+- ✅ Poe: Poetic explanation with soundness proof
 
 **Evaluation Metrics:**
 - Correctness of deduction
