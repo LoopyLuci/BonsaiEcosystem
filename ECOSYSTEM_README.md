@@ -526,7 +526,7 @@ Each major component is documented in `docs/NN-*.md`. Here's what's covered:
 **Workflows**:
 - `./BonsaiExeLauncherBuilder.ps1` - Desktop build
 - `.github/workflows/` - CI checks
-- `bonsai-workspace/src/launch-all.mjs` - Dev launcher
+- `bonsai-workspace/src/orchestrate-bonsai-ecosystem.mjs` - Orchestrates full ecosystem startup (Tauri + bonsai-bot, preflight checks, health validation)
 
 #### [13-TROUBLESHOOTING.md](docs/13-TROUBLESHOOTING.md)
 - Common issues & fixes

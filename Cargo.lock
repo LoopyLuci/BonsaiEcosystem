@@ -3902,6 +3902,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "handlebars"
+version = "4.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "faa67bab9ff362228eb3d00bd024a4965d8231bbb7921167f0cfa66c6626b225"
+dependencies = [
+ "log",
+ "pest",
+ "pest_derive",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9731,6 +9745,75 @@ name = "typewit_proc_macros"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e36a83ea2b3c704935a01b4642946aadd445cea40b10935e3f8bd8052b8193d6"
+
+[[package]]
+name = "ubvm-axiom"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "ubvm-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dashmap 5.5.3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "ubvm-mesh"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "dashmap 5.5.3",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "ubvm-core",
+ "uuid",
+]
+
+[[package]]
+name = "ubvm-suites"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "ubvm-core",
+ "uuid",
+ "zstd 0.13.3",
+]
+
+[[package]]
+name = "ubvm-ulb"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "handlebars",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
 
 [[package]]
 name = "ucd-trie"

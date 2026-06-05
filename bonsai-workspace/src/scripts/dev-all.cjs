@@ -5,7 +5,7 @@ const http = require('http');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const LAUNCHER = path.join(ROOT, 'launch-all.mjs');
+const LAUNCHER = path.join(ROOT, 'orchestrate-bonsai-ecosystem.mjs');
 const VITE_URLS = [process.env.VITE_DEV_URL || 'http://127.0.0.1:1420/', process.env.VITE_DEV_URL_ALT || 'http://localhost:1420/'];
 const API_HOST = process.env.VITE_API_HOST || process.env.BONSAI_API_HOST || '127.0.0.1';
 const API_PORT = process.env.VITE_API_PORT || process.env.BONSAI_API_PORT || '11369';

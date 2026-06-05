@@ -1241,12 +1241,16 @@ dependencies = [
 
 [[package]]
 name = "bonsai-transfer-core"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "blake3",
  "bonsai-transfer-crypto",
+ "bonsai-transfer-identity",
  "bytes",
+ "dashmap 5.5.3",
+ "parking_lot",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -1257,12 +1261,14 @@ dependencies = [
 
 [[package]]
 name = "bonsai-transfer-crypto"
-version = "0.1.0"
+version = "2.0.0"
 dependencies = [
  "aes-gcm",
  "argon2",
  "bip39",
+ "bitflags 2.11.0",
  "blake3",
+ "chrono",
  "ed25519-dalek",
  "hex",
  "rand 0.8.5",
@@ -1272,6 +1278,20 @@ dependencies = [
  "thiserror 1.0.69",
  "x25519-dalek",
  "zeroize",
+]
+
+[[package]]
+name = "bonsai-transfer-identity"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "chrono",
+ "ed25519-dalek",
+ "hex",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

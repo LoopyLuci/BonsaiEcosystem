@@ -87,9 +87,9 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  log('Bonsai all-in-one launcher');
+  log('Bonsai Ecosystem Orchestrator');
   log('');
-  log('Usage: node ./launch-all.mjs [options]');
+  log('Usage: node ./orchestrate-bonsai-ecosystem.mjs [options]');
   log('');
   log('Options:');
   log('  --mode desktop|desktop+usb   Launch mode (default: desktop)');

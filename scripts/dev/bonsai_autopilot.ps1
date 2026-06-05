@@ -109,7 +109,7 @@ function Step-2_Launch {
     }
 
     # Fallback: node launcher
-    $launchMjs = Join-Path $PSScriptRoot 'bonsai-workspace\src\launch-all.mjs'
+    $launchMjs = Join-Path $PSScriptRoot 'bonsai-workspace\src\orchestrate-bonsai-ecosystem.mjs'
     if (Test-Path $launchMjs) {
         if ($isDryRun) { Write-Host "  DryRun: would run node $launchMjs"; return @{ pid = 0 } }
         $node = (Get-Command node -ErrorAction SilentlyContinue)?.Source

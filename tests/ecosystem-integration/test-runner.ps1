@@ -351,11 +351,11 @@ try {
 
   Run-Test -Name "Test 10: Launcher recursion guard" -Body {
     $launchDir = Join-Path $RepoRoot "bonsai-workspace\src"
-    $launcher = Join-Path $launchDir "launch-all.mjs"
+    $launcher = Join-Path $launchDir "orchestrate-bonsai-ecosystem.mjs"
     $pidFile = Join-Path $RepoRoot ".bonsai-launcher.pid"
 
     if (-not (Test-Path $launcher)) {
-      return @{ Pass = $false; Notes = "launch-all.mjs not found" }
+      return @{ Pass = $false; Notes = "orchestrate-bonsai-ecosystem.mjs not found" }
     }
 
     $sentinel = Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-Command", "Start-Sleep -Seconds 30") -PassThru

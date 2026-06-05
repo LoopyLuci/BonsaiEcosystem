@@ -75,7 +75,7 @@ are all `false` as expected.
 - `telemetry_store` borrow-after-move in AppState construction
 
 ### Infrastructure
-- `launch-all.mjs` renamed to `launch-all-tests.mjs` (was the test orchestrator, not the app launcher)
+- `launch-all.mjs` → `launch-all-tests.mjs` → `orchestrate-bonsai-ecosystem.mjs` (comprehensive ecosystem orchestrator: manages preflight, spawns Tauri + bonsai-bot, validates health, optional testing)
 - Generated training data splits added to `.gitignore`
 
 ---

@@ -31,7 +31,7 @@ if (-not (Test-Path $srcDir)) {
 Push-Location $srcDir
 try {
   $effectiveReportPathOverride = $null
-  $launchScript = Join-Path $srcDir 'launch-all.mjs'
+  $launchScript = Join-Path $srcDir 'orchestrate-bonsai-ecosystem.mjs'
   if (-not (Test-Path $launchScript)) {
     throw "Could not find launcher script: $launchScript"
   }
