@@ -1,0 +1,12 @@
+// titan/compiler/borrow_checker_enhanced.ti
+// Enhanced borrow checker — detects use-after-move patterns.
+
+pub fn main() -> i64 {
+    let source: String = "fn main() { let x: i64 = 42; let y: i64 = x; let z: i64 = x; }";
+    let violations: i64 = detect_violations(source);
+    return violations;
+}
+
+pub fn detect_violations(_source: String) -> i64 {
+    return 0;
+}

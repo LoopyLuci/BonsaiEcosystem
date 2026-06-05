@@ -1,0 +1,224 @@
+// axiom/tactics/tactic_core.ti — Tactic monad for Axiom proof assistant
+//
+// A proof state is a list of goals stored on the heap.
+// Each goal is a heap cell: [tag=20, ctx_id, ty_id, next_goal_id]
+// Tactic state: [tag=21, head_goal_id, proof_term_id]
+//
+// Goal tags: 20=Goal, 21=TacticState, 22=GoalNil (no more goals)
+//
+// Term tags: 0=Var 1=Lam 2=App 3=Pi 4=Sort 5=Const 6=Inductive 7=Constructor 8=Elim
+// Context:   9=CtxNil 10=CtxCons
+
+// ── Term constructors ──────────────────────────────────────────────────────
+
+pub fn var_ref(idx: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 0); heap_set(id, 1, idx); return id;
+}
+pub fn lam(body: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 1); heap_set(id, 1, body); return id;
+}
+pub fn app(func: i64, arg: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 2); heap_set(id, 1, func); heap_set(id, 2, arg); return id;
+}
+pub fn pi(domain: i64, codomain: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 3); heap_set(id, 1, domain); heap_set(id, 2, codomain); return id;
+}
+pub fn sort(level: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 4); heap_set(id, 1, level); return id;
+}
+pub fn const_term(name: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 5); heap_set(id, 1, name); return id;
+}
+
+// ── Context ────────────────────────────────────────────────────────────────
+
+pub fn ctx_nil() -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 9); return id;
+}
+pub fn ctx_cons(ty: i64, rest: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 10); heap_set(id, 1, ty); heap_set(id, 2, rest); return id;
+}
+pub fn ctx_lookup(ctx: i64, idx: i64) -> i64 {
+    let tag = heap_get(ctx, 0);
+    if tag == 9 { return 0 - 1; }
+    if idx == 0 { return heap_get(ctx, 1); }
+    return ctx_lookup(heap_get(ctx, 2), idx - 1);
+}
+
+// ── Structural equality ────────────────────────────────────────────────────
+
+pub fn eq_term(a: i64, b: i64) -> i64 {
+    let ta = heap_get(a, 0); let tb = heap_get(b, 0);
+    if ta != tb { return 0; }
+    if ta == 0 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 1 { return eq_term(heap_get(a, 1), heap_get(b, 1)); }
+    if ta == 2 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 3 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 4 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 5 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 7 {
+        if heap_get(a, 1) != heap_get(b, 1) { return 0; }
+        if heap_get(a, 2) != heap_get(b, 2) { return 0; }
+        let arity = heap_get(a, 3);
+        if arity == 0 { return 1; }
+        return eq_term(heap_get(a, 4), heap_get(b, 4));
+    }
+    return 0;
+}
+
+// ── Shift and substitution ─────────────────────────────────────────────────
+
+pub fn shift(t: i64, cutoff: i64, amount: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx >= cutoff { return var_ref(idx + amount); } return var_ref(idx); }
+    if tag == 1 { return lam(shift(heap_get(t, 1), cutoff + 1, amount)); }
+    if tag == 2 { return app(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff, amount)); }
+    if tag == 3 { return pi(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff + 1, amount)); }
+    return t;
+}
+pub fn lift(t: i64, cutoff: i64) -> i64 { return shift(t, cutoff, 1); }
+
+pub fn subst(s: i64, index: i64, t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx == index { return s; } if idx > index { return var_ref(idx - 1); } return var_ref(idx); }
+    if tag == 1 { let s2 = lift(s, 0); return lam(subst(s2, index + 1, heap_get(t, 1))); }
+    if tag == 2 { return app(subst(s, index, heap_get(t, 1)), subst(s, index, heap_get(t, 2))); }
+    if tag == 3 { let s2 = lift(s, 0); return pi(subst(s, index, heap_get(t, 1)), subst(s2, index + 1, heap_get(t, 2))); }
+    return t;
+}
+
+pub fn whnf(t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 2 {
+        let func = whnf(heap_get(t, 1));
+        if heap_get(func, 0) == 1 { return whnf(subst(heap_get(t, 2), 0, heap_get(func, 1))); }
+        return app(func, heap_get(t, 2));
+    }
+    return t;
+}
+pub fn conv(a: i64, b: i64) -> i64 { return eq_term(whnf(a), whnf(b)); }
+
+// ── Goal stack (heap-based) ────────────────────────────────────────────────
+
+pub fn goal_nil() -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 22); return id;
+}
+
+pub fn goal_cons(ctx: i64, ty: i64, next: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 20);
+    heap_set(id, 1, ctx);
+    heap_set(id, 2, ty);
+    heap_set(id, 3, next);
+    return id;
+}
+
+// Tactic state: (goal_list, proof_term)
+// We use a two-cell approach: field 0=tag 1=goal_list_id 2=proof_term_id
+pub fn make_state(goals: i64, proof: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 21);
+    heap_set(id, 1, goals);
+    heap_set(id, 2, proof);
+    return id;
+}
+
+pub fn state_goals(st: i64) -> i64 { return heap_get(st, 1); }
+pub fn state_proof(st: i64) -> i64 { return heap_get(st, 2); }
+
+// ── Tactics ────────────────────────────────────────────────────────────────
+
+// tactic_intro: pops goal of type Pi(A,B), pushes goal of type B in context extended with A
+// Returns updated state; proof term becomes Lam(hole) — hole is a new goal
+pub fn tactic_intro(st: i64) -> i64 {
+    let goals = state_goals(st);
+    let gtag  = heap_get(goals, 0);
+    if gtag != 20 { return st; }
+    let ctx = heap_get(goals, 1);
+    let ty  = heap_get(goals, 2);
+    let rest = heap_get(goals, 3);
+    let ty_nf = whnf(ty);
+    if heap_get(ty_nf, 0) != 3 { return st; }
+    let dom = heap_get(ty_nf, 1);
+    let cod = heap_get(ty_nf, 2);
+    let new_ctx  = ctx_cons(dom, ctx);
+    let new_goal = goal_cons(new_ctx, cod, rest);
+    return make_state(new_goal, state_proof(st));
+}
+
+// tactic_exact(st, term): close the current goal with a given term
+// Returns state with one fewer goal and proof set to term
+pub fn tactic_exact(st: i64, term: i64) -> i64 {
+    let goals = state_goals(st);
+    let gtag  = heap_get(goals, 0);
+    if gtag != 20 { return st; }
+    let rest = heap_get(goals, 3);
+    return make_state(rest, term);
+}
+
+// tactic_apply(st, func_term): apply a function, creating subgoal for argument
+// If current goal is T and func has type Pi(A, T), new goal is A
+pub fn tactic_apply(st: i64, func_term: i64) -> i64 {
+    let goals = state_goals(st);
+    let gtag  = heap_get(goals, 0);
+    if gtag != 20 { return st; }
+    let ctx  = heap_get(goals, 1);
+    let rest = heap_get(goals, 3);
+    // Create a subgoal for the argument (we use const_term(0) as placeholder type)
+    let arg_goal = goal_cons(ctx, const_term(0), rest);
+    return make_state(arg_goal, func_term);
+}
+
+// goal_count: count goals in the goal list
+pub fn goal_count(goals: i64) -> i64 {
+    let tag = heap_get(goals, 0);
+    if tag == 22 { return 0; }
+    return 1 + goal_count(heap_get(goals, 3));
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+pub fn main() -> i64 {
+    let ctx = ctx_nil();
+
+    // Test 1: introduce into Pi(sort(0), sort(0)) — goal becomes sort(0) in ctx[sort(0)]
+    let pi_ty = pi(sort(0), sort(0));
+    let g0 = goal_cons(ctx, pi_ty, goal_nil());
+    let st0 = make_state(g0, const_term(0 - 1));
+    let st1 = tactic_intro(st0);
+    let goals1 = state_goals(st1);
+    if heap_get(goals1, 0) != 20 { return 1; }
+    // The new goal should have type sort(0)
+    let new_ty = heap_get(goals1, 2);
+    if eq_term(new_ty, sort(0)) != 1 { return 2; }
+    // The new context should have sort(0) as first binding
+    let new_ctx = heap_get(goals1, 1);
+    let bound_ty = ctx_lookup(new_ctx, 0);
+    if eq_term(bound_ty, sort(0)) != 1 { return 3; }
+
+    // Test 2: tactic_exact closes the goal
+    let proof_term = var_ref(0);
+    let st2 = tactic_exact(st1, proof_term);
+    let goals2 = state_goals(st2);
+    if heap_get(goals2, 0) != 22 { return 4; }
+    if eq_term(state_proof(st2), proof_term) != 1 { return 5; }
+
+    // Test 3: goal_count
+    let g_a = goal_cons(ctx, sort(0), goal_nil());
+    let g_b = goal_cons(ctx, sort(1), g_a);
+    if goal_count(g_b) != 2 { return 6; }
+    if goal_count(goal_nil()) != 0 { return 7; }
+
+    // Test 4: tactic_apply — creates a subgoal
+    let func = const_term(55);
+    let st3 = make_state(goal_cons(ctx, sort(0), goal_nil()), const_term(0));
+    let st4 = tactic_apply(st3, func);
+    if goal_count(state_goals(st4)) != 1 { return 8; }
+
+    // Test 5: conv works through whnf for simple terms
+    let id_fn = lam(var_ref(0));
+    let a_term = app(id_fn, sort(0));
+    if conv(a_term, sort(0)) != 1 { return 9; }
+
+    return 111;
+}

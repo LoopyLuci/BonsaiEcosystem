@@ -1,0 +1,77 @@
+// axiom/control/match_dispatch.ti
+// Verifies match expression dispatch on integers and booleans
+
+fn classify(n: i64) -> i64 {
+    match n {
+        0 => { return 0; }
+        1 => { return 1; }
+        2 => { return 4; }
+        3 => { return 9; }
+        _ => { return -1; }
+    }
+    return -2;
+}
+
+fn fizzbuzz(n: i64) -> i64 {
+    let by3 = (n % 3) == 0;
+    let by5 = (n % 5) == 0;
+    match by3 {
+        true => {
+            match by5 {
+                true => { return 15; }
+                _ => { return 3; }
+            }
+            return 3;
+        }
+        _ => {
+            match by5 {
+                true => { return 5; }
+                _ => { return 1; }
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+fn verify_classify() -> i64 {
+    if classify(0) != 0 { return 0; }
+    if classify(1) != 1 { return 0; }
+    if classify(2) != 4 { return 0; }
+    if classify(3) != 9 { return 0; }
+    if classify(99) != -1 { return 0; }
+    return 1;
+}
+
+fn verify_fizzbuzz() -> i64 {
+    if fizzbuzz(15) != 15 { return 0; }
+    if fizzbuzz(3) != 3 { return 0; }
+    if fizzbuzz(5) != 5 { return 0; }
+    if fizzbuzz(7) != 1 { return 0; }
+    if fizzbuzz(30) != 15 { return 0; }
+    return 1;
+}
+
+fn sum_by_match(n: i64, acc: i64) -> i64 {
+    match n {
+        0 => { return acc; }
+        _ => { return sum_by_match(n - 1, acc + n); }
+    }
+    return acc;
+}
+
+fn verify_sum() -> i64 {
+    let s = sum_by_match(10, 0);
+    if s != 55 { return 0; }
+    return 1;
+}
+
+fn main() -> i64 {
+    let ok1 = verify_classify();
+    if ok1 == 0 { return 0; }
+    let ok2 = verify_fizzbuzz();
+    if ok2 == 0 { return 0; }
+    let ok3 = verify_sum();
+    if ok3 == 0 { return 0; }
+    return 111;
+}

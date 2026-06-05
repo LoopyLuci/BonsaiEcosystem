@@ -1,0 +1,344 @@
+// tests/test_ai.ti — Phase 205 Integration Test
+// Exercises: model registry → completion → chat → routing.
+// All functions self-contained; no cross-file imports.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+}
+
+// ===== Model registry =====
+const TAG_MODEL_ENTRY:  i64 = 8000;
+const CAP_COMPLETION:   i64 = 1;
+const CAP_CHAT:         i64 = 2;
+const CAP_REASONING:    i64 = 4;
+const CAP_PROOF_SEARCH: i64 = 8;
+const CAP_CODE_GEN:     i64 = 16;
+const CAP_EMBEDDING:    i64 = 32;
+const MODEL_LOCAL:      i64 = 0;
+const MODEL_CLOUD:      i64 = 1;
+
+static mut MODEL_LIST:  i64 = 0;
+static mut MODEL_COUNT: i64 = 0;
+
+pub fn reg_model_create(name_id: i64, source: i64, capabilities: i64,
+                        token_limit: i64, cost_per_1k: i64, endpoint_id: i64) -> i64 {
+    let meta3 = heap_alloc_term();
+    heap_set_body(meta3, cost_per_1k);
+    heap_set_arg(meta3, endpoint_id);
+    heap_set_domain(meta3, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, capabilities);
+    heap_set_arg(meta2, token_limit);
+    heap_set_domain(meta2, meta3);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, name_id);
+    heap_set_arg(meta1, source);
+    heap_set_domain(meta1, meta2);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_MODEL_ENTRY);
+    heap_set_body(m, meta1);
+    heap_set_arg(m, 0);
+    heap_set_domain(m, 0);
+    return m;
+}
+pub fn reg_model_source(m: i64) -> i64       { return heap_get_arg(heap_get_body(m)); }
+pub fn reg_model_capabilities(m: i64) -> i64 { return heap_get_body(heap_get_domain(heap_get_body(m))); }
+pub fn reg_model_token_limit(m: i64) -> i64  { return heap_get_arg(heap_get_domain(heap_get_body(m))); }
+pub fn reg_model_cost(m: i64) -> i64         { return heap_get_body(heap_get_domain(heap_get_domain(heap_get_body(m)))); }
+pub fn reg_has_cap(m: i64, cap: i64) -> bool { return (reg_model_capabilities(m) & cap) != 0; }
+
+pub fn registry_register(name_id: i64, source: i64, capabilities: i64,
+                          token_limit: i64, cost: i64, endpoint_id: i64) -> i64 {
+    let m = reg_model_create(name_id, source, capabilities, token_limit, cost, endpoint_id);
+    heap_set_domain(m, MODEL_LIST);
+    MODEL_LIST  = m;
+    MODEL_COUNT = MODEL_COUNT + 1;
+    return m;
+}
+pub fn registry_count() -> i64 { return MODEL_COUNT; }
+pub fn registry_find_by_capability(cap: i64) -> i64 {
+    let mut curr = MODEL_LIST;
+    let mut best: i64 = 0;
+    let mut best_limit: i64 = 0;
+    while curr != 0 {
+        if reg_has_cap(curr, cap) {
+            let lim = reg_model_token_limit(curr);
+            if lim > best_limit { best_limit = lim; best = curr; }
+        }
+        curr = heap_get_domain(curr);
+    }
+    return best;
+}
+pub fn registry_seed_defaults() {
+    registry_register(heap_alloc_term(), MODEL_LOCAL,
+                      CAP_COMPLETION | CAP_CODE_GEN, 4096, 0, heap_alloc_term());
+    registry_register(heap_alloc_term(), MODEL_CLOUD,
+                      CAP_CHAT | CAP_REASONING | CAP_CODE_GEN, 128000, 3, heap_alloc_term());
+    registry_register(heap_alloc_term(), MODEL_LOCAL,
+                      CAP_EMBEDDING, 512, 0, heap_alloc_term());
+    registry_register(heap_alloc_term(), MODEL_LOCAL,
+                      CAP_PROOF_SEARCH, 8192, 0, heap_alloc_term());
+}
+
+// ===== Completion engine =====
+const TAG_COMPL_REQUEST: i64 = 8100;
+const TAG_COMPL_TOKEN:   i64 = 8101;
+
+static mut COMPL_STREAM_TOKENS: i64 = 0;
+static mut COMPL_STREAM_POS:    i64 = 0;
+
+pub fn compl_request_create(prefix_id: i64, suffix_id: i64, file_id: i64,
+                             line: i64, col: i64, max_tokens: i64) -> i64 {
+    let meta3 = heap_alloc_term();
+    heap_set_body(meta3, col);
+    heap_set_arg(meta3, max_tokens);
+    heap_set_domain(meta3, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, file_id);
+    heap_set_arg(meta2, line);
+    heap_set_domain(meta2, meta3);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, prefix_id);
+    heap_set_arg(meta1, suffix_id);
+    heap_set_domain(meta1, 0);
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_COMPL_REQUEST);
+    heap_set_body(r, meta1);
+    heap_set_arg(r, 0);
+    heap_set_domain(r, meta2);
+    return r;
+}
+pub fn compl_token_create(text_id: i64, confidence: i64, is_final: bool) -> i64 {
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, text_id);
+    heap_set_arg(meta1, confidence);
+    let mut fin: i64 = 0;
+    if is_final { fin = 1; }
+    heap_set_domain(meta1, fin);
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_COMPL_TOKEN);
+    heap_set_body(t, meta1);
+    heap_set_arg(t, 0);
+    heap_set_domain(t, 0);
+    return t;
+}
+pub fn compl_token_is_final(t: i64) -> bool { return heap_get_domain(heap_get_body(t)) != 0; }
+pub fn completion_generate(request: i64, model: i64) -> i64 {
+    let prefix     = heap_get_body(heap_get_body(request));
+    let prefix_len = str_len(prefix);
+    let mut results: i64 = 0;
+    if prefix_len == 0 {
+        let t3 = compl_token_create(heap_alloc_term(), 90, false);
+        heap_set_domain(t3, results); results = t3;
+        let t2 = compl_token_create(heap_alloc_term(), 92, false);
+        heap_set_domain(t2, results); results = t2;
+        let t1 = compl_token_create(heap_alloc_term(), 95, false);
+        heap_set_domain(t1, results); results = t1;
+    } else {
+        let t = compl_token_create(heap_alloc_term(), 80, false);
+        heap_set_domain(t, results); results = t;
+    }
+    let fin = compl_token_create(heap_alloc_term(), 0, true);
+    heap_set_domain(fin, results);
+    results = fin;
+    return results;
+}
+pub fn compl_token_count(tokens: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = tokens;
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+pub fn compl_has_final(tokens: i64) -> bool {
+    let mut curr = tokens;
+    while curr != 0 {
+        if compl_token_is_final(curr) { return true; }
+        curr = heap_get_domain(curr);
+    }
+    return false;
+}
+pub fn compl_stream_start(request: i64, model: i64) {
+    COMPL_STREAM_TOKENS = completion_generate(request, model);
+    COMPL_STREAM_POS    = 0;
+}
+pub fn compl_stream_next() -> i64 {
+    let mut curr = COMPL_STREAM_TOKENS;
+    let mut pos:  i64 = 0;
+    while curr != 0 {
+        if pos == COMPL_STREAM_POS { COMPL_STREAM_POS = COMPL_STREAM_POS + 1; return curr; }
+        pos = pos + 1; curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+pub fn compl_stream_has_more() -> bool {
+    let mut curr = COMPL_STREAM_TOKENS;
+    let mut pos:  i64 = 0;
+    while curr != 0 {
+        if pos == COMPL_STREAM_POS { return true; }
+        pos = pos + 1; curr = heap_get_domain(curr);
+    }
+    return false;
+}
+
+// ===== Chat engine =====
+const TAG_CHAT_MSG:     i64 = 8200;
+const TAG_CHAT_SESSION: i64 = 8201;
+const ROLE_USER:        i64 = 0;
+const ROLE_ASSISTANT:   i64 = 1;
+
+pub fn chat_msg_create(role: i64, content_id: i64, ts: i64) -> i64 {
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, role);
+    heap_set_arg(meta1, content_id);
+    heap_set_domain(meta1, ts);
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_CHAT_MSG);
+    heap_set_body(msg, meta1);
+    heap_set_arg(msg, 0);
+    heap_set_domain(msg, 0);
+    return msg;
+}
+pub fn chat_msg_role(m: i64) -> i64 { return heap_get_body(heap_get_body(m)); }
+pub fn chat_session_create(title_id: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_CHAT_SESSION);
+    heap_set_body(s, title_id);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);
+    return s;
+}
+pub fn chat_session_add_message(session: i64, role: i64, content_id: i64) {
+    let count = heap_get_arg(session);
+    let msg   = chat_msg_create(role, content_id, count);
+    let head  = heap_get_domain(session);
+    if head == 0 {
+        heap_set_domain(session, msg);
+    } else {
+        let mut tail = head;
+        while heap_get_domain(tail) != 0 { tail = heap_get_domain(tail); }
+        heap_set_domain(tail, msg);
+    }
+    heap_set_arg(session, count + 1);
+}
+pub fn chat_session_message_count(s: i64) -> i64 { return heap_get_arg(s); }
+pub fn chat_generate_response(session: i64, user_query_id: i64) -> i64 {
+    chat_session_add_message(session, ROLE_USER, user_query_id);
+    let response = heap_alloc_term();
+    chat_session_add_message(session, ROLE_ASSISTANT, response);
+    return response;
+}
+
+// ===== Model router =====
+const TAG_ROUTE_REQUEST: i64 = 8300;
+const TASK_COMPLETION:   i64 = 0;
+const TASK_CHAT:         i64 = 1;
+const TASK_REASONING:    i64 = 2;
+const TASK_PROOF:        i64 = 3;
+const TASK_CODE_GEN:     i64 = 4;
+const TASK_EMBEDDING:    i64 = 5;
+
+pub fn route_request_create(task_type: i64, complexity: i64,
+                             token_budget: i64, prefer_local: bool) -> i64 {
+    let mut pref: i64 = 0;
+    if prefer_local { pref = 1; }
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, token_budget);
+    heap_set_arg(meta2, pref);
+    heap_set_domain(meta2, 0);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, task_type);
+    heap_set_arg(meta1, complexity);
+    heap_set_domain(meta1, meta2);
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_ROUTE_REQUEST);
+    heap_set_body(r, meta1);
+    heap_set_arg(r, 0);
+    heap_set_domain(r, 0);
+    return r;
+}
+pub fn route_required_capability(task_type: i64) -> i64 {
+    if task_type == TASK_COMPLETION { return CAP_COMPLETION; }
+    if task_type == TASK_CHAT       { return CAP_CHAT; }
+    if task_type == TASK_REASONING  { return CAP_REASONING; }
+    if task_type == TASK_PROOF      { return CAP_PROOF_SEARCH; }
+    if task_type == TASK_CODE_GEN   { return CAP_CODE_GEN; }
+    if task_type == TASK_EMBEDDING  { return CAP_EMBEDDING; }
+    return CAP_COMPLETION;
+}
+pub fn route_select_model(request: i64) -> i64 {
+    let task_type    = heap_get_body(heap_get_body(request));
+    let token_budget = heap_get_body(heap_get_domain(heap_get_body(request)));
+    let prefer_local = heap_get_arg(heap_get_domain(heap_get_body(request))) != 0;
+    let required_cap = route_required_capability(task_type);
+    let mut best_model: i64 = 0;
+    let mut best_score: i64 = 0;
+    let mut have_best: bool = false;
+    let mut curr = MODEL_LIST;
+    while curr != 0 {
+        if reg_has_cap(curr, required_cap) {
+            let mut score: i64 = 0;
+            let limit = reg_model_token_limit(curr);
+            if limit >= token_budget { score = score + 50; }
+            else { score = score + (limit * 50) / token_budget; }
+            if prefer_local && reg_model_source(curr) == MODEL_LOCAL { score = score + 30; }
+            if task_type == TASK_REASONING && reg_model_source(curr) == MODEL_CLOUD { score = score + 30; }
+            let cost = reg_model_cost(curr);
+            if cost == 0 { score = score + 20; } else { score = score + 20 / cost; }
+            if !have_best || score > best_score {
+                best_score = score; best_model = curr; have_best = true;
+            }
+        }
+        curr = heap_get_domain(curr);
+    }
+    return best_model;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    MODEL_LIST          = 0;
+    MODEL_COUNT         = 0;
+    COMPL_STREAM_POS    = 0;
+    COMPL_STREAM_TOKENS = 0;
+
+    // Registry
+    registry_seed_defaults();
+    if registry_count() != 4 { return 1; }
+
+    // Completion generation
+    let req = compl_request_create(heap_alloc_term(), heap_alloc_term(),
+                                   heap_alloc_term(), 1, 1, 20);
+    let tokens = completion_generate(req, 0);
+    if compl_token_count(tokens) < 1 { return 2; }
+    if !compl_has_final(tokens)      { return 3; }
+
+    // Streaming
+    compl_stream_start(req, 0);
+    if !compl_stream_has_more() { return 4; }
+    let tok = compl_stream_next();
+    if tok == 0                 { return 5; }
+
+    // Chat
+    let session = chat_session_create(heap_alloc_term());
+    chat_generate_response(session, heap_alloc_term());
+    if chat_session_message_count(session) != 2 { return 6; }
+
+    // Routing
+    let route_req = route_request_create(TASK_CODE_GEN, 5, 4096, true);
+    let model = route_select_model(route_req);
+    if model == 0                              { return 7; }
+    if !reg_has_cap(model, CAP_CODE_GEN)       { return 8; }
+
+    return 111;
+}

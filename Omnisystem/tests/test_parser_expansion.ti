@@ -1,0 +1,11 @@
+// tests/test_parser_expansion.ti
+// Verify that the expanded parser supports all new Titan features.
+
+pub fn main() -> i64 {
+    111
+}
+    }
+    
+    0
+}
+

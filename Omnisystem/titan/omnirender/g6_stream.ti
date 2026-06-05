@@ -1,0 +1,136 @@
+// titan/omnirender/g6_stream.ti — Performance & Streaming: LOD, GPU budget, feasibility
+// Self-contained. Wrapper-node APPEND for LOD levels.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_LOD:    i64 = 20500;
+const T_BUDGET: i64 = 20501;
+const T_WRP6:   i64 = 20502;
+
+// ===== LOD =====
+// lod: tag=T_LOD, body=level_count(starts 0), arg=list_head(wrappers), domain=max_levels
+// wrapper: tag=T_WRP6, body=level_node, domain=next_wrapper
+// level_node: body=splat_count, arg=tri_count
+
+pub fn g6_lod_create(max_levels: i64) -> i64 {
+    let l = heap_alloc_term();
+    heap_set_tag(l, T_LOD); heap_set_body(l, 0); heap_set_arg(l, 0); heap_set_domain(l, max_levels);
+    return l;
+}
+
+pub fn g6_lod_add_level(l: i64, splat_count: i64, tri_count: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_body(n, splat_count); heap_set_arg(n, tri_count); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP6); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(l);
+    if h == 0 { heap_set_arg(l, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(l, heap_get_body(l) + 1);
+    return n;
+}
+
+pub fn g6_lod_level_count(l: i64) -> i64 { return heap_get_body(l); }
+
+pub fn g6_lod_level_splats(l: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(l); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+pub fn g6_lod_level_tris(l: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(l); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_arg(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== GPU Budget =====
+// budget: tag=T_BUDGET, body=total_bytes, arg=available_bytes
+
+pub fn g6_budget_create(total_bytes: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, T_BUDGET); heap_set_body(b, total_bytes); heap_set_arg(b, total_bytes); heap_set_domain(b, 0);
+    return b;
+}
+
+pub fn g6_budget_total(b: i64) -> i64     { return heap_get_body(b); }
+pub fn g6_budget_available(b: i64) -> i64 { return heap_get_arg(b); }
+
+pub fn g6_budget_allocate(b: i64, bytes: i64) -> i64 {
+    let avail = heap_get_arg(b);
+    if bytes > avail { return 0; }
+    heap_set_arg(b, avail - bytes);
+    return 1;
+}
+
+pub fn g6_budget_release(b: i64, bytes: i64) {
+    let avail = heap_get_arg(b);
+    let mut new_avail: i64 = avail + bytes;
+    if new_avail > heap_get_body(b) { new_avail = heap_get_body(b); }
+    heap_set_arg(b, new_avail);
+}
+
+// ===== Feasibility =====
+pub fn g6_estimate_memory(splat_count: i64) -> i64 { return splat_count * 67; }
+
+pub fn g6_is_feasible(splat_count: i64, mem_bytes: i64) -> i64 {
+    if g6_estimate_memory(splat_count) <= mem_bytes { return 1; }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // LOD: 3 levels, count starts at 0
+    let lod = g6_lod_create(3);
+    g6_lod_add_level(lod, 1000000, 50000);
+    g6_lod_add_level(lod, 100000,  5000);
+    g6_lod_add_level(lod, 10000,   500);
+    if g6_lod_level_count(lod) != 3          { return 1; }
+    if g6_lod_level_splats(lod, 0) != 1000000 { return 2; }
+    if g6_lod_level_splats(lod, 2) != 10000  { return 3; }
+    if g6_lod_level_tris(lod, 2) != 500      { return 4; }
+
+    // Budget: allocate then release (capped at total)
+    let b = g6_budget_create(1000000);
+    if g6_budget_total(b) != 1000000      { return 5; }
+    if g6_budget_available(b) != 1000000  { return 6; }
+    if g6_budget_allocate(b, 300000) != 1 { return 7; }
+    if g6_budget_available(b) != 700000   { return 8; }
+    g6_budget_release(b, 100000);
+    if g6_budget_available(b) != 800000   { return 9; }
+
+    // Over-release capped at total
+    g6_budget_release(b, 999999);
+    if g6_budget_available(b) != 1000000  { return 10; }
+
+    // Over-allocate rejected
+    if g6_budget_allocate(b, 2000000) != 0 { return 11; }
+    if g6_budget_available(b) != 1000000   { return 12; }
+
+    // Feasibility
+    if g6_is_feasible(10000, 1000000) != 1  { return 13; }
+    if g6_is_feasible(100000, 100000) != 0  { return 14; }
+    if g6_estimate_memory(100) != 6700      { return 15; }
+
+    return 111;
+}

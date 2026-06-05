@@ -1,0 +1,270 @@
+// tests/test_global_consciousness.ae
+// Test suite for GlobalConsciousness — Tier 5 collective intelligence
+
+test "global_consciousness_initialization" {
+    let dht = mock_actor();
+    let cortex = mock_actor();
+    let merger = mock_actor();
+    let federation = mock_actor();
+    let learner = mock_actor();
+    
+    let gc = GlobalConsciousness::init(dht, cortex, merger, federation, learner);
+    
+    assert_eq!(gc.stats.network_size, 0);
+    assert_eq!(gc.stats.cycles_completed, 0);
+    assert_eq!(gc.stats.collective_knowledge_size, 0);
+}
+
+test "join_network" {
+    let gc = create_test_global_consciousness();
+    
+    gc ! JoinNetwork;
+    sleep(100);
+    
+    // Should have attempted to join DHT and discover peers
+    let stats = gc ! GetStats;
+    assert!(stats.network_size >= 0);
+}
+
+test "collective_think_cycle" {
+    let gc = create_test_global_consciousness();
+    
+    gc ! JoinNetwork;
+    sleep(100);
+    
+    gc ! CollectiveThink;
+    sleep(100);
+    
+    let stats = gc ! GetStats;
+    assert!(stats.cycles_completed >= 0);
+}
+
+test "knowledge_accumulation" {
+    let gc = create_test_global_consciousness();
+    
+    gc ! JoinNetwork;
+    sleep(100);
+    
+    // Run multiple cycles to accumulate knowledge
+    for _ in 0..3 {
+        gc ! CollectiveThink;
+        sleep(100);
+    }
+    
+    let stats = gc ! GetStats;
+    // Knowledge should grow or stay stable (may be empty if no peers)
+    assert!(stats.collective_knowledge_size >= 0);
+}
+
+test "knowledge_deduplication" {
+    let gc = create_test_global_consciousness();
+    
+    // Add duplicate knowledge
+    let k1 = Knowledge {
+        domain: "test".to_string(),
+        content: "c1".to_string(),
+        proof_hash: "h1".to_string(),
+        confidence: 0.9,
+        source_objective: "o1".to_string(),
+        timestamp: now(),
+    };
+    
+    gc.collective_knowledge.push(k1.clone());
+    gc.collective_knowledge.push(k1.clone());
+    
+    // Deduplicate
+    let dedup = gc.collective_knowledge.iter()
+        .filter(|k| k.proof_hash == "h1")
+        .collect::<Vec<_>>();
+    
+    assert_eq!(dedup.len(), 2);  // Both are in the vector
+}
+
+test "peer_discovery" {
+    let gc = create_test_global_consciousness();
+    
+    gc ! JoinNetwork;
+    sleep(100);
+    
+    gc ! DiscoverPeers;
+    sleep(100);
+    
+    // Peers dictionary should be populated (or empty if no actual DHT)
+    let peer_count = gc.peers.len();
+    assert!(peer_count >= 0);
+}
+
+test "merge_with_peer" {
+    let gc = create_test_global_consciousness();
+    
+    gc ! JoinNetwork;
+    sleep(100);
+    
+    // If peers exist, attempt merge
+    if !gc.peers.is_empty() {
+        if let Some((peer_id, _)) = gc.peers.iter().next() {
+            gc ! MergeWithPeer(peer_id.clone());
+            sleep(100);
+            
+            if let Some(peer_state) = gc.peers.get(peer_id) {
+                assert!(peer_state.merge_count >= 0);
+            }
+        }
+    }
+}
+
+test "query_collective_empty" {
+    let gc = create_test_global_consciousness();
+    
+    let response = gc ! QueryCollective("What is the meaning of life?".to_string());
+    
+    assert!(response.is_some());
+    assert_eq!(response.unwrap().source, "local");
+}
+
+test "query_collective_with_knowledge" {
+    let gc = create_test_global_consciousness();
+    
+    gc.collective_knowledge.push(Knowledge {
+        domain: "philosophy".to_string(),
+        content: "The meaning of life is the pursuit of happiness".to_string(),
+        proof_hash: "h1".to_string(),
+        confidence: 0.8,
+        source_objective: "o1".to_string(),
+        timestamp: now(),
+    });
+    
+    let response = gc ! QueryCollective("meaning of life".to_string());
+    
+    assert!(response.is_some());
+    let resp = response.unwrap();
+    assert_eq!(resp.source, "collective");
+    assert!(resp.contributing_peers >= 0);
+}
+
+test "search_collective_knowledge" {
+    let gc = create_test_global_consciousness();
+    
+    gc.collective_knowledge.push(Knowledge {
+        domain: "test".to_string(),
+        content: "consensus algorithms".to_string(),
+        proof_hash: "h1".to_string(),
+        confidence: 0.9,
+        source_objective: "o1".to_string(),
+        timestamp: now(),
+    });
+    
+    gc.collective_knowledge.push(Knowledge {
+        domain: "test".to_string(),
+        content: "raft protocol".to_string(),
+        proof_hash: "h2".to_string(),
+        confidence: 0.85,
+        source_objective: "o2".to_string(),
+        timestamp: now(),
+    });
+    
+    let results = gc.search_collective_knowledge("consensus".to_string());
+    assert!(results.len() >= 1);
+}
+
+test "knowledge_bounded_at_10k" {
+    let gc = create_test_global_consciousness();
+    
+    // Add more than 10000 items
+    for i in 0..10100 {
+        gc.collective_knowledge.push(Knowledge {
+            domain: "test".to_string(),
+            content: format!("k{}", i),
+            proof_hash: format!("h{}", i),
+            confidence: 0.8,
+            source_objective: format!("o{}", i),
+            timestamp: now(),
+        });
+    }
+    
+    // Simulate cleanup (as done in CollectiveThink)
+    if gc.collective_knowledge.len() > 10000 {
+        gc.collective_knowledge.truncate(10000);
+    }
+    
+    assert_eq!(gc.collective_knowledge.len(), 10000);
+}
+
+test "network_size_tracking" {
+    let gc = create_test_global_consciousness();
+    
+    let initial_size = gc.stats.network_size;
+    assert_eq!(initial_size, 0);
+    
+    gc ! JoinNetwork;
+    sleep(100);
+    
+    let stats = gc ! GetStats;
+    // Network size should be peers + 1 (self)
+    assert!(stats.network_size >= 1);
+}
+
+test "cycles_completed_increment" {
+    let gc = create_test_global_consciousness();
+    
+    gc ! JoinNetwork;
+    sleep(100);
+    
+    let initial_cycles = gc.stats.cycles_completed;
+    
+    gc ! CollectiveThink;
+    sleep(100);
+    
+    let stats = gc ! GetStats;
+    assert!(stats.cycles_completed > initial_cycles);
+}
+
+test "collective_response_fields" {
+    let gc = create_test_global_consciousness();
+    
+    let response = gc ! QueryCollective("test".to_string());
+    
+    assert!(response.is_some());
+    let resp = response.unwrap();
+    
+    assert!(!resp.answer.is_empty());
+    assert!(resp.confidence >= 0.0 && resp.confidence <= 1.0);
+    assert!(!resp.source.is_empty());
+    assert!(resp.contributing_peers >= 0);
+}
+
+test "peer_state_tracking" {
+    let gc = create_test_global_consciousness();
+    
+    let peer_info = ServiceRecord {
+        instance_id: "peer1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "localhost:5001".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 90,
+    };
+    
+    let peer_state = PeerState {
+        info: peer_info,
+        last_merged: 0,
+        merge_count: 0,
+        knowledge_shared: 0,
+    };
+    
+    assert_eq!(peer_state.merge_count, 0);
+    assert_eq!(peer_state.knowledge_shared, 0);
+}
+
+fn create_test_global_consciousness() -> GlobalConsciousness {
+    GlobalConsciousness::init(
+        mock_actor(),
+        mock_actor(),
+        mock_actor(),
+        mock_actor(),
+        mock_actor()
+    )
+}
+
+fn mock_actor() -> ActorId {
+    ActorId { id: "mock".to_string() }
+}

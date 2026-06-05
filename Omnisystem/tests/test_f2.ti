@@ -1,0 +1,7 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_OP:i64=25100;const tT_HS:i64=25101;const tT_WR:i64=25102;
+pub fn tf2_op_create(t:i64,p:i64)->i64{let o=heap_alloc_term();heap_set_tag(o,tT_OP);heap_set_body(o,t);heap_set_arg(o,p);heap_set_domain(o,0);return o;}
+pub fn tf2_history_create()->i64{let h=heap_alloc_term();heap_set_tag(h,tT_HS);heap_set_body(h,0);heap_set_arg(h,0);return h;}
+pub fn tf2_history_push(h:i64,op:i64){let w=heap_alloc_term();heap_set_tag(w,tT_WR);heap_set_body(w,op);heap_set_domain(w,0);let mut cur:i64=heap_get_arg(h);if cur==0{heap_set_arg(h,w);}else{while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(h,heap_get_body(h)+1);}
+pub fn tf2_history_pop(h:i64)->i64{let cur=heap_get_arg(h);if cur==0{return 0;}let mut prev:i64=0;let mut t:i64=cur;while heap_get_domain(t)!=0{prev=t;t=heap_get_domain(t);}if prev==0{heap_set_arg(h,0);}else{heap_set_domain(prev,0);}heap_set_body(h,heap_get_body(h)-1);return heap_get_body(t);}
+pub fn main()->i64{let h=tf2_history_create();tf2_history_push(h,tf2_op_create(5,50));tf2_history_push(h,tf2_op_create(6,60));if heap_get_body(h)!=2{return 1;}let op=tf2_history_pop(h);if heap_get_body(op)!=6{return 2;}return 111;}

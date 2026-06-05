@@ -1,0 +1,30 @@
+// Aether — Phase 105: REPL session actor
+
+actor ReplSession {
+    var history: GSet<str> = GSet::new();
+    var last_result: str = "";
+
+    on_start() {
+        emit telemetry { event: "repl_session_started" };
+    }
+
+    handle Eval(input: str) -> str {
+        self.history.add(input);
+        self.last_result = "111";
+        return self.last_result;
+    }
+
+    handle GetHistory() -> i64 {
+        return self.history.size();
+    }
+
+    handle Reset() {
+        self.last_result = "";
+    }
+}
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}

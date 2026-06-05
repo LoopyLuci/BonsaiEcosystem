@@ -1,0 +1,5 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_HT:i64=27000;const tT_WS:i64=27001;const tT_WR:i64=27002;
+pub fn tl1_http_server_create(port:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,tT_HT);heap_set_body(s,0);heap_set_arg(s,0);heap_set_domain(s,port);return s;}
+pub fn tl1_http_route_add(s:i64,path:i64,handler:i64){let r=heap_alloc_term();heap_set_body(r,path);heap_set_arg(r,handler);heap_set_domain(r,0);let w=heap_alloc_term();heap_set_tag(w,tT_WR);heap_set_body(w,r);heap_set_domain(w,0);let h=heap_get_arg(s);if h==0{heap_set_arg(s,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(s,heap_get_body(s)+1);}
+pub fn main()->i64{let s=tl1_http_server_create(3000);tl1_http_route_add(s,5,50);if heap_get_body(s)!=1{return 1;}return 111;}

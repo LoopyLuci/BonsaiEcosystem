@@ -1,0 +1,351 @@
+// tests/test_service_discovery.ae
+// Test suite for Aion service discovery and registry.
+
+use crate::aether::aion::service_discovery::*;
+
+#[test]
+fn test_registry_initialization() {
+    let registry = AionServiceRegistry::new();
+    assert_eq!(registry.service_count(), 0);
+    assert_eq!(registry.get_stats().services_registered, 0);
+}
+
+#[test]
+fn test_register_single_service() {
+    let mut registry = AionServiceRegistry::new();
+    
+    let service = ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "abc123".to_string(),
+        trust_score: 95,
+        max_concurrency: 100,
+        current_load: 25,
+        healthy: true,
+        proof_hash: Some("proof-abc".to_string()),
+        tier: 2,
+        last_heartbeat: 0,
+    };
+    
+    registry.register_service(service);
+    assert_eq!(registry.service_count(), 1);
+    assert_eq!(registry.get_stats().services_registered, 1);
+}
+
+#[test]
+fn test_register_multiple_services() {
+    let mut registry = AionServiceRegistry::new();
+    
+    for i in 0..5 {
+        let service = ServiceRecord {
+            instance_id: format!("aion-{}", i),
+            capability: "reasoning".to_string(),
+            address: format!("127.0.0.1:{}", 5000 + i),
+            model_hash: format!("hash{}", i),
+            trust_score: 80 + (i as i64),
+            max_concurrency: 100,
+            current_load: (i as i64) * 10,
+            healthy: true,
+            proof_hash: None,
+            tier: 2,
+            last_heartbeat: 0,
+        };
+        registry.register_service(service);
+    }
+    
+    assert_eq!(registry.service_count(), 5);
+}
+
+#[test]
+fn test_discover_service_by_capability() {
+    let mut registry = AionServiceRegistry::new();
+    
+    let service = ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 95,
+        max_concurrency: 100,
+        current_load: 20,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    };
+    
+    registry.register_service(service.clone());
+    
+    let discovered = registry.discover_service("reasoning".to_string());
+    assert!(discovered.is_some());
+    assert_eq!(discovered.unwrap().instance_id, "aion-1");
+}
+
+#[test]
+fn test_discover_selects_lowest_load() {
+    let mut registry = AionServiceRegistry::new();
+    
+    // Register two services with different loads
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 90,
+        max_concurrency: 100,
+        current_load: 80, // High load
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-2".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5001".to_string(),
+        model_hash: "hash2".to_string(),
+        trust_score: 85,
+        max_concurrency: 100,
+        current_load: 10, // Low load
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    // Should select aion-2 because (85 - 10/10) > (90 - 80/10)
+    let discovered = registry.discover_service("reasoning".to_string());
+    assert!(discovered.is_some());
+    assert_eq!(discovered.unwrap().instance_id, "aion-2");
+}
+
+#[test]
+fn test_discover_service_not_found() {
+    let mut registry = AionServiceRegistry::new();
+    
+    let discovered = registry.discover_service("nonexistent".to_string());
+    assert!(discovered.is_none());
+    assert_eq!(registry.get_stats().discovery_failures, 1);
+}
+
+#[test]
+fn test_discover_skips_unhealthy_services() {
+    let mut registry = AionServiceRegistry::new();
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 95,
+        max_concurrency: 100,
+        current_load: 20,
+        healthy: false, // Unhealthy
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-2".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5001".to_string(),
+        model_hash: "hash2".to_string(),
+        trust_score: 90,
+        max_concurrency: 100,
+        current_load: 30,
+        healthy: true, // Healthy
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    let discovered = registry.discover_service("reasoning".to_string());
+    assert!(discovered.is_some());
+    assert_eq!(discovered.unwrap().instance_id, "aion-2");
+}
+
+#[test]
+fn test_list_services_by_capability() {
+    let mut registry = AionServiceRegistry::new();
+    
+    // Register services with different capabilities
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 90,
+        max_concurrency: 100,
+        current_load: 20,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-2".to_string(),
+        capability: "streaming".to_string(),
+        address: "127.0.0.1:5001".to_string(),
+        model_hash: "hash2".to_string(),
+        trust_score: 85,
+        max_concurrency: 100,
+        current_load: 30,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-3".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5002".to_string(),
+        model_hash: "hash3".to_string(),
+        trust_score: 88,
+        max_concurrency: 100,
+        current_load: 25,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    let reasoning_services = registry.list_services("reasoning".to_string());
+    assert_eq!(reasoning_services.len(), 2);
+}
+
+#[test]
+fn test_get_service_by_id() {
+    let mut registry = AionServiceRegistry::new();
+    
+    let service = ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 95,
+        max_concurrency: 100,
+        current_load: 20,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    };
+    
+    registry.register_service(service);
+    
+    let found = registry.get_service("aion-1".to_string());
+    assert!(found.is_some());
+    assert_eq!(found.unwrap().capability, "reasoning");
+}
+
+#[test]
+fn test_deregister_service() {
+    let mut registry = AionServiceRegistry::new();
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 95,
+        max_concurrency: 100,
+        current_load: 20,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    assert_eq!(registry.service_count(), 1);
+    
+    registry.deregister_service("aion-1".to_string());
+    assert_eq!(registry.service_count(), 0);
+}
+
+#[test]
+fn test_update_service_health() {
+    let mut registry = AionServiceRegistry::new();
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 95,
+        max_concurrency: 100,
+        current_load: 20,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    registry.update_service_health("aion-1".to_string(), false, 100);
+    
+    let service = registry.get_service("aion-1".to_string());
+    assert!(service.is_some());
+    assert!(!service.unwrap().healthy);
+    assert_eq!(service.unwrap().current_load, 100);
+}
+
+#[test]
+fn test_services_by_tier() {
+    let mut registry = AionServiceRegistry::new();
+    
+    for i in 0..3 {
+        registry.register_service(ServiceRecord {
+            instance_id: format!("aion-{}", i),
+            capability: "reasoning".to_string(),
+            address: format!("127.0.0.1:{}", 5000 + i),
+            model_hash: format!("hash{}", i),
+            trust_score: 90,
+            max_concurrency: 100,
+            current_load: 20,
+            healthy: true,
+            proof_hash: None,
+            tier: if i < 2 { 2 } else { 3 },
+            last_heartbeat: 0,
+        });
+    }
+    
+    let tier2 = registry.services_by_tier(2);
+    assert_eq!(tier2.len(), 2);
+    
+    let tier3 = registry.services_by_tier(3);
+    assert_eq!(tier3.len(), 1);
+}
+
+#[test]
+fn test_discovery_statistics() {
+    let mut registry = AionServiceRegistry::new();
+    
+    registry.register_service(ServiceRecord {
+        instance_id: "aion-1".to_string(),
+        capability: "reasoning".to_string(),
+        address: "127.0.0.1:5000".to_string(),
+        model_hash: "hash1".to_string(),
+        trust_score: 95,
+        max_concurrency: 100,
+        current_load: 20,
+        healthy: true,
+        proof_hash: None,
+        tier: 2,
+        last_heartbeat: 0,
+    });
+    
+    // Successful discovery
+    registry.discover_service("reasoning".to_string());
+    
+    // Failed discovery
+    registry.discover_service("nonexistent".to_string());
+    
+    let stats = registry.get_stats();
+    assert_eq!(stats.discovery_requests, 2);
+    assert_eq!(stats.services_found, 1);
+    assert_eq!(stats.discovery_failures, 1);
+}

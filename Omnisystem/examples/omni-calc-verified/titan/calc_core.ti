@@ -1,0 +1,67 @@
+// titan/calc_core.ti – Verified arithmetic primitives
+//
+// This module is pure Titan. It can be compiled and used independently,
+// or called from Aether / Sylva.
+
+// ── Public API ──────────────────────────────────────────────
+
+/// Add two 64‑bit integers, with overflow checking.
+/// Returns Ok(result) or Err("overflow").
+pub fn add_checked(a: i64, b: i64) -> Result<i64, String> {
+    let sum = a.wrapping_add(b);
+    // overflow occurs if both operands have same sign and sum has opposite sign
+    if ((a ^ sum) & (b ^ sum)) < 0 {
+        Err(String::from_literal("overflow"))
+    } else {
+        Ok(sum)
+    }
+}
+
+/// Multiply two 64‑bit integers, with overflow checking.
+pub fn mul_checked(a: i64, b: i64) -> Result<i64, String> {
+    if a == 0 || b == 0 {
+        return Ok(0);
+    }
+    let product = a.wrapping_mul(b);
+    if product / a != b {
+        Err(String::from_literal("overflow"))
+    } else {
+        Ok(product)
+    }
+}
+
+/// Evaluate a simple binary expression: left op right.
+pub fn eval_binary(op: i32, left: i64, right: i64) -> Result<i64, String> {
+    match op {
+        // 0 = '+', 1 = '-', 2 = '*', 3 = '/'
+        0 => add_checked(left, right),
+        1 => {
+            // subtraction overflow only possible with MIN - 1, handled by checked
+            if right == -9223372036854775808i64 && left >= 0 {
+                Err(String::from_literal("overflow"))
+            } else {
+                Ok(left - right)
+            }
+        },
+        2 => mul_checked(left, right),
+        3 => {
+            if right == 0 {
+                Err(String::from_literal("division by zero"))
+            } else {
+                Ok(left / right)
+            }
+        },
+        _ => Err(String::from_literal("unknown operator"))
+    }
+}
+
+/// Helper to format operator names
+pub fn op_name(op: i32) -> String {
+    match op {
+        0 => String::from_literal("+"),
+        1 => String::from_literal("-"),
+        2 => String::from_literal("*"),
+        3 => String::from_literal("/"),
+        _ => String::from_literal("?"),
+    }
+}

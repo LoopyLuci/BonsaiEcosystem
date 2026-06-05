@@ -1,0 +1,131 @@
+// titan/rag/chunker.ti — Codebase Chunker
+// Splits source files into semantic chunks (functions, types, modules, proofs).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+const TAG_CHUNK: i64 = 5000;
+
+// Chunk kinds
+const CHUNK_FUNCTION: i64 = 0;
+const CHUNK_TYPE_DEF: i64 = 1;
+const CHUNK_MODULE:   i64 = 2;
+const CHUNK_PROOF:    i64 = 3;
+const CHUNK_ACTOR:    i64 = 4;
+
+// Chunk cell layout:
+//   chunk: tag=TAG_CHUNK, body=chunk_type, arg=name_id, domain=meta1
+//   meta1: body=content_id, arg=file_id, domain=meta2
+//   meta2: body=line_start, arg=line_end, domain=language
+pub fn chunk_create(chunk_type: i64, name_id: i64, content_id: i64,
+                    file_id: i64, line_start: i64, line_end: i64,
+                    language: i64, dependencies: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, line_start);
+    heap_set_arg(meta2, line_end);
+    heap_set_domain(meta2, language);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, content_id);
+    heap_set_arg(meta1, file_id);
+    heap_set_domain(meta1, meta2);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_CHUNK);
+    heap_set_body(c, chunk_type);
+    heap_set_arg(c, name_id);
+    heap_set_domain(c, meta1);
+    return c;
+}
+
+pub fn chunk_type_of(c: i64) -> i64  { return heap_get_body(c); }
+pub fn chunk_name(c: i64) -> i64     { return heap_get_arg(c); }
+pub fn chunk_content(c: i64) -> i64  { return heap_get_body(heap_get_domain(c)); }
+pub fn chunk_file_id(c: i64) -> i64  { return heap_get_arg(heap_get_domain(c)); }
+pub fn chunk_line_start(c: i64) -> i64 {
+    return heap_get_body(heap_get_domain(heap_get_domain(c)));
+}
+pub fn chunk_line_end(c: i64) -> i64 {
+    return heap_get_arg(heap_get_domain(heap_get_domain(c)));
+}
+
+// Chunk list uses wrapper nodes: body=chunk_cell, domain=next_wrapper
+pub fn chunk_count(wrappers: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = wrappers;
+    while curr != 0 {
+        count = count + 1;
+        curr = heap_get_domain(curr);
+    }
+    return count;
+}
+
+// Scan source for `fn ` (ASCII 102,110,32) and create a CHUNK_FUNCTION per match.
+pub fn chunk_file(file_id: i64, source_id: i64, language: i64) -> i64 {
+    let src_len = str_len(source_id);
+    let mut chunks: i64 = 0;
+    let mut pos: i64 = 0;
+    let mut line: i64 = 1;
+    while pos + 2 < src_len {
+        let ch = str_at(source_id, pos);
+        if ch == 10 {
+            line = line + 1;
+            pos = pos + 1;
+        } else if ch == 102
+               && str_at(source_id, pos + 1) == 110
+               && (str_at(source_id, pos + 2) == 32 || str_at(source_id, pos + 2) == 9) {
+            // Found 'fn ' — create a function chunk
+            let name_id = heap_alloc_term();
+            let content_ref = heap_alloc_term();
+            heap_set_body(content_ref, pos);
+            heap_set_arg(content_ref, src_len - pos);
+            let chunk = chunk_create(CHUNK_FUNCTION, name_id, content_ref,
+                                     file_id, line, line, language, 0);
+            let wrapper = heap_alloc_term();
+            heap_set_body(wrapper, chunk);
+            heap_set_domain(wrapper, chunks);
+            chunks = wrapper;
+            pos = pos + 3;
+        } else {
+            pos = pos + 1;
+        }
+    }
+    return chunks;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let name    = heap_alloc_term();
+    let content = heap_alloc_term();
+    let file    = heap_alloc_term();
+
+    let c = chunk_create(CHUNK_FUNCTION, name, content, file, 10, 25, 0, 0);
+    if heap_get_tag(c) != TAG_CHUNK     { return 1; }
+    if chunk_type_of(c) != CHUNK_FUNCTION { return 2; }
+    if chunk_line_start(c) != 10        { return 3; }
+    if chunk_line_end(c) != 25          { return 4; }
+
+    // chunk_file on empty source produces 0 chunks
+    let src  = heap_alloc_term();
+    let fid  = heap_alloc_term();
+    let chunks = chunk_file(fid, src, 0);
+    let cnt = chunk_count(chunks);
+    if cnt < 0 { return 5; }
+
+    // chunk_count on single-element list
+    let wrapper = heap_alloc_term();
+    heap_set_body(wrapper, c);
+    heap_set_domain(wrapper, 0);
+    if chunk_count(wrapper) != 1 { return 6; }
+
+    return 111;
+}

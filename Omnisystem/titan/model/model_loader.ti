@@ -1,0 +1,65 @@
+// titan/model/model_loader.ti — Model Loader (Native Stub)
+// Creates empty model weight stubs; no file I/O (bootstrap has no file_read_all).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_MODEL_WEIGHTS: i64 = 8600;
+const TAG_WEIGHT_TENSOR: i64 = 8601;
+
+// model: tag=TAG_MODEL_WEIGHTS, body=meta, arg=layer_count, domain=tensor_list
+// meta:  body=vocab_size, arg=embed_dim, domain=0
+// tensor: tag=TAG_WEIGHT_TENSOR, body=rows, arg=cols, domain=data_id
+
+pub fn weight_tensor_create(rows: i64, cols: i64, data: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_WEIGHT_TENSOR);
+    heap_set_body(t, rows);
+    heap_set_arg(t, cols);
+    heap_set_domain(t, data);
+    return t;
+}
+
+pub fn weight_tensor_rows(t: i64) -> i64 { return heap_get_body(t); }
+pub fn weight_tensor_cols(t: i64) -> i64 { return heap_get_arg(t); }
+
+pub fn load_model(path_id: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, 32000);
+    heap_set_arg(meta, 512);
+    heap_set_domain(meta, 0);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_MODEL_WEIGHTS);
+    heap_set_body(m, meta);
+    heap_set_arg(m, 0);
+    heap_set_domain(m, 0);
+    return m;
+}
+
+pub fn model_vocab_size(m: i64) -> i64  { return heap_get_body(heap_get_body(m)); }
+pub fn model_embed_dim(m: i64) -> i64   { return heap_get_arg(heap_get_body(m)); }
+pub fn model_layer_count(m: i64) -> i64 { return heap_get_arg(m); }
+
+pub fn main() -> i64 {
+    let m = load_model(heap_alloc_term());
+    if m == 0                                { return 1; }
+    if heap_get_tag(m) != TAG_MODEL_WEIGHTS  { return 2; }
+    if model_vocab_size(m) != 32000          { return 3; }
+    if model_embed_dim(m) != 512             { return 4; }
+
+    let t = weight_tensor_create(4, 8, heap_alloc_term());
+    if heap_get_tag(t) != TAG_WEIGHT_TENSOR  { return 5; }
+    if weight_tensor_rows(t) != 4            { return 6; }
+    if weight_tensor_cols(t) != 8            { return 7; }
+
+    return 111;
+}

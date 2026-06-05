@@ -1,0 +1,132 @@
+// tests/test_r2.ti — Phase R2 OmniToken Integration Test
+// All helpers inlined with tr2_ prefix. Self-contained. No break keyword.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR2_T_FL: i64 = 22100;
+const TR2_T_RG: i64 = 22101;
+const TR2_T_MT: i64 = 22102;
+const TR2_T_WR: i64 = 22103;
+
+pub fn tr2_filter_create(ftype: i64, prio: i64, name: i64, enabled: i64) -> i64 {
+    let f = heap_alloc_term();
+    heap_set_tag(f, TR2_T_FL); heap_set_body(f, ftype); heap_set_arg(f, prio);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TR2_T_MT); heap_set_body(m, name); heap_set_arg(m, enabled);
+    heap_set_domain(f, m);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TR2_T_WR); heap_set_body(w, f); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tr2_filter_type(w: i64) -> i64 {
+    let f = heap_get_body(w);
+    return heap_get_body(f);
+}
+pub fn tr2_filter_enabled(w: i64) -> i64 {
+    let f = heap_get_body(w);
+    let m = heap_get_domain(f);
+    return heap_get_arg(m);
+}
+
+pub fn tr2_registry_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TR2_T_RG); heap_set_body(r, 0); heap_set_arg(r, 0);
+    return r;
+}
+
+pub fn tr2_registry_add(r: i64, w: i64) {
+    let h = heap_get_arg(r);
+    if h == 0 { heap_set_arg(r, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn tr2_registry_get(r: i64, idx: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(r); let mut i: i64 = 0;
+    while cur != 0 {
+        if i == idx { return cur; }
+        i = i + 1; cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+pub fn tr2_compress(r: i64, tokens: i64) -> i64 {
+    let n = heap_get_body(r);
+    let mut result: i64 = tokens;
+    let mut i: i64 = 0;
+    while i < n {
+        let w = tr2_registry_get(r, i);
+        if w != 0 {
+            if tr2_filter_enabled(w) == 1 {
+                let ft = tr2_filter_type(w);
+                if ft == 1 { result = result * 6 / 10; }
+                else { if ft == 2 { result = result * 7 / 10; } }
+            }
+        }
+        i = i + 1;
+    }
+    let floor: i64 = tokens / 10;
+    if result < floor { result = floor; }
+    return result;
+}
+
+// ===== Integration test =====
+// 2 type=1 filters (both enabled), tokens=50
+// 50 → *6/10=30 → *6/10=18; floor=5; result=18
+pub fn main() -> i64 {
+    let r = tr2_registry_create();
+    let w1 = tr2_filter_create(1, 1, 10, 1);
+    let w2 = tr2_filter_create(1, 2, 20, 1);
+    tr2_registry_add(r, w1);
+    tr2_registry_add(r, w2);
+    if heap_get_body(r) != 2        { return 1; }
+    let c = tr2_compress(r, 50);
+    if c != 18                       { return 2; }
+
+    // One disabled filter: 50 → *6/10=30 only; floor=5; result=30
+    let r2 = tr2_registry_create();
+    let wa = tr2_filter_create(1, 1, 1, 1);
+    let wb = tr2_filter_create(1, 2, 2, 0);
+    tr2_registry_add(r2, wa);
+    tr2_registry_add(r2, wb);
+    let c2 = tr2_compress(r2, 50);
+    if c2 != 30                      { return 3; }
+
+    // type=2 filter: 100 → *7/10=70; floor=10; result=70
+    let r3 = tr2_registry_create();
+    let wc = tr2_filter_create(2, 1, 1, 1);
+    tr2_registry_add(r3, wc);
+    let c3 = tr2_compress(r3, 100);
+    if c3 != 70                      { return 4; }
+
+    // Floor clamp: tokens=10, result after filters < floor
+    // type=1, type=1, type=1: 10→6→3→1; floor=1; result=1
+    let r4 = tr2_registry_create();
+    tr2_registry_add(r4, tr2_filter_create(1, 1, 1, 1));
+    tr2_registry_add(r4, tr2_filter_create(1, 2, 2, 1));
+    tr2_registry_add(r4, tr2_filter_create(1, 3, 3, 1));
+    let c4 = tr2_compress(r4, 10);
+    if c4 != 1                       { return 5; }
+
+    // Empty registry: no filters, result = tokens unchanged; floor=tokens/10
+    let r5 = tr2_registry_create();
+    let c5 = tr2_compress(r5, 80);
+    if c5 != 80                      { return 6; }
+
+    return 111;
+}

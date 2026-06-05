@@ -1,0 +1,8 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_ND:i64=24000;const tT_MT:i64=24001;const tT_WR:i64=24002;
+pub fn th1_node_create(id:i64,parent_id:i64,score:i64,timestamp:i64)->i64{let n=heap_alloc_term();heap_set_tag(n,tT_ND);heap_set_body(n,id);let m=heap_alloc_term();heap_set_tag(m,tT_MT);heap_set_body(m,parent_id);heap_set_arg(m,score);heap_set_domain(m,timestamp);heap_set_arg(n,m);heap_set_domain(n,0);return n;}
+pub fn th1_node_score(n:i64)->i64{let m=heap_get_arg(n);return heap_get_arg(m);}
+pub fn th1_add_child(parent:i64,child:i64){let w=heap_alloc_term();heap_set_tag(w,tT_WR);heap_set_body(w,child);heap_set_domain(w,0);let h=heap_get_domain(parent);if h==0{heap_set_domain(parent,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}}
+pub fn th1_child_count(parent:i64)->i64{let mut cur:i64=heap_get_domain(parent);let mut n:i64=0;while cur!=0{n=n+1;cur=heap_get_domain(cur);}return n;}
+pub fn th1_get_child(parent:i64,idx:i64)->i64{let mut cur:i64=heap_get_domain(parent);let mut i:i64=0;while cur!=0{if i==idx{return heap_get_body(cur);}i=i+1;cur=heap_get_domain(cur);}return 0;}
+pub fn main()->i64{let r=th1_node_create(0,0,0,0);let mut i:i64=0;while i<5{let c=th1_node_create(i+1,0,i*10,10+i);th1_add_child(r,c);i=i+1;}if th1_child_count(r)!=5{return 1;}let c3=th1_get_child(r,3);if th1_node_score(c3)!=30{return 2;}return 111;}

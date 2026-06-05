@@ -1,0 +1,1080 @@
+{
+  "timestamp": "Phase 3 P2.1 bootstrap",
+  "python_lexer": "Z:\\Projects\\Omnisystem\\titan\\stage0\\lexer.py",
+  "titan_lexer": "Z:\\Projects\\Omnisystem\\titan\\stage3b\\lexer.ti",
+  "test_inputs": {
+    "minimal_function": "\npub fn main() {\n    return 42;\n}\n",
+    "arithmetic": "\nfn add(a: i32, b: i32) -> i32 {\n    let result = a + b;\n    return result;\n}\n",
+    "control_flow": "\npub fn is_positive(x: i32) -> bool {\n    if x > 0 {\n        return true;\n    } else {\n        return false;\n    }\n}\n",
+    "types_and_ops": "\nfn mixed_types() {\n    let x: i32 = 42;\n    let y: f64 = 3.14;\n    let b: bool = true;\n    let s: str = \"hello\";\n}\n",
+    "struct_and_match": "\npub struct Point {\n    x: i32,\n    y: i32,\n}\n\nfn process(p: Point) {\n    match p {\n        Point { x: 0, y: 0 } => { return; }\n        _ => { return; }\n    }\n}\n"
+  },
+  "results": {
+    "minimal_function": {
+      "tokens": [
+        {
+          "kind": "KW_PUB",
+          "lexeme": "pub",
+          "line": 2,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "KW_FN",
+          "lexeme": "fn",
+          "line": 2,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "main",
+          "line": 2,
+          "col": 8,
+          "value": ""
+        },
+        {
+          "kind": "LPAREN",
+          "lexeme": "(",
+          "line": 2,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "RPAREN",
+          "lexeme": ")",
+          "line": 2,
+          "col": 13,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 2,
+          "col": 15,
+          "value": ""
+        },
+        {
+          "kind": "KW_RETURN",
+          "lexeme": "return",
+          "line": 3,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "INT_LIT",
+          "lexeme": "42",
+          "line": 3,
+          "col": 12,
+          "value": "42"
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 3,
+          "col": 14,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 4,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "EOF",
+          "lexeme": "",
+          "line": 5,
+          "col": 1,
+          "value": ""
+        }
+      ],
+      "hash": "4ed12458324e616f3e9f03db72abdc2eb840c2bccea9155e52a7793c53d677c6",
+      "count": 11
+    },
+    "arithmetic": {
+      "tokens": [
+        {
+          "kind": "KW_FN",
+          "lexeme": "fn",
+          "line": 2,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "add",
+          "line": 2,
+          "col": 4,
+          "value": ""
+        },
+        {
+          "kind": "LPAREN",
+          "lexeme": "(",
+          "line": 2,
+          "col": 7,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "a",
+          "line": 2,
+          "col": 8,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 2,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "TY_I32",
+          "lexeme": "i32",
+          "line": 2,
+          "col": 11,
+          "value": ""
+        },
+        {
+          "kind": "COMMA",
+          "lexeme": ",",
+          "line": 2,
+          "col": 14,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "b",
+          "line": 2,
+          "col": 16,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 2,
+          "col": 17,
+          "value": ""
+        },
+        {
+          "kind": "TY_I32",
+          "lexeme": "i32",
+          "line": 2,
+          "col": 19,
+          "value": ""
+        },
+        {
+          "kind": "RPAREN",
+          "lexeme": ")",
+          "line": 2,
+          "col": 22,
+          "value": ""
+        },
+        {
+          "kind": "ARROW",
+          "lexeme": "->",
+          "line": 2,
+          "col": 24,
+          "value": ""
+        },
+        {
+          "kind": "TY_I32",
+          "lexeme": "i32",
+          "line": 2,
+          "col": 27,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 2,
+          "col": 31,
+          "value": ""
+        },
+        {
+          "kind": "KW_LET",
+          "lexeme": "let",
+          "line": 3,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "result",
+          "line": 3,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "EQ",
+          "lexeme": "=",
+          "line": 3,
+          "col": 16,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "a",
+          "line": 3,
+          "col": 18,
+          "value": ""
+        },
+        {
+          "kind": "PLUS",
+          "lexeme": "+",
+          "line": 3,
+          "col": 20,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "b",
+          "line": 3,
+          "col": 22,
+          "value": ""
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 3,
+          "col": 23,
+          "value": ""
+        },
+        {
+          "kind": "KW_RETURN",
+          "lexeme": "return",
+          "line": 4,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "result",
+          "line": 4,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 4,
+          "col": 18,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 5,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "EOF",
+          "lexeme": "",
+          "line": 6,
+          "col": 1,
+          "value": ""
+        }
+      ],
+      "hash": "da598494f7e6daebe468a10c8f597b4adc19fa0c9a2bb2309243cc035b86da82",
+      "count": 26
+    },
+    "control_flow": {
+      "tokens": [
+        {
+          "kind": "KW_PUB",
+          "lexeme": "pub",
+          "line": 2,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "KW_FN",
+          "lexeme": "fn",
+          "line": 2,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "is_positive",
+          "line": 2,
+          "col": 8,
+          "value": ""
+        },
+        {
+          "kind": "LPAREN",
+          "lexeme": "(",
+          "line": 2,
+          "col": 19,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "x",
+          "line": 2,
+          "col": 20,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 2,
+          "col": 21,
+          "value": ""
+        },
+        {
+          "kind": "TY_I32",
+          "lexeme": "i32",
+          "line": 2,
+          "col": 23,
+          "value": ""
+        },
+        {
+          "kind": "RPAREN",
+          "lexeme": ")",
+          "line": 2,
+          "col": 26,
+          "value": ""
+        },
+        {
+          "kind": "ARROW",
+          "lexeme": "->",
+          "line": 2,
+          "col": 28,
+          "value": ""
+        },
+        {
+          "kind": "TY_BOOL",
+          "lexeme": "bool",
+          "line": 2,
+          "col": 31,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 2,
+          "col": 36,
+          "value": ""
+        },
+        {
+          "kind": "KW_IF",
+          "lexeme": "if",
+          "line": 3,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "x",
+          "line": 3,
+          "col": 8,
+          "value": ""
+        },
+        {
+          "kind": "GT",
+          "lexeme": ">",
+          "line": 3,
+          "col": 10,
+          "value": ""
+        },
+        {
+          "kind": "INT_LIT",
+          "lexeme": "0",
+          "line": 3,
+          "col": 12,
+          "value": "0"
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 3,
+          "col": 14,
+          "value": ""
+        },
+        {
+          "kind": "KW_RETURN",
+          "lexeme": "return",
+          "line": 4,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "BOOL_LIT",
+          "lexeme": "true",
+          "line": 4,
+          "col": 16,
+          "value": "True"
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 4,
+          "col": 20,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 5,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "KW_ELSE",
+          "lexeme": "else",
+          "line": 5,
+          "col": 7,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 5,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "KW_RETURN",
+          "lexeme": "return",
+          "line": 6,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "BOOL_LIT",
+          "lexeme": "false",
+          "line": 6,
+          "col": 16,
+          "value": "False"
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 6,
+          "col": 21,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 7,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 8,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "EOF",
+          "lexeme": "",
+          "line": 9,
+          "col": 1,
+          "value": ""
+        }
+      ],
+      "hash": "7197b6402d0072d0538a790de3bbf9b32abed346a1a416ea39f0a5be1af8f269",
+      "count": 28
+    },
+    "types_and_ops": {
+      "tokens": [
+        {
+          "kind": "KW_FN",
+          "lexeme": "fn",
+          "line": 2,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "mixed_types",
+          "line": 2,
+          "col": 4,
+          "value": ""
+        },
+        {
+          "kind": "LPAREN",
+          "lexeme": "(",
+          "line": 2,
+          "col": 15,
+          "value": ""
+        },
+        {
+          "kind": "RPAREN",
+          "lexeme": ")",
+          "line": 2,
+          "col": 16,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 2,
+          "col": 18,
+          "value": ""
+        },
+        {
+          "kind": "KW_LET",
+          "lexeme": "let",
+          "line": 3,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "x",
+          "line": 3,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 3,
+          "col": 10,
+          "value": ""
+        },
+        {
+          "kind": "TY_I32",
+          "lexeme": "i32",
+          "line": 3,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "EQ",
+          "lexeme": "=",
+          "line": 3,
+          "col": 16,
+          "value": ""
+        },
+        {
+          "kind": "INT_LIT",
+          "lexeme": "42",
+          "line": 3,
+          "col": 18,
+          "value": "42"
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 3,
+          "col": 20,
+          "value": ""
+        },
+        {
+          "kind": "KW_LET",
+          "lexeme": "let",
+          "line": 4,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "y",
+          "line": 4,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 4,
+          "col": 10,
+          "value": ""
+        },
+        {
+          "kind": "TY_F64",
+          "lexeme": "f64",
+          "line": 4,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "EQ",
+          "lexeme": "=",
+          "line": 4,
+          "col": 16,
+          "value": ""
+        },
+        {
+          "kind": "FLOAT_LIT",
+          "lexeme": "3.14",
+          "line": 4,
+          "col": 18,
+          "value": "3.14"
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 4,
+          "col": 22,
+          "value": ""
+        },
+        {
+          "kind": "KW_LET",
+          "lexeme": "let",
+          "line": 5,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "b",
+          "line": 5,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 5,
+          "col": 10,
+          "value": ""
+        },
+        {
+          "kind": "TY_BOOL",
+          "lexeme": "bool",
+          "line": 5,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "EQ",
+          "lexeme": "=",
+          "line": 5,
+          "col": 17,
+          "value": ""
+        },
+        {
+          "kind": "BOOL_LIT",
+          "lexeme": "true",
+          "line": 5,
+          "col": 19,
+          "value": "True"
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 5,
+          "col": 23,
+          "value": ""
+        },
+        {
+          "kind": "KW_LET",
+          "lexeme": "let",
+          "line": 6,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "s",
+          "line": 6,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 6,
+          "col": 10,
+          "value": ""
+        },
+        {
+          "kind": "TY_STR",
+          "lexeme": "str",
+          "line": 6,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "EQ",
+          "lexeme": "=",
+          "line": 6,
+          "col": 16,
+          "value": ""
+        },
+        {
+          "kind": "STR_LIT",
+          "lexeme": "\"hello\"",
+          "line": 6,
+          "col": 18,
+          "value": "hello"
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 6,
+          "col": 25,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 7,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "EOF",
+          "lexeme": "",
+          "line": 8,
+          "col": 1,
+          "value": ""
+        }
+      ],
+      "hash": "257bd13cab7b4414a9fd661480426a3ee89f3a0a7318956cb228db4259659a1f",
+      "count": 35
+    },
+    "struct_and_match": {
+      "tokens": [
+        {
+          "kind": "KW_PUB",
+          "lexeme": "pub",
+          "line": 2,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "KW_STRUCT",
+          "lexeme": "struct",
+          "line": 2,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "Point",
+          "line": 2,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 2,
+          "col": 18,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "x",
+          "line": 3,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 3,
+          "col": 6,
+          "value": ""
+        },
+        {
+          "kind": "TY_I32",
+          "lexeme": "i32",
+          "line": 3,
+          "col": 8,
+          "value": ""
+        },
+        {
+          "kind": "COMMA",
+          "lexeme": ",",
+          "line": 3,
+          "col": 11,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "y",
+          "line": 4,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 4,
+          "col": 6,
+          "value": ""
+        },
+        {
+          "kind": "TY_I32",
+          "lexeme": "i32",
+          "line": 4,
+          "col": 8,
+          "value": ""
+        },
+        {
+          "kind": "COMMA",
+          "lexeme": ",",
+          "line": 4,
+          "col": 11,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 5,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "KW_FN",
+          "lexeme": "fn",
+          "line": 7,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "process",
+          "line": 7,
+          "col": 4,
+          "value": ""
+        },
+        {
+          "kind": "LPAREN",
+          "lexeme": "(",
+          "line": 7,
+          "col": 11,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "p",
+          "line": 7,
+          "col": 12,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 7,
+          "col": 13,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "Point",
+          "line": 7,
+          "col": 15,
+          "value": ""
+        },
+        {
+          "kind": "RPAREN",
+          "lexeme": ")",
+          "line": 7,
+          "col": 20,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 7,
+          "col": 22,
+          "value": ""
+        },
+        {
+          "kind": "KW_MATCH",
+          "lexeme": "match",
+          "line": 8,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "p",
+          "line": 8,
+          "col": 11,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 8,
+          "col": 13,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "Point",
+          "line": 9,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 9,
+          "col": 15,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "x",
+          "line": 9,
+          "col": 17,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 9,
+          "col": 18,
+          "value": ""
+        },
+        {
+          "kind": "INT_LIT",
+          "lexeme": "0",
+          "line": 9,
+          "col": 20,
+          "value": "0"
+        },
+        {
+          "kind": "COMMA",
+          "lexeme": ",",
+          "line": 9,
+          "col": 21,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "y",
+          "line": 9,
+          "col": 23,
+          "value": ""
+        },
+        {
+          "kind": "COLON",
+          "lexeme": ":",
+          "line": 9,
+          "col": 24,
+          "value": ""
+        },
+        {
+          "kind": "INT_LIT",
+          "lexeme": "0",
+          "line": 9,
+          "col": 26,
+          "value": "0"
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 9,
+          "col": 28,
+          "value": ""
+        },
+        {
+          "kind": "FAT_ARROW",
+          "lexeme": "=>",
+          "line": 9,
+          "col": 30,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 9,
+          "col": 33,
+          "value": ""
+        },
+        {
+          "kind": "KW_RETURN",
+          "lexeme": "return",
+          "line": 9,
+          "col": 35,
+          "value": ""
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 9,
+          "col": 41,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 9,
+          "col": 43,
+          "value": ""
+        },
+        {
+          "kind": "IDENT",
+          "lexeme": "_",
+          "line": 10,
+          "col": 9,
+          "value": ""
+        },
+        {
+          "kind": "FAT_ARROW",
+          "lexeme": "=>",
+          "line": 10,
+          "col": 11,
+          "value": ""
+        },
+        {
+          "kind": "LBRACE",
+          "lexeme": "{",
+          "line": 10,
+          "col": 14,
+          "value": ""
+        },
+        {
+          "kind": "KW_RETURN",
+          "lexeme": "return",
+          "line": 10,
+          "col": 16,
+          "value": ""
+        },
+        {
+          "kind": "SEMI",
+          "lexeme": ";",
+          "line": 10,
+          "col": 22,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 10,
+          "col": 24,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 11,
+          "col": 5,
+          "value": ""
+        },
+        {
+          "kind": "RBRACE",
+          "lexeme": "}",
+          "line": 12,
+          "col": 1,
+          "value": ""
+        },
+        {
+          "kind": "EOF",
+          "lexeme": "",
+          "line": 13,
+          "col": 1,
+          "value": ""
+        }
+      ],
+      "hash": "442758e4f56585fe81cc4258abcf96bbaf7ec7caecd945a26c2ea26e29ae8f8a",
+      "count": 48
+    }
+  }
+}

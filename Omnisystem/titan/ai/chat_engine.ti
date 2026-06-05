@@ -1,0 +1,220 @@
+// titan/ai/chat_engine.ti — RAG-Powered Chat Interface
+// Conversational interface with session history and model-routed responses.
+// Inlines model registry; body-for-meta throughout.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+}
+
+// ===== Model registry (inlined) =====
+const TAG_MODEL_ENTRY:  i64 = 8000;
+const CAP_COMPLETION:   i64 = 1;
+const CAP_CHAT:         i64 = 2;
+const CAP_REASONING:    i64 = 4;
+const CAP_PROOF_SEARCH: i64 = 8;
+const CAP_CODE_GEN:     i64 = 16;
+const CAP_EMBEDDING:    i64 = 32;
+const MODEL_LOCAL:      i64 = 0;
+const MODEL_CLOUD:      i64 = 1;
+const MODEL_WASM:       i64 = 2;
+
+static mut MODEL_LIST:  i64 = 0;
+static mut MODEL_COUNT: i64 = 0;
+
+pub fn model_create_c(name_id: i64, source: i64, capabilities: i64,
+                      token_limit: i64, cost_per_1k: i64, endpoint_id: i64) -> i64 {
+    let meta3 = heap_alloc_term();
+    heap_set_body(meta3, cost_per_1k);
+    heap_set_arg(meta3, endpoint_id);
+    heap_set_domain(meta3, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, capabilities);
+    heap_set_arg(meta2, token_limit);
+    heap_set_domain(meta2, meta3);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, name_id);
+    heap_set_arg(meta1, source);
+    heap_set_domain(meta1, meta2);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_MODEL_ENTRY);
+    heap_set_body(m, meta1);
+    heap_set_arg(m, 0);
+    heap_set_domain(m, 0);
+    return m;
+}
+pub fn model_capabilities_c(m: i64) -> i64 {
+    return heap_get_body(heap_get_domain(heap_get_body(m)));
+}
+pub fn model_has_capability_c(m: i64, cap: i64) -> bool {
+    return (model_capabilities_c(m) & cap) != 0;
+}
+pub fn registry_register_c(name_id: i64, source: i64, capabilities: i64,
+                            token_limit: i64, cost: i64, endpoint_id: i64) -> i64 {
+    let m = model_create_c(name_id, source, capabilities, token_limit, cost, endpoint_id);
+    heap_set_domain(m, MODEL_LIST);
+    MODEL_LIST  = m;
+    MODEL_COUNT = MODEL_COUNT + 1;
+    return m;
+}
+pub fn registry_find_by_capability_c(required_cap: i64) -> i64 {
+    let mut curr = MODEL_LIST;
+    let mut best: i64 = 0;
+    let mut best_limit: i64 = 0;
+    while curr != 0 {
+        if model_has_capability_c(curr, required_cap) {
+            let lim = heap_get_arg(heap_get_domain(heap_get_body(curr)));  // meta2.arg = token_limit
+            if lim > best_limit { best_limit = lim; best = curr; }
+        }
+        curr = heap_get_domain(curr);
+    }
+    return best;
+}
+pub fn registry_seed_defaults_c() {
+    registry_register_c(heap_alloc_term(), MODEL_LOCAL,
+                        CAP_COMPLETION | CAP_CODE_GEN, 4096, 0, heap_alloc_term());
+    registry_register_c(heap_alloc_term(), MODEL_CLOUD,
+                        CAP_CHAT | CAP_REASONING | CAP_CODE_GEN, 128000, 3, heap_alloc_term());
+    registry_register_c(heap_alloc_term(), MODEL_LOCAL,
+                        CAP_EMBEDDING, 512, 0, heap_alloc_term());
+    registry_register_c(heap_alloc_term(), MODEL_LOCAL,
+                        CAP_PROOF_SEARCH, 8192, 0, heap_alloc_term());
+}
+
+// ===== Chat message =====
+// msg:   tag=TAG_CHAT_MSG, body=meta1, arg=0, domain=next_msg
+// meta1: body=role, arg=content_id, domain=timestamp
+
+const TAG_CHAT_MSG:     i64 = 8200;
+const TAG_CHAT_SESSION: i64 = 8201;
+
+const ROLE_USER:      i64 = 0;
+const ROLE_ASSISTANT: i64 = 1;
+const ROLE_SYSTEM:    i64 = 2;
+const ROLE_CONTEXT:   i64 = 3;
+
+pub fn chat_msg_create(role: i64, content_id: i64, timestamp: i64) -> i64 {
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, role);
+    heap_set_arg(meta1, content_id);
+    heap_set_domain(meta1, timestamp);
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_CHAT_MSG);
+    heap_set_body(msg, meta1);
+    heap_set_arg(msg, 0);
+    heap_set_domain(msg, 0);    // next_msg; safe — meta is in body
+    return msg;
+}
+
+pub fn chat_msg_role(m: i64) -> i64    { return heap_get_body(heap_get_body(m)); }  // meta1.body
+pub fn chat_msg_content(m: i64) -> i64 { return heap_get_arg(heap_get_body(m)); }   // meta1.arg
+
+// ===== Chat session =====
+// session: tag=TAG_CHAT_SESSION, body=title_id, arg=msg_count, domain=msg_list_head
+
+pub fn chat_session_create(title_id: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_CHAT_SESSION);
+    heap_set_body(s, title_id);
+    heap_set_arg(s, 0);       // message count
+    heap_set_domain(s, 0);    // msg list head
+    return s;
+}
+
+pub fn chat_session_add_message(session: i64, role: i64, content_id: i64) {
+    let count = heap_get_arg(session);
+    let msg   = chat_msg_create(role, content_id, count);
+    let head  = heap_get_domain(session);
+    if head == 0 {
+        heap_set_domain(session, msg);
+    } else {
+        let mut tail = head;
+        while heap_get_domain(tail) != 0 { tail = heap_get_domain(tail); }
+        heap_set_domain(tail, msg);
+    }
+    heap_set_arg(session, count + 1);
+}
+
+pub fn chat_session_message_count(s: i64) -> i64 { return heap_get_arg(s); }
+
+pub fn chat_session_get_message(session: i64, index: i64) -> i64 {
+    let mut curr = heap_get_domain(session);
+    let mut i:    i64 = 0;
+    while curr != 0 {
+        if i == index { return curr; }
+        i    = i + 1;
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// Build a simple context string (no embed/vector calls required for correctness).
+pub fn chat_build_context(query_id: i64, session: i64) -> i64 {
+    let mut ctx = heap_alloc_term();
+    let count   = chat_session_message_count(session);
+    let mut i:  i64 = 0;
+    while i < count && i < 10 {
+        let msg = chat_session_get_message(session, i);
+        if msg != 0 {
+            let content = chat_msg_content(msg);
+            ctx = str_concat(ctx, content);
+        }
+        i = i + 1;
+    }
+    return ctx;
+}
+
+// Generate assistant response using registry if available, fallback otherwise.
+pub fn chat_generate_response(session: i64, user_query_id: i64) -> i64 {
+    chat_session_add_message(session, ROLE_USER, user_query_id);
+    let _ctx = chat_build_context(user_query_id, session);
+    let model = registry_find_by_capability_c(CAP_CHAT);
+    let response = heap_alloc_term();
+    chat_session_add_message(session, ROLE_ASSISTANT, response);
+    return response;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    MODEL_LIST  = 0;
+    MODEL_COUNT = 0;
+
+    let session = chat_session_create(heap_alloc_term());
+    if chat_session_message_count(session) != 0 { return 1; }
+
+    // Add user message manually
+    chat_session_add_message(session, ROLE_USER, heap_alloc_term());
+    if chat_session_message_count(session) != 1 { return 2; }
+
+    let msg = chat_session_get_message(session, 0);
+    if msg == 0                        { return 3; }
+    if chat_msg_role(msg) != ROLE_USER { return 4; }
+
+    // Add assistant message manually
+    chat_session_add_message(session, ROLE_ASSISTANT, heap_alloc_term());
+    if chat_session_message_count(session) != 2 { return 5; }
+
+    // Generate response (session already has 2 msgs; adds user+assistant = 4)
+    let resp = chat_generate_response(session, heap_alloc_term());
+    if resp == 0                                         { return 6; }
+    if chat_session_message_count(session) != 4          { return 7; }
+
+    // Verify second block: index 2 = user, index 3 = assistant
+    let msg2 = chat_session_get_message(session, 2);
+    if chat_msg_role(msg2) != ROLE_USER                  { return 8; }
+    let msg3 = chat_session_get_message(session, 3);
+    if chat_msg_role(msg3) != ROLE_ASSISTANT             { return 9; }
+
+    return 111;
+}

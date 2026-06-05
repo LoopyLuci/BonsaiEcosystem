@@ -1,0 +1,41 @@
+// titan/gui/input_inject.ti — Input Injection (Simulated)
+// Simulated no-op input; returns 0 on success. No real OS I/O in bootstrap.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const INPUT_OK:    i64 = 0;
+const INPUT_ERROR: i64 = 1;
+
+pub fn input_click(x: i64, y: i64, button: i64) -> i64 {
+    return INPUT_OK;
+}
+
+pub fn input_type_text(text_id: i64) -> i64 {
+    return INPUT_OK;
+}
+
+pub fn input_scroll_at(x: i64, y: i64, dx: i64, dy: i64) -> i64 {
+    return INPUT_OK;
+}
+
+pub fn input_key_press(key_code: i64) -> i64 {
+    return INPUT_OK;
+}
+
+pub fn main() -> i64 {
+    if input_click(100, 200, 0)      != INPUT_OK { return 1; }
+    if input_type_text(heap_alloc_term()) != INPUT_OK { return 2; }
+    if input_scroll_at(50, 50, 0, 10) != INPUT_OK { return 3; }
+    if input_key_press(13)            != INPUT_OK { return 4; }
+    return 111;
+}

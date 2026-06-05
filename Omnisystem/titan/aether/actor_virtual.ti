@@ -1,0 +1,138 @@
+// titan/aether/actor_virtual.ti — Virtual Actor System (tags 38300-38399)
+// Manages lightweight virtual actors with mailboxes and activation tracking.
+//
+// Actor cell layout:
+//   field[0] = tag (38300)
+//   field[1] = actor_id
+//   field[2] = state (0=IDLE, 1=ACTIVE, 2=SUSPENDED, 3=TERMINATED)
+//   field[3] = mailbox_head (linked list of messages)
+//   field[4] = msg_count
+//   field[5] = activation_count
+//
+// ActorMsg cell layout:
+//   field[0] = tag (38301)
+//   field[1] = msg_type
+//   field[2] = payload
+//   field[3] = next
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_ACTOR:     i64 = 38300;
+const TAG_ACTOR_MSG: i64 = 38301;
+
+const ACTOR_IDLE:       i64 = 0;
+const ACTOR_ACTIVE:     i64 = 1;
+const ACTOR_SUSPENDED:  i64 = 2;
+const ACTOR_TERMINATED: i64 = 3;
+
+const AMSG_CALL:   i64 = 1;
+const AMSG_CAST:   i64 = 2;
+const AMSG_SIGNAL: i64 = 3;
+
+pub fn actor_new(actor_id: i64) -> i64 {
+    let a = heap_alloc();
+    heap_set(a, 0, TAG_ACTOR);
+    heap_set(a, 1, actor_id);
+    heap_set(a, 2, ACTOR_IDLE);
+    heap_set(a, 3, 0);
+    heap_set(a, 4, 0);
+    heap_set(a, 5, 0);
+    return a;
+}
+
+pub fn actor_send(actor: i64, msg_type: i64, payload: i64) -> i64 {
+    if heap_get(actor, 2) == ACTOR_TERMINATED {
+        return 0;
+    }
+    let m = heap_alloc();
+    heap_set(m, 0, TAG_ACTOR_MSG);
+    heap_set(m, 1, msg_type);
+    heap_set(m, 2, payload);
+    heap_set(m, 3, heap_get(actor, 3));
+    heap_set(actor, 3, m);
+    let cnt = heap_get(actor, 4);
+    heap_set(actor, 4, cnt + 1);
+    return 1;
+}
+
+pub fn actor_activate(actor: i64) -> i64 {
+    let cnt = heap_get(actor, 4);
+    if cnt == 0 {
+        return 0;
+    }
+    heap_set(actor, 2, ACTOR_ACTIVE);
+    let ac = heap_get(actor, 5);
+    heap_set(actor, 5, ac + 1);
+    return 1;
+}
+
+pub fn actor_process_one(actor: i64) -> i64 {
+    let head = heap_get(actor, 3);
+    if head == 0 {
+        heap_set(actor, 2, ACTOR_IDLE);
+        return 0;
+    }
+    let payload = heap_get(head, 2);
+    heap_set(actor, 3, heap_get(head, 3));
+    let cnt = heap_get(actor, 4);
+    heap_set(actor, 4, cnt - 1);
+    if cnt - 1 == 0 {
+        heap_set(actor, 2, ACTOR_IDLE);
+    }
+    return payload;
+}
+
+pub fn actor_terminate(actor: i64) {
+    heap_set(actor, 2, ACTOR_TERMINATED);
+}
+
+pub fn actor_mailbox_size(actor: i64) -> i64 {
+    return heap_get(actor, 4);
+}
+
+pub fn actor_activation_count(actor: i64) -> i64 {
+    return heap_get(actor, 5);
+}
+
+pub fn actor_state(actor: i64) -> i64 {
+    return heap_get(actor, 2);
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: Send 3 messages, mailbox_size == 3
+    let a = actor_new(1);
+    actor_send(a, AMSG_CALL, 10);
+    actor_send(a, AMSG_CALL, 20);
+    actor_send(a, AMSG_CALL, 30);
+    if actor_mailbox_size(a) == 3 {
+        score = score + 37;
+    }
+
+    // Step 2: Activate and process one, activation_count == 1
+    actor_activate(a);
+    let p = actor_process_one(a);
+    if p == 30 {
+        if actor_activation_count(a) == 1 {
+            score = score + 37;
+        }
+    }
+
+    // Step 3: Terminate, send returns 0
+    actor_terminate(a);
+    let ok = actor_send(a, AMSG_CAST, 99);
+    if ok == 0 {
+        if actor_state(a) == ACTOR_TERMINATED {
+            score = score + 37;
+        }
+    }
+
+    return score;
+}

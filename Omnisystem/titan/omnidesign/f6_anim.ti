@@ -1,0 +1,10 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_CLIP:i64=25500;const T_SKEL:i64=25501;const T_WRP:i64=25502;
+pub fn f6_clip_create(name:i64,frames:i64,fps:i64)->i64{let c=heap_alloc_term();heap_set_tag(c,T_CLIP);heap_set_body(c,name);heap_set_arg(c,frames);heap_set_domain(c,fps);let w=heap_alloc_term();heap_set_tag(w,T_WRP);heap_set_body(w,c);heap_set_domain(w,0);return w;}
+pub fn f6_clip_frames(w:i64)->i64{return heap_get_arg(heap_get_body(w));}
+pub fn f6_clip_fps(w:i64)->i64{return heap_get_domain(heap_get_body(w));}
+pub fn f6_skeleton_create()->i64{let s=heap_alloc_term();heap_set_tag(s,T_SKEL);heap_set_body(s,0);heap_set_arg(s,0);return s;}
+pub fn f6_skeleton_add_bone(s:i64,bone_id:i64,parent_id:i64){let b=heap_alloc_term();heap_set_tag(b,T_SKEL+1);heap_set_body(b,bone_id);heap_set_arg(b,parent_id);heap_set_domain(b,0);let h=heap_get_arg(s);if h==0{heap_set_arg(s,b);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,b);}heap_set_body(s,heap_get_body(s)+1);}
+pub fn f6_skeleton_bone_count(s:i64)->i64{return heap_get_body(s);}
+pub fn f6_blend_clips(a:i64,b:i64,t:i64)->i64{return f6_clip_frames(a)+f6_clip_frames(b)+t;}
+pub fn main()->i64{let s=f6_skeleton_create();f6_skeleton_add_bone(s,1,0);f6_skeleton_add_bone(s,2,1);f6_skeleton_add_bone(s,3,2);if f6_skeleton_bone_count(s)!=3{return 1;}let c1=f6_clip_create(1,30,24);let c2=f6_clip_create(2,60,30);if f6_clip_fps(c1)!=24{return 2;}if f6_blend_clips(c1,c2,5)!=95{return 3;}return 111;}

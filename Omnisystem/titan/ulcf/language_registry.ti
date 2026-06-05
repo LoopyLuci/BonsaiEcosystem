@@ -1,0 +1,253 @@
+// titan/ulcf/language_registry.ti
+// ULCF Language Registry – Supported languages and their configurations.
+//
+// This registry tracks all 30+ languages that can be converted to Titan via UGA.
+// Each language has a dedicated config file defining type mappings, operators,
+// and AST node classifications for accurate code translation.
+
+pub struct LanguageRegistry {
+    languages: HashMap<String, LanguageConfig>,
+}
+
+impl LanguageRegistry {
+    pub fn new() -> LanguageRegistry {
+        let mut registry = LanguageRegistry {
+            languages: HashMap::new(),
+        };
+
+        // C-Family Languages (Systems)
+        registry.register("c", c_config());
+        registry.register("cpp", cpp_config());
+        registry.register("rust", rust_config());
+        registry.register("go", go_config());
+        registry.register("swift", swift_config());
+        registry.register("dart", dart_config());
+
+        // JVM Languages
+        registry.register("java", java_config());
+        registry.register("kotlin", kotlin_config());
+        registry.register("scala", scala_config());
+
+        // .NET Languages
+        registry.register("csharp", csharp_config());
+        registry.register("fsharp", fsharp_config());
+
+        // Scripting Languages
+        registry.register("python", python_config());
+        registry.register("ruby", ruby_config());
+        registry.register("perl", perl_config());
+        registry.register("php", php_config());
+
+        // Web Languages
+        registry.register("javascript", javascript_config());
+        registry.register("typescript", typescript_config());
+
+        // Functional Languages
+        registry.register("haskell", haskell_config());
+        registry.register("ocaml", ocaml_config());
+        registry.register("elixir", elixir_config());
+        registry.register("erlang", erlang_config());
+        registry.register("clojure", clojure_config());
+        registry.register("scheme", scheme_config());
+        registry.register("common_lisp", common_lisp_config());
+
+        // Scientific Languages
+        registry.register("r", r_config());
+        registry.register("julia", julia_config());
+
+        // Legacy Languages
+        registry.register("cobol", cobol_config());
+        registry.register("fortran", fortran_config());
+        registry.register("ada", ada_config());
+
+        // Query Languages
+        registry.register("sql", sql_config());
+
+        registry
+    }
+
+    pub fn register(&mut self, name: String, config: LanguageConfig) {
+        self.languages.insert(name, config);
+    }
+
+    pub fn get(&self, name: String) -> Option<LanguageConfig> {
+        self.languages.get(name)
+    }
+
+    pub fn list(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for key in self.languages.keys() {
+            names.push(key.clone());
+        }
+        names
+    }
+
+    pub fn count(&self) -> i64 {
+        self.languages.len() as i64
+    }
+
+    pub fn list_by_category(&self, category: &str) -> Vec<String> {
+        match category {
+            "c-family" => vec!["c", "cpp", "rust", "go", "swift", "dart"]
+                .iter().map(|s| s.to_string()).collect(),
+            "jvm" => vec!["java", "kotlin", "scala"]
+                .iter().map(|s| s.to_string()).collect(),
+            "dotnet" => vec!["csharp", "fsharp"]
+                .iter().map(|s| s.to_string()).collect(),
+            "scripting" => vec!["python", "ruby", "perl", "php"]
+                .iter().map(|s| s.to_string()).collect(),
+            "web" => vec!["javascript", "typescript"]
+                .iter().map(|s| s.to_string()).collect(),
+            "functional" => vec!["haskell", "ocaml", "elixir", "erlang", "clojure", "scheme", "common_lisp"]
+                .iter().map(|s| s.to_string()).collect(),
+            "scientific" => vec!["r", "julia"]
+                .iter().map(|s| s.to_string()).collect(),
+            "legacy" => vec!["cobol", "fortran", "ada"]
+                .iter().map(|s| s.to_string()).collect(),
+            "query" => vec!["sql"]
+                .iter().map(|s| s.to_string()).collect(),
+            _ => Vec::new(),
+        }
+    }
+}
+
+// Language configuration functions
+// Core languages (from uga.ti)
+extern fn c_config() -> LanguageConfig;
+extern fn cpp_config() -> LanguageConfig;
+extern fn rust_config() -> LanguageConfig;
+extern fn go_config() -> LanguageConfig;
+extern fn java_config() -> LanguageConfig;
+extern fn ruby_config() -> LanguageConfig;
+extern fn python_config() -> LanguageConfig;
+extern fn javascript_config() -> LanguageConfig;
+
+// All other language configs are defined in their respective files
+extern fn swift_config() -> LanguageConfig;
+extern fn dart_config() -> LanguageConfig;
+extern fn kotlin_config() -> LanguageConfig;
+extern fn scala_config() -> LanguageConfig;
+extern fn csharp_config() -> LanguageConfig;
+extern fn fsharp_config() -> LanguageConfig;
+extern fn perl_config() -> LanguageConfig;
+extern fn php_config() -> LanguageConfig;
+extern fn typescript_config() -> LanguageConfig;
+extern fn haskell_config() -> LanguageConfig;
+extern fn ocaml_config() -> LanguageConfig;
+extern fn elixir_config() -> LanguageConfig;
+extern fn erlang_config() -> LanguageConfig;
+extern fn clojure_config() -> LanguageConfig;
+extern fn scheme_config() -> LanguageConfig;
+extern fn common_lisp_config() -> LanguageConfig;
+extern fn r_config() -> LanguageConfig;
+extern fn julia_config() -> LanguageConfig;
+extern fn cobol_config() -> LanguageConfig;
+extern fn fortran_config() -> LanguageConfig;
+extern fn ada_config() -> LanguageConfig;
+extern fn sql_config() -> LanguageConfig;
+
+fn scala_config() -> LanguageConfig {
+    empty_config("scala", vec![".scala".to_string()])
+}
+
+fn clojure_config() -> LanguageConfig {
+    empty_config("clojure", vec![".clj".to_string()])
+}
+
+fn javascript_config() -> LanguageConfig {
+    empty_config("javascript", vec![".js".to_string()])
+}
+
+fn typescript_config() -> LanguageConfig {
+    empty_config("typescript", vec![".ts".to_string()])
+}
+
+fn php_config() -> LanguageConfig {
+    empty_config("php", vec![".php".to_string()])
+}
+
+fn lua_config() -> LanguageConfig {
+    empty_config("lua", vec![".lua".to_string()])
+}
+
+fn perl_config() -> LanguageConfig {
+    empty_config("perl", vec![".pl".to_string()])
+}
+
+fn csharp_config() -> LanguageConfig {
+    empty_config("csharp", vec![".cs".to_string()])
+}
+
+fn fsharp_config() -> LanguageConfig {
+    empty_config("fsharp", vec![".fs".to_string()])
+}
+
+fn haskell_config() -> LanguageConfig {
+    empty_config("haskell", vec![".hs".to_string()])
+}
+
+fn ocaml_config() -> LanguageConfig {
+    empty_config("ocaml", vec![".ml".to_string()])
+}
+
+fn elixir_config() -> LanguageConfig {
+    empty_config("elixir", vec![".ex".to_string()])
+}
+
+fn erlang_config() -> LanguageConfig {
+    empty_config("erlang", vec![".erl".to_string()])
+}
+
+fn scheme_config() -> LanguageConfig {
+    empty_config("scheme", vec![".scm".to_string()])
+}
+
+fn swift_config() -> LanguageConfig {
+    empty_config("swift", vec![".swift".to_string()])
+}
+
+fn r_config() -> LanguageConfig {
+    empty_config("r", vec![".r".to_string()])
+}
+
+fn julia_config() -> LanguageConfig {
+    empty_config("julia", vec![".jl".to_string()])
+}
+
+fn matlab_config() -> LanguageConfig {
+    empty_config("matlab", vec![".m".to_string()])
+}
+
+fn bash_config() -> LanguageConfig {
+    empty_config("bash", vec![".sh".to_string()])
+}
+
+fn sql_config() -> LanguageConfig {
+    empty_config("sql", vec![".sql".to_string()])
+}
+
+fn dockerfile_config() -> LanguageConfig {
+    empty_config("dockerfile", vec!["Dockerfile".to_string()])
+}
+
+fn empty_config(name: String, extensions: Vec<String>) -> LanguageConfig {
+    let mut operators = HashMap::new();
+    operators.insert("+".to_string(), "add".to_string());
+    operators.insert("-".to_string(), "sub".to_string());
+    operators.insert("*".to_string(), "mul".to_string());
+    operators.insert("/".to_string(), "div".to_string());
+
+    LanguageConfig {
+        name: name,
+        extensions: extensions,
+        type_map: HashMap::new(),
+        operator_map: operators,
+        statement_nodes: Vec::new(),
+        expression_nodes: Vec::new(),
+        literal_nodes: Vec::new(),
+        comment_nodes: Vec::new(),
+        block_nodes: Vec::new(),
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}

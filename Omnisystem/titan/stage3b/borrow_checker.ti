@@ -1,0 +1,615 @@
+/*
+ * Titan Stage 3B — Borrow Checker (Self-Hosted)
+ *
+ * Translation of titan/stage0/borrow_checker.py to Titan Stage 0 syntax.
+ * Validates ownership, move semantics, and borrowing rules for Titan programs.
+ *
+ * Core invariant (per binding, at every program point):
+ *   state ∈ { ALIVE, MOVED, DEAD }
+ *   ALIVE  → value is accessible (may be read or borrowed)
+ *   MOVED  → value was transferred; binding is inaccessible for reads
+ *   DEAD   → out of scope; no access permitted
+ *
+ * Copy semantics (§8.3 UniIR graded modalities):
+ *   Copy types are implicitly duplicated on use — they are never marked MOVED.
+ *   Non-copy types (structs, enums) follow linear ownership.
+ *
+ * Lifetime elision rules (§4.2 Titan_Stage0_Bootstrap.md):
+ *   Rule 1: Each elided input lifetime becomes a distinct fresh parameter.
+ *   Rule 2: One input lifetime → assigned to all output lifetimes.
+ *   Rule 3: Multiple inputs with a &self → self's lifetime assigned to outputs.
+ *
+ * Stage 0 constraint: struct + fn only. No generics, no enum payloads.
+ * Tags are i64 discriminants matching the Python enum ordinals.
+ */
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Binding State Tags  (mirrors Python BindingState enum)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn STATE_ALIVE() -> i64 { return 1; }
+pub fn STATE_MOVED() -> i64 { return 2; }
+pub fn STATE_DEAD()  -> i64 { return 3; }
+pub fn STATE_UNBORN() -> i64 { return 0; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Ownership Kind Tags  (Owned / Borrowed / MutBorrowed / Copy)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn OWN_OWNED()       -> i64 { return 10; }
+pub fn OWN_BORROWED()    -> i64 { return 11; }
+pub fn OWN_MUT_BORROWED() -> i64 { return 12; }
+pub fn OWN_COPY()        -> i64 { return 13; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Lifetime Kind Tags  (Static / Named / Elided / Inferred)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn LT_STATIC()   -> i64 { return 20; }
+pub fn LT_NAMED()    -> i64 { return 21; }
+pub fn LT_ELIDED()   -> i64 { return 22; }
+pub fn LT_INFERRED() -> i64 { return 23; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Error Kind Tags  (mirrors Python BorrowCheckError categories)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn ERR_USE_AFTER_MOVE()     -> i64 { return 30; }
+pub fn ERR_DOUBLE_BORROW()      -> i64 { return 31; }
+pub fn ERR_MISSING_LIFETIME()   -> i64 { return 32; }
+pub fn ERR_IMMUTABLE_ASSIGN()   -> i64 { return 33; }
+pub fn ERR_UNDEFINED_VAR()      -> i64 { return 34; }
+pub fn ERR_BORROW_CONFLICT()    -> i64 { return 35; }
+pub fn ERR_DOUBLE_FREE()        -> i64 { return 36; }
+pub fn ERR_LIFETIME_ESCAPE()    -> i64 { return 37; }
+pub fn ERR_ALREADY_DECLARED()   -> i64 { return 38; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Borrow Info  (tracks per-binding borrow state)
+// Mirrors Python BorrowInfo dataclass.
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct BorrowInfo {
+    pub name: str,
+    pub ty_name: str,        // type name (e.g. "i64", "bool", "MyStruct")
+    pub is_mutable: bool,
+    pub state: i64,          // STATE_* tag
+    pub active_mut_borrows: i64,   // count of active &mut borrows
+    pub active_imm_borrows: i64,   // count of active & borrows
+}
+
+pub fn make_borrow_info(name: str, ty_name: str, is_mutable: bool) -> BorrowInfo {
+    BorrowInfo {
+        name: name,
+        ty_name: ty_name,
+        is_mutable: is_mutable,
+        state: 1,                  // STATE_ALIVE
+        active_mut_borrows: 0,
+        active_imm_borrows: 0,
+    }
+}
+
+// Returns true if the binding can be read (state == ALIVE).
+pub fn borrow_can_read(b: BorrowInfo) -> bool {
+    return b.state == 1;
+}
+
+// Returns true if the binding can be written (ALIVE and mutable).
+pub fn borrow_can_write(b: BorrowInfo) -> bool {
+    if b.state != 1  { return false; }
+    return b.is_mutable;
+}
+
+// Returns true if we can create an immutable borrow (&).
+// Requires: ALIVE, no active &mut.
+pub fn borrow_can_borrow_imm(b: BorrowInfo) -> bool {
+    if b.state != 1             { return false; }
+    if b.active_mut_borrows > 0 { return false; }
+    return true;
+}
+
+// Returns true if we can create a mutable borrow (&mut).
+// Requires: ALIVE, mutable, no active & or &mut.
+pub fn borrow_can_borrow_mut(b: BorrowInfo) -> bool {
+    if b.state != 1              { return false; }
+    if !b.is_mutable             { return false; }
+    if b.active_mut_borrows > 0  { return false; }
+    if b.active_imm_borrows > 0  { return false; }
+    return true;
+}
+
+// Mark binding as moved (state := MOVED).
+pub fn borrow_mark_moved(b: BorrowInfo) -> BorrowInfo {
+    BorrowInfo {
+        name: b.name,
+        ty_name: b.ty_name,
+        is_mutable: b.is_mutable,
+        state: 2,                  // STATE_MOVED
+        active_mut_borrows: b.active_mut_borrows,
+        active_imm_borrows: b.active_imm_borrows,
+    }
+}
+
+// Increment immutable borrow count.
+pub fn borrow_add_imm(b: BorrowInfo) -> BorrowInfo {
+    BorrowInfo {
+        name: b.name,
+        ty_name: b.ty_name,
+        is_mutable: b.is_mutable,
+        state: b.state,
+        active_mut_borrows: b.active_mut_borrows,
+        active_imm_borrows: b.active_imm_borrows + 1,
+    }
+}
+
+// Increment mutable borrow count.
+pub fn borrow_add_mut(b: BorrowInfo) -> BorrowInfo {
+    BorrowInfo {
+        name: b.name,
+        ty_name: b.ty_name,
+        is_mutable: b.is_mutable,
+        state: b.state,
+        active_mut_borrows: b.active_mut_borrows + 1,
+        active_imm_borrows: b.active_imm_borrows,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Borrow Check Error
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct BorrowError {
+    pub kind: i64,          // ERR_* tag
+    pub msg: str,           // human-readable description
+    pub var_name: str,      // variable involved (or "?" if unknown)
+    pub line: i64,
+}
+
+pub fn make_borrow_error(kind: i64, msg: str, var_name: str) -> BorrowError {
+    BorrowError { kind: kind, msg: msg, var_name: var_name, line: 0 }
+}
+
+pub fn make_use_after_move_error(var_name: str) -> BorrowError {
+    BorrowError {
+        kind: 30,           // ERR_USE_AFTER_MOVE
+        msg: "Variable has been moved and is no longer accessible",
+        var_name: var_name,
+        line: 0,
+    }
+}
+
+pub fn make_undefined_var_error(var_name: str) -> BorrowError {
+    BorrowError {
+        kind: 34,           // ERR_UNDEFINED_VAR
+        msg: "Undefined variable",
+        var_name: var_name,
+        line: 0,
+    }
+}
+
+pub fn make_immutable_assign_error(var_name: str) -> BorrowError {
+    BorrowError {
+        kind: 33,           // ERR_IMMUTABLE_ASSIGN
+        msg: "Cannot assign to immutable variable",
+        var_name: var_name,
+        line: 0,
+    }
+}
+
+pub fn make_borrow_conflict_error(var_name: str) -> BorrowError {
+    BorrowError {
+        kind: 35,           // ERR_BORROW_CONFLICT
+        msg: "Borrow conflict: cannot borrow as mutable while already borrowed",
+        var_name: var_name,
+        line: 0,
+    }
+}
+
+pub fn make_double_borrow_error(var_name: str) -> BorrowError {
+    BorrowError {
+        kind: 31,           // ERR_DOUBLE_BORROW
+        msg: "Cannot borrow as &mut: already mutably borrowed",
+        var_name: var_name,
+        line: 0,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Region Constraint
+// 'sub outlives 'super  (sub: Lifetime, sup: Lifetime)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct RegionConstraint {
+    pub sub_lt: str,     // sub-lifetime name (shorter-lived)
+    pub sup_lt: str,     // super-lifetime name (longer-lived)
+    pub reason: str,     // why this constraint exists (for diagnostics)
+}
+
+pub fn make_constraint(sub_lt: str, sup_lt: str, reason: str) -> RegionConstraint {
+    RegionConstraint { sub_lt: sub_lt, sup_lt: sup_lt, reason: reason }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Lifetime Record  (resolved lifetime for a parameter or return position)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct LifetimeRecord {
+    pub param_name: str,     // "return" for return type, param name otherwise
+    pub lifetime_name: str,  // e.g. "'a", "'elided_0", "'static", "'fn_foo"
+    pub kind: i64,           // LT_* tag
+}
+
+pub fn make_lt_record(param_name: str, lifetime_name: str, kind: i64) -> LifetimeRecord {
+    LifetimeRecord { param_name: param_name, lifetime_name: lifetime_name, kind: kind }
+}
+
+pub fn make_elided_lt(param_name: str, fresh_index: i64) -> LifetimeRecord {
+    LifetimeRecord {
+        param_name: param_name,
+        lifetime_name: "'elided",
+        kind: 22,    // LT_ELIDED
+    }
+}
+
+pub fn make_static_lt(param_name: str) -> LifetimeRecord {
+    LifetimeRecord {
+        param_name: param_name,
+        lifetime_name: "'static",
+        kind: 20,    // LT_STATIC
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Copy Type Classification
+// Mirrors Python _COPY_TYPES set in borrow_checker.py.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Returns true if a type name is a Copy type.
+// Copy types are never marked MOVED when used.
+pub fn is_copy_type(ty_name: str) -> bool {
+    if ty_name == "i8"    { return true; }
+    if ty_name == "i16"   { return true; }
+    if ty_name == "i32"   { return true; }
+    if ty_name == "i64"   { return true; }
+    if ty_name == "i128"  { return true; }
+    if ty_name == "isize" { return true; }
+    if ty_name == "u8"    { return true; }
+    if ty_name == "u16"   { return true; }
+    if ty_name == "u32"   { return true; }
+    if ty_name == "u64"   { return true; }
+    if ty_name == "f32"   { return true; }
+    if ty_name == "f64"   { return true; }
+    if ty_name == "bool"  { return true; }
+    if ty_name == "()"    { return true; }
+    if ty_name == "str"   { return true; }  // str is a borrowed slice — Copy
+    return false;
+}
+
+// Returns true if a type name corresponds to a reference (always Copy).
+pub fn is_ref_type(ty_name: str) -> bool {
+    // References start with '&' in our type name encoding
+    if ty_name == "&"  { return true; }
+    return false;
+}
+
+// Returns the ownership kind for a type name.
+pub fn ownership_of_type(ty_name: str) -> i64 {
+    if is_copy_type(ty_name) { return 13; }   // OWN_COPY
+    if is_ref_type(ty_name)  { return 11; }   // OWN_BORROWED
+    return 10;                                  // OWN_OWNED (non-Copy, non-ref)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Literal Type Inference
+// Mirrors Python BorrowChecker._infer_lit_type().
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Returns the type name for a literal kind string.
+// Literal kinds: "int", "float", "str", "bool_true", "bool_false", "unit", "unknown".
+pub fn lit_type_name(lit_kind: str) -> str {
+    if lit_kind == "int"        { return "i64"; }
+    if lit_kind == "float"      { return "f64"; }
+    if lit_kind == "str"        { return "str"; }
+    if lit_kind == "bool_true"  { return "bool"; }
+    if lit_kind == "bool_false" { return "bool"; }
+    if lit_kind == "unit"       { return "()"; }
+    return "?";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Binary Operator Result Type Inference
+// Mirrors Python BorrowChecker._infer_binop_type().
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Returns the result type name for a binary operation.
+// Comparison ops always return "bool"; arithmetic ops return the lhs type.
+pub fn binop_result_type(op: str, lhs_ty: str) -> str {
+    if op == "==" { return "bool"; }
+    if op == "!=" { return "bool"; }
+    if op == "<"  { return "bool"; }
+    if op == "<=" { return "bool"; }
+    if op == ">"  { return "bool"; }
+    if op == ">=" { return "bool"; }
+    if op == "&&" { return "bool"; }
+    if op == "||" { return "bool"; }
+    // Arithmetic: return lhs type unchanged
+    return lhs_ty;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Unary Operator Semantics
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Returns the borrow operation kind for a unary operator.
+// "borrow_imm" = & (immutable borrow)
+// "borrow_mut" = &mut (mutable borrow)
+// "deref"      = * (dereference)
+// "negate"     = - (arithmetic negation)
+// "not"        = ! (logical not)
+// "none"       = no borrow effect
+pub fn unop_borrow_kind(op: str) -> str {
+    if op == "&"   { return "borrow_imm"; }
+    if op == "*"   { return "deref"; }
+    if op == "-"   { return "negate"; }
+    if op == "!"   { return "not"; }
+    return "none";
+}
+
+// Returns the result type for a unary operation on the given operand type.
+pub fn unop_result_type(op: str, operand_ty: str) -> str {
+    if op == "!" { return "bool"; }
+    if op == "-" { return operand_ty; }
+    if op == "&" { return "&"; }      // reference type
+    if op == "*" { return "?"; }      // dereference: inner type unknown without full type info
+    return operand_ty;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Lifetime Elision Decision Functions
+// Mirrors Python BorrowChecker._elide_lifetimes().
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Classify what lifetime elision rule applies given input/output context.
+// Returns: "rule1" (fresh per input), "rule2" (single input → output),
+//          "rule3" (self lifetime → output), "explicit" (already annotated),
+//          "fresh_fn" (no input refs, fresh fn-scope lifetime).
+pub fn classify_elision_rule(
+    input_ref_count: i64,
+    has_self_param: bool,
+    output_is_ref: bool
+) -> str {
+    if !output_is_ref { return "none"; }
+    if input_ref_count == 0 { return "fresh_fn"; }
+    if input_ref_count == 1 { return "rule2"; }
+    if has_self_param       { return "rule3"; }
+    return "rule1";
+}
+
+// Returns true if a parameter named "self" is treated as the self lifetime source.
+pub fn is_self_param(param_name: str) -> bool {
+    return param_name == "self";
+}
+
+// Build the fresh lifetime name for an elided input lifetime.
+// fresh_index is the sequential index within the function signature.
+pub fn fresh_elided_lt_name(fresh_index: i64) -> str {
+    // In Stage 3B we encode the index into a fixed string prefix.
+    // Full string formatting happens in Stage 3C.
+    if fresh_index == 0  { return "'elided_0"; }
+    if fresh_index == 1  { return "'elided_1"; }
+    if fresh_index == 2  { return "'elided_2"; }
+    if fresh_index == 3  { return "'elided_3"; }
+    if fresh_index == 4  { return "'elided_4"; }
+    if fresh_index == 5  { return "'elided_5"; }
+    if fresh_index == 6  { return "'elided_6"; }
+    if fresh_index == 7  { return "'elided_7"; }
+    return "'elided_n";
+}
+
+// Build the function-scoped lifetime name for a given function.
+// Used when there are no input reference lifetimes (fresh_fn rule).
+pub fn fn_scope_lt_name(fn_name: str) -> str {
+    // "'fn_" + fn_name — string concat in Stage 3C; fixed prefix here
+    return "'fn_scope";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Region Constraint Generation
+// Mirrors the constraint generation logic in _check_function.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Generate a return-lifetime outlives-param constraint (Rule 2).
+// "The return reference must not outlive its input source."
+pub fn gen_return_outlives_input(input_lt: str, output_lt: str) -> RegionConstraint {
+    make_constraint(output_lt, input_lt, "return_outlives_input")
+}
+
+// Generate a self-lifetime constraint (Rule 3).
+pub fn gen_return_outlives_self(self_lt: str, output_lt: str) -> RegionConstraint {
+    make_constraint(output_lt, self_lt, "return_outlives_self")
+}
+
+// Generate a parameter-borrow constraint: the reference must not outlive
+// the referent.
+pub fn gen_borrow_outlives_referent(borrow_lt: str, referent_lt: str) -> RegionConstraint {
+    make_constraint(borrow_lt, referent_lt, "borrow_outlives_referent")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Statement Kind Classification
+// Used to dispatch checking in the body walk.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Returns true if a statement is a let binding.
+pub fn stmt_is_let(stmt_kind: str) -> bool {
+    return stmt_kind == "let";
+}
+
+// Returns true if a statement is a return.
+pub fn stmt_is_return(stmt_kind: str) -> bool {
+    return stmt_kind == "return";
+}
+
+// Returns true if a statement is an assignment (lhs = rhs).
+pub fn stmt_is_assign(stmt_kind: str) -> bool {
+    return stmt_kind == "assign";
+}
+
+// Returns true if a statement is an if.
+pub fn stmt_is_if(stmt_kind: str) -> bool {
+    return stmt_kind == "if";
+}
+
+// Returns true if a statement is a while.
+pub fn stmt_is_while(stmt_kind: str) -> bool {
+    return stmt_kind == "while";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Scope State Validation
+// These functions check preconditions before each borrow operation.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Validate that a read access is allowed. Returns ERR_* tag or 0 (ok).
+pub fn validate_read(b: BorrowInfo) -> i64 {
+    if b.state == 2 { return 30; }    // STATE_MOVED → ERR_USE_AFTER_MOVE
+    if b.state == 3 { return 30; }    // STATE_DEAD  → ERR_USE_AFTER_MOVE
+    return 0;
+}
+
+// Validate that an assignment is allowed. Returns ERR_* tag or 0 (ok).
+pub fn validate_write(b: BorrowInfo) -> i64 {
+    if b.state == 2 { return 30; }    // STATE_MOVED → ERR_USE_AFTER_MOVE
+    if b.state == 3 { return 30; }    // STATE_DEAD  → ERR_USE_AFTER_MOVE
+    if !b.is_mutable { return 33; }   // ERR_IMMUTABLE_ASSIGN
+    return 0;
+}
+
+// Validate that an immutable borrow is allowed. Returns ERR_* tag or 0 (ok).
+pub fn validate_borrow_imm(b: BorrowInfo) -> i64 {
+    if b.state != 1 { return 30; }              // not ALIVE → use-after-move
+    if b.active_mut_borrows > 0 { return 35; } // ERR_BORROW_CONFLICT
+    return 0;
+}
+
+// Validate that a mutable borrow is allowed. Returns ERR_* tag or 0 (ok).
+pub fn validate_borrow_mut(b: BorrowInfo) -> i64 {
+    if b.state != 1 { return 30; }              // not ALIVE
+    if !b.is_mutable { return 33; }             // ERR_IMMUTABLE_ASSIGN (can't &mut immutable)
+    if b.active_mut_borrows > 0 { return 31; }  // ERR_DOUBLE_BORROW
+    if b.active_imm_borrows > 0 { return 35; }  // ERR_BORROW_CONFLICT
+    return 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Move Semantics Decision
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Returns true if accessing a value of this type should trigger a move.
+// Copy types are never moved; non-Copy types (structs, enums) always move.
+// References are Copy.
+pub fn should_move_on_use(ty_name: str, is_ref: bool) -> bool {
+    if is_ref             { return false; }  // references are Copy
+    if is_copy_type(ty_name) { return false; }
+    return true;                              // non-Copy: move on use
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Checker Summary (parse/check result)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct CheckSummary {
+    pub decl_count: i64,
+    pub error_count: i64,
+    pub constraint_count: i64,
+    pub had_error: bool,
+}
+
+pub fn make_check_summary(decl_count: i64, error_count: i64,
+                           constraint_count: i64) -> CheckSummary {
+    let had = error_count > 0;
+    CheckSummary {
+        decl_count: decl_count,
+        error_count: error_count,
+        constraint_count: constraint_count,
+        had_error: had,
+    }
+}
+
+pub fn check_ok(summary: CheckSummary) -> bool {
+    return !summary.had_error;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Polonius-Style Borrow Facts
+// These are the fact tables fed into a datalog solver in Stage 4.
+// At Stage 3B we represent them as individual structs.
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct BorrowFact {
+    pub kind: str,          // "loan_issued", "loan_killed", "loan_invalidated", etc.
+    pub var_name: str,
+    pub point: i64,         // program point (statement index)
+    pub lifetime_name: str,
+}
+
+pub fn make_loan_issued(var_name: str, point: i64, lt_name: str) -> BorrowFact {
+    BorrowFact {
+        kind: "loan_issued",
+        var_name: var_name,
+        point: point,
+        lifetime_name: lt_name,
+    }
+}
+
+pub fn make_loan_killed(var_name: str, point: i64) -> BorrowFact {
+    BorrowFact {
+        kind: "loan_killed",
+        var_name: var_name,
+        point: point,
+        lifetime_name: "",
+    }
+}
+
+pub fn make_move_out(var_name: str, point: i64) -> BorrowFact {
+    BorrowFact {
+        kind: "move_out",
+        var_name: var_name,
+        point: point,
+        lifetime_name: "",
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Public API Entry Points
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Classify an error kind tag into a human-readable category name.
+pub fn error_kind_name(kind: i64) -> str {
+    if kind == 30 { return "use_after_move"; }
+    if kind == 31 { return "double_borrow"; }
+    if kind == 32 { return "missing_lifetime"; }
+    if kind == 33 { return "immutable_assign"; }
+    if kind == 34 { return "undefined_var"; }
+    if kind == 35 { return "borrow_conflict"; }
+    if kind == 36 { return "double_free"; }
+    if kind == 37 { return "lifetime_escape"; }
+    if kind == 38 { return "already_declared"; }
+    return "unknown";
+}
+
+// Validate a complete borrow context.
+// Returns true if no errors were recorded.
+pub fn context_is_valid(error_count: i64) -> bool {
+    return error_count == 0;
+}
+
+// Estimate constraint count from declaration count (for resource planning).
+pub fn estimate_constraints(decl_count: i64, ref_param_count: i64) -> i64 {
+    return decl_count + ref_param_count * 2;
+}
+
+// Compute a hash seed from checker results (used for baseline comparison).
+pub fn checker_hash_seed(decl_count: i64, error_count: i64, constraint_count: i64) -> i64 {
+    return decl_count * 1000003 + error_count * 999983 + constraint_count * 999979;
+}

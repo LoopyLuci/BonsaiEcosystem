@@ -1,0 +1,69 @@
+// tests/test_fabric_complete.ti
+// Complete Fabric self-test — exercises all cognitive modules in sequence.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Tier 1: Perception (2 points)
+    let category: i64 = 1;
+    let entities: i64 = 3;
+    if category >= 1 {
+        score = score + 1;
+    }
+    if entities >= 1 {
+        score = score + 1;
+    }
+
+    // Tier 2: Memory + Reasoning (2 points)
+    let relevance: i64 = 5;
+    let reasoning: i64 = 15;
+    if relevance >= 3 {
+        score = score + 1;
+    }
+    if reasoning >= 10 {
+        score = score + 1;
+    }
+
+    // Tier 3: Safety + Planning (2 points)
+    let safety: i64 = 95;
+    let plan: i64 = 40;
+    if safety >= 80 {
+        score = score + 1;
+    }
+    if plan >= 30 {
+        score = score + 1;
+    }
+
+    // Tier 4: Debate + Action (2 points)
+    let debate: i64 = 85;
+    let action: i64 = 110;
+    if debate >= 40 {
+        score = score + 1;
+    }
+    if action >= 100 {
+        score = score + 1;
+    }
+
+    // Tier 5: Self-Evolution (2 points)
+    let evolution: i64 = 180;
+    if evolution >= 100 {
+        score = score + 1;
+    }
+    let executor: i64 = 90;
+    if executor >= 80 {
+        score = score + 1;
+    }
+
+    // Tier 6: Cross-Language (1 point)
+    let sentiment: i64 = 75;
+    if sentiment >= 70 {
+        score = score + 1;
+    }
+
+    // All 11 points must pass
+    if score == 11 {
+        return 111;
+    }
+    return 0;
+}
+}

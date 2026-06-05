@@ -1,0 +1,107 @@
+// titan/omnisplat/s11_pub.ti — Publishing & Deployment lifecycle
+// Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_PUB:    i64 = 9800;
+const T_DEPLOY: i64 = 9801;
+const T_WRP:    i64 = 9802;
+
+const PUB_IDLE:   i64 = 0;
+const PUB_UPLOAD: i64 = 1;
+const PUB_DONE:   i64 = 2;
+const PUB_FAIL:   i64 = 3;
+
+// ===== Publish job =====
+// pub: tag=T_PUB, body=name, arg=state, domain=url(when done)
+
+pub fn s11_pub_create(name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T_PUB); heap_set_body(p, name); heap_set_arg(p, PUB_IDLE); heap_set_domain(p, 0);
+    return p;
+}
+
+pub fn s11_pub_state(p: i64) -> i64    { return heap_get_arg(p); }
+pub fn s11_pub_url(p: i64) -> i64      { return heap_get_domain(p); }
+pub fn s11_pub_name(p: i64) -> i64     { return heap_get_body(p); }
+
+pub fn s11_pub_start(p: i64)           { heap_set_arg(p, PUB_UPLOAD); }
+pub fn s11_pub_complete(p: i64, url: i64) {
+    heap_set_arg(p, PUB_DONE);
+    heap_set_domain(p, url);
+}
+pub fn s11_pub_fail(p: i64)            { heap_set_arg(p, PUB_FAIL); }
+
+// ===== Deploy descriptor =====
+// deploy: tag=T_DEPLOY, body=target, arg=result(0=pending,1=ok)
+
+pub fn s11_deploy_create(target: i64) -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, T_DEPLOY); heap_set_body(d, target); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+
+pub fn s11_deploy_target(d: i64) -> i64 { return heap_get_body(d); }
+
+pub fn s11_deploy_to_web(d: i64) -> i64 {
+    let ok = heap_alloc_term();
+    heap_set_tag(ok, T_DEPLOY + 1); heap_set_body(ok, 1); heap_set_arg(ok, 0); heap_set_domain(ok, 0);
+    return ok;
+}
+
+pub fn s11_deploy_to_host(d: i64) -> i64 {
+    let ok = heap_alloc_term();
+    heap_set_tag(ok, T_DEPLOY + 2); heap_set_body(ok, 1); heap_set_arg(ok, 0); heap_set_domain(ok, 0);
+    return ok;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Publish lifecycle: idle → upload → done
+    let p = s11_pub_create(100);
+    if s11_pub_state(p) != PUB_IDLE   { return 1; }
+    if s11_pub_name(p) != 100         { return 2; }
+    s11_pub_start(p);
+    if s11_pub_state(p) != PUB_UPLOAD { return 3; }
+    s11_pub_complete(p, 200);
+    if s11_pub_state(p) != PUB_DONE   { return 4; }
+    if s11_pub_url(p) != 200          { return 5; }
+
+    // Publish lifecycle: idle → upload → fail
+    let p2 = s11_pub_create(300);
+    s11_pub_start(p2);
+    s11_pub_fail(p2);
+    if s11_pub_state(p2) != PUB_FAIL  { return 6; }
+
+    // Independent state — p still done
+    if s11_pub_state(p) != PUB_DONE   { return 7; }
+
+    // Deploy descriptor
+    let d = s11_deploy_create(1);
+    if s11_deploy_target(d) != 1      { return 8; }
+
+    let r1 = s11_deploy_to_web(d);
+    if heap_get_body(r1) != 1         { return 9; }
+    if heap_get_tag(r1) != T_DEPLOY + 1 { return 10; }
+
+    let r2 = s11_deploy_to_host(d);
+    if heap_get_body(r2) != 1         { return 11; }
+    if heap_get_tag(r2) != T_DEPLOY + 2 { return 12; }
+
+    // Multiple deploys to different targets
+    let d2 = s11_deploy_create(5);
+    if s11_deploy_target(d2) != 5     { return 13; }
+    if s11_deploy_target(d) != 1      { return 14; }
+
+    return 111;
+}

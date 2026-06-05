@@ -1,0 +1,122 @@
+// tests/test_r1.ti — Phase R1 Core Router & Format Translation Integration Test
+// All helpers inlined with tr1_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR1_T_EP:   i64 = 22000;
+const TR1_T_RT:   i64 = 22001;
+const TR1_T_MT:   i64 = 22002;
+const TR1_T_WR:   i64 = 22003;
+
+pub fn tr1_ep_create(url: i64, ptype: i64, prio: i64, active: i64) -> i64 {
+    let ep = heap_alloc_term();
+    heap_set_tag(ep, TR1_T_EP); heap_set_body(ep, url); heap_set_arg(ep, ptype);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TR1_T_MT); heap_set_body(m, prio); heap_set_arg(m, active);
+    heap_set_domain(ep, m);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TR1_T_WR); heap_set_body(w, ep); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tr1_ep_url(w: i64) -> i64 {
+    return heap_get_body(heap_get_body(w));
+}
+pub fn tr1_ep_active(w: i64) -> i64 {
+    let ep = heap_get_body(w);
+    let m = heap_get_domain(ep);
+    return heap_get_arg(m);
+}
+pub fn tr1_ep_prio(w: i64) -> i64 {
+    let ep = heap_get_body(w);
+    let m = heap_get_domain(ep);
+    return heap_get_body(m);
+}
+
+pub fn tr1_router_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TR1_T_RT); heap_set_body(r, 0); heap_set_arg(r, 0);
+    return r;
+}
+
+pub fn tr1_router_add(r: i64, w: i64) {
+    let h = heap_get_arg(r);
+    if h == 0 { heap_set_arg(r, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn tr1_router_count(r: i64) -> i64 { return heap_get_body(r); }
+
+pub fn tr1_router_select(r: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(r);
+    let mut best: i64 = 0;
+    let mut best_prio: i64 = -1;
+    while cur != 0 {
+        if tr1_ep_active(cur) == 1 {
+            let p = tr1_ep_prio(cur);
+            if p > best_prio { best_prio = p; best = cur; }
+        }
+        cur = heap_get_domain(cur);
+    }
+    return best;
+}
+
+pub fn tr1_format_translate(fmt: i64) -> i64 {
+    if fmt == 1 { return 2; }
+    if fmt == 2 { return 1; }
+    return fmt;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let r = tr1_router_create();
+    let w1 = tr1_ep_create(10, 1, 5,  1);
+    let w2 = tr1_ep_create(20, 2, 80, 1);
+    let w3 = tr1_ep_create(30, 3, 40, 0);
+    let w4 = tr1_ep_create(40, 4, 60, 1);
+    tr1_router_add(r, w1);
+    tr1_router_add(r, w2);
+    tr1_router_add(r, w3);
+    tr1_router_add(r, w4);
+    if tr1_router_count(r) != 4       { return 1; }
+    // Active: w1(prio=5), w2(prio=80), w4(prio=60) → w2 wins
+    let sel = tr1_router_select(r);
+    if sel != w2                       { return 2; }
+    if tr1_format_translate(2) != 1    { return 3; }
+    if tr1_format_translate(99) != 99  { return 4; }
+
+    // All inactive → select returns 0
+    let r2 = tr1_router_create();
+    let wx = tr1_ep_create(1, 1, 100, 0);
+    tr1_router_add(r2, wx);
+    if tr1_router_select(r2) != 0      { return 5; }
+
+    // Single active → returns it
+    let r3 = tr1_router_create();
+    let wa = tr1_ep_create(7, 1, 99, 1);
+    tr1_router_add(r3, wa);
+    if tr1_router_select(r3) != wa     { return 6; }
+
+    // url accessor
+    if tr1_ep_url(w3) != 30            { return 7; }
+
+    // format translate: 1↔2 roundtrip
+    if tr1_format_translate(tr1_format_translate(1)) != 1 { return 8; }
+
+    return 111;
+}

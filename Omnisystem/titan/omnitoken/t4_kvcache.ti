@@ -1,0 +1,140 @@
+// titan/omnitoken/t4_kvcache.ti — KV Cache Manager
+// Self-contained. capacity in domain (not body) to avoid collision with count.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_CACHE: i64 = 21300;
+const T_CENT:  i64 = 21301;
+const T_CWRP:  i64 = 21302;
+
+// cache: tag=T_CACHE, body=count, arg=list_head(wrappers), domain=capacity
+// wrapper: tag=T_CWRP, body=entry, domain=next_wrapper
+// entry: tag=T_CENT, body=key, arg=value, domain=score
+
+pub fn t4_cache_create(capacity: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_CACHE); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, capacity);
+    return c;
+}
+
+pub fn t4_cache_count(c: i64) -> i64    { return heap_get_body(c); }
+pub fn t4_cache_capacity(c: i64) -> i64 { return heap_get_domain(c); }
+
+pub fn t4_cache_lookup(c: i64, key: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(c);
+    while w != 0 {
+        let e = heap_get_body(w);
+        if heap_get_body(e) == key { return heap_get_arg(e); }
+        w = heap_get_domain(w);
+    }
+    return -1;
+}
+
+// Find min-score entry and evict it (unlink wrapper from list)
+pub fn t4_cache_evict_min(c: i64) {
+    let head = heap_get_arg(c);
+    if head == 0 { return; }
+
+    // Find wrapper with minimum score entry
+    let mut min_prev: i64 = 0;
+    let mut min_w: i64 = head;
+    let mut min_score: i64 = heap_get_domain(heap_get_body(head));
+
+    let mut prev: i64 = 0;
+    let mut cur: i64 = head;
+    while cur != 0 {
+        let e = heap_get_body(cur);
+        let sc = heap_get_domain(e);
+        if sc < min_score {
+            min_score = sc;
+            min_w = cur;
+            min_prev = prev;
+        }
+        prev = cur;
+        cur = heap_get_domain(cur);
+    }
+
+    // Unlink min_w from list
+    let next = heap_get_domain(min_w);
+    if min_prev == 0 {
+        heap_set_arg(c, next);
+    } else {
+        heap_set_domain(min_prev, next);
+    }
+    heap_set_body(c, heap_get_body(c) - 1);
+}
+
+pub fn t4_cache_insert(c: i64, key: i64, value: i64, score: i64) {
+    let cap = heap_get_domain(c);
+    let cnt = heap_get_body(c);
+    if cnt >= cap { t4_cache_evict_min(c); }
+
+    let e = heap_alloc_term();
+    heap_set_tag(e, T_CENT); heap_set_body(e, key); heap_set_arg(e, value); heap_set_domain(e, score);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_CWRP); heap_set_body(w, e); heap_set_domain(w, 0);
+
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Capacity=3, insert 3 entries
+    let c = t4_cache_create(3);
+    if t4_cache_capacity(c) != 3   { return 1; }
+    if t4_cache_count(c) != 0      { return 2; }
+
+    t4_cache_insert(c, 10, 100, 50);
+    t4_cache_insert(c, 20, 200, 80);
+    t4_cache_insert(c, 30, 300, 60);
+    if t4_cache_count(c) != 3      { return 3; }
+    if t4_cache_lookup(c, 10) != 100 { return 4; }
+    if t4_cache_lookup(c, 20) != 200 { return 5; }
+    if t4_cache_lookup(c, 30) != 300 { return 6; }
+
+    // Insert 4th — evicts lowest score (key=10, score=50)
+    t4_cache_insert(c, 40, 400, 70);
+    if t4_cache_count(c) != 3        { return 7; }
+    if t4_cache_lookup(c, 10) != -1  { return 8; }
+    if t4_cache_lookup(c, 40) != 400 { return 9; }
+
+    // Miss
+    if t4_cache_lookup(c, 99) != -1  { return 10; }
+
+    // Insert 5th — evicts lowest remaining (key=30, score=60)
+    t4_cache_insert(c, 50, 500, 90);
+    if t4_cache_count(c) != 3        { return 11; }
+    if t4_cache_lookup(c, 30) != -1  { return 12; }
+    if t4_cache_lookup(c, 50) != 500 { return 13; }
+
+    // capacity=1: always evicts on second insert
+    let c2 = t4_cache_create(1);
+    t4_cache_insert(c2, 1, 11, 10);
+    if t4_cache_count(c2) != 1       { return 14; }
+    t4_cache_insert(c2, 2, 22, 5);
+    // score 5 < 10, so new entry evicts old... wait: old score=10 > new score=5
+    // evict_min on insert: evicts lowest EXISTING (score=10)? No — evict before insert.
+    // Before insert: count=1>=cap=1, evict min (only entry key=1 score=10), then insert key=2 score=5
+    if t4_cache_count(c2) != 1       { return 15; }
+    if t4_cache_lookup(c2, 1) != -1  { return 16; }
+    if t4_cache_lookup(c2, 2) != 22  { return 17; }
+
+    return 111;
+}

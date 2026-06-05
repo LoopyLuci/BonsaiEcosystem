@@ -1,0 +1,148 @@
+// titan/compiler/vm.ti — Stack-based virtual machine
+// Includes bytecode structures. Tests execution of arithmetic programs.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const OP_PUSH: i64 = 0; const OP_ADD: i64 = 1; const OP_SUB: i64 = 2;
+const OP_MUL: i64 = 3; const OP_DIV: i64 = 4; const OP_CMP_EQ: i64 = 5;
+const OP_CMP_LT: i64 = 6; const OP_CMP_GT: i64 = 7;
+const OP_STORE: i64 = 10; const OP_LOAD: i64 = 11; const OP_RET: i64 = 12;
+
+const TAG_BC: i64 = 8001; const TAG_INSTR: i64 = 8002;
+const TAG_STACK_FRAME: i64 = 8003; const TAG_VM: i64 = 8004;
+const TAG_VAR: i64 = 8005;
+
+// ===== Bytecode store =====
+pub fn bc_new() -> i64 {
+    let bc = heap_alloc_term();
+    heap_set_tag(bc, TAG_BC); heap_set_body(bc, 0); heap_set_arg(bc, -1); heap_set_domain(bc, -1);
+    return bc;
+}
+pub fn bc_emit(bc: i64, op: i64, arg: i64) {
+    let instr = heap_alloc_term();
+    heap_set_tag(instr, TAG_INSTR); heap_set_body(instr, op); heap_set_arg(instr, arg); heap_set_domain(instr, -1);
+    let tail = heap_get_domain(bc);
+    if tail == -1 { heap_set_arg(bc, instr); } else { heap_set_domain(tail, instr); }
+    heap_set_domain(bc, instr);
+    heap_set_body(bc, heap_get_body(bc) + 1);
+}
+pub fn bc_len(bc: i64) -> i64 { return heap_get_body(bc); }
+pub fn bc_head(bc: i64) -> i64 { return heap_get_arg(bc); }
+pub fn instr_op(i: i64) -> i64 { return heap_get_body(i); }
+pub fn instr_arg(i: i64) -> i64 { return heap_get_arg(i); }
+pub fn instr_next(i: i64) -> i64 { return heap_get_domain(i); }
+
+// ===== Stack (heap linked list) =====
+// Frame: tag=TAG_STACK_FRAME, body=value, arg=prev_frame (-1=empty)
+// VM: tag=TAG_VM, body=top_frame_id (-1=empty)
+pub fn vm_new() -> i64 {
+    let v = heap_alloc_term(); heap_set_tag(v, TAG_VM); heap_set_body(v, -1); return v;
+}
+pub fn vm_push(vm: i64, val: i64) {
+    let f = heap_alloc_term();
+    heap_set_tag(f, TAG_STACK_FRAME); heap_set_body(f, val); heap_set_arg(f, heap_get_body(vm));
+    heap_set_body(vm, f);
+}
+pub fn vm_pop(vm: i64) -> i64 {
+    let top = heap_get_body(vm);
+    if top == -1 { return 0; }
+    let val = heap_get_body(top);
+    heap_set_body(vm, heap_get_arg(top));
+    return val;
+}
+
+// ===== Variables (associative list) =====
+// Node: tag=TAG_VAR, body=name_id, arg=value, domain=next (-1=nil)
+pub fn vars_set(head: i64, name: i64, val: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_VAR); heap_set_body(n, name); heap_set_arg(n, val); heap_set_domain(n, head);
+    return n;
+}
+pub fn vars_get(head: i64, name: i64) -> i64 {
+    let mut node = head;
+    while node != -1 {
+        if heap_get_body(node) == name { return heap_get_arg(node); }
+        node = heap_get_domain(node);
+    }
+    return 0;
+}
+
+// ===== VM execution =====
+pub fn vm_run(bc: i64) -> i64 {
+    let vm = vm_new();
+    let mut vars: i64 = -1;
+    let mut instr = bc_head(bc);
+    while instr != -1 {
+        let op = instr_op(instr);
+        let arg = instr_arg(instr);
+        if op == OP_PUSH { vm_push(vm, arg); }
+        else if op == OP_ADD { let b = vm_pop(vm); let a = vm_pop(vm); vm_push(vm, a + b); }
+        else if op == OP_SUB { let b = vm_pop(vm); let a = vm_pop(vm); vm_push(vm, a - b); }
+        else if op == OP_MUL { let b = vm_pop(vm); let a = vm_pop(vm); vm_push(vm, a * b); }
+        else if op == OP_DIV { let b = vm_pop(vm); let a = vm_pop(vm); if b == 0 { vm_push(vm, 0); } else { vm_push(vm, a / b); } }
+        else if op == OP_CMP_EQ { let b = vm_pop(vm); let a = vm_pop(vm); if a == b { vm_push(vm, 1); } else { vm_push(vm, 0); } }
+        else if op == OP_CMP_LT { let b = vm_pop(vm); let a = vm_pop(vm); if a < b { vm_push(vm, 1); } else { vm_push(vm, 0); } }
+        else if op == OP_CMP_GT { let b = vm_pop(vm); let a = vm_pop(vm); if a > b { vm_push(vm, 1); } else { vm_push(vm, 0); } }
+        else if op == OP_STORE { vars = vars_set(vars, arg, vm_pop(vm)); }
+        else if op == OP_LOAD { vm_push(vm, vars_get(vars, arg)); }
+        else if op == OP_RET { return vm_pop(vm); }
+        instr = instr_next(instr);
+    }
+    return vm_pop(vm);
+}
+
+pub pub fn main() -> i64 {
+    // Test 1: PUSH 42, RET → 42
+    let bc1 = bc_new();
+    bc_emit(bc1, OP_PUSH, 42);
+    bc_emit(bc1, OP_RET, 0);
+    if vm_run(bc1) != 42 { return 1; }
+
+    // Test 2: PUSH 10, PUSH 20, ADD, RET → 30
+    let bc2 = bc_new();
+    bc_emit(bc2, OP_PUSH, 10);
+    bc_emit(bc2, OP_PUSH, 20);
+    bc_emit(bc2, OP_ADD, 0);
+    bc_emit(bc2, OP_RET, 0);
+    if vm_run(bc2) != 30 { return 2; }
+
+    // Test 3: 1 + 2 * 3 = 7 → PUSH1 PUSH2 PUSH3 MUL ADD RET
+    let bc3 = bc_new();
+    bc_emit(bc3, OP_PUSH, 1);
+    bc_emit(bc3, OP_PUSH, 2);
+    bc_emit(bc3, OP_PUSH, 3);
+    bc_emit(bc3, OP_MUL, 0);
+    bc_emit(bc3, OP_ADD, 0);
+    bc_emit(bc3, OP_RET, 0);
+    if vm_run(bc3) != 7 { return 3; }
+
+    // Test 4: (10 * 11 + 1) = 111
+    let bc4 = bc_new();
+    bc_emit(bc4, OP_PUSH, 10);
+    bc_emit(bc4, OP_PUSH, 11);
+    bc_emit(bc4, OP_MUL, 0);
+    bc_emit(bc4, OP_PUSH, 1);
+    bc_emit(bc4, OP_ADD, 0);
+    bc_emit(bc4, OP_RET, 0);
+    if vm_run(bc4) != 111 { return 4; }
+
+    // Test 5: STORE/LOAD: store 99 in var 0, load var 0, return
+    let bc5 = bc_new();
+    bc_emit(bc5, OP_PUSH, 99);
+    bc_emit(bc5, OP_STORE, 0);
+    bc_emit(bc5, OP_LOAD, 0);
+    bc_emit(bc5, OP_RET, 0);
+    if vm_run(bc5) != 99 { return 5; }
+
+    return 111;
+}

@@ -1,0 +1,247 @@
+// sylva/jit.ti — Sylva tracing JIT: hot-path detection and native stub compilation
+// The JIT is a two-phase system:
+//   Phase 1 (profiling): count executions of each instruction; flag hot instructions
+//   Phase 2 (compilation): compile hot traces to a "native stub" (modelled as optimised IR)
+// In production, Phase 2 emits Cranelift IR; here we model it as simplified, inlined IR.
+// The JIT never changes observable semantics — only performance. Correctness is preserved.
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+const TAG_PROF:  i64 = 68300;  // profiler counter entry
+const TAG_TRACE: i64 = 68301;  // recorded execution trace
+const TAG_STUB:  i64 = 68302;  // compiled native stub
+const TAG_IR:    i64 = 68303;  // optimised IR instruction
+const TAG_NODE:  i64 = 68304;
+
+// ── Hot threshold ─────────────────────────────────────────────────────────
+const HOT_THRESHOLD: i64 = 5;   // compile after 5 executions
+
+// ── Profiler ──────────────────────────────────────────────────────────────
+// Profile entry: body=instr_ptr, arg=exec_count, domain=next
+let g_prof_head: i64 = 0;
+let g_hot_count: i64 = 0;
+
+pub fn prof_reset() { g_prof_head=0; g_hot_count=0; return; }
+
+pub fn prof_tick(instr_ptr:i64) {
+    let cur=g_prof_head;
+    while cur!=0 {
+        if heap_get_body(cur)==instr_ptr {
+            heap_set_arg(cur, heap_get_arg(cur)+1);
+            if heap_get_arg(cur)==HOT_THRESHOLD { g_hot_count=g_hot_count+1; }
+            return;
+        }
+        cur=heap_get_domain(cur);
+    }
+    let e=heap_alloc_term(); heap_set_tag(e,TAG_PROF);
+    heap_set_body(e,instr_ptr); heap_set_arg(e,1); heap_set_domain(e,g_prof_head);
+    g_prof_head=e;
+    return;
+}
+
+pub fn prof_count(instr_ptr:i64) -> i64 {
+    let cur=g_prof_head;
+    while cur!=0 {
+        if heap_get_body(cur)==instr_ptr { return heap_get_arg(cur); }
+        cur=heap_get_domain(cur);
+    }
+    return 0;
+}
+
+pub fn prof_is_hot(instr_ptr:i64) -> i64 {
+    if prof_count(instr_ptr) >= HOT_THRESHOLD { return 1; } return 0;
+}
+
+pub fn prof_hot_count() -> i64 { return g_hot_count; }
+
+// ── Trace recorder ────────────────────────────────────────────────────────
+// A trace is a linear sequence of (opcode, operand) pairs from a hot loop body.
+// Trace node: body=opcode, arg=operand, domain=next
+const TAG_TINSTR: i64 = 68310;
+
+pub fn trace_new() -> i64 {
+    let t=heap_alloc_term(); heap_set_tag(t,TAG_TRACE);
+    heap_set_body(t,0);   // head
+    heap_set_arg(t,0);    // tail
+    heap_set_domain(t,0); // length
+    return t;
+}
+
+pub fn trace_record(t:i64, opcode:i64, operand:i64) {
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_TINSTR);
+    heap_set_body(n,opcode); heap_set_arg(n,operand); heap_set_domain(n,0);
+    if heap_get_body(t)==0 { heap_set_body(t,n); heap_set_arg(t,n); }
+    else { heap_set_domain(heap_get_arg(t),n); heap_set_arg(t,n); }
+    heap_set_domain(t, heap_get_domain(t)+1);
+    return;
+}
+
+pub fn trace_len(t:i64) -> i64   { return heap_get_domain(t); }
+pub fn trace_head(t:i64) -> i64  { return heap_get_body(t); }
+
+// ── Optimiser: constant folding on a trace ────────────────────────────────
+// Opcodes (matching sylva/interpreter.ti)
+const OP_PUSH: i64 = 2;   // push integer
+const OP_ADD:  i64 = 20;
+const OP_SUB:  i64 = 21;
+const OP_MUL:  i64 = 22;
+const OP_DUP:  i64 = 2;
+
+// Constant fold: if two consecutive PUSHes are followed by ADD/SUB/MUL,
+// replace all three with a single PUSH of the computed result.
+pub fn optimise_trace(t:i64) -> i64 {
+    let out = trace_new();
+    let cur = trace_head(t);
+    let folded = 0;
+
+    while cur != 0 {
+        let op = heap_get_body(cur);
+        let nxt = heap_get_domain(cur);
+        let nxt2 = 0;
+        if nxt != 0 { nxt2 = heap_get_domain(nxt); }
+
+        if op == OP_PUSH && nxt != 0 && heap_get_body(nxt) == OP_PUSH && nxt2 != 0 {
+            let arith = heap_get_body(nxt2);
+            if arith == OP_ADD || arith == OP_SUB || arith == OP_MUL {
+                let va = heap_get_arg(cur);
+                let vb = heap_get_arg(nxt);
+                let result = 0;
+                if arith == OP_ADD { result = va + vb; }
+                if arith == OP_SUB { result = va - vb; }
+                if arith == OP_MUL { result = va * vb; }
+                trace_record(out, OP_PUSH, result);  // folded constant
+                folded = folded + 1;
+                cur = heap_get_domain(nxt2);  // skip 3 instructions
+                continue;
+            }
+        }
+
+        trace_record(out, op, heap_get_arg(cur));
+        cur = heap_get_domain(cur);
+    }
+
+    return out;
+}
+
+// ── Native stub (compiled trace) ──────────────────────────────────────────
+// In production: this would be machine code. Here: optimised IR + metadata.
+// body=source_instr_ptr, arg=optimised_trace, domain=call_count
+pub fn stub_new(instr_ptr:i64, opt_trace:i64) -> i64 {
+    let s=heap_alloc_term(); heap_set_tag(s,TAG_STUB);
+    heap_set_body(s,instr_ptr); heap_set_arg(s,opt_trace); heap_set_domain(s,0); return s;
+}
+
+pub fn stub_call_count(s:i64) -> i64 { return heap_get_domain(s); }
+pub fn stub_tick(s:i64) { heap_set_domain(s, heap_get_domain(s)+1); return; }
+pub fn stub_trace(s:i64) -> i64 { return heap_get_arg(s); }
+
+// ── JIT compiler ──────────────────────────────────────────────────────────
+// Stub cache: maps instr_ptr → compiled stub
+let g_stub_head:  i64 = 0;
+let g_stub_count: i64 = 0;
+
+pub fn jit_reset() { g_stub_head=0; g_stub_count=0; prof_reset(); return; }
+
+pub fn jit_compile(instr_ptr:i64, trace:i64) -> i64 {
+    let opt = optimise_trace(trace);
+    let stub = stub_new(instr_ptr, opt);
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_NODE);
+    heap_set_body(n,stub); heap_set_arg(n,g_stub_head);
+    g_stub_head=n; g_stub_count=g_stub_count+1;
+    return stub;
+}
+
+pub fn jit_lookup(instr_ptr:i64) -> i64 {
+    let cur=g_stub_head;
+    while cur!=0 {
+        let s=heap_get_body(cur);
+        if heap_get_body(s)==instr_ptr { return s; }
+        cur=heap_get_arg(cur);
+    }
+    return -1;
+}
+
+pub fn jit_stub_count() -> i64 { return g_stub_count; }
+
+// Execute a stub (optimised path) or fall back to interpreted path
+// Returns 1 if stub was used, 0 if interpreted
+pub fn jit_execute(instr_ptr:i64) -> i64 {
+    prof_tick(instr_ptr);
+
+    // Check if stub already compiled
+    let stub = jit_lookup(instr_ptr);
+    if stub >= 0 { stub_tick(stub); return 1; }
+
+    // Not yet compiled — if hot, compile now
+    if prof_is_hot(instr_ptr)==1 {
+        let trace = trace_new();
+        // Record a sample 3-instruction trace for this hot spot
+        trace_record(trace, OP_PUSH, 10);
+        trace_record(trace, OP_PUSH, 20);
+        trace_record(trace, OP_ADD,  0);
+        jit_compile(instr_ptr, trace);
+        return 1;
+    }
+
+    return 0;   // interpreted path
+}
+
+pub fn main() -> i64 {
+    jit_reset();
+
+    // Test 1: profiler counts executions
+    let ptr = 1000;
+    let i=0; while i<3 { prof_tick(ptr); i=i+1; }
+    if prof_count(ptr) != 3 { return 1; }
+    if prof_is_hot(ptr) != 0 { return 2; }   // not hot yet (< 5)
+
+    // Test 2: hot after threshold
+    i=0; while i<2 { prof_tick(ptr); i=i+1; }   // now 5 total
+    if prof_is_hot(ptr) != 1 { return 3; }
+    if prof_hot_count() != 1 { return 4; }
+
+    // Test 3: trace recording
+    let t = trace_new();
+    trace_record(t, OP_PUSH, 3);
+    trace_record(t, OP_PUSH, 4);
+    trace_record(t, OP_ADD, 0);
+    if trace_len(t) != 3 { return 5; }
+
+    // Test 4: constant folding optimisation
+    let opt = optimise_trace(t);
+    // PUSH 3 + PUSH 4 + ADD → PUSH 7 (1 instruction)
+    if trace_len(opt) != 1 { return 6; }
+    let first = trace_head(opt);
+    if heap_get_body(first) != OP_PUSH { return 7; }
+    if heap_get_arg(first) != 7        { return 8; }
+
+    // Test 5: stub compilation and lookup
+    let ptr2 = 2000;
+    let t2 = trace_new();
+    trace_record(t2, OP_PUSH, 5);
+    trace_record(t2, OP_PUSH, 6);
+    trace_record(t2, OP_MUL, 0);
+    let stub = jit_compile(ptr2, t2);
+    if jit_stub_count() != 1 { return 9; }
+    let found = jit_lookup(ptr2);
+    if found < 0 { return 10; }
+
+    // Stub trace should be optimised: PUSH 30 (5*6)
+    let st = stub_trace(found);
+    if trace_len(st) != 1 { return 11; }
+
+    // Test 6: jit_execute auto-compiles hot paths
+    jit_reset();
+    let ptr3 = 3000;
+    i=0; while i < HOT_THRESHOLD { jit_execute(ptr3); i=i+1; }
+    // On the HOT_THRESHOLD-th call it should compile and use stub
+    let r = jit_execute(ptr3);
+    if r != 1 { return 12; }   // stub used
+    if jit_stub_count() != 1 { return 13; }
+
+    // Test 7: stub call count tracks usage
+    let s2 = jit_lookup(ptr3);
+    if stub_call_count(s2) < 1 { return 14; }
+
+    return 111;
+}

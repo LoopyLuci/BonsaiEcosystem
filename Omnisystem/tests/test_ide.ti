@@ -1,0 +1,178 @@
+// tests/test_ide.ti — Phase 209 Full IDE Integration Test
+// All subsystems inlined: layout, services, commands, event bus. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+// ===== Layout =====
+const TAG_LAYOUT:     i64 = 8702;
+const PANEL_EXPLORER: i64 = 0;
+const PANEL_EDITOR:   i64 = 1;
+const PANEL_TERMINAL: i64 = 2;
+const PANEL_DEBUGGER: i64 = 3;
+const PANEL_AGENT:    i64 = 4;
+const PANEL_RAG:      i64 = 5;
+const PANEL_PIPELINE: i64 = 6;
+
+pub fn ti_layout_create() -> i64 {
+    let l = heap_alloc_term();
+    heap_set_tag(l, TAG_LAYOUT); heap_set_body(l, 0); heap_set_arg(l, 0); heap_set_domain(l, 0);
+    return l;
+}
+pub fn ti_layout_add(layout: i64, zone: i64, ptype: i64) {
+    let p = heap_alloc_term(); heap_set_body(p, ptype); heap_set_arg(p, zone);
+    if zone == 0 { heap_set_domain(p, heap_get_body(layout)); heap_set_body(layout, p); }
+    else if zone == 1 { heap_set_domain(p, heap_get_arg(layout)); heap_set_arg(layout, p); }
+    else { heap_set_domain(p, heap_get_domain(layout)); heap_set_domain(layout, p); }
+}
+pub fn ti_layout_count(layout: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = heap_get_body(layout); while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    c = heap_get_arg(layout); while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    c = heap_get_domain(layout); while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+
+// ===== Services =====
+const TAG_SERVICE:      i64 = 8710;
+const SVC_LSP:          i64 = 0;
+const SVC_RAG:          i64 = 1;
+const SVC_ORCHESTRATOR: i64 = 2;
+const SVC_AGENT_POOL:   i64 = 3;
+const SVC_STOPPED:      i64 = 0;
+const SVC_RUNNING:      i64 = 2;
+
+static mut TI_SVC_LIST:  i64 = 0;
+static mut TI_SVC_COUNT: i64 = 0;
+
+pub fn ti_svc_reg(svc_type: i64) {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SERVICE); heap_set_body(s, svc_type);
+    heap_set_arg(s, SVC_STOPPED); heap_set_domain(s, TI_SVC_LIST);
+    TI_SVC_LIST = s; TI_SVC_COUNT = TI_SVC_COUNT + 1;
+}
+pub fn ti_svc_start_all() -> i64 {
+    let mut n: i64 = 0;
+    let mut c = TI_SVC_LIST;
+    while c != 0 { heap_set_arg(c, SVC_RUNNING); n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+pub fn ti_svc_stop_all() {
+    let mut c = TI_SVC_LIST;
+    while c != 0 { heap_set_arg(c, SVC_STOPPED); c = heap_get_domain(c); }
+}
+pub fn ti_svc_count() -> i64 { return TI_SVC_COUNT; }
+pub fn ti_svc_running() -> i64 {
+    let mut n: i64 = 0; let mut c = TI_SVC_LIST;
+    while c != 0 { if heap_get_arg(c) == SVC_RUNNING { n = n + 1; } c = heap_get_domain(c); }
+    return n;
+}
+
+// ===== Commands =====
+const TAG_COMMAND:         i64 = 8720;
+const CMD_BUILD:           i64 = 3;
+const CMD_AGENT_DECOMPOSE: i64 = 12;
+const CMD_AION_RUN:        i64 = 13;
+
+static mut TI_CMD_LIST:  i64 = 0;
+static mut TI_CMD_COUNT: i64 = 0;
+
+pub fn ti_cmd_reg(the_id: i64) {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_COMMAND); heap_set_body(c, the_id);
+    heap_set_arg(c, heap_alloc_term());
+    let meta = heap_alloc_term(); heap_set_domain(c, meta);
+    heap_set_domain(c, TI_CMD_LIST); TI_CMD_LIST = c; TI_CMD_COUNT = TI_CMD_COUNT + 1;
+}
+pub fn ti_cmd_find(target_id: i64) -> i64 {
+    let mut c = TI_CMD_LIST;
+    while c != 0 { if heap_get_body(c) == target_id { return c; } c = heap_get_domain(c); }
+    return 0;
+}
+pub fn ti_cmd_seed() {
+    TI_CMD_LIST = 0; TI_CMD_COUNT = 0;
+    ti_cmd_reg(0); ti_cmd_reg(1); ti_cmd_reg(CMD_BUILD); ti_cmd_reg(4);
+    ti_cmd_reg(5); ti_cmd_reg(CMD_AGENT_DECOMPOSE); ti_cmd_reg(CMD_AION_RUN);
+}
+pub fn ti_cmd_count() -> i64 { return TI_CMD_COUNT; }
+
+// ===== Event bus =====
+const TAG_EVENT: i64 = 8730;
+const EVT_BUILD_STARTED:  i64 = 2;
+const EVT_BUILD_COMPLETE: i64 = 3;
+const EVT_AGENT_ARTIFACT: i64 = 4;
+
+static mut TI_EVENT_QUEUE: i64 = 0;
+static mut TI_QUEUE_COUNT: i64 = 0;
+static mut TI_SUBSCRIBERS: i64 = 0;
+
+pub fn ti_bus_sub(the_evt: i64, panel_id: i64) {
+    let s = heap_alloc_term();
+    heap_set_body(s, the_evt); heap_set_arg(s, panel_id); heap_set_domain(s, TI_SUBSCRIBERS);
+    TI_SUBSCRIBERS = s;
+}
+pub fn ti_bus_pub(the_evt: i64, payload: i64) {
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_EVENT); heap_set_body(e, the_evt); heap_set_arg(e, 0);
+    heap_set_domain(e, payload);
+    if TI_EVENT_QUEUE == 0 { TI_EVENT_QUEUE = e; }
+    else { let mut t = TI_EVENT_QUEUE; while heap_get_domain(t) != 0 { t = heap_get_domain(t); } heap_set_domain(t, e); }
+    TI_QUEUE_COUNT = TI_QUEUE_COUNT + 1;
+}
+pub fn ti_bus_pending() -> i64 { return TI_QUEUE_COUNT; }
+pub fn ti_bus_drain() -> i64 { let n = TI_QUEUE_COUNT; TI_EVENT_QUEUE = 0; TI_QUEUE_COUNT = 0; return n; }
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    TI_SVC_LIST = 0; TI_SVC_COUNT = 0;
+    TI_EVENT_QUEUE = 0; TI_QUEUE_COUNT = 0; TI_SUBSCRIBERS = 0;
+
+    // 1. Layout with all 7 panel types
+    let layout = ti_layout_create();
+    ti_layout_add(layout, 0, PANEL_EXPLORER);
+    ti_layout_add(layout, 1, PANEL_EDITOR);
+    ti_layout_add(layout, 2, PANEL_TERMINAL);
+    ti_layout_add(layout, 2, PANEL_DEBUGGER);
+    ti_layout_add(layout, 2, PANEL_AGENT);
+    ti_layout_add(layout, 2, PANEL_RAG);
+    ti_layout_add(layout, 2, PANEL_PIPELINE);
+    if ti_layout_count(layout) != 7 { return 1; }
+
+    // 2. Service lifecycle
+    ti_svc_reg(SVC_LSP); ti_svc_reg(SVC_RAG);
+    ti_svc_reg(SVC_ORCHESTRATOR); ti_svc_reg(SVC_AGENT_POOL);
+    if ti_svc_count() != 4         { return 2; }
+    let started = ti_svc_start_all();
+    if started != 4                { return 3; }
+    ti_svc_stop_all();
+    if ti_svc_running() != 0       { return 4; }
+
+    // 3. Command palette
+    ti_cmd_seed();
+    if ti_cmd_count() != 7                      { return 5; }
+    if ti_cmd_find(CMD_AGENT_DECOMPOSE) == 0    { return 6; }
+
+    // 4. Event bus pub/sub
+    ti_bus_sub(EVT_BUILD_STARTED, 10);
+    ti_bus_sub(EVT_BUILD_COMPLETE, 20);
+    ti_bus_sub(EVT_AGENT_ARTIFACT, 30);
+    ti_bus_pub(EVT_BUILD_STARTED,  heap_alloc_term());
+    ti_bus_pub(EVT_BUILD_COMPLETE, heap_alloc_term());
+    ti_bus_pub(EVT_AGENT_ARTIFACT, heap_alloc_term());
+    if ti_bus_pending() != 3       { return 7; }
+    ti_bus_drain();
+    if ti_bus_pending() != 0       { return 8; }
+
+    return 111;
+}

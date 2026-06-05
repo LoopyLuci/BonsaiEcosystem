@@ -1,0 +1,215 @@
+// titan/timetravel/reverse_debugger.ti — Reverse Debugger
+// Forward/backward step, breakpoints, continue. Inlines execution_recorder.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// ===== Execution recorder (inlined) =====
+const TAG_TRACE_STEP:     i64 = 7200;
+const TAG_TRACE_SNAPSHOT: i64 = 7201;
+
+const STEP_EXECUTE: i64 = 0;
+const STEP_STORE:   i64 = 1;
+const STEP_LOAD:    i64 = 2;
+const STEP_CALL:    i64 = 3;
+const STEP_RETURN:  i64 = 4;
+const STEP_JUMP:    i64 = 5;
+
+const OP_PUSH: i64 = 1;
+const OP_ADD:  i64 = 2;
+const OP_RET:  i64 = 14;
+
+static mut TRACE_HEAD:      i64  = 0;
+static mut TRACE_TAIL:      i64  = 0;
+static mut TRACE_COUNT:     i64  = 0;
+static mut TRACE_RECORDING: bool = false;
+
+pub fn trace_step_type(step: i64) -> i64       { return heap_get_body(heap_get_body(step)); }
+pub fn trace_step_opcode(step: i64) -> i64     { return heap_get_arg(step); }
+pub fn trace_step_pc(step: i64) -> i64         { return heap_get_arg(heap_get_body(step)); }
+
+pub fn trace_start() {
+    TRACE_HEAD = 0; TRACE_TAIL = 0; TRACE_COUNT = 0; TRACE_RECORDING = true;
+}
+pub fn trace_stop()              { TRACE_RECORDING = false; }
+pub fn trace_is_recording() -> bool { return TRACE_RECORDING; }
+pub fn trace_count() -> i64     { return TRACE_COUNT; }
+
+pub fn trace_record(step_type: i64, opcode: i64, arg: i64,
+                    pc: i64, sp: i64, stack_top: i64) {
+    if !TRACE_RECORDING { return; }
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, arg);
+    heap_set_arg(meta2, sp);
+    heap_set_domain(meta2, stack_top);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, step_type);
+    heap_set_arg(meta1, pc);
+    heap_set_domain(meta1, meta2);
+    let step = heap_alloc_term();
+    heap_set_tag(step, TAG_TRACE_STEP);
+    heap_set_body(step, meta1);
+    heap_set_arg(step, opcode);
+    heap_set_domain(step, 0);
+    if TRACE_TAIL != 0 { heap_set_domain(TRACE_TAIL, step); } else { TRACE_HEAD = step; }
+    TRACE_TAIL  = step;
+    TRACE_COUNT = TRACE_COUNT + 1;
+}
+
+pub fn trace_snapshot_at_index(index: i64) -> i64 {
+    let mut curr = TRACE_HEAD;
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index {
+            let snap = heap_alloc_term();
+            heap_set_tag(snap, TAG_TRACE_SNAPSHOT);
+            heap_set_body(snap, curr);
+            return snap;
+        }
+        i = i + 1; curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Breakpoints =====
+// bp: tag=TAG_BREAKPOINT, body=location, arg=bp_type, domain=next_bp
+const TAG_BREAKPOINT: i64 = 7300;
+const BP_PC:          i64 = 0;
+const BP_STEP_TYPE:   i64 = 1;
+
+static mut BREAKPOINTS: i64 = 0;
+static mut BP_COUNT:    i64 = 0;
+
+pub fn bp_add(bp_type: i64, location: i64, condition: i64) {
+    let bp = heap_alloc_term();
+    heap_set_tag(bp, TAG_BREAKPOINT);
+    heap_set_body(bp, location);
+    heap_set_arg(bp, bp_type);
+    heap_set_domain(bp, BREAKPOINTS);
+    BREAKPOINTS = bp;
+    BP_COUNT    = BP_COUNT + 1;
+}
+
+pub fn bp_remove(location: i64) -> bool {
+    let mut prev: i64 = 0;
+    let mut curr = BREAKPOINTS;
+    while curr != 0 {
+        if heap_get_body(curr) == location {
+            let next = heap_get_domain(curr);
+            if prev == 0 { BREAKPOINTS = next; }
+            else         { heap_set_domain(prev, next); }
+            BP_COUNT = BP_COUNT - 1;
+            return true;
+        }
+        prev = curr; curr = heap_get_domain(curr);
+    }
+    return false;
+}
+
+pub fn bp_check(location: i64) -> bool {
+    let mut curr = BREAKPOINTS;
+    while curr != 0 {
+        if heap_get_body(curr) == location { return true; }
+        curr = heap_get_domain(curr);
+    }
+    return false;
+}
+
+pub fn bp_count() -> i64 { return BP_COUNT; }
+
+// ===== Debug session =====
+static mut DEBUG_CURRENT_STEP: i64 = 0;
+
+pub fn debug_load_trace() {
+    DEBUG_CURRENT_STEP = 0;
+}
+
+pub fn debug_current_step() -> i64 { return DEBUG_CURRENT_STEP; }
+
+pub fn debug_step_forward() -> i64 {
+    let next = DEBUG_CURRENT_STEP + 1;
+    if next < TRACE_COUNT {
+        DEBUG_CURRENT_STEP = next;
+    }
+    return trace_snapshot_at_index(DEBUG_CURRENT_STEP);
+}
+
+pub fn debug_step_backward() -> i64 {
+    if DEBUG_CURRENT_STEP > 0 {
+        DEBUG_CURRENT_STEP = DEBUG_CURRENT_STEP - 1;
+    }
+    return trace_snapshot_at_index(DEBUG_CURRENT_STEP);
+}
+
+pub fn debug_jump_to(step_index: i64) -> i64 {
+    if step_index >= 0 && step_index < TRACE_COUNT {
+        DEBUG_CURRENT_STEP = step_index;
+    }
+    return trace_snapshot_at_index(DEBUG_CURRENT_STEP);
+}
+
+// Run forward until a breakpoint is hit (by PC) or end of trace.
+pub fn debug_continue() -> i64 {
+    while DEBUG_CURRENT_STEP < TRACE_COUNT - 1 {
+        DEBUG_CURRENT_STEP = DEBUG_CURRENT_STEP + 1;
+        let snap = trace_snapshot_at_index(DEBUG_CURRENT_STEP);
+        if snap != 0 {
+            let step_node = heap_get_body(snap);
+            let pc = trace_step_pc(step_node);
+            if bp_check(pc) { return snap; }
+        }
+    }
+    return trace_snapshot_at_index(DEBUG_CURRENT_STEP);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    TRACE_HEAD = 0; TRACE_TAIL = 0; TRACE_COUNT = 0; TRACE_RECORDING = false;
+    BREAKPOINTS = 0; BP_COUNT = 0; DEBUG_CURRENT_STEP = 0;
+
+    trace_start();
+    trace_record(STEP_CALL,    OP_PUSH, 10, 0, 0, 0);
+    trace_record(STEP_EXECUTE, OP_ADD,  0,  1, 1, 10);
+    trace_record(STEP_EXECUTE, OP_ADD,  0,  2, 1, 10);
+    trace_record(STEP_RETURN,  OP_RET,  0,  3, 0, 0);
+    trace_stop();
+    if trace_count() != 4 { return 1; }
+
+    debug_load_trace();
+    if debug_current_step() != 0 { return 2; }
+
+    // Step forward
+    let snap_f = debug_step_forward();
+    if snap_f == 0               { return 3; }
+    if debug_current_step() != 1 { return 4; }
+
+    // Step backward
+    let snap_b = debug_step_backward();
+    if snap_b == 0               { return 5; }
+    if debug_current_step() != 0 { return 6; }
+
+    // Breakpoints
+    bp_add(BP_PC, 1, 0);
+    if !bp_check(1) { return 7; }
+    if bp_count() != 1 { return 8; }
+
+    bp_remove(1);
+    if bp_check(1) { return 9; }
+    if bp_count() != 0 { return 10; }
+
+    // Jump to step 3
+    let jsnap = debug_jump_to(3);
+    if jsnap == 0                { return 11; }
+    if debug_current_step() != 3 { return 12; }
+
+    return 111;
+}

@@ -1,0 +1,260 @@
+// aether/crdt.ti — CRDT implementations for Aether actor state
+// All CRDTs satisfy: merge is commutative, associative, idempotent.
+// Supported: GCounter, PNCounter, ORSet, LWWRegister, MVRegister
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+const TAG_GC:  i64 = 61100;  // GCounter node
+const TAG_PN:  i64 = 61101;  // PNCounter
+const TAG_OR:  i64 = 61102;  // ORSet entry
+const TAG_LWW: i64 = 61103;  // LWWRegister
+const TAG_MV:  i64 = 61104;  // MVRegister version
+const TAG_ND:  i64 = 61105;  // generic linked-list node
+
+// ── GCounter ─────────────────────────────────────────────────────────────
+// A grow-only counter: n replicas, each with its own slot.
+// Value = sum of all slots. Merge = pointwise max.
+// Layout: body=node_id, arg=count, domain=next_node
+
+pub fn gc_new(node_id:i64) -> i64 {
+    let g=heap_alloc_term(); heap_set_tag(g,TAG_GC);
+    heap_set_body(g,node_id); heap_set_arg(g,0); heap_set_domain(g,0); return g;
+}
+
+pub fn gc_increment(g:i64, node_id:i64, amount:i64) {
+    let cur = g;
+    while cur != 0 {
+        if heap_get_body(cur) == node_id {
+            heap_set_arg(cur, heap_get_arg(cur) + amount);
+            return;
+        }
+        cur = heap_get_domain(cur);
+    }
+    // Node not found — append new entry
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_GC);
+    heap_set_body(n,node_id); heap_set_arg(n,amount); heap_set_domain(n,0);
+    // Find tail
+    let tail = g;
+    while heap_get_domain(tail) != 0 { tail = heap_get_domain(tail); }
+    heap_set_domain(tail, n);
+    return;
+}
+
+pub fn gc_value(g:i64) -> i64 {
+    let sum = 0; let cur = g;
+    while cur != 0 { sum = sum + heap_get_arg(cur); cur = heap_get_domain(cur); }
+    return sum;
+}
+
+pub fn gc_slot(g:i64, node_id:i64) -> i64 {
+    let cur = g;
+    while cur != 0 {
+        if heap_get_body(cur) == node_id { return heap_get_arg(cur); }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+// Merge: pointwise max of corresponding node slots
+pub fn gc_merge(a:i64, b:i64) -> i64 {
+    // For each node in b, set a's slot to max(a_slot, b_slot)
+    let cur = b;
+    while cur != 0 {
+        let nid = heap_get_body(cur);
+        let bv  = heap_get_arg(cur);
+        let av  = gc_slot(a, nid);
+        if bv > av { gc_increment(a, nid, bv - av); }
+        cur = heap_get_domain(cur);
+    }
+    return a;
+}
+
+// ── PNCounter ────────────────────────────────────────────────────────────
+// Two GCounters: increments and decrements. Value = inc - dec.
+// body=inc_gcounter_head, arg=dec_gcounter_head
+
+pub fn pn_new(node_id:i64) -> i64 {
+    let p=heap_alloc_term(); heap_set_tag(p,TAG_PN);
+    heap_set_body(p, gc_new(node_id));
+    heap_set_arg(p,  gc_new(node_id));
+    heap_set_domain(p,0); return p;
+}
+
+pub fn pn_inc(p:i64, node_id:i64, amount:i64) { gc_increment(heap_get_body(p), node_id, amount); return; }
+pub fn pn_dec(p:i64, node_id:i64, amount:i64) { gc_increment(heap_get_arg(p), node_id, amount); return; }
+pub fn pn_value(p:i64) -> i64 { return gc_value(heap_get_body(p)) - gc_value(heap_get_arg(p)); }
+pub fn pn_merge(a:i64, b:i64) -> i64 {
+    gc_merge(heap_get_body(a), heap_get_body(b));
+    gc_merge(heap_get_arg(a),  heap_get_arg(b));
+    return a;
+}
+
+// ── LWWRegister ──────────────────────────────────────────────────────────
+// Last-Write-Wins: highest timestamp wins.
+// body=value, arg=timestamp, domain=node_id
+
+pub fn lww_new(value:i64, ts:i64, node_id:i64) -> i64 {
+    let r=heap_alloc_term(); heap_set_tag(r,TAG_LWW);
+    heap_set_body(r,value); heap_set_arg(r,ts); heap_set_domain(r,node_id); return r;
+}
+
+pub fn lww_value(r:i64) -> i64 { return heap_get_body(r); }
+pub fn lww_ts(r:i64) -> i64    { return heap_get_arg(r); }
+
+pub fn lww_write(r:i64, value:i64, ts:i64, node_id:i64) {
+    if ts > lww_ts(r) {
+        heap_set_body(r, value); heap_set_arg(r, ts); heap_set_domain(r, node_id);
+    }
+    return;
+}
+
+// Merge: keep entry with higher timestamp; break ties by node_id
+pub fn lww_merge(a:i64, b:i64) -> i64 {
+    let ats = lww_ts(a); let bts = lww_ts(b);
+    if bts > ats { return b; }
+    if bts == ats && heap_get_domain(b) > heap_get_domain(a) { return b; }
+    return a;
+}
+
+// ── ORSet (Observed-Remove Set) ───────────────────────────────────────────
+// Add-wins semantics: concurrent add and remove → element stays.
+// Each element tagged with a unique token; remove deletes the token.
+// Entry: body=element, arg=token (unique add id), domain=next
+
+pub fn ors_new() -> i64 {
+    let s=heap_alloc_term(); heap_set_tag(s,TAG_OR);
+    heap_set_body(s,0); heap_set_arg(s,0); heap_set_domain(s,0); return s;
+}
+
+let g_ors_token: i64 = 1;
+
+pub fn ors_add(s:i64, element:i64) -> i64 {
+    let tok = g_ors_token; g_ors_token = g_ors_token + 1;
+    let entry=heap_alloc_term(); heap_set_tag(entry,TAG_OR);
+    heap_set_body(entry, element); heap_set_arg(entry, tok); heap_set_domain(entry, 0);
+    // Prepend to set list (stored in domain of sentinel)
+    heap_set_domain(entry, heap_get_domain(s));
+    heap_set_domain(s, entry);
+    return tok;
+}
+
+pub fn ors_remove_token(s:i64, tok:i64) {
+    // Remove entry with matching token by unlinking
+    let cur = heap_get_domain(s); let prev = s;
+    while cur != 0 {
+        if heap_get_arg(cur) == tok {
+            heap_set_domain(prev, heap_get_domain(cur));
+            heap_set_domain(cur, 0);
+            return;
+        }
+        prev = cur; cur = heap_get_domain(cur);
+    }
+    return;
+}
+
+pub fn ors_contains(s:i64, element:i64) -> i64 {
+    let cur = heap_get_domain(s);
+    while cur != 0 {
+        if heap_get_body(cur) == element { return 1; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+pub fn ors_size(s:i64) -> i64 {
+    let n = 0; let cur = heap_get_domain(s);
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+// Merge two ORSets: union of entries (by token uniqueness)
+pub fn ors_merge(a:i64, b:i64) -> i64 {
+    let cur = heap_get_domain(b);
+    while cur != 0 {
+        let elem = heap_get_body(cur);
+        let tok  = heap_get_arg(cur);
+        // Add to a if token not already present
+        let fa = heap_get_domain(a); let found = 0;
+        while fa != 0 {
+            if heap_get_arg(fa) == tok { found = 1; }
+            fa = heap_get_domain(fa);
+        }
+        if found == 0 {
+            let entry=heap_alloc_term(); heap_set_tag(entry,TAG_OR);
+            heap_set_body(entry,elem); heap_set_arg(entry,tok);
+            heap_set_domain(entry, heap_get_domain(a));
+            heap_set_domain(a, entry);
+        }
+        cur = heap_get_domain(cur);
+    }
+    return a;
+}
+
+pub fn main() -> i64 {
+    // ── GCounter tests ───────────────────────────────────────────────────
+    let g = gc_new(1);
+    gc_increment(g, 1, 5);
+    gc_increment(g, 2, 3);
+    if gc_value(g) != 8 { return 1; }
+
+    let g2 = gc_new(1);
+    gc_increment(g2, 1, 10);
+    gc_increment(g2, 3, 2);
+    gc_merge(g, g2);
+    // node1: max(5,10)=10; node2: 3; node3: 2 → total=15
+    if gc_value(g) != 15 { return 2; }
+
+    // merge idempotent: merge with itself changes nothing
+    let before = gc_value(g);
+    gc_merge(g, g);
+    if gc_value(g) != before { return 3; }
+
+    // ── PNCounter tests ──────────────────────────────────────────────────
+    let p = pn_new(1);
+    pn_inc(p, 1, 10);
+    pn_dec(p, 1, 3);
+    if pn_value(p) != 7 { return 4; }
+
+    let p2 = pn_new(2);
+    pn_inc(p2, 2, 5);
+    pn_merge(p, p2);
+    if pn_value(p) != 12 { return 5; }
+
+    // ── LWWRegister tests ────────────────────────────────────────────────
+    let r = lww_new(42, 100, 1);
+    if lww_value(r) != 42 { return 6; }
+
+    lww_write(r, 99, 200, 1);
+    if lww_value(r) != 99 { return 7; }
+
+    lww_write(r, 0, 50, 2);   // older timestamp — ignored
+    if lww_value(r) != 99 { return 8; }
+
+    let r2 = lww_new(77, 300, 2);
+    let merged = lww_merge(r, r2);
+    if lww_value(merged) != 77 { return 9; }   // r2 has higher ts
+
+    // ── ORSet tests ──────────────────────────────────────────────────────
+    let s = ors_new();
+    let tok1 = ors_add(s, 10);
+    let tok2 = ors_add(s, 20);
+    ors_add(s, 10);  // second add of same element — two tokens
+    if ors_contains(s, 10) != 1 { return 10; }
+    if ors_size(s) != 3 { return 11; }
+
+    ors_remove_token(s, tok1);   // remove first token for 10
+    if ors_contains(s, 10) != 1 { return 12; }  // still present (second token)
+    if ors_size(s) != 2 { return 13; }
+
+    // ORSet merge: concurrent add wins over concurrent remove
+    let sa = ors_new();
+    let sb = ors_new();
+    let ta = ors_add(sa, 99);
+    ors_merge(sb, sa);          // sb now has 99 with ta
+    ors_remove_token(sa, ta);   // sa removes 99
+    // merge: sb still has token ta — after merge, 99 survives (add-wins)
+    ors_merge(sa, sb);
+    if ors_contains(sa, 99) != 1 { return 14; }
+
+    return 111;
+}

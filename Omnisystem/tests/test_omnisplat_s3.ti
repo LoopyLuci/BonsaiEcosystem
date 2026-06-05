@@ -1,0 +1,343 @@
+// tests/test_omnisplat_s3.ti — Phase S3 Camera & Scene Integration Test
+// All subsystems inlined with ts3_ prefix. Exercises: camera orbit/pan/zoom/pose,
+// scene graph add/count, walk navigation, voxel grid.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// ===== Camera (ts3_cam_ prefix) =====
+const TAG_CAMERA_S3:   i64 = 9100;
+const TAG_CAM_POSE_S3: i64 = 9101;
+const TAG_CAM_EYE_S3:  i64 = 9102;
+
+fn ts3_cam_m1(c: i64) -> i64 { return heap_get_domain(c); }
+fn ts3_cam_m2(c: i64) -> i64 { return heap_get_domain(ts3_cam_m1(c)); }
+fn ts3_cam_m3(c: i64) -> i64 { return heap_get_domain(ts3_cam_m2(c)); }
+
+pub fn ts3_cam_cx(c: i64) -> i64         { return heap_get_body(c); }
+pub fn ts3_cam_cy(c: i64) -> i64         { return heap_get_arg(c); }
+pub fn ts3_cam_cz(c: i64) -> i64         { return heap_get_body(ts3_cam_m1(c)); }
+pub fn ts3_cam_distance(c: i64) -> i64   { return heap_get_arg(ts3_cam_m1(c)); }
+pub fn ts3_cam_yaw(c: i64) -> i64        { return heap_get_body(ts3_cam_m2(c)); }
+pub fn ts3_cam_pitch(c: i64) -> i64      { return heap_get_arg(ts3_cam_m2(c)); }
+pub fn ts3_cam_fov(c: i64) -> i64        { return heap_get_body(ts3_cam_m3(c)); }
+pub fn ts3_cam_pose_count(c: i64) -> i64 { return heap_get_arg(ts3_cam_m3(c)); }
+
+pub fn ts3_cam_create(cx: i64, cy: i64, cz: i64,
+                      dist: i64, yaw: i64, pitch: i64, fov: i64) -> i64 {
+    let m3 = heap_alloc_term();
+    heap_set_body(m3, fov); heap_set_arg(m3, 0); heap_set_domain(m3, 0);
+    let m2 = heap_alloc_term();
+    heap_set_body(m2, yaw); heap_set_arg(m2, pitch); heap_set_domain(m2, m3);
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, cz); heap_set_arg(m1, dist); heap_set_domain(m1, m2);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_CAMERA_S3);
+    heap_set_body(c, cx); heap_set_arg(c, cy); heap_set_domain(c, m1);
+    return c;
+}
+
+pub fn ts3_cam_orbit(c: i64, dyaw: i64, dpitch: i64) {
+    let ny = ts3_cam_yaw(c)   + dyaw;
+    let np = ts3_cam_pitch(c) + dpitch;
+    heap_set_body(ts3_cam_m2(c), ny);
+    heap_set_arg(ts3_cam_m2(c),  np);
+}
+
+pub fn ts3_cam_pan(c: i64, dx: i64, dy: i64) {
+    heap_set_body(c, heap_get_body(c) + dx);
+    heap_set_arg(c,  heap_get_arg(c)  + dy);
+}
+
+pub fn ts3_cam_zoom(c: i64, delta: i64) {
+    let nd = ts3_cam_distance(c) - delta;
+    heap_set_arg(ts3_cam_m1(c), nd);
+}
+
+pub fn ts3_cam_compute_eye(c: i64) -> i64 {
+    let d  = ts3_cam_distance(c);
+    let ex = ts3_cam_cx(c) + d;
+    let ey = ts3_cam_cy(c) + d;
+    let ez = ts3_cam_cz(c) + d;
+    let meta = heap_alloc_term(); heap_set_body(meta, ez);
+    let eye  = heap_alloc_term();
+    heap_set_tag(eye, TAG_CAM_EYE_S3);
+    heap_set_body(eye, ex); heap_set_arg(eye, ey); heap_set_domain(eye, meta);
+    return eye;
+}
+
+pub fn ts3_cam_save_pose(c: i64) {
+    let m3 = ts3_cam_m3(c);
+    let pm2 = heap_alloc_term();
+    heap_set_body(pm2, ts3_cam_cy(c));
+    heap_set_arg(pm2,  ts3_cam_cz(c));
+    heap_set_domain(pm2, heap_get_domain(m3));
+    let pm1 = heap_alloc_term();
+    heap_set_body(pm1, ts3_cam_pitch(c));
+    heap_set_arg(pm1,  ts3_cam_cx(c));
+    heap_set_domain(pm1, pm2);
+    let pose = heap_alloc_term();
+    heap_set_tag(pose, TAG_CAM_POSE_S3);
+    heap_set_body(pose, ts3_cam_distance(c));
+    heap_set_arg(pose,  ts3_cam_yaw(c));
+    heap_set_domain(pose, pm1);
+    heap_set_domain(m3, pose);
+    heap_set_arg(m3, heap_get_arg(m3) + 1);
+}
+
+pub fn ts3_cam_restore_pose(c: i64) {
+    let m3   = ts3_cam_m3(c);
+    let pose = heap_get_domain(m3);
+    if pose == 0 { return; }
+    let pm1 = heap_get_domain(pose);
+    let pm2 = heap_get_domain(pm1);
+    heap_set_arg(ts3_cam_m1(c), heap_get_body(pose));   // distance
+    heap_set_body(ts3_cam_m2(c), heap_get_arg(pose));   // yaw
+    heap_set_arg(ts3_cam_m2(c),  heap_get_body(pm1));   // pitch
+    heap_set_body(c, heap_get_arg(pm1));                 // cx
+    heap_set_arg(c,  heap_get_body(pm2));                // cy
+    heap_set_body(ts3_cam_m1(c), heap_get_arg(pm2));    // cz
+    heap_set_domain(m3, heap_get_domain(pm2));
+    heap_set_arg(m3, heap_get_arg(m3) - 1);
+}
+
+// ===== Scene (ts3_scene_ prefix) =====
+const TAG_SCENE_S3:      i64 = 9150;
+const TAG_SCENE_NODE_S3: i64 = 9151;
+const TAG_GRID_S3:       i64 = 9152;
+const NODE_ROOT_S3:      i64 = 0;
+
+pub fn ts3_scene_create(cell_size: i64) -> i64 {
+    let root = heap_alloc_term();
+    heap_set_tag(root, TAG_SCENE_NODE_S3);
+    heap_set_body(root, NODE_ROOT_S3);
+    heap_set_arg(root, 0); heap_set_domain(root, 0);
+
+    let grid = heap_alloc_term();
+    heap_set_tag(grid, TAG_GRID_S3);
+    heap_set_body(grid, cell_size);
+
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, grid); heap_set_arg(m1, 0); heap_set_domain(m1, 0);
+
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SCENE_S3);
+    heap_set_body(s, root); heap_set_arg(s, 1); heap_set_domain(s, m1);
+    return s;
+}
+
+pub fn ts3_scene_content_root(s: i64) -> i64 { return heap_get_body(s); }
+pub fn ts3_scene_node_count(s: i64) -> i64   { return heap_get_arg(s); }
+
+pub fn ts3_scene_add_splat(s: i64, data: i64) {
+    let root = ts3_scene_content_root(s);
+    let w = heap_alloc_term(); heap_set_body(w, data); heap_set_domain(w, 0);
+    let head = heap_get_domain(root);
+    if head == 0 { heap_set_domain(root, w); }
+    else {
+        let mut c = head;
+        while heap_get_domain(c) != 0 { c = heap_get_domain(c); }
+        heap_set_domain(c, w);
+    }
+    heap_set_arg(root, heap_get_arg(root) + 1);
+    heap_set_arg(s,    heap_get_arg(s)    + 1);
+}
+
+pub fn ts3_scene_splat_count(s: i64) -> i64 {
+    return heap_get_arg(ts3_scene_content_root(s));
+}
+
+pub fn ts3_scene_grid_cell_size(s: i64) -> i64 {
+    let m1   = heap_get_domain(s);
+    let grid = heap_get_body(m1);
+    return heap_get_body(grid);
+}
+
+// ===== Walker (ts3_walk_ prefix) =====
+const TAG_WALKER_S3:     i64 = 9200;
+const TAG_VOXEL_GRID_S3: i64 = 9201;
+
+pub fn ts3_walker_create(px: i64, py: i64, pz: i64, speed: i64) -> i64 {
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, pz); heap_set_arg(m1, speed); heap_set_domain(m1, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WALKER_S3);
+    heap_set_body(w, px); heap_set_arg(w, py); heap_set_domain(w, m1);
+    return w;
+}
+
+pub fn ts3_walker_px(w: i64) -> i64    { return heap_get_body(w); }
+pub fn ts3_walker_py(w: i64) -> i64    { return heap_get_arg(w); }
+pub fn ts3_walker_pz(w: i64) -> i64    { return heap_get_body(heap_get_domain(w)); }
+pub fn ts3_walker_speed(w: i64) -> i64 { return heap_get_arg(heap_get_domain(w)); }
+
+pub fn ts3_walker_move(w: i64, dx: i64, dy: i64, dz: i64) {
+    let s  = ts3_walker_speed(w);
+    let m1 = heap_get_domain(w);
+    heap_set_body(w,  heap_get_body(w)  + dx * s);
+    heap_set_arg(w,   heap_get_arg(w)   + dy * s);
+    heap_set_body(m1, heap_get_body(m1) + dz * s);
+}
+
+pub fn ts3_walker_check_collision(w: i64,
+                                   min_x: i64, min_y: i64, min_z: i64,
+                                   max_x: i64, max_y: i64, max_z: i64) -> bool {
+    let px = ts3_walker_px(w);
+    let py = ts3_walker_py(w);
+    let pz = ts3_walker_pz(w);
+    return px >= min_x && px <= max_x
+        && py >= min_y && py <= max_y
+        && pz >= min_z && pz <= max_z;
+}
+
+// Inline nav data helpers for voxel grid
+pub fn ts3_nav_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, 8800); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ts3_nav_data_add(data: i64, splat: i64) {
+    let w = heap_alloc_term(); heap_set_body(w, splat); heap_set_domain(w, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, w); }
+    else {
+        let mut c = head;
+        while heap_get_domain(c) != 0 { c = heap_get_domain(c); }
+        heap_set_domain(c, w);
+    }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+pub fn ts3_nav_data_count(data: i64) -> i64 { return heap_get_body(data); }
+pub fn ts3_nav_data_get(data: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(data); let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index { return heap_get_body(curr); }
+        i = i + 1; curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+pub fn ts3_nav_vertex_create(px: i64, py: i64, pz: i64) -> i64 {
+    let m1 = heap_alloc_term(); heap_set_body(m1, pz);
+    let v  = heap_alloc_term();
+    heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, m1);
+    return v;
+}
+pub fn ts3_nav_vx(s: i64) -> i64 { return heap_get_body(s); }
+pub fn ts3_nav_vy(s: i64) -> i64 { return heap_get_arg(s); }
+pub fn ts3_nav_vz(s: i64) -> i64 { return heap_get_body(heap_get_domain(s)); }
+
+pub fn ts3_build_voxel_grid(data: i64, voxel_size: i64) -> i64 {
+    let count = ts3_nav_data_count(data);
+    if count == 0 {
+        let g = heap_alloc_term();
+        heap_set_tag(g, TAG_VOXEL_GRID_S3); heap_set_body(g, 0); heap_set_arg(g, voxel_size);
+        return g;
+    }
+    let first  = ts3_nav_data_get(data, 0);
+    let mut min_x = ts3_nav_vx(first); let mut max_x = min_x;
+    let mut min_y = ts3_nav_vy(first); let mut max_y = min_y;
+    let mut min_z = ts3_nav_vz(first); let mut max_z = min_z;
+    let mut i: i64 = 1;
+    while i < count {
+        let s = ts3_nav_data_get(data, i);
+        if s != 0 {
+            let sx = ts3_nav_vx(s); let sy = ts3_nav_vy(s); let sz = ts3_nav_vz(s);
+            if sx < min_x { min_x = sx; } if sx > max_x { max_x = sx; }
+            if sy < min_y { min_y = sy; } if sy > max_y { max_y = sy; }
+            if sz < min_z { min_z = sz; } if sz > max_z { max_z = sz; }
+        }
+        i = i + 1;
+    }
+    let nx = (max_x - min_x) / voxel_size + 1;
+    let ny = (max_y - min_y) / voxel_size + 1;
+    let nz = (max_z - min_z) / voxel_size + 1;
+    let g = heap_alloc_term();
+    heap_set_tag(g, TAG_VOXEL_GRID_S3);
+    heap_set_body(g, nx * ny * nz);
+    heap_set_arg(g, voxel_size);
+    return g;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // --- Camera ---
+    let c = ts3_cam_create(0, 0, 0, 100, 45, 30, 60);
+    if heap_get_tag(c)      != TAG_CAMERA_S3 { return 1; }
+    if ts3_cam_fov(c)       != 60            { return 2; }
+    if ts3_cam_distance(c)  != 100           { return 3; }
+
+    ts3_cam_orbit(c, 10, -5);
+    if ts3_cam_yaw(c)   != 55 { return 4; }
+    if ts3_cam_pitch(c) != 25 { return 5; }
+
+    ts3_cam_pan(c, 5, -3);
+    if ts3_cam_cx(c) != 5  { return 6; }
+    if ts3_cam_cy(c) != -3 { return 7; }
+
+    ts3_cam_zoom(c, 50);
+    if ts3_cam_distance(c) != 50 { return 8; }
+
+    // Eye: cx=5, cy=-3, cz=0, d=50 → ex=55, ey=47, ez=50
+    let eye = ts3_cam_compute_eye(c);
+    if heap_get_tag(eye)     != TAG_CAM_EYE_S3 { return 9; }
+    if heap_get_body(eye)    != 55             { return 10; }
+
+    // Pose save/restore
+    ts3_cam_save_pose(c);
+    if ts3_cam_pose_count(c) != 1 { return 11; }
+    ts3_cam_orbit(c, 200, 200);
+    ts3_cam_restore_pose(c);
+    if ts3_cam_pose_count(c) != 0  { return 12; }
+    if ts3_cam_yaw(c)        != 55 { return 13; }
+    if ts3_cam_pitch(c)      != 25 { return 14; }
+
+    // --- Scene ---
+    let scene = ts3_scene_create(100);
+    if heap_get_tag(scene)           != TAG_SCENE_S3 { return 15; }
+    if ts3_scene_grid_cell_size(scene) != 100        { return 16; }
+    if ts3_scene_splat_count(scene)    != 0          { return 17; }
+
+    let d1 = heap_alloc_term(); heap_set_body(d1, 42);
+    let d2 = heap_alloc_term(); heap_set_body(d2, 99);
+    ts3_scene_add_splat(scene, d1);
+    ts3_scene_add_splat(scene, d2);
+    if ts3_scene_splat_count(scene) != 2 { return 18; }
+    if ts3_scene_node_count(scene)  != 3 { return 19; } // root + 2
+
+    // --- Walker ---
+    let w = ts3_walker_create(50, 0, 100, 5);
+    if heap_get_tag(w)      != TAG_WALKER_S3 { return 20; }
+    if ts3_walker_px(w)     != 50            { return 21; }
+    if ts3_walker_speed(w)  != 5             { return 22; }
+
+    // Move dx=1 → px = 50 + 1*5 = 55
+    ts3_walker_move(w, 1, 0, 0);
+    if ts3_walker_px(w) != 55 { return 23; }
+
+    // Collision: walker at (55,0,100) inside (0,-10,50)-(100,10,150)
+    if !ts3_walker_check_collision(w, 0, -10, 50, 100, 10, 150) { return 24; }
+    // Outside box
+    if ts3_walker_check_collision(w, 200, 200, 200, 300, 300, 300) { return 25; }
+
+    // --- Voxel grid: s1=(10,20,30), s2=(50,60,70), voxel_size=10 → 5*5*5=125 ---
+    let nav_data = ts3_nav_data_create();
+    let sv1 = ts3_nav_vertex_create(10, 20, 30);
+    let sv2 = ts3_nav_vertex_create(50, 60, 70);
+    ts3_nav_data_add(nav_data, sv1);
+    ts3_nav_data_add(nav_data, sv2);
+    let grid = ts3_build_voxel_grid(nav_data, 10);
+    if heap_get_tag(grid) != TAG_VOXEL_GRID_S3 { return 26; }
+    let voxels = heap_get_body(grid);
+    if voxels != 125                           { return 27; }
+
+    return 111;
+}

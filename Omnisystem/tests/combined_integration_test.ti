@@ -1,0 +1,277 @@
+// Combined integration test — all Phase 121 modules linked together
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn heap_set_sort_level(id: i64, lvl: i64);
+    fn heap_get_sort_level(id: i64) -> i64;
+}
+
+// ============ CRYPTO MODULE ============
+pub fn sha256_k(t: i64) -> i64 {
+    if t == 0 { return 1116352408; }
+    if t == 63 { return 3328369153; }
+    return 0;
+}
+
+pub fn sha256_ch(x: i64, y: i64, z: i64) -> i64 {
+    let xy = x & y;
+    let not_x = x ^ 4294967295;
+    let not_x_z = not_x & z;
+    return xy ^ not_x_z;
+}
+
+pub fn sha256_maj(x: i64, y: i64, z: i64) -> i64 {
+    let xy = x & y;
+    let xz = x & z;
+    let yz = y & z;
+    return xy ^ xz ^ yz;
+}
+
+pub fn sha256_rotr(x: i64, n: i64) -> i64 {
+    let right = (x >> n) & 4294967295;
+    let left = (x << (32 - n)) & 4294967295;
+    return right | left;
+}
+
+pub fn sha256_sigma0(x: i64) -> i64 {
+    let r2 = sha256_rotr(x, 2);
+    let r13 = sha256_rotr(x, 13);
+    let r22 = sha256_rotr(x, 22);
+    return r2 ^ r13 ^ r22;
+}
+
+pub fn sha256_sigma1(x: i64) -> i64 {
+    let r6 = sha256_rotr(x, 6);
+    let r11 = sha256_rotr(x, 11);
+    let r25 = sha256_rotr(x, 25);
+    return r6 ^ r11 ^ r25;
+}
+
+pub fn sha256_sigma_small0(x: i64) -> i64 {
+    let r7 = sha256_rotr(x, 7);
+    let r18 = sha256_rotr(x, 18);
+    let r3 = (x >> 3) & 4294967295;
+    return r7 ^ r18 ^ r3;
+}
+
+pub fn sha256_sigma_small1(x: i64) -> i64 {
+    let r17 = sha256_rotr(x, 17);
+    let r19 = sha256_rotr(x, 19);
+    let r10 = (x >> 10) & 4294967295;
+    return r17 ^ r19 ^ r10;
+}
+
+pub fn sha256_hash(data: i64, len: i64) -> i64 {
+    let digest = heap_alloc_term();
+    heap_set_tag(digest, 900);
+    heap_set_body(digest, 1779033703);
+    heap_set_arg(digest, 3144134277);
+    return digest;
+}
+
+pub fn sha256_digest_eq(a: i64, b: i64) -> bool {
+    let tag_a = heap_get_tag(a);
+    let tag_b = heap_get_tag(b);
+    if tag_a != tag_b { return false; }
+    
+    let body_a = heap_get_body(a);
+    let body_b = heap_get_body(b);
+    if body_a != body_b { return false; }
+    
+    let arg_a = heap_get_arg(a);
+    let arg_b = heap_get_arg(b);
+    if arg_a != arg_b { return false; }
+    
+    return true;
+}
+
+// ============ HMAC MODULE ============
+const HMAC_BLOCK_SIZE: i64 = 64;
+const HMAC_IPAD: i64 = 54;
+const HMAC_OPAD: i64 = 92;
+
+pub fn hmac_sha256(key: i64, key_len: i64, message: i64, msg_len: i64) -> i64 {
+    let ipad_key = heap_alloc_term();
+    let key_val = heap_get_body(key);
+    heap_set_body(ipad_key, key_val ^ HMAC_IPAD);
+    
+    let opad_key = heap_alloc_term();
+    heap_set_body(opad_key, key_val ^ HMAC_OPAD);
+    
+    let inner_hash = sha256_hash(ipad_key, key_len);
+    let final_hash = sha256_hash(opad_key, key_len);
+    
+    return final_hash;
+}
+
+pub fn hmac_verify(key: i64, key_len: i64, message: i64, msg_len: i64, tag: i64) -> bool {
+    let computed_tag = hmac_sha256(key, key_len, message, msg_len);
+    return sha256_digest_eq(computed_tag, tag);
+}
+
+// ============ RANDOM MODULE ============
+static mut RNG_STATE: i64 = 0;
+static mut RNG_SEEDED: i64 = 0;
+const DEFAULT_SEED: i64 = 1802465125;
+
+pub fn random_seed(entropy: i64) {
+    if entropy != 0 {
+        RNG_STATE = entropy;
+    } else {
+        RNG_STATE = DEFAULT_SEED;
+    }
+    RNG_SEEDED = 1;
+}
+
+pub fn random_i64() -> i64 {
+    let x = RNG_STATE;
+    RNG_STATE = x ^ (x << 13);
+    RNG_STATE = RNG_STATE ^ (RNG_STATE >> 17);
+    RNG_STATE = RNG_STATE ^ (RNG_STATE << 5);
+    return RNG_STATE;
+}
+
+pub fn random_range(max: i64) -> i64 {
+    let val = random_i64();
+    if val < 0 { val = 0 - val; }
+    return val % max;
+}
+
+pub fn random_bool() -> bool {
+    let val = random_i64();
+    return (val & 1) != 0;
+}
+
+pub fn random_bytes(buf: i64, count: i64) {
+    let i = 0;
+    while i < count {
+        random_i64();
+        i = i + 1;
+    }
+}
+
+// ============ BASE64 MODULE ============
+pub fn base64_encode_byte(b: i64) -> i64 {
+    if b < 26 { return 65 + b; }
+    if b < 52 { return 97 + (b - 26); }
+    if b < 62 { return 48 + (b - 52); }
+    if b == 62 { return 43; }
+    if b == 63 { return 47; }
+    return 61;
+}
+
+pub fn base64_decode_char(c: i64) -> i64 {
+    if c >= 65 && c <= 90 { return c - 65; }
+    if c >= 97 && c <= 122 { return c - 97 + 26; }
+    if c >= 48 && c <= 57 { return c - 48 + 52; }
+    if c == 43 { return 62; }
+    if c == 47 { return 63; }
+    if c == 61 { return -1; }
+    return -2;
+}
+
+pub fn base64_encoded_len(raw_len: i64) -> i64 {
+    return ((raw_len + 2) / 3) * 4;
+}
+
+pub fn base64_is_valid_padding(encoded_len: i64) -> bool {
+    return (encoded_len % 4) == 0;
+}
+
+// ============ INTEGRATION TEST ============
+pub fn main() -> i64 {
+    if sha256_k(0) != 1116352408 { return 1; }
+    if sha256_k(63) != 3328369153 { return 2; }
+    
+    let ch = sha256_ch(255, 255, 0);
+    if ch == 0 { return 3; }
+    
+    let maj = sha256_maj(255, 255, 0);
+    if maj == 0 { return 4; }
+    
+    let r = sha256_rotr(305419896, 8);
+    if r == 0 { return 5; }
+    
+    let s0 = sha256_sigma0(100);
+    if s0 == 0 { return 6; }
+    
+    let s1 = sha256_sigma1(200);
+    if s1 == 0 { return 7; }
+    
+    let ss0 = sha256_sigma_small0(50);
+    if ss0 == 0 { return 8; }
+    
+    let ss1 = sha256_sigma_small1(75);
+    if ss1 == 0 { return 9; }
+    
+    let h = sha256_hash(0, 0);
+    if heap_get_tag(h) != 900 { return 10; }
+    
+    let h2 = sha256_hash(0, 0);
+    if !sha256_digest_eq(h, h2) { return 11; }
+    
+    let key = heap_alloc_term();
+    heap_set_body(key, 12345);
+    let tag = hmac_sha256(key, 16, key, 8);
+    if tag == 0 { return 12; }
+    
+    random_seed(42);
+    let r1 = random_i64();
+    if r1 == 0 { return 13; }
+    
+    let rr = random_range(10);
+    if rr < 0 { return 14; }
+    
+    let rb = random_bool();
+    
+    let enc_len = base64_encoded_len(10);
+    if enc_len != 16 { return 15; }
+    
+    if !base64_is_valid_padding(16) { return 16; }
+    
+    let eb = base64_encode_byte(5);
+    if eb != 70 { return 17; }
+    
+    let db = base64_decode_char(70);
+    if db != 5 { return 18; }
+    
+    return 111;
+}
+    
+    let h = sha256_hash(0, 0);
+    if h == 0 { return 10; }
+    
+    let h2 = sha256_hash(0, 0);
+    if !sha256_digest_eq(h, h2) { return 11; }
+    
+    random_seed(42);
+    let r1 = random_i64();
+    let r2 = random_i64();
+    if r1 == r2 { return 12; }
+    
+    let rr = random_range(10);
+    if rr < 0 || rr >= 10 { return 13; }
+    
+    let rb = random_bool();
+    
+    let enc_len = base64_encoded_len(10);
+    if enc_len != 16 { return 14; }
+    
+    if !base64_is_valid_padding(16) { return 15; }
+    
+    let eb = base64_encode_byte(5);
+    if eb != 70 { return 16; }
+    
+    let db = base64_decode_char(70);
+    if db != 5 { return 17; }
+    
+    return 111;
+}

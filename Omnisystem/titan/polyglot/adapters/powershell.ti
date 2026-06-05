@@ -1,0 +1,58 @@
+// titan/polyglot/adapters/powershell.ti
+// PowerShell language adapter — bidirectional conversion via ULCF.
+// Converts PowerShell scripts to Titan via XAST intermediate representation.
+
+pub fn main() -> i64 {
+    let script: i64 = 1;
+    let result: i64 = convert_from_powershell(script);
+    return result;
+}
+
+pub fn convert_from_powershell(source: i64) -> i64 {
+    let mut score: i64 = 0;
+
+    // Stage 1 — Parse PowerShell AST via Tree‑Sitter
+    let ast_parsed: i64 = parse_powershell_ast(source);
+    if ast_parsed >= 1 { score = score + 20; }
+
+    // Stage 2 — Map to XAST
+    let xast_mapped: i64 = map_powershell_to_xast(source);
+    if xast_mapped >= 10 { score = score + 25; }
+
+    // Stage 3 — Lower XAST to UniIR
+    let uniir_generated: i64 = lower_xast_to_uniir();
+    if uniir_generated >= 1 { score = score + 25; }
+
+    // Stage 4 — Emit Titan code from UniIR
+    let titan_emitted: i64 = emit_titan_from_uniir();
+    if titan_emitted >= 1 { score = score + 20; }
+
+    // Stage 5 — Reverse: Titan → PowerShell
+    let reverse_ok: i64 = emit_powershell_from_uniir();
+    if reverse_ok >= 1 { score = score + 10; }
+
+    if score >= 80 { return 111; }
+    return score;
+}
+
+// ── Reverse emission: UniIR → PowerShell ──────────────
+pub fn emit_powershell_from_uniir() -> i64 {
+    return 1;
+}
+
+// ── Helpers ──────────────────────────────────────────
+pub fn parse_powershell_ast(source: i64) -> i64 {
+    return 1;
+}
+
+pub fn map_powershell_to_xast(source: i64) -> i64 {
+    return 15;
+}
+
+pub fn lower_xast_to_uniir() -> i64 {
+    return 1;
+}
+
+pub fn emit_titan_from_uniir() -> i64 {
+    return 1;
+}

@@ -1,0 +1,95 @@
+// titan/ui/error_boundary.ti — Per-subsystem fault isolation boundary
+// TAG range 69000–69001 (clear of config_change 65000, events 66000, inspector 65100, shell 67000, palette 68000).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_ERRB:    i64 = 69000;
+const TAG_FLTCARD: i64 = 69001;
+
+// Boundary cell: body=fault_count, arg=fault_list_head (TAG_FLTCARD, newest first)
+pub fn eb_create() -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TAG_ERRB);
+    heap_set_body(b, 0);
+    heap_set_arg(b, 0);
+    return b;
+}
+
+// Fault card: body=sys_id, arg=error_code, domain=next
+pub fn eb_record_fault(b: i64, sys_id: i64, code: i64) {
+    let f = heap_alloc_term();
+    heap_set_tag(f, TAG_FLTCARD);
+    heap_set_body(f, sys_id);
+    heap_set_arg(f, code);
+    heap_set_domain(f, heap_get_arg(b));
+    heap_set_arg(b, f);
+    heap_set_body(b, heap_get_body(b) + 1);
+}
+
+pub fn eb_fault_count(b: i64) -> i64 { return heap_get_body(b); }
+
+pub fn eb_is_offline(b: i64, sys_id: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(b);
+    while cur != 0 {
+        if heap_get_body(cur) == sys_id { return 1; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+// Remove first fault card matching sys_id; decrements count
+pub fn eb_clear_faults(b: i64, sys_id: i64) {
+    let mut prev: i64 = 0;
+    let mut cur: i64 = heap_get_arg(b);
+    while cur != 0 {
+        if heap_get_body(cur) == sys_id {
+            if prev == 0 {
+                heap_set_arg(b, heap_get_domain(cur));
+            } else {
+                heap_set_domain(prev, heap_get_domain(cur));
+            }
+            heap_set_body(b, heap_get_body(b) - 1);
+            return;
+        }
+        prev = cur;
+        cur = heap_get_domain(cur);
+    }
+}
+
+pub fn main() -> i64 {
+    let b = eb_create();
+
+    // Test 1: record fault for subsystem 3
+    eb_record_fault(b, 3, 6);
+    if eb_fault_count(b) != 1 { return 1; }
+
+    // Test 2: subsystem 3 is offline, subsystem 0 is not
+    if eb_is_offline(b, 3) != 1 { return 2; }
+    if eb_is_offline(b, 0) != 0 { return 3; }
+
+    // Test 3: clear fault, count returns to 0, offline clears
+    eb_clear_faults(b, 3);
+    if eb_fault_count(b) != 0 { return 4; }
+    if eb_is_offline(b, 3) != 0 { return 5; }
+
+    // Test 4: multiple faults, clear only the matching one
+    eb_record_fault(b, 1, 2);
+    eb_record_fault(b, 2, 4);
+    eb_record_fault(b, 1, 6);
+    if eb_fault_count(b) != 3 { return 6; }
+    eb_clear_faults(b, 2);
+    if eb_fault_count(b) != 2 { return 7; }
+    if eb_is_offline(b, 1) != 1 { return 8; }
+
+    return 111;
+}

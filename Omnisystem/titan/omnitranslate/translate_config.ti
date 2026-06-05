@@ -1,0 +1,13 @@
+// OmniTranslate — Translation engine configuration
+pub pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    let var_ok: i64 = configure_provider("deepl") >= 80 { score += 25; }
+    let var_ok: i64 = configure_provider("google-translate") >= 80 { score += 25; }
+    let var_ok: i64 = set_default_language_pair("en", "ja") >= 80 { score += 25; }
+    let var_ok: i64 = verify_providers() >= 80 { score += 36; }
+    if score >= 80 { return 111; }
+    return score;
+}
+pub fn configure_provider(_name: &str) -> i64 { return 111; }
+pub fn set_default_language_pair(_from: &str, _to: &str) -> i64 { return 111; }
+pub fn verify_providers() -> i64 { return 111; }

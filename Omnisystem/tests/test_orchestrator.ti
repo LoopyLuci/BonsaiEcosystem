@@ -1,0 +1,269 @@
+// tests/test_orchestrator.ti — Agentic Orchestrator integration test
+// Exercises the full pipeline: decompose → pool → orchestrate → artifacts.
+// Self-contained: all needed functions duplicated inline.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+}
+
+// ===== Constants =====
+const TAG_TASK:       i64 = 6000;
+const TAG_TASK_GRAPH: i64 = 6001;
+const TASK_PENDING:     i64 = 0;
+const TASK_COMPLETE:    i64 = 3;
+const TASK_FAILED:      i64 = 4;
+const TASK_BLOCKED:     i64 = 5;
+
+const TAG_AGENT:      i64 = 6100;
+const AGENT_PLANNER:  i64 = 0;
+const AGENT_CODER:    i64 = 1;
+const AGENT_TESTER:   i64 = 2;
+const AGENT_VERIFIER: i64 = 3;
+const AGENT_IDLE:     i64 = 0;
+const AGENT_BUSY:     i64 = 1;
+
+const TAG_ARTIFACT:      i64 = 6200;
+const ART_PLAN:          i64 = 0;
+const ART_CODE_DIFF:     i64 = 1;
+const REVIEW_PENDING:    i64 = 0;
+const REVIEW_APPROVED:   i64 = 1;
+
+const ORCH_EXECUTING: i64 = 1;
+const ORCH_COMPLETE:  i64 = 2;
+const ORCH_FAILED:    i64 = 3;
+
+// ===== Task functions =====
+pub fn task_create(description_id: i64, agent_type: i64, priority: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, 0);
+    heap_set_arg(meta2, priority);
+    heap_set_domain(meta2, 0);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, description_id);
+    heap_set_arg(meta1, agent_type);
+    heap_set_domain(meta1, meta2);
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_TASK);
+    heap_set_body(t, meta1);
+    heap_set_arg(t, TASK_PENDING);
+    heap_set_domain(t, 0);
+    return t;
+}
+pub fn task_set_status(t: i64, status: i64) { heap_set_arg(t, status); }
+pub fn task_status(t: i64) -> i64           { return heap_get_arg(t); }
+pub fn task_agent_type(t: i64) -> i64       { return heap_get_arg(heap_get_body(t)); }
+pub fn task_assigned_agent(t: i64) -> i64   {
+    return heap_get_body(heap_get_domain(heap_get_body(t)));
+}
+pub fn task_set_assigned_agent(t: i64, agent: i64) {
+    heap_set_body(heap_get_domain(heap_get_body(t)), agent);
+}
+pub fn task_add_dependency(task: i64, dep_task: i64) {
+    let meta2    = heap_get_domain(heap_get_body(task));
+    let dep_node = heap_alloc_term();
+    heap_set_tag(dep_node, TAG_TASK_GRAPH);
+    heap_set_body(dep_node, dep_task);
+    heap_set_domain(dep_node, heap_get_domain(meta2));
+    heap_set_domain(meta2, dep_node);
+}
+pub fn task_dependencies_satisfied(task: i64) -> bool {
+    let mut dep = heap_get_domain(heap_get_domain(heap_get_body(task)));
+    while dep != 0 {
+        if task_status(heap_get_body(dep)) != TASK_COMPLETE { return false; }
+        dep = heap_get_domain(dep);
+    }
+    return true;
+}
+pub fn task_count(tasks: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = tasks;
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+pub fn decompose_objective(objective_id: i64) -> i64 {
+    let plan      = task_create(heap_alloc_term(), AGENT_PLANNER,  1);
+    let implement = task_create(heap_alloc_term(), AGENT_CODER,    2);
+    let test      = task_create(heap_alloc_term(), AGENT_TESTER,   2);
+    let verify    = task_create(heap_alloc_term(), AGENT_VERIFIER, 3);
+    task_add_dependency(implement, plan);    task_set_status(implement, TASK_BLOCKED);
+    task_add_dependency(test, implement);    task_set_status(test, TASK_BLOCKED);
+    task_add_dependency(verify, test);       task_set_status(verify, TASK_BLOCKED);
+    heap_set_domain(plan, implement);
+    heap_set_domain(implement, test);
+    heap_set_domain(test, verify);
+    heap_set_domain(verify, 0);
+    return plan;
+}
+
+// ===== Agent functions =====
+pub fn agent_create(agent_type: i64, name: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, name);
+    heap_set_arg(meta, 0);
+    heap_set_domain(meta, 0);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_AGENT);
+    heap_set_body(a, agent_type);
+    heap_set_arg(a, AGENT_IDLE);
+    heap_set_domain(a, meta);
+    return a;
+}
+pub fn agent_is_idle(agent: i64) -> bool { return heap_get_arg(agent) == AGENT_IDLE; }
+pub fn agent_type_of(agent: i64) -> i64  { return heap_get_body(agent); }
+pub fn agent_assign_task(agent: i64, task: i64) -> bool {
+    if heap_get_arg(agent) != AGENT_IDLE { return false; }
+    heap_set_arg(agent, AGENT_BUSY);
+    heap_set_arg(heap_get_domain(agent), task);
+    return true;
+}
+pub fn agent_complete_task(agent: i64, result: i64) {
+    heap_set_arg(agent, AGENT_IDLE);
+    heap_set_domain(heap_get_domain(agent), result);
+}
+
+static mut AGENT_POOL: i64 = 0;
+static mut POOL_COUNT: i64 = 0;
+
+pub fn pool_add_agent(agent_type: i64, name: i64) -> i64 {
+    let agent   = agent_create(agent_type, name);
+    let wrapper = heap_alloc_term();
+    heap_set_body(wrapper, agent);
+    heap_set_domain(wrapper, AGENT_POOL);
+    AGENT_POOL = wrapper;
+    POOL_COUNT = POOL_COUNT + 1;
+    return agent;
+}
+pub fn pool_count() -> i64 { return POOL_COUNT; }
+pub fn pool_find_idle_agent(required_type: i64) -> i64 {
+    let mut curr = AGENT_POOL;
+    while curr != 0 {
+        let agent = heap_get_body(curr);
+        if agent_is_idle(agent) && agent_type_of(agent) == required_type { return agent; }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Orchestrator state =====
+static mut ORCH_TASKS:     i64 = 0;
+static mut ORCH_ARTIFACTS: i64 = 0;
+static mut ORCH_PHASE:     i64 = 0;
+
+pub fn orchestrate_phase() -> i64 { return ORCH_PHASE; }
+pub fn orchestrate_artifact_count() -> i64 {
+    let mut n: i64 = 0; let mut c = ORCH_ARTIFACTS;
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+pub fn orchestrate_start(objective_id: i64) {
+    ORCH_TASKS = decompose_objective(objective_id);
+    ORCH_ARTIFACTS = 0;
+    ORCH_PHASE = ORCH_EXECUTING;
+}
+pub fn orchestrate_tick() -> i64 {
+    if ORCH_PHASE == ORCH_COMPLETE || ORCH_PHASE == ORCH_FAILED { return ORCH_PHASE; }
+    let mut all_complete: bool = true;
+    let mut curr = ORCH_TASKS;
+    while curr != 0 {
+        let status = task_status(curr);
+        if status == TASK_BLOCKED {
+            if task_dependencies_satisfied(curr) { task_set_status(curr, TASK_PENDING); }
+            else { all_complete = false; }
+        }
+        let status2 = task_status(curr);
+        if status2 == TASK_PENDING {
+            all_complete = false;
+            let agent = pool_find_idle_agent(task_agent_type(curr));
+            if agent != 0 {
+                agent_assign_task(agent, curr);
+                task_set_assigned_agent(curr, agent);
+                agent_complete_task(agent, heap_alloc_term());
+                task_set_status(curr, TASK_COMPLETE);
+                let art = heap_alloc_term();
+                heap_set_domain(art, ORCH_ARTIFACTS);
+                ORCH_ARTIFACTS = art;
+            }
+        } else if status2 == TASK_FAILED {
+            ORCH_PHASE = ORCH_FAILED; return ORCH_PHASE;
+        }
+        curr = heap_get_domain(curr);
+    }
+    if all_complete { ORCH_PHASE = ORCH_COMPLETE; }
+    return ORCH_PHASE;
+}
+
+// ===== Artifact store =====
+static mut ARTIFACT_LIST:  i64 = 0;
+static mut ARTIFACT_COUNT: i64 = 0;
+
+pub fn artifact_create(art_type: i64, task_id: i64, agent_id: i64,
+                       content_id: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, content_id);
+    heap_set_arg(meta2, 0);
+    heap_set_domain(meta2, REVIEW_PENDING);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, art_type);
+    heap_set_arg(meta1, agent_id);
+    heap_set_domain(meta1, meta2);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_ARTIFACT);
+    heap_set_body(a, meta1);
+    heap_set_arg(a, task_id);
+    heap_set_domain(a, 0);
+    return a;
+}
+pub fn artifact_type(a: i64) -> i64 { return heap_get_body(heap_get_body(a)); }
+pub fn artifact_task(a: i64) -> i64 { return heap_get_arg(a); }
+pub fn store_insert(artifact: i64) {
+    heap_set_domain(artifact, ARTIFACT_LIST);
+    ARTIFACT_LIST  = artifact;
+    ARTIFACT_COUNT = ARTIFACT_COUNT + 1;
+}
+pub fn store_count() -> i64 { return ARTIFACT_COUNT; }
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    AGENT_POOL = 0;    POOL_COUNT = 0;
+    ARTIFACT_LIST = 0; ARTIFACT_COUNT = 0;
+    ORCH_TASKS = 0;    ORCH_ARTIFACTS = 0; ORCH_PHASE = 0;
+
+    // Agent pool
+    pool_add_agent(AGENT_PLANNER,  100);
+    pool_add_agent(AGENT_CODER,    200);
+    pool_add_agent(AGENT_TESTER,   300);
+    pool_add_agent(AGENT_VERIFIER, 400);
+    if pool_count() != 4 { return 1; }
+
+    // Decompose (separate from ORCH_TASKS)
+    let tasks = decompose_objective(heap_alloc_term());
+    if task_count(tasks) != 4 { return 2; }
+
+    // Orchestrate
+    orchestrate_start(heap_alloc_term());
+    let mut ticks: i64 = 0;
+    while orchestrate_phase() == ORCH_EXECUTING && ticks < 20 {
+        orchestrate_tick();
+        ticks = ticks + 1;
+    }
+    if orchestrate_phase() != ORCH_COMPLETE   { return 3; }
+    if orchestrate_artifact_count() != 4      { return 4; }
+
+    // Artifact store
+    let a = artifact_create(ART_CODE_DIFF, 1, 200, heap_alloc_term());
+    store_insert(a);
+    if store_count() != 1             { return 5; }
+    if artifact_type(a) != ART_CODE_DIFF { return 6; }
+    if artifact_task(a) != 1         { return 7; }
+
+    return 111;
+}

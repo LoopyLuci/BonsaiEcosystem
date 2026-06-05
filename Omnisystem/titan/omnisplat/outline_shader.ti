@@ -1,0 +1,111 @@
+// titan/omnisplat/outline_shader.ti — Edge Detection Shader
+// Screen-space 5×5 edge detection for selected splat outlines. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_EDGE_BUFFER: i64 = 9020;
+
+// Returns a heap node: body=dx, arg=dy for kernel position k (0..24 in 5×5 grid).
+// k=0 → top-left (-2,-2); k=12 → center (0,0); k=24 → bottom-right (2,2).
+pub fn outline_kernel_offset(k: i64) -> i64 {
+    let row = k / 5;
+    let col = k % 5;
+    let dx = col - 2;
+    let dy = row - 2;
+    let r = heap_alloc_term();
+    heap_set_body(r, dx);
+    heap_set_arg(r, dy);
+    return r;
+}
+
+// Returns true if centre alpha > threshold AND the provided neighbour node has alpha ≤ threshold.
+pub fn outline_detect_edge(alpha_centre: i64, alpha_neighbors: i64) -> bool {
+    let threshold: i64 = 128;
+    if alpha_centre <= threshold { return false; }
+    let mut i: i64 = 0;
+    while i < 25 {
+        if i != 12 {
+            let n_alpha = heap_get_body(alpha_neighbors);
+            if n_alpha <= threshold { return true; }
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// Count splats whose alpha exceeds threshold (each counts as an edge candidate).
+pub fn outline_count_edges(splat_alphas: i64, splat_count: i64, threshold: i64) -> i64 {
+    let mut edge_count: i64 = 0;
+    let mut i: i64 = 0;
+    while i < splat_count {
+        let alpha = heap_get_body(splat_alphas);
+        if alpha > threshold { edge_count = edge_count + 1; }
+        i = i + 1;
+    }
+    return edge_count;
+}
+
+// edge_buffer: tag=TAG_EDGE_BUFFER, body=width, arg=height, domain=edge_positions
+pub fn outline_build_edge_buffer(width: i64, height: i64, edge_positions: i64) -> i64 {
+    let buf = heap_alloc_term();
+    heap_set_tag(buf, TAG_EDGE_BUFFER);
+    heap_set_body(buf, width);
+    heap_set_arg(buf, height);
+    heap_set_domain(buf, edge_positions);
+    return buf;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // k=0 → (-2,-2)
+    let off0 = outline_kernel_offset(0);
+    if heap_get_body(off0) != -2 { return 1; }
+    if heap_get_arg(off0) != -2  { return 2; }
+
+    // k=12 → center (0,0)
+    let off12 = outline_kernel_offset(12);
+    if heap_get_body(off12) != 0 { return 3; }
+    if heap_get_arg(off12) != 0  { return 4; }
+
+    // k=24 → (+2,+2)
+    let off24 = outline_kernel_offset(24);
+    if heap_get_body(off24) != 2 { return 5; }
+    if heap_get_arg(off24) != 2  { return 6; }
+
+    // k=8 → row=1, col=3, dx=1, dy=-1
+    let off8 = outline_kernel_offset(8);
+    if heap_get_body(off8) != 1  { return 7; }
+    if heap_get_arg(off8) != -1  { return 8; }
+
+    // Edge detection: centre=255 > 128, neighbour=50 ≤ 128 → edge
+    let neighbours = heap_alloc_term();
+    heap_set_body(neighbours, 50);
+    if !outline_detect_edge(255, neighbours) { return 9; }
+
+    // No edge when centre is below threshold
+    if outline_detect_edge(50, neighbours)  { return 10; }
+
+    // Edge counting: all 10 splats have alpha=255 > threshold=128
+    let alphas = heap_alloc_term();
+    heap_set_body(alphas, 255);
+    let edges = outline_count_edges(alphas, 10, 128);
+    if edges != 10                          { return 11; }
+
+    // Edge buffer creation
+    let buf = outline_build_edge_buffer(1920, 1080, heap_alloc_term());
+    if heap_get_tag(buf) != TAG_EDGE_BUFFER { return 12; }
+    if heap_get_body(buf) != 1920           { return 13; }
+    if heap_get_arg(buf) != 1080            { return 14; }
+
+    return 111;
+}

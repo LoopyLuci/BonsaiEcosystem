@@ -1,0 +1,45 @@
+// tests/test_c8.ti — Phase C8 Performance & Stress Testing Integration Test
+// All helpers inlined with tc8_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TC8_T_BN: i64 = 23700;
+
+pub fn tc8_bench_create(name: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TC8_T_BN); heap_set_body(b, name); heap_set_arg(b, 0); heap_set_domain(b, 0);
+    return b;
+}
+
+pub fn tc8_bench_record(b: i64, result: i64) { heap_set_arg(b, result); }
+
+pub fn tc8_throughput_test(circuits: i64, msgs: i64) -> i64 { return circuits * msgs; }
+
+pub fn tc8_adversarial_test(honest: i64, malicious: i64) -> i64 {
+    if honest > malicious { return 1; }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let b = tc8_bench_create(2);
+    tc8_bench_record(b, 500);
+    if heap_get_arg(b) != 500            { return 1; }
+    if tc8_throughput_test(5, 20) != 100 { return 2; }
+    if tc8_adversarial_test(60, 40) != 1 { return 3; }
+
+    // Equal counts: not strictly greater → 0
+    if tc8_adversarial_test(50, 50) != 0 { return 4; }
+
+    return 111;
+}

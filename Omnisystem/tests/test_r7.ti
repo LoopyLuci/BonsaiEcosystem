@@ -1,0 +1,85 @@
+// tests/test_r7.ti — Phase R7 Dashboard & Analytics Integration Test
+// All helpers inlined with tr7_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR7_T_MET:   i64 = 22600;
+const TR7_T_DASH:  i64 = 22601;
+const TR7_T_ALERT: i64 = 22602;
+
+pub fn tr7_metric_create(name: i64, value: i64) -> i64 {
+    let m = heap_alloc_term();
+    heap_set_tag(m, TR7_T_MET); heap_set_body(m, name); heap_set_arg(m, value); heap_set_domain(m, 0);
+    return m;
+}
+
+pub fn tr7_dashboard_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TR7_T_DASH); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+
+pub fn tr7_dashboard_add(d: i64, m: i64) {
+    let h = heap_get_arg(d);
+    if h == 0 { heap_set_arg(d, m); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, m);
+    }
+    heap_set_body(d, heap_get_body(d) + 1);
+}
+
+pub fn tr7_dashboard_sum(d: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(d);
+    let mut s: i64 = 0;
+    while cur != 0 { s = s + heap_get_arg(cur); cur = heap_get_domain(cur); }
+    return s;
+}
+
+pub fn tr7_alert_create(name: i64, threshold: i64) -> i64 {
+    let a = heap_alloc_term();
+    heap_set_tag(a, TR7_T_ALERT); heap_set_body(a, name); heap_set_arg(a, threshold); heap_set_domain(a, 0);
+    return a;
+}
+
+pub fn tr7_check_alert(a: i64, value: i64) -> i64 {
+    if value >= heap_get_arg(a) { return 1; }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let d = tr7_dashboard_create();
+    tr7_dashboard_add(d, tr7_metric_create(5, 50));
+    tr7_dashboard_add(d, tr7_metric_create(6, 150));
+    if heap_get_body(d) != 2          { return 1; }
+    if tr7_dashboard_sum(d) != 200    { return 2; }
+
+    let a = tr7_alert_create(7, 100);
+    if tr7_check_alert(a, 50) != 0    { return 3; }
+    if tr7_check_alert(a, 150) != 1   { return 4; }
+
+    // Boundary: exactly at threshold fires
+    if tr7_check_alert(a, 100) != 1   { return 5; }
+
+    // Multi-metric sum
+    let d2 = tr7_dashboard_create();
+    tr7_dashboard_add(d2, tr7_metric_create(1, 10));
+    tr7_dashboard_add(d2, tr7_metric_create(2, 20));
+    tr7_dashboard_add(d2, tr7_metric_create(3, 30));
+    if tr7_dashboard_sum(d2) != 60    { return 6; }
+    if heap_get_body(d2) != 3         { return 7; }
+
+    return 111;
+}

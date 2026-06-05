@@ -1,0 +1,283 @@
+// titan/lsp/semantic_analyzer.ti — Multi-language semantic analysis
+// Symbol resolution, type inference, and diagnostics for Titan/Aether/Sylva/Axiom.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+}
+
+// Symbol kinds
+const SYM_FUNCTION: i64 = 0;
+const SYM_VARIABLE: i64 = 1;
+const SYM_TYPE:     i64 = 2;
+const SYM_MODULE:   i64 = 3;
+const SYM_ACTOR:    i64 = 4;
+const SYM_THEOREM:  i64 = 5;
+
+// Diagnostic severity
+const DIAG_ERROR:   i64 = 0;
+const DIAG_WARNING: i64 = 1;
+const DIAG_INFO:    i64 = 2;
+const DIAG_HINT:    i64 = 3;
+
+const TAG_SYMBOL:     i64 = 4100;
+const TAG_DIAGNOSTIC: i64 = 4101;
+const TAG_REF_NODE:   i64 = 4102;
+
+// ===== Symbol table (global linked list) =====
+// Node: tag=TAG_SYMBOL, body=name_id, arg=kind, domain=next_node (0=end)
+// Metadata linked via a second cell: body=line, arg=col, domain=type_id
+static mut SYMBOLS: i64 = 0;
+
+pub fn symbol_create(name_id: i64, kind: i64, line: i64, col: i64, type_id: i64) -> i64 {
+    let sym = heap_alloc_term();
+    heap_set_tag(sym, TAG_SYMBOL);
+    heap_set_body(sym, name_id);
+    heap_set_arg(sym, kind);
+    // Metadata cell stores position and type
+    let meta = heap_alloc_term();
+    heap_set_body(meta, line);
+    heap_set_arg(meta, col);
+    heap_set_domain(meta, type_id);
+    // Link meta off domain temporarily; domain will be set to next in insert
+    heap_set_domain(sym, 0);
+    // Store meta in a side-chain via a wrapper: reuse meta as the symbol's extra
+    // We encode meta reference by storing it in the tag field of a helper cell
+    let helper = heap_alloc_term();
+    heap_set_body(helper, meta);
+    heap_set_domain(sym, helper);
+    return sym;
+}
+
+pub fn sym_meta(sym: i64) -> i64 { return heap_get_body(heap_get_domain(sym)); }
+pub fn sym_name(sym: i64) -> i64 { return heap_get_body(sym); }
+pub fn sym_kind(sym: i64) -> i64 { return heap_get_arg(sym); }
+pub fn sym_line(sym: i64) -> i64 { return heap_get_body(sym_meta(sym)); }
+pub fn sym_col(sym: i64) -> i64 { return heap_get_arg(sym_meta(sym)); }
+pub fn sym_type(sym: i64) -> i64 { return heap_get_domain(sym_meta(sym)); }
+pub fn sym_next(sym: i64) -> i64 { return heap_get_domain(heap_get_domain(sym)); }
+pub fn sym_set_next(sym: i64, next: i64) { heap_set_domain(heap_get_domain(sym), next); }
+
+pub fn symtable_insert(name_id: i64, kind: i64, line: i64, col: i64, type_id: i64) {
+    let sym = symbol_create(name_id, kind, line, col, type_id);
+    sym_set_next(sym, SYMBOLS);
+    SYMBOLS = sym;
+}
+
+pub fn symtable_lookup(name_id: i64) -> i64 {
+    let mut curr = SYMBOLS;
+    while curr != 0 {
+        if str_eq(sym_name(curr), name_id) { return curr; }
+        curr = sym_next(curr);
+    }
+    return 0;
+}
+
+pub fn symtable_find_references(name_id: i64) -> i64 {
+    let mut refs: i64 = 0;
+    let mut curr = SYMBOLS;
+    while curr != 0 {
+        if str_eq(sym_name(curr), name_id) {
+            let ref_node = heap_alloc_term();
+            heap_set_tag(ref_node, TAG_REF_NODE);
+            heap_set_body(ref_node, sym_line(curr));
+            heap_set_arg(ref_node, sym_col(curr));
+            heap_set_domain(ref_node, refs);
+            refs = ref_node;
+        }
+        curr = sym_next(curr);
+    }
+    return refs;
+}
+
+// ===== Diagnostics =====
+// Node: tag=TAG_DIAGNOSTIC, body=line, arg=col, domain=severity
+pub fn diagnostic_create(line: i64, col: i64, severity: i64, message_id: i64) -> i64 {
+    let diag = heap_alloc_term();
+    heap_set_tag(diag, TAG_DIAGNOSTIC);
+    heap_set_body(diag, line);
+    heap_set_arg(diag, col);
+    // Store severity and message in a metadata cell
+    let meta = heap_alloc_term();
+    heap_set_body(meta, severity);
+    heap_set_arg(meta, message_id);
+    heap_set_domain(diag, meta);
+    return diag;
+}
+pub fn diag_line(d: i64) -> i64 { return heap_get_body(d); }
+pub fn diag_col(d: i64) -> i64 { return heap_get_arg(d); }
+pub fn diag_severity(d: i64) -> i64 { return heap_get_body(heap_get_domain(d)); }
+
+// ===== Source analysis =====
+// Simple character helpers
+pub fn is_alpha_sa(c: i64) -> bool { return (c>=65&&c<=90)||(c>=97&&c<=122)||c==95; }
+pub fn is_digit_sa(c: i64) -> bool { return c>=48&&c<=57; }
+pub fn is_alphanum_sa(c: i64) -> bool { return is_alpha_sa(c)||is_digit_sa(c); }
+
+// Analyze a Titan source file: scan for fn/let definitions, populate symbol table
+pub fn analyze_titan(source_id: i64) -> i64 {
+    let src_len = str_len(source_id);
+    let mut pos: i64 = 0;
+    let mut line: i64 = 1;
+    let mut col: i64 = 1;
+    let mut diagnostics: i64 = 0;
+    let mut token_count: i64 = 0;
+    let mut previous_was_fn: bool = false;
+    let mut previous_was_let: bool = false;
+
+    while pos < src_len {
+        let ch = str_at(source_id, pos);
+        if ch == 10 { // newline
+            line = line + 1; col = 1; pos = pos + 1;
+        } else if ch == 32 || ch == 9 || ch == 13 { // whitespace
+            col = col + 1; pos = pos + 1;
+        } else if is_alpha_sa(ch) {
+            // Read identifier or keyword
+            let start = pos;
+            while pos < src_len && is_alphanum_sa(str_at(source_id, pos)) {
+                pos = pos + 1; col = col + 1;
+            }
+            let klen = pos - start;
+            token_count = token_count + 1;
+
+            // Check for keyword 'fn' (f=102, n=110)
+            if klen == 2 && str_at(source_id, start) == 102 && str_at(source_id, start+1) == 110 {
+                previous_was_fn = true;
+                previous_was_let = false;
+            }
+            // Check for keyword 'let' (l=108, e=101, t=116)
+            else if klen == 3 && str_at(source_id, start) == 108 && str_at(source_id, start+1) == 101 && str_at(source_id, start+2) == 116 {
+                previous_was_let = true;
+                previous_was_fn = false;
+            } else {
+                // It's an identifier
+                let name_cell = heap_alloc_term();
+                heap_set_body(name_cell, start);
+                heap_set_arg(name_cell, klen);
+                if previous_was_fn {
+                    symtable_insert(name_cell, SYM_FUNCTION, line, col - klen, 0);
+                    previous_was_fn = false;
+                } else if previous_was_let {
+                    symtable_insert(name_cell, SYM_VARIABLE, line, col - klen, 0);
+                    previous_was_let = false;
+                } else {
+                    previous_was_fn = false;
+                    previous_was_let = false;
+                }
+            }
+        } else if is_digit_sa(ch) {
+            while pos < src_len && is_digit_sa(str_at(source_id, pos)) {
+                pos = pos + 1; col = col + 1;
+            }
+            token_count = token_count + 1;
+            previous_was_fn = false; previous_was_let = false;
+        } else {
+            pos = pos + 1; col = col + 1;
+            previous_was_fn = false; previous_was_let = false;
+        }
+    }
+
+    if token_count == 0 {
+        diagnostics = diagnostic_create(1, 1, DIAG_INFO, heap_alloc_term());
+    }
+    return diagnostics;
+}
+
+// Find the definition location for a symbol
+pub fn find_definition(name_id: i64) -> i64 {
+    let sym = symtable_lookup(name_id);
+    if sym == 0 { return 0; }
+    let loc = heap_alloc_term();
+    heap_set_body(loc, sym_line(sym));
+    heap_set_arg(loc, sym_col(sym));
+    return loc;
+}
+
+// Find all references to a symbol
+pub fn find_references(name_id: i64) -> i64 {
+    return symtable_find_references(name_id);
+}
+
+// Generate completion candidates matching a prefix
+pub fn completions(prefix_id: i64) -> i64 {
+    let mut items: i64 = 0;
+    let mut curr = SYMBOLS;
+    while curr != 0 {
+        let name = sym_name(curr);
+        let kind = sym_kind(curr);
+        // Include if prefix is empty or first character matches
+        if str_len(prefix_id) == 0 || str_at(name, 0) == str_at(prefix_id, 0) {
+            let item = heap_alloc_term();
+            heap_set_body(item, name);
+            heap_set_arg(item, kind);
+            heap_set_domain(item, items);
+            items = item;
+        }
+        curr = sym_next(curr);
+    }
+    return items;
+}
+
+// ===== Self-test =====
+pub pub fn main() -> i64 {
+    // Initially no symbols
+    let name_a = heap_alloc_term();
+    if symtable_lookup(name_a) != 0 { return 1; }
+
+    // Insert a function symbol
+    symtable_insert(name_a, SYM_FUNCTION, 10, 5, 0);
+    let sym = symtable_lookup(name_a);
+    if sym == 0 { return 2; }
+    if sym_kind(sym) != SYM_FUNCTION { return 3; }
+    if sym_line(sym) != 10 { return 4; }
+    if sym_col(sym) != 5 { return 5; }
+
+    // Insert a variable symbol
+    let name_b = heap_alloc_term();
+    symtable_insert(name_b, SYM_VARIABLE, 15, 3, 0);
+    let sym_b = symtable_lookup(name_b);
+    if sym_b == 0 { return 6; }
+    if sym_kind(sym_b) != SYM_VARIABLE { return 7; }
+
+    // Lookup non-existent symbol
+    let name_c = heap_alloc_term();
+    if symtable_lookup(name_c) != 0 { return 8; }
+
+    // Find definition
+    let loc = find_definition(name_a);
+    if loc == 0 { return 9; }
+    if heap_get_body(loc) != 10 { return 10; }
+
+    // References
+    let refs = find_references(name_a);
+    if refs == 0 { return 11; }
+
+    // Completions
+    let items = completions(name_a);
+    if items == 0 { return 12; }
+
+    // Analyze a source (empty body returns info diagnostic)
+    let src = heap_alloc_term();
+    let diags = analyze_titan(src);
+    if diags == 0 { return 13; }
+    if diag_severity(diags) != DIAG_INFO { return 14; }
+
+    // Diagnostic construction
+    let d = diagnostic_create(5, 10, DIAG_ERROR, heap_alloc_term());
+    if diag_line(d) != 5 { return 15; }
+    if diag_col(d) != 10 { return 16; }
+    if diag_severity(d) != DIAG_ERROR { return 17; }
+
+    return 111;
+}

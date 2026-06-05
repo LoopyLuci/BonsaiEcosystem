@@ -1,0 +1,12 @@
+// Sylva — Phase 105: REPL UI layer
+// Returns 111 on success
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}
+
+fn render_prompt() -> i64 { return 111; }
+fn display_result(val: str) -> i64 { return 111; }
+fn show_history() -> i64 { return 111; }

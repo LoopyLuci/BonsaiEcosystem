@@ -1,0 +1,264 @@
+// titan/rag/hybrid_search.ti — Hybrid Search Engine
+// Combines keyword scoring with vector similarity (40/60 weight) and re-ranks.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+}
+
+// ===== Vec (self-contained) =====
+const TAG_VEC:   i64 = 5500;
+const EMBED_DIM: i64 = 64;
+
+pub fn vec_new() -> i64 {
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_VEC);
+    heap_set_body(v, 0);
+    heap_set_arg(v, 0);
+    return v;
+}
+pub fn vec_push(v: i64, val: i64) {
+    let idx = heap_get_arg(v);
+    let node = heap_alloc_term();
+    heap_set_body(node, val);
+    heap_set_arg(node, idx);
+    heap_set_domain(node, heap_get_body(v));
+    heap_set_body(v, node);
+    heap_set_arg(v, idx + 1);
+}
+pub fn vec_len(v: i64) -> i64 { return heap_get_arg(v); }
+pub fn vec_get(v: i64, idx: i64) -> i64 {
+    let mut curr = heap_get_body(v);
+    while curr != 0 {
+        if heap_get_arg(curr) == idx { return heap_get_body(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+pub fn sqrt_approx(n: i64) -> i64 {
+    if n <= 0 { return 0; }
+    if n == 1 { return 1; }
+    let mut x = n;
+    let mut y = (x + 1) / 2;
+    while y < x { x = y; y = (x + n / x) / 2; }
+    return x;
+}
+pub fn embed_text(content_id: i64, content_len: i64) -> i64 {
+    let v = vec_new();
+    let mut i: i64 = 0;
+    while i < EMBED_DIM {
+        let mut hash: i64 = (i + 1) * 1000003;
+        let step = i + 1;
+        let mut j: i64 = 0;
+        while j < content_len {
+            let bv = (content_id + j + i * 31) % 256;
+            hash = (hash * 16777619 + bv) % 2147483647;
+            j = j + step;
+        }
+        if hash < 0 { hash = 0 - hash; }
+        vec_push(v, hash % 10000 + 1);
+        i = i + 1;
+    }
+    return v;
+}
+pub fn cosine_similarity(a: i64, b: i64) -> i64 {
+    let len = vec_len(a);
+    if len == 0 { return 0; }
+    if vec_len(b) != len { return 0; }
+    let mut dot: i64 = 0;
+    let mut norm_a: i64 = 0;
+    let mut norm_b: i64 = 0;
+    let mut i: i64 = 0;
+    while i < len {
+        let av = vec_get(a, i);
+        let bv = vec_get(b, i);
+        dot    = dot    + av * bv;
+        norm_a = norm_a + av * av;
+        norm_b = norm_b + bv * bv;
+        i = i + 1;
+    }
+    if norm_a == 0 || norm_b == 0 { return 0; }
+    let denom = sqrt_approx(norm_a) * sqrt_approx(norm_b);
+    if denom == 0 { return 0; }
+    return (dot * 100) / denom;
+}
+
+// ===== Chunk (self-contained) =====
+const TAG_CHUNK:    i64 = 5000;
+const CHUNK_FUNCTION: i64 = 0;
+
+pub fn chunk_create(chunk_type: i64, name_id: i64, content_id: i64,
+                    file_id: i64, line_start: i64, line_end: i64,
+                    language: i64, dependencies: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, line_start);
+    heap_set_arg(meta2, line_end);
+    heap_set_domain(meta2, language);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, content_id);
+    heap_set_arg(meta1, file_id);
+    heap_set_domain(meta1, meta2);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_CHUNK);
+    heap_set_body(c, chunk_type);
+    heap_set_arg(c, name_id);
+    heap_set_domain(c, meta1);
+    return c;
+}
+
+// content node stores (start_pos, length) — length in arg
+pub fn chunk_content(c: i64) -> i64 { return heap_get_body(heap_get_domain(c)); }
+
+// Scan source for `fn ` and build chunk wrappers
+pub fn chunk_file(file_id: i64, source_id: i64, language: i64) -> i64 {
+    let src_len = str_len(source_id);
+    let mut chunks: i64 = 0;
+    let mut pos: i64 = 0;
+    let mut line: i64 = 1;
+    while pos + 2 < src_len {
+        let ch = str_at(source_id, pos);
+        if ch == 10 {
+            line = line + 1; pos = pos + 1;
+        } else if ch == 102
+               && str_at(source_id, pos + 1) == 110
+               && (str_at(source_id, pos + 2) == 32 || str_at(source_id, pos + 2) == 9) {
+            let name_id   = heap_alloc_term();
+            let content_ref = heap_alloc_term();
+            heap_set_body(content_ref, pos);
+            heap_set_arg(content_ref, src_len - pos);
+            let chunk   = chunk_create(CHUNK_FUNCTION, name_id, content_ref,
+                                       file_id, line, line, language, 0);
+            let wrapper = heap_alloc_term();
+            heap_set_body(wrapper, chunk);
+            heap_set_domain(wrapper, chunks);
+            chunks  = wrapper;
+            pos     = pos + 3;
+        } else {
+            pos = pos + 1;
+        }
+    }
+    return chunks;
+}
+
+// ===== Keyword scoring =====
+// Counts query-byte occurrences in a content reference node's virtual byte stream.
+// content node: body=start_pos, arg=content_len
+// byte stream = (start_pos + offset) % 256
+pub fn keyword_score(content_node: i64, query_id: i64) -> i64 {
+    let content_len = heap_get_arg(content_node);
+    let start_pos   = heap_get_body(content_node);
+    let query_len   = str_len(query_id);
+    if query_len == 0 { return 0; }
+    let mut score: i64 = 0;
+    let mut i: i64 = 0;
+    while i < content_len {
+        let mut matches: bool = true;
+        let mut j: i64 = 0;
+        while j < query_len {
+            if (start_pos + i + j) % 256 != str_at(query_id, j) % 256 {
+                matches = false;
+                j = query_len; // break
+            }
+            j = j + 1;
+        }
+        if matches { score = score + 1; }
+        i = i + 1;
+    }
+    return score;
+}
+
+// ===== Hybrid search =====
+// chunks: linked list of chunk wrapper nodes (body=chunk_cell, domain=next_wrapper)
+// Each chunk carries its embedding in a parallel structure built at index time.
+// For hybrid_search we accept a list where body=chunk_cell and arg=embedding_vec.
+pub fn hybrid_search(query_text: i64, query_embedding: i64,
+                     indexed_list: i64, top_k: i64) -> i64 {
+    let mut results: i64 = 0;
+    let mut curr = indexed_list;
+    while curr != 0 {
+        let chunk_cell = heap_get_body(curr);
+        let emb        = heap_get_arg(curr);
+        let content    = chunk_content(chunk_cell);
+        let kw_score   = keyword_score(content, query_text);
+        let vec_score  = cosine_similarity(query_embedding, emb);
+        let combined   = (kw_score * 40 + vec_score * 60) / 100;
+        let rnode = heap_alloc_term();
+        heap_set_body(rnode, chunk_cell);
+        heap_set_arg(rnode, combined);
+        // Insert descending
+        let mut prev: i64 = 0;
+        let mut r = results;
+        while r != 0 && heap_get_arg(r) > combined {
+            prev = r;
+            r = heap_get_domain(r);
+        }
+        heap_set_domain(rnode, r);
+        if prev == 0 { results = rnode; }
+        else { heap_set_domain(prev, rnode); }
+        curr = heap_get_domain(curr);
+    }
+    // Trim to top_k
+    let mut count: i64 = 0;
+    let mut cur2 = results;
+    let mut prev2: i64 = 0;
+    while cur2 != 0 && count < top_k {
+        prev2 = cur2;
+        cur2 = heap_get_domain(cur2);
+        count = count + 1;
+    }
+    if cur2 != 0 && prev2 != 0 { heap_set_domain(prev2, 0); }
+    return results;
+}
+
+// Build an indexed list entry: wrapper with body=chunk_cell, arg=embedding
+pub fn index_chunk(chunk_cell: i64, emb: i64, next: i64) -> i64 {
+    let node = heap_alloc_term();
+    heap_set_body(node, chunk_cell);
+    heap_set_arg(node, emb);
+    heap_set_domain(node, next);
+    return node;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Build a chunk and index it with an embedding
+    let content_ref = heap_alloc_term();
+    heap_set_body(content_ref, 100);
+    heap_set_arg(content_ref, 50);
+    let chunk = chunk_create(CHUNK_FUNCTION, heap_alloc_term(), content_ref,
+                             heap_alloc_term(), 1, 10, 0, 0);
+
+    let emb       = embed_text(1000, 30);
+    let query_emb = embed_text(1000, 30);
+
+    // Index list with one entry
+    let ilist = index_chunk(chunk, emb, 0);
+    if ilist == 0 { return 1; }
+
+    let results = hybrid_search(heap_alloc_term(), query_emb, ilist, 3);
+    if results == 0 { return 2; }
+
+    // Score should be dominated by vector component: cosine(emb, emb) ~ 100
+    let score = heap_get_arg(results);
+    if score < 50 { return 3; }
+
+    // Two indexed chunks
+    let chunk2   = chunk_create(CHUNK_FUNCTION, heap_alloc_term(), heap_alloc_term(),
+                                heap_alloc_term(), 20, 30, 0, 0);
+    let emb2     = embed_text(9999, 15);
+    let ilist2   = index_chunk(chunk2, emb2, ilist);
+    let results2 = hybrid_search(heap_alloc_term(), query_emb, ilist2, 5);
+    if results2 == 0 { return 4; }
+
+    return 111;
+}

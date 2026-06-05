@@ -1,0 +1,130 @@
+// titan/omnisplat/s10_ide.ti — IDE Integration: Panel Registry, Services, Agent Skills
+// Self-contained. Wrapper-node APPEND for panel registry list.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_PANREG: i64 = 9700;
+const T_SVC:    i64 = 9701;
+const T_SKILL:  i64 = 9702;
+const T_WRP:    i64 = 9703;
+
+const PT_SPLAT:  i64 = 50;
+const SVC_IDLE:  i64 = 0;
+const SVC_RUN:   i64 = 1;
+
+// ===== Panel Registry =====
+// reg: tag=T_PANREG, body=count, arg=list_head(wrappers)
+// wrapper: tag=T_WRP, body=panel_node, domain=next_wrapper
+// panel_node: body=kind, arg=name
+
+pub fn s10_panel_reg() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, T_PANREG); heap_set_body(r, 0); heap_set_arg(r, 0); heap_set_domain(r, 0);
+    return r;
+}
+
+pub fn s10_preg_add(r: i64, kind: i64, name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_body(p, kind); heap_set_arg(p, name); heap_set_domain(p, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP); heap_set_body(w, p); heap_set_domain(w, 0);
+    let c = heap_get_body(r);
+    if c == 0 { heap_set_arg(r, w); }
+    else {
+        let mut t = heap_get_arg(r);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(r, c + 1);
+    return p;
+}
+
+pub fn s10_preg_cnt(r: i64) -> i64 { return heap_get_body(r); }
+
+pub fn s10_preg_get(r: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(r); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+
+// ===== Service =====
+// svc: tag=T_SVC, body=kind, arg=state
+
+pub fn s10_svc_create(kind: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_SVC); heap_set_body(s, kind); heap_set_arg(s, SVC_IDLE); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn s10_svc_start(s: i64)      { heap_set_arg(s, SVC_RUN); }
+pub fn s10_svc_stop(s: i64)       { heap_set_arg(s, SVC_IDLE); }
+pub fn s10_svc_state(s: i64) -> i64 { return heap_get_arg(s); }
+pub fn s10_svc_kind(s: i64) -> i64  { return heap_get_body(s); }
+
+// ===== Agent Skill =====
+// skill: tag=T_SKILL, body=name, arg=desc
+
+pub fn s10_skill_create(name: i64, desc: i64) -> i64 {
+    let k = heap_alloc_term();
+    heap_set_tag(k, T_SKILL); heap_set_body(k, name); heap_set_arg(k, desc); heap_set_domain(k, 0);
+    return k;
+}
+
+pub fn s10_skill_name(k: i64) -> i64 { return heap_get_body(k); }
+pub fn s10_skill_desc(k: i64) -> i64 { return heap_get_arg(k); }
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Panel registry: 3 panels
+    let r = s10_panel_reg();
+    let p1 = s10_preg_add(r, PT_SPLAT,     1);
+    let p2 = s10_preg_add(r, PT_SPLAT + 1, 2);
+    let p3 = s10_preg_add(r, PT_SPLAT + 2, 3);
+    if s10_preg_cnt(r) != 3        { return 1; }
+    if heap_get_body(p1) != PT_SPLAT     { return 2; }
+    if heap_get_body(p2) != PT_SPLAT + 1 { return 3; }
+    if heap_get_body(p3) != PT_SPLAT + 2 { return 4; }
+
+    // Verify retrieval by index
+    let rp0 = s10_preg_get(r, 0);
+    if heap_get_body(rp0) != PT_SPLAT     { return 5; }
+    let rp2 = s10_preg_get(r, 2);
+    if heap_get_body(rp2) != PT_SPLAT + 2 { return 6; }
+
+    // Service lifecycle
+    let s = s10_svc_create(0);
+    if s10_svc_state(s) != SVC_IDLE { return 7; }
+    s10_svc_start(s);
+    if s10_svc_state(s) != SVC_RUN  { return 8; }
+    s10_svc_stop(s);
+    if s10_svc_state(s) != SVC_IDLE { return 9; }
+
+    // Two independent services
+    let sa = s10_svc_create(1);
+    let sb = s10_svc_create(2);
+    s10_svc_start(sa);
+    if s10_svc_state(sa) != SVC_RUN  { return 10; }
+    if s10_svc_state(sb) != SVC_IDLE { return 11; }
+    if s10_svc_kind(sa) != 1         { return 12; }
+    if s10_svc_kind(sb) != 2         { return 13; }
+
+    // Skills
+    let k1 = s10_skill_create(10, 100);
+    let k2 = s10_skill_create(20, 200);
+    if s10_skill_name(k1) != 10  { return 14; }
+    if s10_skill_name(k2) != 20  { return 15; }
+    if s10_skill_desc(k1) != 100 { return 16; }
+    if s10_skill_desc(k2) != 200 { return 17; }
+
+    return 111;
+}

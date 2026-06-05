@@ -1,0 +1,83 @@
+// titan/omnicloak/c1_circuit.ti — Secure Circuit Builder
+// Self-contained. Onion encryption via XOR layers.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_C1:  i64 = 23000;
+const T_HOP: i64 = 23001;
+const T_ENC: i64 = 23002;
+const T_WRP: i64 = 23003;
+
+// circuit: tag=T_C1, body=hop_count, arg=list_head(wrappers)
+pub fn c1_circuit_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_C1); heap_set_body(c, 0); heap_set_arg(c, 0);
+    return c;
+}
+
+// hop: tag=T_HOP, body=node_id, arg=key, domain=0
+// wrapper: tag=T_WRP, body=hop, domain=next_wrapper
+pub fn c1_hop_create(node_id: i64, key: i64) -> i64 {
+    let h = heap_alloc_term();
+    heap_set_tag(h, T_HOP); heap_set_body(h, node_id); heap_set_arg(h, key); heap_set_domain(h, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP); heap_set_body(w, h); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn c1_hop_id(w: i64) -> i64  { return heap_get_body(heap_get_body(w)); }
+pub fn c1_hop_key(w: i64) -> i64 { return heap_get_arg(heap_get_body(w)); }
+
+pub fn c1_circuit_add_hop(c: i64, w: i64) {
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+pub fn c1_circuit_hop_count(c: i64) -> i64 { return heap_get_body(c); }
+
+pub fn c1_encrypt_layer(data: i64, key: i64) -> i64 { return data ^ key; }
+
+pub fn c1_onion_encrypt(c: i64, msg: i64) -> i64 {
+    let mut result: i64 = msg;
+    let mut cur: i64 = heap_get_arg(c);
+    while cur != 0 {
+        let w = cur;
+        let key = c1_hop_key(w);
+        result = c1_encrypt_layer(result, key);
+        cur = heap_get_domain(cur);
+    }
+    return result;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let c = c1_circuit_create();
+    let w1 = c1_hop_create(10, 7);
+    let w2 = c1_hop_create(20, 13);
+    let w3 = c1_hop_create(30, 3);
+    c1_circuit_add_hop(c, w1);
+    c1_circuit_add_hop(c, w2);
+    c1_circuit_add_hop(c, w3);
+    if c1_circuit_hop_count(c) != 3  { return 1; }
+    if c1_hop_id(w2) != 20           { return 2; }
+    if c1_hop_key(w2) != 13          { return 3; }
+    let enc = c1_onion_encrypt(c, 42);
+    if enc == 42                      { return 4; }
+    return 111;
+}

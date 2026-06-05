@@ -1,0 +1,97 @@
+// titan/ulcf/configs/swift.ti
+// Swift language configuration for the Universal Grammar Adapter.
+
+pub fn swift_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("Int".to_string(), "i64".to_string());
+    type_map.insert("Int8".to_string(), "i8".to_string());
+    type_map.insert("Int16".to_string(), "i16".to_string());
+    type_map.insert("Int32".to_string(), "i32".to_string());
+    type_map.insert("Int64".to_string(), "i64".to_string());
+    type_map.insert("UInt".to_string(), "u64".to_string());
+    type_map.insert("UInt8".to_string(), "u8".to_string());
+    type_map.insert("UInt16".to_string(), "u16".to_string());
+    type_map.insert("UInt32".to_string(), "u32".to_string());
+    type_map.insert("UInt64".to_string(), "u64".to_string());
+    type_map.insert("Float".to_string(), "f32".to_string());
+    type_map.insert("Double".to_string(), "f64".to_string());
+    type_map.insert("Float32".to_string(), "f32".to_string());
+    type_map.insert("Float64".to_string(), "f64".to_string());
+    type_map.insert("Bool".to_string(), "bool".to_string());
+    type_map.insert("String".to_string(), "String".to_string());
+    type_map.insert("Character".to_string(), "u8".to_string());
+    type_map.insert("Void".to_string(), "void".to_string());
+    type_map.insert("Never".to_string(), "never".to_string());
+    type_map.insert("Array".to_string(), "Vec<Any>".to_string());
+    type_map.insert("Dictionary".to_string(), "HashMap<Any,Any>".to_string());
+    type_map.insert("Optional".to_string(), "Option<Any>".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+    operator_map.insert("??".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "swift".to_string(),
+        extensions: vec![".swift".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "declaration".to_string(),
+            "variable_declaration".to_string(),
+            "if_statement".to_string(),
+            "while_statement".to_string(),
+            "repeat_while_statement".to_string(),
+            "for_statement".to_string(),
+            "switch_statement".to_string(),
+            "return_statement".to_string(),
+            "guard_statement".to_string(),
+            "defer_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "call_expression".to_string(),
+            "simple_identifier".to_string(),
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "nil_literal".to_string(),
+            "array_literal".to_string(),
+            "dictionary_literal".to_string(),
+            "self_expression".to_string(),
+            "super_expression".to_string(),
+            "try_expression".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "nil".to_string(),
+        ],
+        comment_nodes: vec![
+            "comment".to_string(),
+            "multiline_comment".to_string(),
+        ],
+        block_nodes: vec![
+            "statements".to_string(),
+            "code_block".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "var_first".to_string(),
+    }
+}

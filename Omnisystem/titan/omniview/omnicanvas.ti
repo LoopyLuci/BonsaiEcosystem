@@ -1,0 +1,104 @@
+// omnicanvas.ti — OmniCanvas: composited 2D drawing on window surfaces
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn heap_set_domain(a:i64,b:i64);
+    fn heap_get_domain(a:i64)->i64;
+    fn surface_clear(sid:i64,color:i64);
+    fn surface_draw_rect(sid:i64,x:i64,y:i64,w:i64,h:i64,color:i64);
+    fn surface_draw_text(sid:i64,x:i64,y:i64,text:i64,color:i64);
+    fn surface_present(sid:i64);
+}
+
+const T_CANVAS:i64=29100;
+const T_LAYER:i64=29101;
+
+const COL_BG:i64=1513239;
+const COL_PANEL:i64=2631720;
+const COL_ACCENT:i64=255;
+const COL_WHITE:i64=16777215;
+const COL_DARK:i64=526344;
+const COL_GREEN:i64=52224;
+const COL_RED:i64=12582912;
+
+pub fn canvas_make(sid:i64,w:i64,h:i64)->i64{
+    let c:i64=heap_alloc_term();
+    heap_set_tag(c,T_CANVAS);
+    heap_set_body(c,sid);
+    heap_set_arg(c,w);
+    heap_set_domain(c,h);
+    return c;
+}
+
+pub fn canvas_begin(cv:i64,bg:i64){
+    let sid:i64=heap_get_body(cv);
+    surface_clear(sid,bg);
+}
+
+pub fn canvas_end(cv:i64){
+    let sid:i64=heap_get_body(cv);
+    surface_present(sid);
+}
+
+pub fn canvas_fill(cv:i64,x:i64,y:i64,w:i64,h:i64,color:i64){
+    let sid:i64=heap_get_body(cv);
+    surface_draw_rect(sid,x,y,w,h,color);
+}
+
+pub fn canvas_label(cv:i64,x:i64,y:i64,text:i64,color:i64){
+    let sid:i64=heap_get_body(cv);
+    surface_draw_text(sid,x,y,text,color);
+}
+
+pub fn canvas_border(cv:i64,x:i64,y:i64,w:i64,h:i64,thick:i64,color:i64){
+    let sid:i64=heap_get_body(cv);
+    surface_draw_rect(sid,x,y,w,thick,color);
+    surface_draw_rect(sid,x,y+h-thick,w,thick,color);
+    surface_draw_rect(sid,x,y,thick,h,color);
+    surface_draw_rect(sid,x+w-thick,y,thick,h,color);
+}
+
+pub fn canvas_panel(cv:i64,x:i64,y:i64,w:i64,h:i64){
+    canvas_fill(cv,x,y,w,h,COL_PANEL);
+    canvas_border(cv,x,y,w,h,2,COL_ACCENT);
+}
+
+pub fn canvas_button(cv:i64,x:i64,y:i64,w:i64,h:i64,label:i64,active:i64){
+    let mut col:i64=COL_DARK;
+    if active==1{col=COL_ACCENT;}
+    canvas_fill(cv,x,y,w,h,col);
+    canvas_border(cv,x,y,w,h,1,COL_WHITE);
+    canvas_label(cv,x+8,y+4,label,COL_WHITE);
+}
+
+pub fn canvas_bar(cv:i64,x:i64,y:i64,maxw:i64,h:i64,val:i64,maxval:i64,color:i64){
+    let filled:i64=val*maxw/maxval;
+    canvas_fill(cv,x,y,maxw,h,COL_DARK);
+    canvas_fill(cv,x,y,filled,h,color);
+}
+
+pub fn canvas_demo(cv:i64){
+    canvas_begin(cv,COL_BG);
+    canvas_panel(cv,10,10,780,40);
+    canvas_label(cv,20,18,1,COL_WHITE);
+    canvas_panel(cv,10,60,200,520);
+    canvas_panel(cv,220,60,570,520);
+    canvas_bar(cv,230,80,540,16,70,100,COL_GREEN);
+    canvas_bar(cv,230,110,540,16,42,100,COL_ACCENT);
+    canvas_bar(cv,230,140,540,16,88,100,COL_RED);
+    canvas_button(cv,20,80,180,32,2,1);
+    canvas_button(cv,20,124,180,32,3,0);
+    canvas_button(cv,20,168,180,32,4,0);
+    canvas_end(cv);
+}
+
+pub fn main()->i64{
+    let cv:i64=canvas_make(1,800,600);
+    canvas_demo(cv);
+    return 111;
+}

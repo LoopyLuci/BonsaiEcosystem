@@ -1,0 +1,105 @@
+// titan/omnirender/g3_idepanel.ti — OmniSplat IDE Panel: panel, filelist
+// Self-contained. Wrapper-node APPEND for filelist.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_IDEPANEL: i64 = 20200;
+const T_FILELIST: i64 = 20201;
+const T_WRP3:     i64 = 20202;
+
+// ===== Panel =====
+// panel: tag=T_IDEPANEL, body=panel_type, arg=name, domain=filelist_ptr
+
+pub fn g3_panel_create(panel_type: i64, name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T_IDEPANEL); heap_set_body(p, panel_type); heap_set_arg(p, name); heap_set_domain(p, 0);
+    return p;
+}
+
+pub fn g3_panel_type(p: i64) -> i64     { return heap_get_body(p); }
+pub fn g3_panel_name(p: i64) -> i64     { return heap_get_arg(p); }
+pub fn g3_panel_set_filelist(p: i64, fl: i64) { heap_set_domain(p, fl); }
+pub fn g3_panel_filelist(p: i64) -> i64 { return heap_get_domain(p); }
+
+// ===== Filelist =====
+// fl: tag=T_FILELIST, body=count, arg=list_head(wrappers)
+// wrapper: tag=T_WRP3, body=file_node, domain=next_wrapper
+// file_node: body=file_path
+
+pub fn g3_filelist_create() -> i64 {
+    let fl = heap_alloc_term();
+    heap_set_tag(fl, T_FILELIST); heap_set_body(fl, 0); heap_set_arg(fl, 0); heap_set_domain(fl, 0);
+    return fl;
+}
+
+pub fn g3_filelist_add(fl: i64, file_path: i64) {
+    let node = heap_alloc_term();
+    heap_set_body(node, file_path); heap_set_domain(node, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP3); heap_set_body(w, node); heap_set_domain(w, 0);
+    let h = heap_get_arg(fl);
+    if h == 0 { heap_set_arg(fl, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(fl, heap_get_body(fl) + 1);
+}
+
+pub fn g3_filelist_count(fl: i64) -> i64 { return heap_get_body(fl); }
+
+pub fn g3_filelist_get(fl: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(fl); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Panel fields
+    let p = g3_panel_create(50, 10);
+    if g3_panel_type(p) != 50 { return 1; }
+    if g3_panel_name(p) != 10 { return 2; }
+
+    // Filelist: 3 entries
+    let fl = g3_filelist_create();
+    g3_filelist_add(fl, 100);
+    g3_filelist_add(fl, 200);
+    g3_filelist_add(fl, 300);
+    if g3_filelist_count(fl) != 3   { return 3; }
+    if g3_filelist_get(fl, 0) != 100 { return 4; }
+    if g3_filelist_get(fl, 1) != 200 { return 5; }
+    if g3_filelist_get(fl, 2) != 300 { return 6; }
+
+    // Attach filelist to panel and retrieve
+    g3_panel_set_filelist(p, fl);
+    let ret_fl = g3_panel_filelist(p);
+    if g3_filelist_count(ret_fl) != 3  { return 7; }
+    if g3_filelist_get(ret_fl, 0) != 100 { return 8; }
+
+    // Second panel — isolation
+    let p2 = g3_panel_create(99, 77);
+    if g3_panel_type(p2) != 99 { return 9; }
+    if g3_panel_type(p) != 50  { return 10; }
+
+    // Empty filelist — out of bounds returns 0
+    let fl2 = g3_filelist_create();
+    if g3_filelist_count(fl2) != 0   { return 11; }
+    if g3_filelist_get(fl2, 0) != 0  { return 12; }
+
+    return 111;
+}

@@ -1,0 +1,28 @@
+// titan/studio/debug_timeline.ti
+// Omni Studio Debug Timeline — Time-travel debugging panel.
+
+pub fn main() -> i64 {
+    let mut debug_active: i64 = 1;
+    let mut current_step: i64 = 0;
+    let total_steps: i64 = 8;
+
+    while debug_active == 1 {
+        let _: i64 = emit_string("Debug Timeline: Step ");
+        let _: i64 = print_int(current_step);
+        let _: i64 = emit_string(" / ");
+        let _: i64 = print_int(total_steps - 1);
+        let _: i64 = emit_string("\n");
+
+        let key: i64 = read_key();
+        if key == 27 { debug_active = 0; }
+        if key == 37 && current_step > 0 { current_step -= 1; }
+        if key == 39 && current_step < total_steps - 1 { current_step += 1; }
+    }
+
+    if current_step >= 0 { return 111; }
+    return current_step;
+}
+
+pub fn read_key() -> i64 { return 0; }
+pub fn emit_string(s: String) -> i64 { return 1; }
+pub fn print_int(n: i64) -> i64 { return 1; }

@@ -1,0 +1,7 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_TN4:i64=27300;const tT_LY4:i64=27301;
+pub fn tl4_tensor_create(rows:i64,cols:i64)->i64{let t=heap_alloc_term();heap_set_tag(t,tT_TN4);heap_set_body(t,rows);heap_set_arg(t,cols);heap_set_domain(t,0);return t;}
+pub fn tl4_tensor_rows(t:i64)->i64{return heap_get_body(t);}
+pub fn tl4_tensor_cols(t:i64)->i64{return heap_get_arg(t);}
+pub fn tl4_matmul(a:i64,b:i64)->i64{if tl4_tensor_cols(a)!=tl4_tensor_rows(b){return 0;}return tl4_tensor_rows(a)*100+tl4_tensor_cols(b);}
+pub fn main()->i64{let a=tl4_tensor_create(5,3);let b=tl4_tensor_create(3,7);if tl4_matmul(a,b)!=507{return 1;}return 111;}

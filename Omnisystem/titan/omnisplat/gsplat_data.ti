@@ -1,0 +1,229 @@
+// titan/omnisplat/gsplat_data.ti — Core Splat Data Structures
+// Typed storage for Gaussian Splat vertices and per-splat state.
+// Each vertex stores position(3) + covariance(9) + colour(3) + opacity(1) = 16 i64 fields.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_SPLAT_DATA:   i64 = 8800;
+const TAG_SPLAT_VERTEX: i64 = 8801;
+const TAG_SPLAT_STATE:  i64 = 8802;
+
+const SPLAT_FLOATS: i64 = 16;
+const SPLAT_STRIDE: i64 = 16;
+
+// Per-splat state bitflags
+const STATE_NONE:     i64 = 0;
+const STATE_SELECTED: i64 = 1;
+const STATE_LOCKED:   i64 = 2;
+const STATE_DELETED:  i64 = 4;
+
+// ===== Splat vertex =====
+// vertex: tag=TAG_SPLAT_VERTEX, body=px, arg=py, domain=m6
+// m6: body=opacity, arg=0,   domain=m5
+// m5: body=g,       arg=b,   domain=m4
+// m4: body=c5,      arg=r,   domain=m3
+// m3: body=c3,      arg=c4,  domain=m2
+// m2: body=c1,      arg=c2,  domain=m1
+// m1: body=pz,      arg=c0,  domain=0
+
+pub fn splat_vertex_create(px: i64, py: i64, pz: i64,
+                            c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+                            r: i64, g: i64, b: i64, opacity: i64) -> i64 {
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, pz); heap_set_arg(m1, c0); heap_set_domain(m1, 0);
+    let m2 = heap_alloc_term();
+    heap_set_body(m2, c1); heap_set_arg(m2, c2); heap_set_domain(m2, m1);
+    let m3 = heap_alloc_term();
+    heap_set_body(m3, c3); heap_set_arg(m3, c4); heap_set_domain(m3, m2);
+    let m4 = heap_alloc_term();
+    heap_set_body(m4, c5); heap_set_arg(m4, r);  heap_set_domain(m4, m3);
+    let m5 = heap_alloc_term();
+    heap_set_body(m5, g);  heap_set_arg(m5, b);  heap_set_domain(m5, m4);
+    let m6 = heap_alloc_term();
+    heap_set_body(m6, opacity); heap_set_arg(m6, 0); heap_set_domain(m6, m5);
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_SPLAT_VERTEX);
+    heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, m6);
+    return v;
+}
+
+pub fn splat_vx(s: i64) -> i64 { return heap_get_body(s); }
+pub fn splat_vy(s: i64) -> i64 { return heap_get_arg(s); }
+pub fn splat_vz(s: i64) -> i64 {
+    // domain chain: m6→m5→m4→m3→m2→m1; m1.body = pz
+    let m6 = heap_get_domain(s);
+    let m5 = heap_get_domain(m6);
+    let m4 = heap_get_domain(m5);
+    let m3 = heap_get_domain(m4);
+    let m2 = heap_get_domain(m3);
+    let m1 = heap_get_domain(m2);
+    return heap_get_body(m1);
+}
+
+// ===== Splat data container =====
+// splat_data: tag=TAG_SPLAT_DATA, body=count, arg=list_head (wrapper nodes), domain=state_arr
+// Wrapper nodes: body=vertex_ptr, domain=next_wrapper (append order — index 0 = first added)
+
+pub fn splat_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_SPLAT_DATA);
+    heap_set_body(d, 0);
+    heap_set_arg(d, 0);
+    heap_set_domain(d, 0);
+    return d;
+}
+
+pub fn splat_data_add(data: i64, splat: i64) {
+    let wrapper = heap_alloc_term();
+    heap_set_body(wrapper, splat);
+    heap_set_domain(wrapper, 0);
+    let head = heap_get_arg(data);
+    if head == 0 {
+        heap_set_arg(data, wrapper);
+    } else {
+        let mut curr = head;
+        while heap_get_domain(curr) != 0 { curr = heap_get_domain(curr); }
+        heap_set_domain(curr, wrapper);
+    }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+
+pub fn splat_data_count(data: i64) -> i64 { return heap_get_body(data); }
+
+pub fn splat_data_get(data: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(data);
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index { return heap_get_body(curr); }
+        i = i + 1;
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Per-splat state =====
+// state_arr: tag=TAG_SPLAT_STATE, body=splat_count, arg=list_head
+// Each entry: body=index, arg=flags, domain=next (prepend; first match wins)
+
+pub fn splat_state_create(splat_count: i64) -> i64 {
+    let arr = heap_alloc_term();
+    heap_set_tag(arr, TAG_SPLAT_STATE);
+    heap_set_body(arr, splat_count);
+    heap_set_arg(arr, 0);
+    return arr;
+}
+
+pub fn splat_state_set(state_arr: i64, index: i64, flags: i64) {
+    let node = heap_alloc_term();
+    heap_set_body(node, index);
+    heap_set_arg(node, flags);
+    heap_set_domain(node, heap_get_arg(state_arr));
+    heap_set_arg(state_arr, node);
+}
+
+pub fn splat_state_get(state_arr: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(state_arr);
+    while curr != 0 {
+        if heap_get_body(curr) == index { return heap_get_arg(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return STATE_NONE;
+}
+
+// ===== Selection API =====
+// Requires heap_set_domain(data, state_arr) before use.
+
+pub fn splat_select(data: i64, index: i64) {
+    let state_arr = heap_get_domain(data);
+    let cur = splat_state_get(state_arr, index);
+    splat_state_set(state_arr, index, cur | STATE_SELECTED);
+}
+
+pub fn splat_deselect(data: i64, index: i64) {
+    let state_arr = heap_get_domain(data);
+    let cur = splat_state_get(state_arr, index);
+    splat_state_set(state_arr, index, cur & (STATE_LOCKED | STATE_DELETED));
+}
+
+pub fn splat_is_selected(data: i64, index: i64) -> bool {
+    let state_arr = heap_get_domain(data);
+    return (splat_state_get(state_arr, index) & STATE_SELECTED) != 0;
+}
+
+pub fn splat_select_all(data: i64) {
+    let count = splat_data_count(data);
+    let mut i: i64 = 0;
+    while i < count { splat_select(data, i); i = i + 1; }
+}
+
+pub fn splat_select_none(data: i64) {
+    let count = splat_data_count(data);
+    let mut i: i64 = 0;
+    while i < count { splat_deselect(data, i); i = i + 1; }
+}
+
+pub fn splat_selected_count(data: i64) -> i64 {
+    let count = splat_data_count(data);
+    let mut sel: i64 = 0;
+    let mut i: i64 = 0;
+    while i < count {
+        if splat_is_selected(data, i) { sel = sel + 1; }
+        i = i + 1;
+    }
+    return sel;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let data = splat_data_create();
+    if heap_get_tag(data) != TAG_SPLAT_DATA { return 1; }
+    if splat_data_count(data) != 0          { return 2; }
+
+    let s1 = splat_vertex_create(100, 200, 300, 1,0,0,0,0,0, 255,0,0, 128);
+    let s2 = splat_vertex_create(400, 500, 600, 0,1,0,0,0,0, 0,255,0, 200);
+    let s3 = splat_vertex_create(700, 800, 900, 0,0,1,0,0,0, 0,0,255, 255);
+    splat_data_add(data, s1);
+    splat_data_add(data, s2);
+    splat_data_add(data, s3);
+    if splat_data_count(data) != 3          { return 3; }
+
+    // Vertex access — index 0 = first added (s1)
+    let v0 = splat_data_get(data, 0);
+    if heap_get_tag(v0) != TAG_SPLAT_VERTEX { return 4; }
+    if splat_vx(v0) != 100                  { return 5; }
+    if splat_vy(v0) != 200                  { return 6; }
+    if splat_vz(v0) != 300                  { return 7; }
+
+    // State / selection
+    let state_arr = splat_state_create(3);
+    heap_set_domain(data, state_arr);
+    if splat_is_selected(data, 0)           { return 8; }
+
+    splat_select(data, 0);
+    if !splat_is_selected(data, 0)          { return 9; }
+    if splat_is_selected(data, 1)           { return 10; }
+
+    splat_select(data, 1);
+    if splat_selected_count(data) != 2      { return 11; }
+
+    splat_deselect(data, 0);
+    if splat_selected_count(data) != 1      { return 12; }
+
+    splat_select_all(data);
+    if splat_selected_count(data) != 3      { return 13; }
+
+    splat_select_none(data);
+    if splat_selected_count(data) != 0      { return 14; }
+
+    return 111;
+}

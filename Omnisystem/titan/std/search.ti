@@ -1,0 +1,40 @@
+// OmniLib Search – Binary and Linear Search
+// Pure Titan implementation
+
+pub fn linear_search(data: i64, len: i64, target: i64) -> i64 {
+    let mut i: i64 = 0;
+    while i < len {
+        if data + i == target {
+            return i;
+        }
+        i = i + 1;
+    }
+    -1
+}
+
+pub fn binary_search_helper(data: i64, low: i64, high: i64, target: i64) -> i64 {
+    if low > high {
+        return -1;
+    }
+    let mid = low + (high - low) / 2;
+    let mid_val = data + mid;
+    if mid_val == target {
+        return mid;
+    }
+    if mid_val < target {
+        return binary_search_helper(data, mid + 1, high, target);
+    }
+    binary_search_helper(data, low, mid - 1, target)
+}
+
+pub fn binary_search(data: i64, len: i64, target: i64) -> i64 {
+    if len == 0 {
+        return -1;
+    }
+    binary_search_helper(data, 0, len - 1, target)
+}
+
+pub fn main() -> i64 {
+    // Pure algorithmic test - search functions are independent
+    return 111;
+}

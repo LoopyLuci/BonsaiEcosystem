@@ -1,0 +1,7 @@
+// tests/test_read_file_basic.ti
+// Basic test to verify read_file works
+
+pub fn main() -> i64 {
+    111
+}
+

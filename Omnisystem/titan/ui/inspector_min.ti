@@ -1,0 +1,13 @@
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+}
+const TAG_INSP: i64 = 65100;
+pub fn insp_create() -> i64 {
+    let i = heap_alloc_term();
+    heap_set_tag(i, TAG_INSP);
+    return i;
+}
+pub fn main() -> i64 {
+    return 111;
+}

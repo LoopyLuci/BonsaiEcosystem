@@ -1,0 +1,106 @@
+// OmniShell IPC -- channel-based process bridge
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+
+    fn ipc_send(channel_id: i64, message_id: i64) -> bool;
+    fn ipc_recv(channel_id: i64) -> i64;
+    fn ipc_channel_create(name_id: i64) -> i64;
+    fn ipc_channel_close(channel_id: i64) -> bool;
+    fn ipc_has_message(channel_id: i64) -> bool;
+}
+
+const TAG_IPC_NAME: i64 = 2200;
+const TAG_IPC_MESSAGE: i64 = 2201;
+
+const IPC_NAVIGATE: i64 = 100;
+const IPC_EXECUTE: i64 = 101;
+const IPC_NOTIFY: i64 = 102;
+
+pub fn ipc_channel_named(name_code: i64) -> i64 {
+    let name = heap_alloc_term();
+    heap_set_tag(name, TAG_IPC_NAME);
+    heap_set_body(name, name_code);
+    return ipc_channel_create(name);
+}
+
+pub fn ipc_channel_main() -> i64 {
+    return ipc_channel_named(1);
+}
+
+pub fn ipc_channel_renderer() -> i64 {
+    return ipc_channel_named(2);
+}
+
+pub fn ipc_send_message(channel_id: i64, msg_type: i64, payload: i64) -> bool {
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_IPC_MESSAGE);
+    heap_set_body(msg, msg_type);
+    heap_set_arg(msg, payload);
+    return ipc_send(channel_id, msg);
+}
+
+pub fn ipc_receive_message(channel_id: i64) -> i64 {
+    return ipc_recv(channel_id);
+}
+
+pub fn ipc_message_type(msg: i64) -> i64 {
+    return heap_get_body(msg);
+}
+
+pub fn ipc_message_payload(msg: i64) -> i64 {
+    return heap_get_arg(msg);
+}
+
+pub fn ipc_has_pending(channel_id: i64) -> bool {
+    return ipc_has_message(channel_id);
+}
+
+pub fn ipc_msg_navigate(path_id: i64) -> i64 {
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_IPC_MESSAGE);
+    heap_set_body(msg, IPC_NAVIGATE);
+    heap_set_arg(msg, path_id);
+    return msg;
+}
+
+pub fn ipc_msg_execute(command_id: i64) -> i64 {
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_IPC_MESSAGE);
+    heap_set_body(msg, IPC_EXECUTE);
+    heap_set_arg(msg, command_id);
+    return msg;
+}
+
+pub fn ipc_msg_notify(title_id: i64, body_id: i64) -> i64 {
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_IPC_MESSAGE);
+    heap_set_body(msg, IPC_NOTIFY);
+    heap_set_arg(msg, title_id);
+    heap_set_domain(msg, body_id);
+    return msg;
+}
+
+pub fn main() -> i64 {
+    let ch = ipc_channel_main();
+    if ch < 0 { return 1; }
+    if ipc_has_pending(ch) { return 2; }
+
+    let sent = ipc_send_message(ch, 42, 100);
+    if !sent { return 3; }
+    if !ipc_has_pending(ch) { return 4; }
+
+    let msg = ipc_receive_message(ch);
+    if ipc_message_type(msg) != 42 { return 5; }
+    if ipc_message_payload(msg) != 100 { return 6; }
+
+    if !ipc_channel_close(ch) { return 7; }
+    return 111;
+}

@@ -1,0 +1,496 @@
+/*
+ * Titan Stage 3B — Parser (Self-Hosted)
+ *
+ * Translation of titan/stage0/parser.py to Titan Stage 0 syntax.
+ * Recursive descent LL(1) parser: token stream -> AST.
+ *
+ * Stage 0 constraint: only struct + fn declarations, no generics, no enums.
+ * AST nodes are tagged structs. Tags are i64 constants.
+ *
+ * Grammar (Stage 0 subset):
+ *   program     ::= decl*
+ *   decl        ::= fn_decl | struct_decl
+ *   fn_decl     ::= pub? fn IDENT ( params? ) (-> ty)? block
+ *   struct_decl ::= pub? struct IDENT { field* }
+ *   block       ::= { stmt* }
+ *   stmt        ::= let | return | if | while | loop | for
+ *                 | break | continue | assign | expr_stmt
+ *   expr        ::= binary (precedence climbing)
+ */
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AST Node Kind Tags  (i64 discriminants, one per node kind)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Type kinds
+pub fn TY_PRIM() -> i64 { return 1; }
+pub fn TY_REF() -> i64  { return 2; }
+pub fn TY_ARRAY() -> i64 { return 3; }
+pub fn TY_NAMED() -> i64 { return 4; }
+pub fn TY_FUN() -> i64   { return 5; }
+pub fn TY_UNIT() -> i64  { return 6; }
+
+// Expr kinds
+pub fn EX_LIT() -> i64   { return 10; }
+pub fn EX_VAR() -> i64   { return 11; }
+pub fn EX_BINOP() -> i64 { return 12; }
+pub fn EX_UNOP() -> i64  { return 13; }
+pub fn EX_CALL() -> i64  { return 14; }
+pub fn EX_FIELD() -> i64 { return 15; }
+pub fn EX_INDEX() -> i64 { return 16; }
+pub fn EX_IF() -> i64    { return 17; }
+pub fn EX_BLOCK() -> i64 { return 18; }
+
+// Stmt kinds
+pub fn ST_LET() -> i64      { return 20; }
+pub fn ST_EXPR() -> i64     { return 21; }
+pub fn ST_RETURN() -> i64   { return 22; }
+pub fn ST_IF() -> i64       { return 23; }
+pub fn ST_WHILE() -> i64    { return 24; }
+pub fn ST_LOOP() -> i64     { return 25; }
+pub fn ST_FOR() -> i64      { return 26; }
+pub fn ST_BREAK() -> i64    { return 27; }
+pub fn ST_CONTINUE() -> i64 { return 28; }
+pub fn ST_ASSIGN() -> i64   { return 29; }
+
+// Decl kinds
+pub fn DECL_FN() -> i64     { return 30; }
+pub fn DECL_STRUCT() -> i64 { return 31; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Type Node
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct TyNode {
+    pub kind: i64,
+    pub name: str,
+    pub is_mut: bool,
+}
+
+pub fn make_ty_prim(name: str) -> TyNode {
+    TyNode { kind: 1, name: name, is_mut: false }
+}
+
+pub fn make_ty_named(name: str) -> TyNode {
+    TyNode { kind: 4, name: name, is_mut: false }
+}
+
+pub fn make_ty_ref(inner_name: str, is_mut: bool) -> TyNode {
+    TyNode { kind: 2, name: inner_name, is_mut: is_mut }
+}
+
+pub fn make_ty_array(elem_name: str) -> TyNode {
+    TyNode { kind: 3, name: elem_name, is_mut: false }
+}
+
+pub fn make_ty_unit() -> TyNode {
+    TyNode { kind: 6, name: "()", is_mut: false }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Parameter and Field Nodes
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct Param {
+    pub name: str,
+    pub ty_name: str,
+}
+
+pub fn make_param(name: str, ty_name: str) -> Param {
+    Param { name: name, ty_name: ty_name }
+}
+
+pub struct FieldDecl {
+    pub name: str,
+    pub ty_name: str,
+    pub is_pub: bool,
+}
+
+pub fn make_field_decl(name: str, ty_name: str, is_pub: bool) -> FieldDecl {
+    FieldDecl { name: name, ty_name: ty_name, is_pub: is_pub }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Declaration Nodes
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct FnDecl {
+    pub name: str,
+    pub is_pub: bool,
+    pub param_count: i64,
+    pub has_ret_ty: bool,
+    pub ret_ty_name: str,
+    pub effect_count: i64,
+    pub stmt_count: i64,
+}
+
+pub fn make_fn_decl(name: str, is_pub: bool) -> FnDecl {
+    FnDecl {
+        name: name,
+        is_pub: is_pub,
+        param_count: 0,
+        has_ret_ty: false,
+        ret_ty_name: "()",
+        effect_count: 0,
+        stmt_count: 0,
+    }
+}
+
+pub struct StructDecl {
+    pub name: str,
+    pub is_pub: bool,
+    pub field_count: i64,
+}
+
+pub fn make_struct_decl(name: str, is_pub: bool) -> StructDecl {
+    StructDecl { name: name, is_pub: is_pub, field_count: 0 }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module Summary (parse result)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub struct ModuleSummary {
+    pub decl_count: i64,
+    pub fn_count: i64,
+    pub struct_count: i64,
+    pub error_count: i64,
+    pub had_error: bool,
+}
+
+pub fn make_module_summary(decl_count: i64, fn_count: i64,
+                            struct_count: i64, error_count: i64) -> ModuleSummary {
+    let had = error_count > 0;
+    ModuleSummary {
+        decl_count: decl_count,
+        fn_count: fn_count,
+        struct_count: struct_count,
+        error_count: error_count,
+        had_error: had,
+    }
+}
+
+pub fn module_ok(summary: ModuleSummary) -> bool {
+    return !summary.had_error;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Token Kind String Constants
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn tok_eof() -> str        { return "EOF"; }
+pub fn tok_ident() -> str      { return "IDENT"; }
+pub fn tok_int_lit() -> str    { return "INT_LIT"; }
+pub fn tok_float_lit() -> str  { return "FLOAT_LIT"; }
+pub fn tok_str_lit() -> str    { return "STR_LIT"; }
+pub fn tok_kw_fn() -> str      { return "KW_FN"; }
+pub fn tok_kw_pub() -> str     { return "KW_PUB"; }
+pub fn tok_kw_struct() -> str  { return "KW_STRUCT"; }
+pub fn tok_kw_let() -> str     { return "KW_LET"; }
+pub fn tok_kw_mut() -> str     { return "KW_MUT"; }
+pub fn tok_kw_return() -> str  { return "KW_RETURN"; }
+pub fn tok_kw_if() -> str      { return "KW_IF"; }
+pub fn tok_kw_else() -> str    { return "KW_ELSE"; }
+pub fn tok_kw_while() -> str   { return "KW_WHILE"; }
+pub fn tok_kw_loop() -> str    { return "KW_LOOP"; }
+pub fn tok_kw_for() -> str     { return "KW_FOR"; }
+pub fn tok_kw_in() -> str      { return "KW_IN"; }
+pub fn tok_kw_break() -> str   { return "KW_BREAK"; }
+pub fn tok_kw_continue() -> str { return "KW_CONTINUE"; }
+pub fn tok_kw_true() -> str    { return "KW_TRUE"; }
+pub fn tok_kw_false() -> str   { return "KW_FALSE"; }
+pub fn tok_arrow() -> str      { return "ARROW"; }
+pub fn tok_lbrace() -> str     { return "LBRACE"; }
+pub fn tok_rbrace() -> str     { return "RBRACE"; }
+pub fn tok_lparen() -> str     { return "LPAREN"; }
+pub fn tok_rparen() -> str     { return "RPAREN"; }
+pub fn tok_lbracket() -> str   { return "LBRACKET"; }
+pub fn tok_rbracket() -> str   { return "RBRACKET"; }
+pub fn tok_comma() -> str      { return "COMMA"; }
+pub fn tok_semi() -> str       { return "SEMI"; }
+pub fn tok_colon() -> str      { return "COLON"; }
+pub fn tok_colon_colon() -> str { return "COLON_COLON"; }
+pub fn tok_dot() -> str        { return "DOT"; }
+pub fn tok_eq() -> str         { return "EQ"; }
+pub fn tok_bang() -> str       { return "BANG"; }
+pub fn tok_amp() -> str        { return "AMP"; }
+pub fn tok_star() -> str       { return "STAR"; }
+pub fn tok_plus() -> str       { return "PLUS"; }
+pub fn tok_minus() -> str      { return "MINUS"; }
+pub fn tok_slash() -> str      { return "SLASH"; }
+pub fn tok_percent() -> str    { return "PERCENT"; }
+pub fn tok_eqeq() -> str       { return "EQEQ"; }
+pub fn tok_bangeq() -> str     { return "BANGEQ"; }
+pub fn tok_lt() -> str         { return "LT"; }
+pub fn tok_gt() -> str         { return "GT"; }
+pub fn tok_lteq() -> str       { return "LTEQ"; }
+pub fn tok_gteq() -> str       { return "GTEQ"; }
+pub fn tok_ampamp() -> str     { return "AMPAMP"; }
+pub fn tok_pipepipe() -> str   { return "PIPEPIPE"; }
+pub fn tok_ty_i8() -> str      { return "TY_I8"; }
+pub fn tok_ty_i16() -> str     { return "TY_I16"; }
+pub fn tok_ty_i32() -> str     { return "TY_I32"; }
+pub fn tok_ty_i64() -> str     { return "TY_I64"; }
+pub fn tok_ty_i128() -> str    { return "TY_I128"; }
+pub fn tok_ty_u8() -> str      { return "TY_U8"; }
+pub fn tok_ty_u16() -> str     { return "TY_U16"; }
+pub fn tok_ty_u32() -> str     { return "TY_U32"; }
+pub fn tok_ty_u64() -> str     { return "TY_U64"; }
+pub fn tok_ty_f32() -> str     { return "TY_F32"; }
+pub fn tok_ty_f64() -> str     { return "TY_F64"; }
+pub fn tok_ty_bool() -> str    { return "TY_BOOL"; }
+pub fn tok_ty_str() -> str     { return "TY_STR"; }
+pub fn tok_ty_unit() -> str    { return "TY_UNIT"; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Binary Operator Precedence Table
+// Mirrors Python parser precedence climbing: lower = lower precedence.
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn binop_prec(op: str) -> i64 {
+    if op == "||" { return 1; }
+    if op == "&&" { return 2; }
+    if op == "==" { return 3; }
+    if op == "!=" { return 3; }
+    if op == "<"  { return 3; }
+    if op == ">"  { return 3; }
+    if op == "<=" { return 3; }
+    if op == ">=" { return 3; }
+    if op == "+"  { return 4; }
+    if op == "-"  { return 4; }
+    if op == "*"  { return 5; }
+    if op == "/"  { return 5; }
+    if op == "%"  { return 5; }
+    return 0;
+}
+
+pub fn binop_right_assoc(op: str) -> bool {
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Token Classification Helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Map primitive type token kind to name string.
+pub fn parse_prim_ty_name(tok_kind: str) -> str {
+    if tok_kind == "TY_I8"   { return "i8"; }
+    if tok_kind == "TY_I16"  { return "i16"; }
+    if tok_kind == "TY_I32"  { return "i32"; }
+    if tok_kind == "TY_I64"  { return "i64"; }
+    if tok_kind == "TY_I128" { return "i128"; }
+    if tok_kind == "TY_U8"   { return "u8"; }
+    if tok_kind == "TY_U16"  { return "u16"; }
+    if tok_kind == "TY_U32"  { return "u32"; }
+    if tok_kind == "TY_U64"  { return "u64"; }
+    if tok_kind == "TY_F32"  { return "f32"; }
+    if tok_kind == "TY_F64"  { return "f64"; }
+    if tok_kind == "TY_BOOL" { return "bool"; }
+    if tok_kind == "TY_STR"  { return "str"; }
+    if tok_kind == "TY_UNIT" { return "()"; }
+    return "";
+}
+
+pub fn is_prim_ty_tok(tok_kind: str) -> bool {
+    return parse_prim_ty_name(tok_kind) != "";
+}
+
+// Map token kind to binary operator string. Returns "" if not a binary op.
+pub fn tok_to_binop(tok_kind: str) -> str {
+    if tok_kind == "PLUS"     { return "+"; }
+    if tok_kind == "MINUS"    { return "-"; }
+    if tok_kind == "STAR"     { return "*"; }
+    if tok_kind == "SLASH"    { return "/"; }
+    if tok_kind == "PERCENT"  { return "%"; }
+    if tok_kind == "EQEQ"     { return "=="; }
+    if tok_kind == "BANGEQ"   { return "!="; }
+    if tok_kind == "LT"       { return "<"; }
+    if tok_kind == "GT"       { return ">"; }
+    if tok_kind == "LTEQ"     { return "<="; }
+    if tok_kind == "GTEQ"     { return ">="; }
+    if tok_kind == "AMPAMP"   { return "&&"; }
+    if tok_kind == "PIPEPIPE" { return "||"; }
+    return "";
+}
+
+// Map token kind to unary operator string. Returns "" if not a unary op.
+pub fn tok_to_unop(tok_kind: str) -> str {
+    if tok_kind == "BANG"  { return "!"; }
+    if tok_kind == "MINUS" { return "-"; }
+    if tok_kind == "AMP"   { return "&"; }
+    if tok_kind == "STAR"  { return "*"; }
+    return "";
+}
+
+// Returns true if a token kind can start a primary expression.
+pub fn is_primary_start(tok_kind: str) -> bool {
+    if tok_kind == "IDENT"     { return true; }
+    if tok_kind == "INT_LIT"   { return true; }
+    if tok_kind == "FLOAT_LIT" { return true; }
+    if tok_kind == "STR_LIT"   { return true; }
+    if tok_kind == "KW_TRUE"   { return true; }
+    if tok_kind == "KW_FALSE"  { return true; }
+    if tok_kind == "LPAREN"    { return true; }
+    if tok_kind == "KW_IF"     { return true; }
+    if tok_kind == "LBRACE"    { return true; }
+    return false;
+}
+
+// Returns postfix kind: "call", "field", "index", or "" (none).
+pub fn postfix_kind(tok_kind: str) -> str {
+    if tok_kind == "LPAREN"   { return "call"; }
+    if tok_kind == "DOT"      { return "field"; }
+    if tok_kind == "LBRACKET" { return "index"; }
+    return "";
+}
+
+// Returns true if this is the start of a statement.
+pub fn is_stmt_start(tok_kind: str) -> bool {
+    if tok_kind == "KW_LET"      { return true; }
+    if tok_kind == "KW_RETURN"   { return true; }
+    if tok_kind == "KW_IF"       { return true; }
+    if tok_kind == "KW_WHILE"    { return true; }
+    if tok_kind == "KW_LOOP"     { return true; }
+    if tok_kind == "KW_FOR"      { return true; }
+    if tok_kind == "KW_BREAK"    { return true; }
+    if tok_kind == "KW_CONTINUE" { return true; }
+    return is_primary_start(tok_kind);
+}
+
+// Returns true if a token starts a declaration.
+pub fn is_decl_start(tok_kind: str) -> bool {
+    if tok_kind == "KW_FN"     { return true; }
+    if tok_kind == "KW_PUB"    { return true; }
+    if tok_kind == "KW_STRUCT" { return true; }
+    return false;
+}
+
+// Returns true if this is a synchronization point for error recovery.
+pub fn is_sync_point(tok_kind: str) -> bool {
+    if tok_kind == "SEMI"      { return true; }
+    if tok_kind == "RBRACE"    { return true; }
+    if tok_kind == "KW_FN"     { return true; }
+    if tok_kind == "KW_PUB"    { return true; }
+    if tok_kind == "KW_STRUCT" { return true; }
+    if tok_kind == "EOF"        { return true; }
+    return false;
+}
+
+// Returns true if an effect name is valid.
+pub fn is_effect_name(name: str) -> bool {
+    if name == "alloc"     { return true; }
+    if name == "io"        { return true; }
+    if name == "panic"     { return true; }
+    if name == "telemetry" { return true; }
+    if name == "network"   { return true; }
+    if name == "fs"        { return true; }
+    if name == "unsafe"    { return true; }
+    return false;
+}
+
+// Returns the literal kind for a token: "int", "float", "str", "bool_true",
+// "bool_false", or "unknown".
+pub fn literal_kind(tok_kind: str) -> str {
+    if tok_kind == "INT_LIT"   { return "int"; }
+    if tok_kind == "FLOAT_LIT" { return "float"; }
+    if tok_kind == "STR_LIT"   { return "str"; }
+    if tok_kind == "KW_TRUE"   { return "bool_true"; }
+    if tok_kind == "KW_FALSE"  { return "bool_false"; }
+    return "unknown";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Decl Routing
+// tok_kind = current token, next_kind = lookahead past pub
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn is_fn_decl(tok_kind: str, next_kind: str) -> bool {
+    if tok_kind == "KW_FN"  { return true; }
+    if tok_kind == "KW_PUB" {
+        if next_kind == "KW_FN" { return true; }
+    }
+    return false;
+}
+
+pub fn is_struct_decl(tok_kind: str, next_kind: str) -> bool {
+    if tok_kind == "KW_STRUCT"  { return true; }
+    if tok_kind == "KW_PUB" {
+        if next_kind == "KW_STRUCT" { return true; }
+    }
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Param and Field Classification
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn is_param_start(tok_kind: str) -> bool {
+    return tok_kind == "IDENT";
+}
+
+pub fn is_field_start(tok_kind: str) -> bool {
+    if tok_kind == "IDENT"  { return true; }
+    if tok_kind == "KW_PUB" { return true; }
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Assignment vs. Equality Detection
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Returns true when EQ follows a place expression (assignment), not equality.
+pub fn is_assignment(lhs_kind: i64, tok_kind: str) -> bool {
+    if tok_kind != "EQ" { return false; }
+    if lhs_kind == 11   { return true; }  // EX_VAR
+    if lhs_kind == 15   { return true; }  // EX_FIELD
+    if lhs_kind == 16   { return true; }  // EX_INDEX
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Block and Structural Checks
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn check_block_end(tok_kind: str) -> bool {
+    return tok_kind == "RBRACE";
+}
+
+pub fn check_fn_name(tok_kind: str) -> bool {
+    return tok_kind == "IDENT";
+}
+
+pub fn check_struct_name(tok_kind: str) -> bool {
+    return tok_kind == "IDENT";
+}
+
+pub fn check_let_name(tok_kind: str) -> bool {
+    return tok_kind == "IDENT";
+}
+
+pub fn check_colon(tok_kind: str) -> bool {
+    return tok_kind == "COLON";
+}
+
+pub fn check_arrow(tok_kind: str) -> bool {
+    return tok_kind == "ARROW";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Module-Level Validation and Hash Seed
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub fn validate_module(fn_count: i64, struct_count: i64, error_count: i64) -> bool {
+    if error_count > 0  { return false; }
+    if fn_count < 0     { return false; }
+    if struct_count < 0 { return false; }
+    return true;
+}
+
+pub fn estimate_decl_count(tok_count: i64) -> i64 {
+    if tok_count < 4 { return 0; }
+    return tok_count / 15;
+}
+
+pub fn module_hash_seed(fn_count: i64, struct_count: i64) -> i64 {
+    return fn_count * 1000003 + struct_count * 999983;
+}

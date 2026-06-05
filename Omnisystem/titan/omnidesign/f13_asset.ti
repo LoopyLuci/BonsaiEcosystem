@@ -1,0 +1,9 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_IMPORT13:i64=26200;const T_EXPORT13:i64=26201;const T_WRP13:i64=26202;
+pub fn f13_import_create(format:i64)->i64{let imp=heap_alloc_term();heap_set_tag(imp,T_IMPORT13);heap_set_body(imp,format);heap_set_arg(imp,0);heap_set_domain(imp,0);return imp;}
+pub fn f13_import_format(imp:i64)->i64{return heap_get_body(imp);}
+pub fn f13_export_create(format:i64,data:i64)->i64{let exp=heap_alloc_term();heap_set_tag(exp,T_EXPORT13);heap_set_body(exp,format);heap_set_arg(exp,data);heap_set_domain(exp,0);return exp;}
+pub fn f13_export_format(exp:i64)->i64{return heap_get_body(exp);}
+pub fn f13_export_data(exp:i64)->i64{return heap_get_arg(exp);}
+pub fn f13_convert(data:i64,from_fmt:i64,to_fmt:i64)->i64{return data+from_fmt*10-to_fmt*5;}
+pub fn main()->i64{let imp=f13_import_create(1);if f13_import_format(imp)!=1{return 1;}let exp=f13_export_create(2,42);if f13_export_format(exp)!=2{return 2;}if f13_export_data(exp)!=42{return 3;}if f13_convert(100,3,4)!=110{return 4;}return 111;}

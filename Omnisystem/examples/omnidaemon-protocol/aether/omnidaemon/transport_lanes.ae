@@ -1,0 +1,131 @@
+// aether/omnidaemon/transport_lanes.ae
+// Transport lane actors — each encapsulates one protocol.
+// All lanes implement the same message interface.
+
+type WireChunk = {
+    gsn: u64,
+    payload: Vec<u8>,
+};
+
+type LaneMetrics = {
+    protocol: String,
+    rtt_us: u64,
+    bandwidth_bps: u64,
+    active_chunks: i64,
+    errors: i64,
+    alive: bool,
+};
+
+// ── TCP Lane Actor ────────────────────────────────────────
+actor TcpLane {
+    var id: u32,
+    var metrics: LaneMetrics,
+    var peer_addr: String,
+    var connected: bool,
+    
+    pub message Init(lane_id: u32, peer: String) -> String {
+        self.id = lane_id;
+        self.peer_addr = peer;
+        self.connected = false;
+        self.metrics = LaneMetrics {
+            protocol: String::from_literal("tcp"),
+            rtt_us: 0,
+            bandwidth_bps: 1_000_000_000,  // 1 Gbps assumed
+            active_chunks: 0,
+            errors: 0,
+            alive: true,
+        };
+        self ! Connect;
+        String::from_literal("TCP lane initialized")
+    }
+    
+    pub message Connect() -> String {
+        self.connected = true;
+        self.metrics.alive = true;
+        format!("Connected to {}", self.peer_addr)
+    }
+    
+    pub message SendChunk(chunk: String) -> String {
+        if self.connected {
+            self.metrics.active_chunks += 1;
+            String::from_literal("Chunk sent via TCP")
+        } else {
+            String::from_literal("Not connected")
+        }
+    }
+    
+    pub message GetMetrics() -> LaneMetrics {
+        self.metrics
+    }
+}
+
+// ── DMI Lane Actor (Thunderbolt / USB4 direct) ─────────────
+actor DmiLane {
+    var id: u32,
+    var metrics: LaneMetrics,
+    var ring_initialized: bool,
+    
+    pub message Init(lane_id: u32) -> String {
+        self.id = lane_id;
+        self.ring_initialized = false;
+        self.metrics = LaneMetrics {
+            protocol: String::from_literal("dmi"),
+            rtt_us: 0,
+            bandwidth_bps: 100_000_000_000,  // 100 Gbps
+            active_chunks: 0,
+            errors: 0,
+            alive: true,
+        };
+        String::from_literal("DMI lane initialized")
+    }
+    
+    pub message SendChunk(chunk: String) -> String {
+        if self.ring_initialized {
+            self.metrics.active_chunks += 1;
+            String::from_literal("Chunk sent via DMI (zero-copy)")
+        } else {
+            String::from_literal("Ring not initialized")
+        }
+    }
+    
+    pub message GetMetrics() -> LaneMetrics {
+        self.metrics
+    }
+}
+
+// ── Relay Lane Actor (blind relay network) ────────────────
+actor RelayLane {
+    var id: u32,
+    var metrics: LaneMetrics,
+    var relay_addr: String,
+    var session_token: Option<[u8; 32]>,
+    
+    pub message Init(lane_id: u32, relay: String) -> String {
+        self.id = lane_id;
+        self.relay_addr = relay;
+        self.session_token = None;
+        self.metrics = LaneMetrics {
+            protocol: String::from_literal("relay"),
+            rtt_us: 50_000,
+            bandwidth_bps: 100_000_000,  // 100 Mbps through relay
+            active_chunks: 0,
+            errors: 0,
+            alive: true,
+        };
+        String::from_literal("Relay lane initialized")
+    }
+    
+    pub message SendChunk(chunk: String) -> String {
+        self.metrics.active_chunks += 1;
+        String::from_literal("Chunk sent through blind relay (zero-knowledge)")
+    }
+    
+    pub message GetMetrics() -> LaneMetrics {
+        self.metrics
+    }
+}
+
+// Helper
+fn format(template: String, arg: String) -> String {
+    template
+}

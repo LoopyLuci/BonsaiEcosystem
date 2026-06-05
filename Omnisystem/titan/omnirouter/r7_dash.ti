@@ -1,0 +1,91 @@
+// titan/omnirouter/r7_dash.ti — Dashboard & Analytics
+// Self-contained. Metrics stored directly in list (domain as next pointer).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_MET7:   i64 = 22600;
+const T_DASH7:  i64 = 22601;
+const T_ALERT7: i64 = 22602;
+const T_META7:  i64 = 22603;
+
+// metric: tag=T_MET7, body=name, arg=value, domain=next_metric
+pub fn r7_metric_create(name: i64, value: i64) -> i64 {
+    let m = heap_alloc_term();
+    heap_set_tag(m, T_MET7); heap_set_body(m, name); heap_set_arg(m, value); heap_set_domain(m, 0);
+    return m;
+}
+
+pub fn r7_metric_name(m: i64) -> i64  { return heap_get_body(m); }
+pub fn r7_metric_value(m: i64) -> i64 { return heap_get_arg(m); }
+
+// dashboard: tag=T_DASH7, body=count, arg=list_head(metrics)
+pub fn r7_dashboard_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, T_DASH7); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+
+pub fn r7_dashboard_add(d: i64, m: i64) {
+    let h = heap_get_arg(d);
+    if h == 0 { heap_set_arg(d, m); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, m);
+    }
+    heap_set_body(d, heap_get_body(d) + 1);
+}
+
+pub fn r7_dashboard_metric_count(d: i64) -> i64 { return heap_get_body(d); }
+
+pub fn r7_dashboard_sum(d: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(d);
+    let mut s: i64 = 0;
+    while cur != 0 { s = s + heap_get_arg(cur); cur = heap_get_domain(cur); }
+    return s;
+}
+
+// alert: tag=T_ALERT7, body=name, arg=threshold
+pub fn r7_alert_create(name: i64, threshold: i64) -> i64 {
+    let a = heap_alloc_term();
+    heap_set_tag(a, T_ALERT7); heap_set_body(a, name); heap_set_arg(a, threshold); heap_set_domain(a, 0);
+    return a;
+}
+
+pub fn r7_alert_threshold(a: i64) -> i64 { return heap_get_arg(a); }
+
+pub fn r7_check_alert(a: i64, value: i64) -> i64 {
+    if value >= r7_alert_threshold(a) { return 1; }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let d = r7_dashboard_create();
+    let m1 = r7_metric_create(1, 100);
+    let m2 = r7_metric_create(2, 200);
+    let m3 = r7_metric_create(3, 300);
+    r7_dashboard_add(d, m1);
+    r7_dashboard_add(d, m2);
+    r7_dashboard_add(d, m3);
+    if r7_dashboard_metric_count(d) != 3  { return 1; }
+    if r7_metric_name(m2) != 2            { return 2; }
+    if r7_metric_value(m2) != 200         { return 3; }
+    if r7_dashboard_sum(d) != 600         { return 4; }
+
+    let a = r7_alert_create(10, 250);
+    if r7_alert_threshold(a) != 250       { return 5; }
+    if r7_check_alert(a, 200) != 0        { return 6; }
+    if r7_check_alert(a, 300) != 1        { return 7; }
+    return 111;
+}

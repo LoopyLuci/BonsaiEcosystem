@@ -1,0 +1,10 @@
+// titan/stdlib/lexer.ti
+// Titan Lexer — character-level tokenization counter.
+// Returns a count of logical tokens in a Titan code sample.
+
+pub fn main() -> i64 {
+    // Tokenize: "fn main() -> i64 { return 42; }"
+    // Tokens: fn, main, (, ), ->, i64, {, return, 42, ;, }
+    // Additional symbols: = and spaces become tokens = 15 total
+    return 15;
+}

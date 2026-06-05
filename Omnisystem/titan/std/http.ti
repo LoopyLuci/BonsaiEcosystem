@@ -1,0 +1,136 @@
+// OmniLib HTTP — HTTP/1.1 client with request/response handling
+// Builds on net.ti and url.ti for socket communication.
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+    fn int_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+}
+
+// HTTP response node tag: 820
+// HTTP request node tag: 821
+// HTTP methods: GET=0, POST=1, PUT=2, DELETE=3
+// HTTP status codes: OK=200, CREATED=201, BAD_REQUEST=400, NOT_FOUND=404, SERVER_ERROR=500
+const HTTP_TAG_RESPONSE: i64 = 820;
+const HTTP_TAG_REQUEST: i64 = 821;
+const HTTP_METHOD_GET: i64 = 0;
+
+pub fn http_response_new() -> i64 {
+    let resp = heap_alloc_term();
+    heap_set_tag(resp, HTTP_TAG_RESPONSE);
+    heap_set_body(resp, 0);
+    heap_set_arg(resp, 0);
+    heap_set_domain(resp, 0);
+    resp
+}
+
+pub fn http_response_status(resp: i64) -> i64 {
+    heap_get_body(resp)
+}
+
+pub fn http_response_body(resp: i64) -> i64 {
+    heap_get_domain(resp)
+}
+
+pub fn http_response_body_len(resp: i64) -> i64 {
+    heap_get_arg(resp)
+}
+
+pub fn http_is_success(resp: i64) -> bool {
+    let status = http_response_status(resp);
+    status >= 200 && status < 300
+}
+
+pub fn http_is_client_error(resp: i64) -> bool {
+    let status = http_response_status(resp);
+    status >= 400 && status < 500
+}
+
+pub fn http_is_server_error(resp: i64) -> bool {
+    let status = http_response_status(resp);
+    status >= 500 && status < 600
+}
+
+pub fn http_build_get_request(host_id: i64, path_id: i64) -> i64 {
+    let req = heap_alloc_term();
+    heap_set_tag(req, HTTP_TAG_REQUEST);
+    heap_set_body(req, host_id);
+    heap_set_arg(req, path_id);
+    heap_set_domain(req, HTTP_METHOD_GET);
+    req
+}
+
+pub fn http_parse_status_line(response_data: i64) -> i64 {
+    let len = str_len(response_data);
+    let mut i: i64 = 0;
+    while i < len {
+        if str_at(response_data, i) == 32 { break; }
+        i = i + 1;
+    }
+
+    if i >= len { return http_response_new(); }
+    i = i + 1;
+
+    let mut code: i64 = 0;
+    let mut digits: i64 = 0;
+    while i < len {
+        let ch = str_at(response_data, i);
+        if ch < 48 || ch > 57 { break; }
+        code = (code * 10) + (ch - 48);
+        digits = digits + 1;
+        i = i + 1;
+    }
+
+    let resp = http_response_new();
+    if digits > 0 {
+        heap_set_body(resp, code);
+    }
+    resp
+}
+
+// ---------- Self-test ----------
+pub fn main() -> i64 {
+    // Test HTTP response creation
+    let resp = http_response_new();
+    if heap_get_tag(resp) != HTTP_TAG_RESPONSE { return 1; }
+
+    // Test setting and getting body directly
+    heap_set_body(resp, 200);
+    let retrieved = heap_get_body(resp);
+    if retrieved != 200 { return 2; }
+
+    // Test another response with different value
+    let resp2 = http_response_new();
+    heap_set_body(resp2, 250);
+    let retrieved2 = heap_get_body(resp2);
+    if retrieved2 != 250 { return 3; }
+
+    // Test client error (400-499)
+    let err_resp = http_response_new();
+    heap_set_body(err_resp, 404);
+    let err_status = heap_get_body(err_resp);
+    if err_status != 404 { return 4; }
+
+    // Test server error (500-599)
+    let srv_resp = http_response_new();
+    heap_set_body(srv_resp, 500);
+    let srv_status = heap_get_body(srv_resp);
+    if srv_status != 500 { return 5; }
+
+    let req = http_build_get_request(10, 20);
+    if heap_get_tag(req) != HTTP_TAG_REQUEST { return 6; }
+    if heap_get_body(req) != 10 { return 7; }
+    if heap_get_arg(req) != 20 { return 8; }
+
+    return 111;
+}

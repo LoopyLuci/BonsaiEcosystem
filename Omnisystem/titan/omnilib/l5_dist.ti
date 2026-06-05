@@ -1,0 +1,12 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_RAFT5:i64=27400;const T_CRDT5:i64=27401;const T_WRP5:i64=27402;
+pub fn l5_raft_create(node_id:i64)->i64{let r=heap_alloc_term();heap_set_tag(r,T_RAFT5);heap_set_body(r,node_id);heap_set_arg(r,0);heap_set_domain(r,0);return r;}
+pub fn l5_raft_term(r:i64)->i64{return heap_get_arg(r);}
+pub fn l5_raft_set_term(r:i64,t:i64){heap_set_arg(r,t);}
+pub fn l5_raft_vote(r:i64,candidate:i64)->i64{heap_set_arg(r,heap_get_arg(r)+1);return 1;}
+pub fn l5_crdt_create()->i64{let c=heap_alloc_term();heap_set_tag(c,T_CRDT5);heap_set_body(c,0);heap_set_arg(c,0);heap_set_domain(c,0);return c;}
+pub fn l5_crdt_add(c:i64,value:i64){heap_set_body(c,heap_get_body(c)+value);}
+pub fn l5_crdt_merge(c:i64,other:i64){heap_set_body(c,heap_get_body(c)+heap_get_body(other));}
+pub fn l5_crdt_value(c:i64)->i64{return heap_get_body(c);}
+pub fn l5_dist_lock_try(lock_id:i64,owner:i64)->i64{return owner*100+lock_id;}
+pub fn main()->i64{let r=l5_raft_create(1);if l5_raft_term(r)!=0{return 1;}l5_raft_set_term(r,5);if l5_raft_term(r)!=5{return 2;}if l5_raft_vote(r,2)!=1{return 3;}let c=l5_crdt_create();l5_crdt_add(c,10);l5_crdt_add(c,20);if l5_crdt_value(c)!=30{return 4;}if l5_dist_lock_try(7,3)!=307{return 5;}return 111;}

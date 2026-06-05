@@ -1,0 +1,98 @@
+// titan/omnirouter/r9_agent.ti — Integration with OmniAgent & OmniBot
+// Self-contained. Bot connects agents via PREPEND list on bot.domain.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_AR9:  i64 = 22800;
+const T_BOT9: i64 = 22801;
+const T_WRP9: i64 = 22803;
+
+// agent wrapper: tag=T_WRP9, body=agent_node, domain=next_wrapper
+// agent_node: tag=T_AR9, body=aid, arg=cap, domain=0
+
+pub fn r9_agent_create(aid: i64, cap: i64) -> i64 {
+    let a = heap_alloc_term();
+    heap_set_tag(a, T_AR9); heap_set_body(a, aid); heap_set_arg(a, cap); heap_set_domain(a, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP9); heap_set_body(w, a); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn r9_agent_id(w: i64) -> i64 {
+    let a = heap_get_body(w);
+    return heap_get_body(a);
+}
+pub fn r9_agent_cap(w: i64) -> i64 {
+    let a = heap_get_body(w);
+    return heap_get_arg(a);
+}
+pub fn r9_agent_set_cap(w: i64, c: i64) {
+    let a = heap_get_body(w);
+    heap_set_arg(a, c);
+}
+
+// bot: tag=T_BOT9, body=bid, arg=mem, domain=agent_list(PREPEND wrappers)
+pub fn r9_bot_create(bid: i64, mem: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, T_BOT9); heap_set_body(b, bid); heap_set_arg(b, mem); heap_set_domain(b, 0);
+    return b;
+}
+
+pub fn r9_bot_id(b: i64) -> i64  { return heap_get_body(b); }
+pub fn r9_bot_mem(b: i64) -> i64 { return heap_get_arg(b); }
+
+pub fn r9_bot_connect(b: i64, w: i64) {
+    let h = heap_get_domain(b);
+    heap_set_domain(w, h);
+    heap_set_domain(b, w);
+}
+
+pub fn r9_bot_agent_count(b: i64) -> i64 {
+    let mut cur: i64 = heap_get_domain(b);
+    let mut n: i64 = 0;
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+// Route to agent with highest capacity
+pub fn r9_route(b: i64, task: i64) -> i64 {
+    let mut cur: i64 = heap_get_domain(b);
+    let mut best: i64 = 0;
+    let mut best_cap: i64 = -1;
+    while cur != 0 {
+        let w = cur;
+        let c = r9_agent_cap(w);
+        if c > best_cap { best_cap = c; best = w; }
+        cur = heap_get_domain(cur);
+    }
+    return best;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let b = r9_bot_create(1, 100);
+    let w1 = r9_agent_create(10, 50);
+    let w2 = r9_agent_create(20, 80);
+    let w3 = r9_agent_create(30, 30);
+    r9_bot_connect(b, w1);
+    r9_bot_connect(b, w2);
+    r9_bot_connect(b, w3);
+    if r9_bot_id(b) != 1            { return 1; }
+    if r9_bot_mem(b) != 100         { return 2; }
+    if r9_agent_id(w2) != 20        { return 3; }
+    if r9_agent_cap(w2) != 80       { return 4; }
+    if r9_bot_agent_count(b) != 3   { return 5; }
+    let routed = r9_route(b, 0);
+    if routed != w2                  { return 6; }
+    return 111;
+}

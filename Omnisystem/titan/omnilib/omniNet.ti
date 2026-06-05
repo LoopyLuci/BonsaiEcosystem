@@ -1,0 +1,140 @@
+// omniNet.ti — Phase 3: TCP/UDP networking over Winsock2
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn heap_set_domain(a:i64,b:i64);
+    fn heap_get_domain(a:i64)->i64;
+    fn socket_create(type:i64)->i64;
+    fn socket_connect(sock:i64,addr:i64,port:i64)->i64;
+    fn socket_send(sock:i64,data:i64)->i64;
+    fn socket_recv(sock:i64)->i64;
+    fn socket_close(sock:i64);
+    fn net_listen(port:i64)->i64;
+    fn net_accept(sock:i64)->i64;
+    fn repl_print_int(v:i64);
+    fn repl_print_newline();
+}
+
+const T_SOCK:i64=30000;
+const T_CONN:i64=30001;
+const T_SERVER:i64=30002;
+const NET_TCP:i64=0;
+const NET_UDP:i64=1;
+const NET_OK:i64=1;
+const NET_ERR:i64=0;
+
+pub fn net_make_sock(type:i64)->i64{
+    let term:i64=heap_alloc_term();
+    let fd:i64=socket_create(type);
+    heap_set_tag(term,T_SOCK);
+    heap_set_body(term,fd);
+    heap_set_arg(term,type);
+    return term;
+}
+
+pub fn net_sock_fd(sock:i64)->i64{
+    return heap_get_body(sock);
+}
+
+pub fn net_connect(sock:i64,addr:i64,port:i64)->i64{
+    let fd:i64=heap_get_body(sock);
+    let ok:i64=socket_connect(fd,addr,port);
+    heap_set_domain(sock,ok);
+    return ok;
+}
+
+pub fn net_send(sock:i64,data:i64)->i64{
+    let fd:i64=heap_get_body(sock);
+    return socket_send(fd,data);
+}
+
+pub fn net_recv(sock:i64)->i64{
+    let fd:i64=heap_get_body(sock);
+    return socket_recv(fd);
+}
+
+pub fn net_close(sock:i64){
+    let fd:i64=heap_get_body(sock);
+    socket_close(fd);
+    heap_set_body(sock,0);
+}
+
+pub fn net_make_server(port:i64)->i64{
+    let term:i64=heap_alloc_term();
+    let fd:i64=net_listen(port);
+    heap_set_tag(term,T_SERVER);
+    heap_set_body(term,fd);
+    heap_set_arg(term,port);
+    return term;
+}
+
+pub fn net_server_accept(server:i64)->i64{
+    let sfd:i64=heap_get_body(server);
+    let cfd:i64=net_accept(sfd);
+    if cfd==0{return 0;}
+    let term:i64=heap_alloc_term();
+    heap_set_tag(term,T_CONN);
+    heap_set_body(term,cfd);
+    return term;
+}
+
+pub fn net_server_close(server:i64){
+    let fd:i64=heap_get_body(server);
+    socket_close(fd);
+    heap_set_body(server,0);
+}
+
+pub fn net_echo_n(sock:i64,n:i64)->i64{
+    let mut i:i64=0;
+    while i<n{
+        let data:i64=net_recv(sock);
+        net_send(sock,data);
+        i=i+1;
+    }
+    return n;
+}
+
+pub fn net_loopback_addr()->i64{
+    return 2130706433;
+}
+
+pub fn net_test_socket_lifecycle()->i64{
+    let s:i64=net_make_sock(NET_TCP);
+    let fd:i64=net_sock_fd(s);
+    if fd==0{return 0;}
+    net_close(s);
+    return 1;
+}
+
+pub fn net_test_udp()->i64{
+    let s:i64=net_make_sock(NET_UDP);
+    let fd:i64=net_sock_fd(s);
+    if fd==0{return 0;}
+    net_close(s);
+    return 1;
+}
+
+pub fn net_test_listen()->i64{
+    let srv:i64=net_make_server(19877);
+    let fd:i64=heap_get_body(srv);
+    if fd==0{return 0;}
+    net_server_close(srv);
+    return 1;
+}
+
+pub fn main()->i64{
+    let mut score:i64=0;
+    let r1:i64=net_test_socket_lifecycle();
+    if r1==1{score=score+37;}
+    let r2:i64=net_test_udp();
+    if r2==1{score=score+37;}
+    let r3:i64=net_test_listen();
+    if r3==1{score=score+37;}
+    if score==111{return 111;}
+    return score;
+}

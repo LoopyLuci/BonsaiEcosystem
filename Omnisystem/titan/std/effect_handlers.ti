@@ -1,0 +1,235 @@
+// titan/std/effect_handlers.ti — Concrete effect handlers
+// Handlers intercept effect operations and redirect them to concrete implementations.
+// This enables: deterministic testing (swap real I/O with mock), sandboxing,
+// audit logging, and performance profiling—all as ordinary Titan libraries.
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+// ── Effect bitmasks (must match titan/std/effects.ti) ────────────────────
+const EFF_PURE: i64 = 0;
+const EFF_IO:   i64 = 1;
+const EFF_GPU:  i64 = 2;
+const EFF_MEM:  i64 = 4;
+const EFF_RACE: i64 = 8;
+const EFF_HW:   i64 = 16;
+const EFF_NET:  i64 = 32;
+const EFF_FS:   i64 = 64;
+
+// ── Handler kinds ────────────────────────────────────────────────────────
+const HK_REAL:    i64 = 0;  // pass through to real system call
+const HK_MOCK:    i64 = 1;  // return canned response from script
+const HK_LOG:     i64 = 2;  // log and forward to real
+const HK_SANDBOX: i64 = 3;  // deny if effect not in allowed set
+const HK_COUNT:   i64 = 4;  // count invocations, forward to real
+
+const TAG_HANDLER: i64 = 10100;
+const TAG_LOG_ENTRY: i64 = 10101;
+const TAG_CTX:     i64 = 10102;
+
+// ── Handler record ───────────────────────────────────────────────────────
+// body=kind, arg=allowed_effects_mask, domain=stats_ptr
+pub fn handler_new(kind:i64, allowed:i64) -> i64 {
+    let h=heap_alloc_term(); heap_set_tag(h,TAG_HANDLER);
+    heap_set_body(h,kind); heap_set_arg(h,allowed); heap_set_domain(h,0); return h;
+}
+pub fn handler_kind(h:i64) -> i64 { return heap_get_body(h); }
+pub fn handler_allowed(h:i64) -> i64 { return heap_get_arg(h); }
+
+// ── Stats node: body=invocations, arg=denied, domain=logged ──────────────
+pub fn stats_new() -> i64 {
+    let s=heap_alloc_term(); heap_set_tag(s,TAG_CTX);
+    heap_set_body(s,0); heap_set_arg(s,0); heap_set_domain(s,0); return s;
+}
+pub fn stats_invocations(s:i64) -> i64 { return heap_get_body(s); }
+pub fn stats_denied(s:i64) -> i64      { return heap_get_arg(s); }
+pub fn stats_logged(s:i64) -> i64      { return heap_get_domain(s); }
+
+pub fn stats_inc_invoke(s:i64) { heap_set_body(s, heap_get_body(s)+1); return; }
+pub fn stats_inc_deny(s:i64)   { heap_set_arg(s,  heap_get_arg(s)+1);  return; }
+pub fn stats_inc_log(s:i64)    { heap_set_domain(s,heap_get_domain(s)+1); return; }
+
+// ── Audit log: linked list of (effect, result) entries ───────────────────
+const TAG_LOGN: i64 = 10103;
+
+let g_log_head: i64 = 0;
+let g_log_count: i64 = 0;
+
+pub fn log_reset() { g_log_head = 0; g_log_count = 0; return; }
+
+pub fn log_append(effect:i64, result:i64) {
+    let e=heap_alloc_term(); heap_set_tag(e,TAG_LOGN);
+    heap_set_body(e,effect); heap_set_arg(e,result); heap_set_domain(e,g_log_head);
+    g_log_head=e; g_log_count=g_log_count+1;
+    return;
+}
+
+pub fn log_count() -> i64 { return g_log_count; }
+
+pub fn log_last_effect() -> i64 {
+    if g_log_head==0 { return -1; }
+    return heap_get_body(g_log_head);
+}
+
+// ── Effect dispatch ───────────────────────────────────────────────────────
+// Returns: 1 = allowed/handled, 0 = denied, -1 = error
+pub fn effect_dispatch(h:i64, effect:i64, stats:i64) -> i64 {
+    let kind    = handler_kind(h);
+    let allowed = handler_allowed(h);
+
+    // Count invocations
+    if stats != 0 { stats_inc_invoke(stats); }
+
+    // SANDBOX: deny if effect not in allowed mask
+    if kind == HK_SANDBOX {
+        if effect == EFF_PURE { return 1; }
+        if (allowed & effect) != effect {
+            if stats != 0 { stats_inc_deny(stats); }
+            return 0;
+        }
+        return 1;
+    }
+
+    // LOG: record + forward
+    if kind == HK_LOG {
+        log_append(effect, 1);
+        if stats != 0 { stats_inc_log(stats); }
+        return 1;
+    }
+
+    // COUNT: just count, always allow
+    if kind == HK_COUNT {
+        return 1;
+    }
+
+    // MOCK: always succeed (canned response)
+    if kind == HK_MOCK {
+        return 1;
+    }
+
+    // REAL: allow everything (OS does the actual check)
+    return 1;
+}
+
+// ── Effect context: stack of handlers for the current coroutine ───────────
+const TAG_HSTACK: i64 = 10104;
+
+let g_hstack:     i64 = 0;
+let g_hstack_depth: i64 = 0;
+
+pub fn ctx_push_handler(h:i64) {
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_HSTACK);
+    heap_set_body(n,h); heap_set_arg(n,g_hstack);
+    g_hstack=n; g_hstack_depth=g_hstack_depth+1;
+    return;
+}
+
+pub fn ctx_pop_handler() -> i64 {
+    if g_hstack==0 { return -1; }
+    let h=heap_get_body(g_hstack);
+    g_hstack=heap_get_arg(g_hstack);
+    g_hstack_depth=g_hstack_depth-1;
+    return h;
+}
+
+pub fn ctx_current_handler() -> i64 {
+    if g_hstack==0 { return -1; }
+    return heap_get_body(g_hstack);
+}
+
+pub fn ctx_depth() -> i64 { return g_hstack_depth; }
+
+// ── Perform: the entry point for any effectful operation ──────────────────
+// Called by generated code at every effect site.
+// Returns 1 if allowed, 0 if denied.
+pub fn perform(effect:i64) -> i64 {
+    let h = ctx_current_handler();
+    if h < 0 { return 1; }   // no handler = allow (top-level context)
+    return effect_dispatch(h, effect, 0);
+}
+
+// ── Mock handler: pre-programmed responses ───────────────────────────────
+// body=response_list_head (each entry: body=effect, arg=response, domain=next)
+const TAG_MOCK_RESP: i64 = 10105;
+
+pub fn mock_handler_new() -> i64 {
+    let h = handler_new(HK_MOCK, EFF_IO | EFF_FS | EFF_NET | EFF_GPU | EFF_MEM);
+    heap_set_domain(h, 0);  // response list
+    return h;
+}
+
+pub fn mock_add_response(h:i64, effect:i64, response:i64) {
+    let r=heap_alloc_term(); heap_set_tag(r,TAG_MOCK_RESP);
+    heap_set_body(r,effect); heap_set_arg(r,response);
+    heap_set_domain(r, heap_get_domain(h));
+    heap_set_domain(h,r);
+    return;
+}
+
+pub fn mock_get_response(h:i64, effect:i64) -> i64 {
+    let cur=heap_get_domain(h);
+    while cur!=0 {
+        if heap_get_body(cur)==effect { return heap_get_arg(cur); }
+        cur=heap_get_domain(cur);
+    }
+    return 1;  // default: allow
+}
+
+pub fn main() -> i64 {
+    log_reset();
+
+    // Test 1: REAL handler allows everything
+    let real_h = handler_new(HK_REAL, EFF_IO|EFF_GPU|EFF_MEM|EFF_NET|EFF_FS);
+    let s = stats_new();
+    if effect_dispatch(real_h, EFF_IO, s) != 1 { return 1; }
+    if effect_dispatch(real_h, EFF_GPU, s) != 1 { return 2; }
+    if stats_invocations(s) != 2 { return 3; }
+
+    // Test 2: SANDBOX denies disallowed effects
+    let sandbox = handler_new(HK_SANDBOX, EFF_IO);  // only IO allowed
+    let ss = stats_new();
+    if effect_dispatch(sandbox, EFF_IO, ss) != 1 { return 4; }   // allowed
+    if effect_dispatch(sandbox, EFF_GPU, ss) != 0 { return 5; }  // denied
+    if effect_dispatch(sandbox, EFF_NET, ss) != 0 { return 6; }  // denied
+    if stats_denied(ss) != 2 { return 7; }
+
+    // Test 3: LOG handler records calls
+    let logger = handler_new(HK_LOG, EFF_IO|EFF_FS|EFF_NET);
+    let ls = stats_new();
+    effect_dispatch(logger, EFF_IO, ls);
+    effect_dispatch(logger, EFF_FS, ls);
+    if log_count() != 2 { return 8; }
+    if log_last_effect() != EFF_FS { return 9; }
+    if stats_logged(ls) != 2 { return 10; }
+
+    // Test 4: handler stack context
+    g_hstack=0; g_hstack_depth=0;
+    let h1 = handler_new(HK_LOG,     EFF_IO);
+    let h2 = handler_new(HK_SANDBOX, EFF_GPU);
+    ctx_push_handler(h1);
+    ctx_push_handler(h2);
+    if ctx_depth() != 2 { return 11; }
+    if ctx_current_handler() != h2 { return 12; }
+    ctx_pop_handler();
+    if ctx_current_handler() != h1 { return 13; }
+    ctx_pop_handler();
+    if ctx_depth() != 0 { return 14; }
+
+    // Test 5: perform with sandbox
+    let sb2 = handler_new(HK_SANDBOX, EFF_IO);
+    g_hstack=0; g_hstack_depth=0;
+    ctx_push_handler(sb2);
+    if perform(EFF_IO) != 1 { return 15; }   // allowed
+    if perform(EFF_NET) != 0 { return 16; }  // denied
+
+    // Test 6: mock handler with canned responses
+    let mock = mock_handler_new();
+    mock_add_response(mock, EFF_IO, 42);
+    if mock_get_response(mock, EFF_IO) != 42 { return 17; }
+    if mock_get_response(mock, EFF_GPU) != 1 { return 18; }  // default
+
+    // Test 7: PURE effect always allowed by sandbox
+    let sb3 = handler_new(HK_SANDBOX, EFF_IO);
+    if effect_dispatch(sb3, EFF_PURE, 0) != 1 { return 19; }
+
+    return 111;
+}

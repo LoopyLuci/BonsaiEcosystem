@@ -1,0 +1,51 @@
+// titan/bootstrap/compiler.ti
+// Titan Bootstrap Compiler — Full pipeline driver.
+// Lex → Parse → Codegen → LLVM IR output
+
+pub struct CompileResult {
+    pub success: bool,
+    pub output: String,
+    pub errors: Vec<String>,
+}
+
+pub fn compile(source: String, module_name: String) -> CompileResult {
+    // Stage 1: Lex
+    let mut lexer = Lexer::new(source);
+    let tokens = lexer.tokenize();
+
+    let mut lex_errors = Vec::new();
+    for token in tokens.iter() {
+        if token.kind == TokenKind::ERROR {
+            lex_errors.push(format!("Lex error: {} at line {}", token.lexeme, token.line));
+        }
+    }
+    if !lex_errors.is_empty() {
+        return CompileResult {
+            success: false,
+            output: "".to_string(),
+            errors: lex_errors,
+        };
+    }
+
+    // Stage 2: Parse
+    let mut parser = Parser::new(tokens);
+    let ast = parser.parse_module();
+
+    if !parser.errors.is_empty() {
+        return CompileResult {
+            success: false,
+            output: "".to_string(),
+            errors: parser.errors,
+        };
+    }
+
+    // Stage 3: Codegen
+    let mut codegen = Codegen::new(module_name);
+    let llvm_ir = codegen.generate(&ast);
+
+    CompileResult {
+        success: true,
+        output: llvm_ir,
+        errors: Vec::new(),
+    }
+}

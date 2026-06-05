@@ -1,0 +1,5 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_RQ11:i64=26000;const tT_RS11:i64=26001;
+pub fn tf11_request_create(prompt:i64,ctx:i64)->i64{let r=heap_alloc_term();heap_set_tag(r,tT_RQ11);heap_set_body(r,prompt);heap_set_arg(r,ctx);heap_set_domain(r,0);return r;}
+pub fn tf11_response_create(text:i64,conf:i64)->i64{let r=heap_alloc_term();heap_set_tag(r,tT_RS11);heap_set_body(r,text);heap_set_arg(r,conf);heap_set_domain(r,0);return r;}
+pub fn main()->i64{let res=tf11_response_create(50,95);if heap_get_arg(res)!=95{return 1;}return 111;}

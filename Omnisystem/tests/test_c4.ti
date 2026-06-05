@@ -1,0 +1,49 @@
+// tests/test_c4.ti — Phase C4 Anti-Fingerprinting & Privacy Integration Test
+// All helpers inlined with tc4_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+pub fn tc4_canvas_noise(value: i64) -> i64 { return value + (value % 7) - 3; }
+pub fn tc4_webgl_normalize(vendor_id: i64) -> i64 { return (vendor_id / 100) * 100; }
+pub fn tc4_cookie_isolate(domain: i64, key: i64) -> i64 { return domain * 1000 + key; }
+pub fn tc4_tracker_block(url: i64, blocklist: i64) -> i64 {
+    let mut cur: i64 = blocklist;
+    while cur != 0 {
+        if heap_get_body(cur) == url { return 1; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    if tc4_webgl_normalize(5678) != 5600  { return 1; }
+    if tc4_cookie_isolate(3, 7) != 3007   { return 2; }
+
+    // canvas noise range check (no ||)
+    let n = tc4_canvas_noise(50);
+    if n < 44 { return 3; }
+    if n > 56 { return 3; }
+
+    // tracker block
+    let a = heap_alloc_term();
+    heap_set_body(a, 10);
+    let b = heap_alloc_term();
+    heap_set_body(b, 20);
+    heap_set_domain(b, a);
+    if tc4_tracker_block(10, b) != 1      { return 4; }
+    if tc4_tracker_block(20, b) != 1      { return 5; }
+    if tc4_tracker_block(30, b) != 0      { return 6; }
+
+    return 111;
+}

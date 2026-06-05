@@ -1,0 +1,187 @@
+// omniThread.ti — Phase 4: mutex synchronisation and cooperative threading
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn heap_set_domain(a:i64,b:i64);
+    fn heap_get_domain(a:i64)->i64;
+    fn mutex_create()->i64;
+    fn mutex_lock(mid:i64);
+    fn mutex_unlock(mid:i64);
+    fn thread_sleep(ms:i64);
+    fn thread_spawn(fn_id:i64)->i64;
+    fn thread_join(tid:i64);
+    fn repl_print_int(v:i64);
+    fn repl_print_newline();
+}
+
+const T_MUTEX:i64=31000;
+const T_TASK:i64=31001;
+const T_WORKER:i64=31002;
+const T_SEMAPHORE:i64=31003;
+
+pub fn ot_make_mutex()->i64{
+    let term:i64=heap_alloc_term();
+    let mid:i64=mutex_create();
+    heap_set_tag(term,T_MUTEX);
+    heap_set_body(term,mid);
+    heap_set_arg(term,0);
+    return term;
+}
+
+pub fn ot_lock(mtx:i64){
+    let mid:i64=heap_get_body(mtx);
+    mutex_lock(mid);
+    let held:i64=heap_get_arg(mtx);
+    heap_set_arg(mtx,held+1);
+}
+
+pub fn ot_unlock(mtx:i64){
+    let mid:i64=heap_get_body(mtx);
+    mutex_unlock(mid);
+    let held:i64=heap_get_arg(mtx);
+    if held>0{heap_set_arg(mtx,held-1);}
+}
+
+pub fn ot_lock_count(mtx:i64)->i64{
+    return heap_get_arg(mtx);
+}
+
+pub fn ot_with_lock(mtx:i64,val:i64)->i64{
+    ot_lock(mtx);
+    let result:i64=val+1;
+    ot_unlock(mtx);
+    return result;
+}
+
+pub fn ot_make_semaphore(initial:i64)->i64{
+    let term:i64=heap_alloc_term();
+    let mid:i64=mutex_create();
+    heap_set_tag(term,T_SEMAPHORE);
+    heap_set_body(term,mid);
+    heap_set_arg(term,initial);
+    heap_set_domain(term,initial);
+    return term;
+}
+
+pub fn ot_sem_count(sem:i64)->i64{
+    return heap_get_arg(sem);
+}
+
+pub fn ot_sem_acquire(sem:i64)->i64{
+    let mid:i64=heap_get_body(sem);
+    mutex_lock(mid);
+    let count:i64=heap_get_arg(sem);
+    if count>0{
+        heap_set_arg(sem,count-1);
+        mutex_unlock(mid);
+        return 1;
+    }
+    mutex_unlock(mid);
+    return 0;
+}
+
+pub fn ot_sem_release(sem:i64){
+    let mid:i64=heap_get_body(sem);
+    let max:i64=heap_get_domain(sem);
+    mutex_lock(mid);
+    let count:i64=heap_get_arg(sem);
+    if count<max{heap_set_arg(sem,count+1);}
+    mutex_unlock(mid);
+}
+
+pub fn ot_sleep(ms:i64){
+    thread_sleep(ms);
+}
+
+pub fn ot_make_counter(mtx:i64)->i64{
+    let term:i64=heap_alloc_term();
+    heap_set_tag(term,T_TASK);
+    heap_set_body(term,mtx);
+    heap_set_arg(term,0);
+    return term;
+}
+
+pub fn ot_inc(counter:i64)->i64{
+    let mtx:i64=heap_get_body(counter);
+    let mid:i64=heap_get_body(mtx);
+    mutex_lock(mid);
+    let v:i64=heap_get_arg(counter);
+    heap_set_arg(counter,v+1);
+    mutex_unlock(mid);
+    return v+1;
+}
+
+pub fn ot_get(counter:i64)->i64{
+    return heap_get_arg(counter);
+}
+
+pub fn ot_inc_n(counter:i64,n:i64){
+    let mut i:i64=0;
+    while i<n{
+        ot_inc(counter);
+        i=i+1;
+    }
+}
+
+pub fn test_mutex_basic()->i64{
+    let mtx:i64=ot_make_mutex();
+    let mid:i64=heap_get_body(mtx);
+    if mid==0{return 0;}
+    ot_lock(mtx);
+    let c1:i64=ot_lock_count(mtx);
+    ot_unlock(mtx);
+    let c2:i64=ot_lock_count(mtx);
+    if c1==1{
+        if c2==0{return 1;}
+    }
+    return 0;
+}
+
+pub fn test_semaphore()->i64{
+    let sem:i64=ot_make_semaphore(3);
+    let r1:i64=ot_sem_acquire(sem);
+    let r2:i64=ot_sem_acquire(sem);
+    let r3:i64=ot_sem_acquire(sem);
+    let r4:i64=ot_sem_acquire(sem);
+    ot_sem_release(sem);
+    let r5:i64=ot_sem_acquire(sem);
+    if r1==1{
+        if r2==1{
+            if r3==1{
+                if r4==0{
+                    if r5==1{return 1;}
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+pub fn test_counter()->i64{
+    let mtx:i64=ot_make_mutex();
+    let ctr:i64=ot_make_counter(mtx);
+    ot_inc_n(ctr,37);
+    let v:i64=ot_get(ctr);
+    if v==37{return 1;}
+    return 0;
+}
+
+pub fn test_sleep()->i64{
+    ot_sleep(1);
+    return 1;
+}
+
+pub fn main()->i64{
+    let mut score:i64=0;
+    if test_mutex_basic()==1{score=score+1;}
+    if test_semaphore()==1{score=score+1;}
+    if test_counter()==1{score=score+1;}
+    if test_sleep()==1{score=score+1;}
+    if score==4{return 111;}
+    return score;
+}

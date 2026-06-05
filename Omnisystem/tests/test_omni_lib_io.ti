@@ -1,0 +1,67 @@
+// Integration test for Phase 118 - I/O and Path modules with correct bool types
+
+// Inline path operations with proper bool return types
+fn path_is_absolute(path: i64) -> bool {
+    if path == 0 { return false; }
+    return false;
+}
+
+fn path_has_extension(path: i64) -> bool {
+    if path == 0 { return false; }
+    return false;
+}
+
+// Inline I/O operations with proper bool return types
+fn io_exists(path_id: i64) -> bool {
+    if path_id == 0 { return false; }
+    return false;
+}
+
+fn io_delete(path_id: i64) -> bool {
+    if path_id == 0 { return false; }
+    return false;
+}
+
+fn test_path_bool_types() -> bool {
+    // Test that bool return types work in conditionals
+    let is_abs: bool = path_is_absolute(0);
+    let has_ext: bool = path_has_extension(0);
+    
+    // Both should be false
+    if is_abs { return false; }
+    if has_ext { return false; }
+    
+    // Negation should work
+    if !is_abs { return true; }
+    return true;
+}
+
+fn test_io_bool_types() -> bool {
+    // Test that bool return types work with I/O operations
+    let exists: bool = io_exists(0);
+    let deleted: bool = io_delete(0);
+    
+    // Both should be false
+    if exists { return false; }
+    if deleted { return false; }
+    
+    return true;
+}
+
+fn test_bool_expressions() -> bool {
+    // Test complex bool expressions
+    let a: bool = path_is_absolute(0);
+    let b: bool = io_exists(0);
+    let combined: bool = a || b;
+    
+    if combined { return false; }
+    
+    return true;
+}
+
+pub fn main() -> i64 {
+    if !test_path_bool_types() { return 1; }
+    if !test_io_bool_types() { return 2; }
+    if !test_bool_expressions() { return 3; }
+    return 111;
+}

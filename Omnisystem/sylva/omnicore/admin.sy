@@ -1,0 +1,13 @@
+// sylva/omnicore/admin.sy
+// KV store admin console in Sylva — interactive management.
+
+pub fn main() -> i64 {
+    let server_status: i64 = check_server();
+    let client_count: i64 = count_clients();
+    let data_size: i64 = measure_data();
+    return server_status + client_count + data_size;
+}
+
+pub fn check_server() -> i64 { return 1; }
+pub fn count_clients() -> i64 { return 2; }
+pub fn measure_data() -> i64 { return 100; }

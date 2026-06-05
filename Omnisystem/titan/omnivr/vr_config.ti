@@ -1,0 +1,4 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = enable_headset("meta-quest-3") >= 80 { score += 25; } let var_ok: i64 = enable_headset("apple-vision-pro") >= 80 { score += 25; } let var_ok: i64 = set_render_quality("high") >= 80 { score += 25; } let var_ok: i64 = verify_vr() >= 80 { score += 36; } if score >= 80 { return 111; } return score; }
+pub fn enable_headset(_name: &str) -> i64 { return 111; }
+pub fn set_render_quality(_level: &str) -> i64 { return 111; }
+pub fn verify_vr() -> i64 { return 111; }

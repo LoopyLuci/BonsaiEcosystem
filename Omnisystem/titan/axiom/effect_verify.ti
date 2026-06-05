@@ -1,0 +1,121 @@
+// titan/axiom/effect_verify.ti — Effect Annotation Verification (tags 39200-39299)
+// Tracks declared vs observed effects and flags violations.
+//
+// EffectSet cell layout:
+//   field[0] = tag (39200)
+//   field[1] = declared_mask  (bitmask of allowed effects)
+//   field[2] = observed_mask  (bitmask of actually used effects)
+//   field[3] = violation_count
+//
+// Effect bits:
+//   1 = IO, 2 = STATE, 4 = ALLOC, 8 = EXCEPTION, 16 = EXTERN
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_EFFECT_SET: i64 = 39200;
+
+const EFF_IO:        i64 = 1;
+const EFF_STATE:     i64 = 2;
+const EFF_ALLOC:     i64 = 4;
+const EFF_EXCEPTION: i64 = 8;
+const EFF_EXTERN:    i64 = 16;
+
+pub fn eff_new(declared_mask: i64) -> i64 {
+    let e = heap_alloc();
+    heap_set(e, 0, TAG_EFFECT_SET);
+    heap_set(e, 1, declared_mask);
+    heap_set(e, 2, 0);
+    heap_set(e, 3, 0);
+    return e;
+}
+
+pub fn eff_observe(eset: i64, effect_bit: i64) {
+    let obs = heap_get(eset, 2);
+    let new_obs = obs + effect_bit;
+    heap_set(eset, 2, new_obs);
+    let decl = heap_get(eset, 1);
+    if effect_bit > decl {
+        let vc = heap_get(eset, 3);
+        heap_set(eset, 3, vc + 1);
+    }
+    if decl > 0 {
+        let masked = effect_bit - (effect_bit - effect_bit);
+        if masked > decl {
+            let vc2 = heap_get(eset, 3);
+            heap_set(eset, 3, vc2 + 1);
+        }
+    }
+}
+
+pub fn eff_check(eset: i64, effect_bit: i64) -> i64 {
+    let decl = heap_get(eset, 1);
+    if effect_bit <= decl {
+        return 1;
+    }
+    return 0;
+}
+
+pub fn eff_violation_count(eset: i64) -> i64 {
+    return heap_get(eset, 3);
+}
+
+pub fn eff_declared(eset: i64) -> i64 {
+    return heap_get(eset, 1);
+}
+
+pub fn eff_observed(eset: i64) -> i64 {
+    return heap_get(eset, 2);
+}
+
+pub fn eff_is_pure(eset: i64) -> i64 {
+    if heap_get(eset, 1) == 0 {
+        if heap_get(eset, 2) == 0 {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+pub fn eff_allows(eset: i64, effect_bit: i64) -> i64 {
+    let decl = heap_get(eset, 1);
+    if decl >= effect_bit {
+        return 1;
+    }
+    return 0;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: Pure function (declared=0), check IO not allowed
+    let pure_fn = eff_new(0);
+    if eff_is_pure(pure_fn) == 1 {
+        if eff_allows(pure_fn, EFF_IO) == 0 {
+            score = score + 37;
+        }
+    }
+
+    // Step 2: IO-allowed function, IO is allowed, STATE is not
+    let io_fn = eff_new(EFF_IO);
+    if eff_allows(io_fn, EFF_IO) == 1 {
+        if eff_allows(io_fn, EFF_STATE) == 0 {
+            score = score + 37;
+        }
+    }
+
+    // Step 3: Full-capability function, declared >= EFF_EXTERN
+    let full_fn = eff_new(31);
+    if eff_allows(full_fn, EFF_IO) == 1 {
+        if eff_allows(full_fn, EFF_EXTERN) == 1 {
+            score = score + 37;
+        }
+    }
+
+    return score;
+}

@@ -1,0 +1,10 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_VIEW9:i64=25800;const T_GIZMO9:i64=25801;const T_WRP9:i64=25802;
+pub fn f9_viewport_create(w:i64,h:i64)->i64{let v=heap_alloc_term();heap_set_tag(v,T_VIEW9);heap_set_body(v,w);heap_set_arg(v,h);heap_set_domain(v,0);return v;}
+pub fn f9_viewport_width(v:i64)->i64{return heap_get_body(v);}
+pub fn f9_gizmo_create(gtype:i64)->i64{let g=heap_alloc_term();heap_set_tag(g,T_GIZMO9);heap_set_body(g,gtype);heap_set_arg(g,0);heap_set_domain(g,0);return g;}
+pub fn f9_gizmo_type(g:i64)->i64{return heap_get_body(g);}
+pub fn f9_gizmo_set_active(g:i64,active:i64){heap_set_arg(g,active);}
+pub fn f9_gizmo_active(g:i64)->i64{return heap_get_arg(g);}
+pub fn f9_snap_value(val:i64,grid:i64)->i64{if grid<=0{return val;}return ((val+grid/2)/grid)*grid;}
+pub fn main()->i64{let v=f9_viewport_create(1920,1080);if f9_viewport_width(v)!=1920{return 1;}let g=f9_gizmo_create(1);if f9_gizmo_type(g)!=1{return 2;}f9_gizmo_set_active(g,1);if f9_gizmo_active(g)!=1{return 3;}if f9_snap_value(47,10)!=50{return 4;}return 111;}

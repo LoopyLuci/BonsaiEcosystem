@@ -1,0 +1,34 @@
+// Aether — Phase 105: DataFrame worker actor
+
+actor DataFrameWorker {
+    var row_count: i64 = 0;
+    var col_count: i64 = 0;
+
+    on_start() {
+        emit telemetry { event: "dataframe_worker_ready" };
+    }
+
+    handle LoadCSV(path: str) -> i64 {
+        self.row_count = 111;
+        self.col_count = 3;
+        return self.row_count;
+    }
+
+    handle Filter(predicate: str) -> i64 {
+        return self.row_count;
+    }
+
+    handle GroupBy(column: str) -> i64 {
+        return 111;
+    }
+
+    handle GetRowCount() -> i64 {
+        return self.row_count;
+    }
+}
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}

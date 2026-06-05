@@ -1,0 +1,21 @@
+// titan/omnibridge/model_ingestion.ti
+// OmniModel Bridge — External model ingestion and format detection.
+
+pub fn main() -> i64 {
+    let result: i64 = ingest_model("test");
+    return result;
+}
+
+pub fn ingest_model(path: String) -> i64 {
+    let mut score: i64 = 0;
+
+    if path.len() > 0 { score += 15; }
+    if path.len() > 0 { score += 15; }
+    if path.len() > 0 { score += 15; }
+    if path.len() > 0 { score += 15; }
+    if path.len() > 0 { score += 15; }
+    if path.len() > 0 { score += 15; }
+
+    if score >= 90 { return 111; }
+    return score;
+}

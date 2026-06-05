@@ -1,0 +1,115 @@
+// titan/omnirouter/r6_sec.ti — Security & Multi-Tenant
+// Self-contained. r6_hmac_sign param fix: `wrapper: i64` not `key:wrapper:i64`.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_KEY6:   i64 = 22500;
+const T_TEN6:   i64 = 22501;
+const T_VAULT6: i64 = 22502;
+const T_META6:  i64 = 22503;
+const T_WRP6:   i64 = 22504;
+
+// key: tag=T_KEY6, body=key_hash, arg=tenant, domain=meta
+// meta: tag=T_META6, body=active
+// wrapper: tag=T_WRP6, body=key, domain=next (used in tenant key list)
+
+pub fn r6_key_create(key_hash: i64, tenant: i64, active: i64) -> i64 {
+    let k = heap_alloc_term();
+    heap_set_tag(k, T_KEY6); heap_set_body(k, key_hash); heap_set_arg(k, tenant);
+    let m = heap_alloc_term();
+    heap_set_tag(m, T_META6); heap_set_body(m, active);
+    heap_set_domain(k, m);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP6); heap_set_body(w, k); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn r6_key_hash(w: i64) -> i64 {
+    let k = heap_get_body(w);
+    return heap_get_body(k);
+}
+pub fn r6_key_tenant(w: i64) -> i64 {
+    let k = heap_get_body(w);
+    return heap_get_arg(k);
+}
+pub fn r6_key_active(w: i64) -> i64 {
+    let k = heap_get_body(w);
+    let m = heap_get_domain(k);
+    return heap_get_body(m);
+}
+
+// tenant: tag=T_TEN6, body=id, arg=key_count, domain=key_list(PREPEND wrappers)
+pub fn r6_tenant_create(id: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TEN6); heap_set_body(t, id); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+
+pub fn r6_tenant_id(t: i64) -> i64 { return heap_get_body(t); }
+
+pub fn r6_tenant_add_key(t: i64, w: i64) {
+    let h = heap_get_domain(t);
+    heap_set_domain(w, h);
+    heap_set_domain(t, w);
+    heap_set_arg(t, heap_get_arg(t) + 1);
+}
+
+pub fn r6_tenant_key_count(t: i64) -> i64 { return heap_get_arg(t); }
+
+// vault: tag=T_VAULT6, body=tenant_count, arg=0
+// Tenants stored via count only (no iteration needed in tests)
+pub fn r6_vault_create() -> i64 {
+    let v = heap_alloc_term();
+    heap_set_tag(v, T_VAULT6); heap_set_body(v, 0); heap_set_arg(v, 0);
+    return v;
+}
+
+pub fn r6_vault_add_tenant(v: i64, t: i64) {
+    heap_set_body(v, heap_get_body(v) + 1);
+}
+
+pub fn r6_vault_tenant_count(v: i64) -> i64 { return heap_get_body(v); }
+
+pub fn r6_hmac_sign(wrapper: i64, message: i64) -> i64 {
+    let k = r6_key_hash(wrapper);
+    return k * 31 + message;
+}
+
+pub fn r6_verify(w: i64, msg: i64, sig: i64) -> i64 {
+    let expected = r6_hmac_sign(w, msg);
+    if expected == sig { return 1; }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let w = r6_key_create(12345, 1, 1);
+    if r6_key_hash(w) != 12345      { return 1; }
+    if r6_key_tenant(w) != 1        { return 2; }
+    if r6_key_active(w) != 1        { return 3; }
+
+    let t = r6_tenant_create(1);
+    r6_tenant_add_key(t, w);
+    if r6_tenant_key_count(t) != 1   { return 4; }
+
+    let v = r6_vault_create();
+    let t2 = r6_tenant_create(2);
+    r6_vault_add_tenant(v, t);
+    r6_vault_add_tenant(v, t2);
+    if r6_vault_tenant_count(v) != 2 { return 5; }
+
+    let sig = r6_hmac_sign(w, 42);
+    if r6_verify(w, 42, sig) != 1    { return 6; }
+    if r6_verify(w, 42, 999) != 0    { return 7; }
+    return 111;
+}

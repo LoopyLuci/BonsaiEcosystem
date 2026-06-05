@@ -1,0 +1,82 @@
+// tests/test_r8.ti — Phase R8 Axiom Verification & Stress Testing Integration Test
+// All helpers inlined with tr8_ prefix. Self-contained. No || operator.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR8_T_FUZZ: i64 = 22700;
+const TR8_T_INV:  i64 = 22701;
+
+pub fn tr8_fuzz_create(seed: i64) -> i64 {
+    let f = heap_alloc_term();
+    heap_set_tag(f, TR8_T_FUZZ); heap_set_body(f, seed); heap_set_arg(f, 0);
+    return f;
+}
+
+pub fn tr8_fuzz_next(f: i64) -> i64 {
+    let x = heap_get_body(f);
+    let y: i64 = x * 1103515245 + 12345;
+    let r: i64 = (y / 65536) % 2147483648;
+    heap_set_body(f, y);
+    return r;
+}
+
+pub fn tr8_fuzz_range(f: i64, max: i64) -> i64 {
+    let mut r: i64 = tr8_fuzz_next(f);
+    if r < 0 { r = -r; }
+    return r % max;
+}
+
+pub fn tr8_inv_create(name: i64, status: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, TR8_T_INV); heap_set_body(inv, name); heap_set_arg(inv, status); heap_set_domain(inv, 0);
+    return inv;
+}
+pub fn tr8_inv_check(inv: i64) -> i64 { return heap_get_arg(inv); }
+pub fn tr8_inv_fail(inv: i64)          { heap_set_arg(inv, 0); }
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let f = tr8_fuzz_create(99);
+    let mut i: i64 = 0;
+    let mut ok: i64 = 1;
+    while i < 30 {
+        let r = tr8_fuzz_range(f, 50);
+        if r < 0  { ok = 0; }
+        if r >= 50 { ok = 0; }
+        i = i + 1;
+    }
+    if ok == 0                      { return 1; }
+
+    let inv = tr8_inv_create(5, 1);
+    if tr8_inv_check(inv) != 1      { return 2; }
+    tr8_inv_fail(inv);
+    if tr8_inv_check(inv) != 0      { return 3; }
+
+    // Second invariant stays independent
+    let inv2 = tr8_inv_create(6, 1);
+    if tr8_inv_check(inv2) != 1     { return 4; }
+
+    // Different seed produces values in range
+    let f2 = tr8_fuzz_create(12345);
+    let mut j: i64 = 0;
+    let mut ok2: i64 = 1;
+    while j < 10 {
+        let r2 = tr8_fuzz_range(f2, 200);
+        if r2 < 0   { ok2 = 0; }
+        if r2 >= 200 { ok2 = 0; }
+        j = j + 1;
+    }
+    if ok2 == 0                     { return 5; }
+
+    return 111;
+}

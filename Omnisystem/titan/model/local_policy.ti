@@ -1,0 +1,95 @@
+// titan/model/local_policy.ti — Deterministic Local Policy
+// Maps (instruction, screenshot) → action. Inlines action_parser constants.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+// ===== Action constants (inlined from action_parser) =====
+const TAG_ACTION: i64 = 8500;
+const ACT_CLICK:  i64 = 0;
+const ACT_TYPE:   i64 = 1;
+const ACT_SCROLL: i64 = 2;
+const ACT_DONE:   i64 = 3;
+const ACT_WAIT:   i64 = 4;
+const ACT_KEY:    i64 = 5;
+
+pub fn lp_action_create(action_type: i64, x: i64, y: i64, text_id: i64, delta: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, y);
+    heap_set_arg(meta2, text_id);
+    heap_set_domain(meta2, delta);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, action_type);
+    heap_set_arg(meta1, x);
+    heap_set_domain(meta1, meta2);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_ACTION);
+    heap_set_body(a, meta1);
+    heap_set_arg(a, 0);
+    heap_set_domain(a, 0);
+    return a;
+}
+
+// Check if instruction contains "type" (ASCII 116,121,112,101)
+pub fn lp_has_type_keyword(instr: i64) -> bool {
+    let len = str_len(instr);
+    let mut i: i64 = 0;
+    while i + 3 < len {
+        if str_at(instr, i)     == 116
+        && str_at(instr, i + 1) == 121
+        && str_at(instr, i + 2) == 112
+        && str_at(instr, i + 3) == 101 {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// Check if instruction contains "done" (ASCII 100,111,110,101)
+pub fn lp_has_done_keyword(instr: i64) -> bool {
+    let len = str_len(instr);
+    let mut i: i64 = 0;
+    while i + 3 < len {
+        if str_at(instr, i)     == 100
+        && str_at(instr, i + 1) == 111
+        && str_at(instr, i + 2) == 110
+        && str_at(instr, i + 3) == 101 {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+pub fn policy_decide(instruction_id: i64, screenshot: i64) -> i64 {
+    if lp_has_done_keyword(instruction_id) {
+        return lp_action_create(ACT_DONE, 0, 0, 0, 0);
+    }
+    if lp_has_type_keyword(instruction_id) {
+        return lp_action_create(ACT_TYPE, 0, 0, instruction_id, 0);
+    }
+    return lp_action_create(ACT_CLICK, 100, 100, 0, 0);
+}
+
+pub fn main() -> i64 {
+    let instr = heap_alloc_term();
+    let shot  = heap_alloc_term();
+    let act = policy_decide(instr, shot);
+    if act == 0                          { return 1; }
+    if heap_get_tag(act) != TAG_ACTION   { return 2; }
+    // Default action should be CLICK
+    if heap_get_body(heap_get_body(act)) != ACT_CLICK { return 3; }
+    return 111;
+}

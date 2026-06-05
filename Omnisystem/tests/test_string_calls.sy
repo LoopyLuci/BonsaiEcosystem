@@ -1,0 +1,14 @@
+// Test function calls with string parameters
+pub fn main() -> i64 {
+    let a: i64 = get_count("A");
+    let b: i64 = get_count("B");
+    let c: i64 = get_count("C");
+    return a + b + c;
+}
+
+pub fn get_count(s: String) -> i64 {
+    if s == "A" { return 1; }
+    if s == "B" { return 2; }
+    if s == "C" { return 3; }
+    return 0;
+}

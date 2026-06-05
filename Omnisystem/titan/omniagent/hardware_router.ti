@@ -1,0 +1,115 @@
+// titan/omniagent/hardware_router.ti
+// Hardware-aware execution router — selects optimal device (CPU/GPU/iGPU).
+
+pub fn main() -> i64 {
+    // Test hardware selection across tensor sizes
+    let result1: i64 = select_and_execute_device(512);
+    let result2: i64 = select_and_execute_device(8192);
+    let result3: i64 = select_and_execute_device(131072);
+    
+    let total: i64 = result1 + result2 + result3;
+    return total;
+}
+
+pub fn select_device(tensor_size: i64) -> i64 {
+    // Device selection: 0=CPU, 1=iGPU, 2=GPU
+    let mut device: i64 = 0;
+    
+    if tensor_size < 1024 {
+        device = 0;  // CPU for small tensors
+    }
+    else if tensor_size < 65536 {
+        device = 1;  // iGPU for medium tensors (power efficient)
+    }
+    else {
+        device = 2;  // GPU for large tensors
+    }
+    
+    return device;
+}
+
+pub fn execute_on_cpu(tensor_size: i64) -> i64 {
+    // CPU execution path
+    let operations: i64 = tensor_size / 256;
+    let cpu_time: i64 = operations + 10;
+    return cpu_time;
+}
+
+pub fn execute_on_igpu(tensor_size: i64) -> i64 {
+    // iGPU execution path (lower power)
+    let compute_units: i64 = tensor_size / 512;
+    let igpu_time: i64 = compute_units + 5;
+    return igpu_time;
+}
+
+pub fn execute_on_gpu(tensor_size: i64) -> i64 {
+    // GPU execution path (high throughput)
+    let thread_blocks: i64 = tensor_size / 2048;
+    let gpu_time: i64 = thread_blocks + 2;
+    return gpu_time;
+}
+
+pub fn select_and_execute_device(tensor_size: i64) -> i64 {
+    let device: i64 = select_device(tensor_size);
+    
+    let result: i64 = 0;
+    if device == 0 {
+        result = execute_on_cpu(tensor_size);
+    }
+    else if device == 1 {
+        result = execute_on_igpu(tensor_size);
+    }
+    else if device == 2 {
+        result = execute_on_gpu(tensor_size);
+    }
+    
+    return result;
+}
+
+pub fn estimate_power_consumption(device: i64, duration: i64) -> i64 {
+    // Estimate power in milliwatts
+    let base_power: i64 = 0;
+    
+    if device == 0 {
+        base_power = 10;  // CPU: ~10mW per unit time
+    }
+    else if device == 1 {
+        base_power = 5;   // iGPU: ~5mW (efficient)
+    }
+    else if device == 2 {
+        base_power = 50;  // GPU: ~50mW (high power)
+    }
+    
+    return base_power * duration;
+}
+
+pub fn adaptive_batch_size(device: i64) -> i64 {
+    // Recommended batch size per device
+    if device == 0 { return 32; }    // CPU: small batches
+    if device == 1 { return 128; }   // iGPU: medium batches
+    if device == 2 { return 512; }   // GPU: large batches
+    return 32;
+}
+
+pub fn check_device_availability(device_type: i64) -> i64 {
+    // Check if device is available (1=yes, 0=no)
+    // Assume all devices available in testing
+    return 1;
+}
+
+pub fn get_device_memory(device: i64) -> i64 {
+    // Get available memory in MB
+    if device == 0 { return 16384; }    // CPU: assume 16GB
+    if device == 1 { return 2048; }     // iGPU: assume 2GB
+    if device == 2 { return 8192; }     // GPU: assume 8GB
+    return 0;
+}
+
+pub fn allocate_tensor(size: i64, device: i64) -> i64 {
+    // Allocate tensor on device, return handle or error code
+    let available_memory: i64 = get_device_memory(device);
+    if size <= available_memory {
+        return 1;  // allocation successful
+    }
+    return 0;  // allocation failed
+}

@@ -1,0 +1,48 @@
+// titan/ui/lenses/router_lens.ti — OmniRouter Dashboard Lens
+// Projects Subsystem 3 (OmniRouter) telemetry into a structured UI allocation.
+// TAG_ROUTER_LENS=71000 is clear of all existing tag ranges.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_ROUTER_LENS: i64 = 71000;
+
+// Lens cell: body=budget (token capacity usage), arg=routes (active visual pathways)
+// Returns 0 if sys_id is not OmniRouter (subsystem 3).
+pub fn rl_render_metrics(sys_id: i64, budget: i64, routes: i64) -> i64 {
+    if sys_id != 3 { return 0; }
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_ROUTER_LENS);
+    heap_set_body(v, budget);
+    heap_set_arg(v, routes);
+    return v;
+}
+
+pub fn rl_budget(v: i64) -> i64 { return heap_get_body(v); }
+pub fn rl_routes(v: i64) -> i64 { return heap_get_arg(v); }
+
+pub fn main() -> i64 {
+    // Test 1: valid sys_id=3 returns populated lens cell
+    let v = rl_render_metrics(3, 80, 14);
+    if v == 0            { return 1; }
+    if rl_budget(v) != 80 { return 2; }
+    if rl_routes(v) != 14 { return 3; }
+
+    // Test 2: wrong sys_id returns 0 (no other subsystem gets router lens)
+    if rl_render_metrics(0, 80, 14) != 0 { return 4; }
+    if rl_render_metrics(8, 80, 14) != 0 { return 5; }
+
+    // Test 3: tag is correctly set
+    if heap_get_tag(v) != TAG_ROUTER_LENS { return 6; }
+
+    return 111;
+}

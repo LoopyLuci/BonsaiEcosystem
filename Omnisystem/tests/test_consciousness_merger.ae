@@ -1,0 +1,276 @@
+// tests/test_consciousness_merger.ae
+// Test suite for ConsciousnessMerger — Tier 4 mind merging
+
+test "merger_initialization" {
+    let primary = mock_actor();
+    let secondary = mock_actor();
+    let verifier = mock_actor();
+    
+    let merger = ConsciousnessMerger::init(primary, secondary, verifier);
+    
+    assert_eq!(merger.stats.merges_attempted, 0);
+    assert_eq!(merger.stats.merges_succeeded, 0);
+    assert_eq!(merger.stats.merges_failed, 0);
+}
+
+test "merge_two_workspaces" {
+    let primary = GlobalWorkspace {
+        thoughts: vec![
+            Thought { id: "t1".to_string(), content: "thought1".to_string(), confidence: 0.8 },
+            Thought { id: "t2".to_string(), content: "thought2".to_string(), confidence: 0.7 },
+        ],
+    };
+    
+    let secondary = GlobalWorkspace {
+        thoughts: vec![
+            Thought { id: "t3".to_string(), content: "thought3".to_string(), confidence: 0.9 },
+            Thought { id: "t2".to_string(), content: "thought2_updated".to_string(), confidence: 0.8 },
+        ],
+    };
+    
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    let merged = merger.merge_workspaces(primary, secondary);
+    
+    // Should have 3 unique thoughts (t1, t2 updated, t3)
+    assert_eq!(merged.thoughts.len(), 3);
+    
+    // t2 should be updated (0.8 > 0.7)
+    let t2 = merged.thoughts.iter().find(|t| t.id == "t2").unwrap();
+    assert_eq!(t2.confidence, 0.8);
+}
+
+test "merge_workspace_crdt_semantics" {
+    let a = GlobalWorkspace {
+        thoughts: vec![
+            Thought { id: "t1".to_string(), content: "a1".to_string(), confidence: 0.5 },
+        ],
+    };
+    
+    let b = GlobalWorkspace {
+        thoughts: vec![
+            Thought { id: "t1".to_string(), content: "b1".to_string(), confidence: 0.7 },
+        ],
+    };
+    
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    let ab = merger.merge_workspaces(a.clone(), b.clone());
+    let ba = merger.merge_workspaces(b.clone(), a.clone());
+    
+    // Both merges should preserve the higher confidence thought
+    assert_eq!(ab.thoughts[0].confidence, ba.thoughts[0].confidence);
+}
+
+test "merge_knowledge_bases" {
+    let knowledge_a = vec![
+        Knowledge {
+            domain: "test".to_string(),
+            content: "k1".to_string(),
+            proof_hash: "h1".to_string(),
+            confidence: 0.9,
+            source_objective: "o1".to_string(),
+            timestamp: now(),
+        },
+    ];
+    
+    let knowledge_b = vec![
+        Knowledge {
+            domain: "test".to_string(),
+            content: "k2".to_string(),
+            proof_hash: "h2".to_string(),
+            confidence: 0.8,
+            source_objective: "o2".to_string(),
+            timestamp: now(),
+        },
+    ];
+    
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    let merged = merger.merge_knowledge(knowledge_a, knowledge_b);
+    
+    // Both knowledge items should be present (no duplicates)
+    assert_eq!(merged.len(), 2);
+}
+
+test "merge_deduplication_by_hash" {
+    let knowledge_a = vec![
+        Knowledge {
+            domain: "test".to_string(),
+            content: "k1".to_string(),
+            proof_hash: "h_same".to_string(),
+            confidence: 0.9,
+            source_objective: "o1".to_string(),
+            timestamp: now(),
+        },
+    ];
+    
+    let knowledge_b = vec![
+        Knowledge {
+            domain: "test".to_string(),
+            content: "k1".to_string(),
+            proof_hash: "h_same".to_string(),  // Same hash
+            confidence: 0.8,
+            source_objective: "o1".to_string(),
+            timestamp: now(),
+        },
+    ];
+    
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    let merged = merger.merge_knowledge(knowledge_a, knowledge_b);
+    
+    // Should deduplicate to 1 item
+    assert_eq!(merged.len(), 1);
+}
+
+test "emotion_merge_weighted_average" {
+    let e1 = Emotion {
+        valence: 0.6,
+        arousal: 0.4,
+        dominance: 0.5,
+        label: "happy".to_string(),
+    };
+    
+    let e2 = Emotion {
+        valence: 0.4,
+        arousal: 0.8,
+        dominance: 0.9,
+        label: "excited".to_string(),
+    };
+    
+    // Weighted average: 0.6 weight for primary, 0.4 for secondary
+    let valence = e1.valence * 0.6 + e2.valence * 0.4;
+    let arousal = e1.arousal * 0.6 + e2.arousal * 0.4;
+    let dominance = e1.dominance * 0.6 + e2.dominance * 0.4;
+    
+    assert_eq!(valence, 0.52);  // 0.6*0.6 + 0.4*0.4 = 0.36 + 0.16
+    assert_eq!(arousal, 0.56);  // 0.4*0.6 + 0.8*0.4 = 0.24 + 0.32
+    assert_eq!(dominance, 0.66); // 0.5*0.6 + 0.9*0.4 = 0.30 + 0.36
+}
+
+test "merge_commutativity_property" {
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    
+    let a = GlobalWorkspace {
+        thoughts: vec![
+            Thought { id: "t1".to_string(), content: "a".to_string(), confidence: 0.5 },
+        ],
+    };
+    
+    let b = GlobalWorkspace {
+        thoughts: vec![
+            Thought { id: "t2".to_string(), content: "b".to_string(), confidence: 0.6 },
+        ],
+    };
+    
+    let ab = merger.merge_workspaces(a.clone(), b.clone());
+    let ba = merger.merge_workspaces(b.clone(), a.clone());
+    
+    // Both merges should contain all thoughts
+    assert_eq!(ab.thoughts.len(), ba.thoughts.len());
+}
+
+test "merge_attempted_tracking" {
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    
+    assert_eq!(merger.stats.merges_attempted, 0);
+    
+    // After merge (would update stats)
+    let stats = MergerStats {
+        merges_attempted: 1,
+        merges_succeeded: 1,
+        merges_failed: 0,
+    };
+    
+    assert_eq!(stats.merges_attempted, 1);
+}
+
+test "auto_merge_scheduling" {
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    
+    merger ! AutoMerge;
+    sleep(100);
+    
+    // Would be rescheduled after 10 minutes
+    assert!(true);
+}
+
+test "knowledge_union_preservation" {
+    let a = vec![
+        Knowledge {
+            domain: "d1".to_string(),
+            content: "c1".to_string(),
+            proof_hash: "h1".to_string(),
+            confidence: 0.9,
+            source_objective: "o1".to_string(),
+            timestamp: now(),
+        },
+    ];
+    
+    let b = vec![
+        Knowledge {
+            domain: "d2".to_string(),
+            content: "c2".to_string(),
+            proof_hash: "h2".to_string(),
+            confidence: 0.8,
+            source_objective: "o2".to_string(),
+            timestamp: now(),
+        },
+    ];
+    
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    let merged = merger.merge_knowledge(a.clone(), b.clone());
+    
+    // Both original items should be in result
+    assert!(merged.iter().any(|k| k.proof_hash == "h1"));
+    assert!(merged.iter().any(|k| k.proof_hash == "h2"));
+}
+
+test "no_knowledge_destruction_guarantee" {
+    let large_a: Vec<Knowledge> = (0..100).map(|i| Knowledge {
+        domain: "test".to_string(),
+        content: format!("c{}", i),
+        proof_hash: format!("h{}", i),
+        confidence: 0.9,
+        source_objective: format!("o{}", i),
+        timestamp: now(),
+    }).collect();
+    
+    let large_b: Vec<Knowledge> = (100..200).map(|i| Knowledge {
+        domain: "test".to_string(),
+        content: format!("c{}", i),
+        proof_hash: format!("h{}", i),
+        confidence: 0.8,
+        source_objective: format!("o{}", i),
+        timestamp: now(),
+    }).collect();
+    
+    let merger = ConsciousnessMerger::init(mock_actor(), mock_actor(), mock_actor());
+    let merged = merger.merge_knowledge(large_a, large_b);
+    
+    // Should have all 200 items (no destruction)
+    assert_eq!(merged.len(), 200);
+}
+
+test "emotion_label_selection" {
+    let e1 = Emotion {
+        valence: 0.9,
+        arousal: 0.1,
+        dominance: 0.5,
+        label: "confident".to_string(),
+    };
+    
+    let e2 = Emotion {
+        valence: 0.5,
+        arousal: 0.9,
+        dominance: 0.3,
+        label: "anxious".to_string(),
+    };
+    
+    let confidence1 = e1.confidence();
+    let confidence2 = e2.confidence();
+    
+    // e1 has higher confidence, so its label should be selected
+    assert!(confidence1 > confidence2);
+}
+
+fn mock_actor() -> ActorId {
+    ActorId { id: "mock".to_string() }
+}

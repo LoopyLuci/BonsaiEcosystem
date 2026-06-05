@@ -1,0 +1,331 @@
+// sylva/compiler.ti — Sylva source → Omni-IR bytecode compiler
+// Stages: lex → parse → resolve → emit IR
+// The emitted IR is consumed directly by sylva/interpreter.ti's sv_exec()
+// or by the future Cranelift-based JIT.
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+// ── Reuse Omni-IR opcodes (mirrors build/omni_ir/ir.ti) ──────────────────
+const OP_PUSH:      i64 = 0;
+const OP_POP:       i64 = 1;
+const OP_DUP:       i64 = 2;
+const OP_LOAD:      i64 = 10;
+const OP_STORE:     i64 = 11;
+const OP_ADD:       i64 = 20;
+const OP_SUB:       i64 = 21;
+const OP_MUL:       i64 = 22;
+const OP_DIV:       i64 = 23;
+const OP_MOD:       i64 = 24;
+const OP_NEG:       i64 = 25;
+const OP_EQ:        i64 = 30;
+const OP_NEQ:       i64 = 31;
+const OP_LT:        i64 = 32;
+const OP_LE:        i64 = 33;
+const OP_GT:        i64 = 34;
+const OP_GE:        i64 = 35;
+const OP_AND:       i64 = 40;
+const OP_OR:        i64 = 41;
+const OP_NOT:       i64 = 42;
+const OP_JUMP:      i64 = 50;
+const OP_JUMP_IF:   i64 = 51;
+const OP_CALL:      i64 = 53;
+const OP_RET:       i64 = 54;
+const OP_HALT:      i64 = 55;
+const OP_NULL:      i64 = 60;
+const OP_TRUE:      i64 = 61;
+const OP_FALSE:     i64 = 62;
+const OP_LIST_NEW:  i64 = 63;
+const OP_LIST_GET:  i64 = 64;
+const OP_LIST_SET:  i64 = 65;
+const OP_LIST_LEN:  i64 = 66;
+const OP_MAP_NEW:   i64 = 67;
+const OP_MAP_GET:   i64 = 68;
+const OP_MAP_SET:   i64 = 69;
+const OP_PERFORM:   i64 = 70;
+
+// ── AST node tags ──────────────────────────────────────────────────────────
+const TAG_IR:       i64 = 65000;  // IR instruction node
+const AST_INT:      i64 = 65010;
+const AST_FLOAT:    i64 = 65011;
+const AST_BOOL:     i64 = 65012;
+const AST_NULL:     i64 = 65013;
+const AST_IDENT:    i64 = 65014;  // body=slot_id (resolved)
+const AST_BINOP:    i64 = 65015;  // body=op, arg=left_node, domain=right_node
+const AST_UNOP:     i64 = 65016;  // body=op, arg=operand_node
+const AST_LET:      i64 = 65017;  // body=slot, arg=init_expr_node
+const AST_ASSIGN:   i64 = 65018;  // body=slot, arg=expr_node
+const AST_IF:       i64 = 65019;  // body=cond, arg=then_node, domain=else_node(0=no else)
+const AST_WHILE:    i64 = 65020;  // body=cond, arg=body_node
+const AST_BLOCK:    i64 = 65021;  // body=first_stmt, arg=next_stmt_chain
+const AST_CALL:     i64 = 65022;  // body=fn_id, arg=args_list
+const AST_RET:      i64 = 65023;  // body=expr_node
+const AST_LIST:     i64 = 65024;  // body=elements_list
+const AST_MAP:      i64 = 65025;  // body=pairs_list
+const AST_INDEX:    i64 = 65026;  // body=collection_node, arg=index_node
+
+// Binop codes
+const BOP_ADD:  i64 = 1; const BOP_SUB: i64 = 2; const BOP_MUL: i64 = 3;
+const BOP_DIV:  i64 = 4; const BOP_MOD: i64 = 5;
+const BOP_EQ:   i64 = 6; const BOP_NEQ: i64 = 7;
+const BOP_LT:   i64 = 8; const BOP_LE:  i64 = 9;
+const BOP_GT:   i64 = 10; const BOP_GE: i64 = 11;
+const BOP_AND:  i64 = 12; const BOP_OR: i64 = 13;
+
+// ── IR construction helpers ───────────────────────────────────────────────
+pub fn ir(op:i64, operand:i64) -> i64 {
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_IR);
+    heap_set_body(n,op); heap_set_arg(n,operand); heap_set_domain(n,0); return n;
+}
+
+pub fn ir_link(a:i64, b:i64) -> i64 {
+    // returns tail so callers can chain
+    let cur = a;
+    while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+    heap_set_domain(cur, b);
+    return b;
+}
+
+// ── AST constructors ──────────────────────────────────────────────────────
+pub fn ast_int(v:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_INT); heap_set_body(n,v); return n; }
+pub fn ast_bool(b:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_BOOL); heap_set_body(n,b); return n; }
+pub fn ast_null() -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_NULL); return n; }
+pub fn ast_ident(slot:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_IDENT); heap_set_body(n,slot); return n; }
+pub fn ast_let(slot:i64, init:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_LET); heap_set_body(n,slot); heap_set_arg(n,init); return n; }
+pub fn ast_assign(slot:i64, expr:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_ASSIGN); heap_set_body(n,slot); heap_set_arg(n,expr); return n; }
+pub fn ast_binop(op:i64, left:i64, right:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_BINOP); heap_set_body(n,op); heap_set_arg(n,left); heap_set_domain(n,right); return n; }
+pub fn ast_unop(op:i64, operand:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_UNOP); heap_set_body(n,op); heap_set_arg(n,operand); return n; }
+pub fn ast_if(cond:i64, then_n:i64, else_n:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_IF); heap_set_body(n,cond); heap_set_arg(n,then_n); heap_set_domain(n,else_n); return n; }
+pub fn ast_while(cond:i64, body:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_WHILE); heap_set_body(n,cond); heap_set_arg(n,body); return n; }
+pub fn ast_ret(expr:i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_RET); heap_set_body(n,expr); return n; }
+
+// Block: body=stmt, domain=next_in_block (singly linked)
+pub fn ast_block_new() -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_BLOCK); heap_set_body(n,0); heap_set_arg(n,0); return n; }
+pub fn ast_block_add(blk:i64, stmt:i64) {
+    let node=heap_alloc_term(); heap_set_tag(node,AST_BLOCK+1);
+    heap_set_body(node,stmt); heap_set_arg(node,0);
+    if heap_get_body(blk)==0 { heap_set_body(blk,node); heap_set_arg(blk,node); }
+    else { heap_set_arg(heap_get_arg(blk),node); heap_set_arg(blk,node); }
+    return;
+}
+
+// ── Code emitter ──────────────────────────────────────────────────────────
+// Compiler state: body=head_instr, arg=tail_instr, domain=next_label_id
+const TAG_EMIT: i64 = 65100;
+
+pub fn emit_new() -> i64 {
+    let e=heap_alloc_term(); heap_set_tag(e,TAG_EMIT);
+    heap_set_body(e,0); heap_set_arg(e,0); heap_set_domain(e,0); return e;
+}
+
+pub fn emit_head(e:i64) -> i64 { return heap_get_body(e); }
+
+pub fn emit_instr(e:i64, op:i64, operand:i64) {
+    let n = ir(op, operand);
+    if heap_get_body(e)==0 { heap_set_body(e,n); heap_set_arg(e,n); }
+    else { heap_set_domain(heap_get_arg(e),n); heap_set_arg(e,n); }
+    return;
+}
+
+pub fn emit_patch_jump(instr:i64, target:i64) {
+    heap_set_arg(instr, target);
+    return;
+}
+
+// ── Expression compiler ───────────────────────────────────────────────────
+pub fn compile_expr(e:i64, node:i64) {
+    let tag = heap_get_tag(node);
+
+    if tag == AST_INT  { emit_instr(e, OP_PUSH, heap_get_body(node)); return; }
+    if tag == AST_BOOL { if heap_get_body(node)==1 { emit_instr(e,OP_TRUE,0); } else { emit_instr(e,OP_FALSE,0); } return; }
+    if tag == AST_NULL { emit_instr(e,OP_NULL,0); return; }
+    if tag == AST_IDENT { emit_instr(e, OP_LOAD, heap_get_body(node)); return; }
+
+    if tag == AST_BINOP {
+        let op    = heap_get_body(node);
+        let left  = heap_get_arg(node);
+        let right = heap_get_domain(node);
+        compile_expr(e, left);
+        compile_expr(e, right);
+        if op == BOP_ADD  { emit_instr(e,OP_ADD,0);  return; }
+        if op == BOP_SUB  { emit_instr(e,OP_SUB,0);  return; }
+        if op == BOP_MUL  { emit_instr(e,OP_MUL,0);  return; }
+        if op == BOP_DIV  { emit_instr(e,OP_DIV,0);  return; }
+        if op == BOP_MOD  { emit_instr(e,OP_MOD,0);  return; }
+        if op == BOP_EQ   { emit_instr(e,OP_EQ,0);   return; }
+        if op == BOP_NEQ  { emit_instr(e,OP_NEQ,0);  return; }
+        if op == BOP_LT   { emit_instr(e,OP_LT,0);   return; }
+        if op == BOP_LE   { emit_instr(e,OP_LE,0);   return; }
+        if op == BOP_GT   { emit_instr(e,OP_GT,0);   return; }
+        if op == BOP_GE   { emit_instr(e,OP_GE,0);   return; }
+        if op == BOP_AND  { emit_instr(e,OP_AND,0);  return; }
+        if op == BOP_OR   { emit_instr(e,OP_OR,0);   return; }
+        return;
+    }
+
+    if tag == AST_UNOP {
+        let op = heap_get_body(node);
+        compile_expr(e, heap_get_arg(node));
+        if op == 1 { emit_instr(e,OP_NEG,0); return; }  // negation
+        if op == 2 { emit_instr(e,OP_NOT,0); return; }  // logical not
+        return;
+    }
+
+    // List literal
+    if tag == AST_LIST {
+        emit_instr(e, OP_LIST_NEW, 0);
+        let cur = heap_get_body(node);
+        while cur != 0 {
+            compile_expr(e, heap_get_body(cur));
+            emit_instr(e, OP_LIST_SET, 0);
+            cur = heap_get_arg(cur);
+        }
+        return;
+    }
+
+    return;
+}
+
+// ── Statement compiler ────────────────────────────────────────────────────
+pub fn compile_stmt(e:i64, node:i64) {
+    let tag = heap_get_tag(node);
+
+    if tag == AST_LET {
+        compile_expr(e, heap_get_arg(node));
+        emit_instr(e, OP_STORE, heap_get_body(node));
+        return;
+    }
+
+    if tag == AST_ASSIGN {
+        compile_expr(e, heap_get_arg(node));
+        emit_instr(e, OP_STORE, heap_get_body(node));
+        return;
+    }
+
+    if tag == AST_RET {
+        compile_expr(e, heap_get_body(node));
+        emit_instr(e, OP_RET, 0);
+        return;
+    }
+
+    // if/else: emit cond, JUMP_IF to then, then body, JUMP over else, else body
+    if tag == AST_IF {
+        compile_expr(e, heap_get_body(node));
+        // placeholder jump-to-then
+        emit_instr(e, OP_JUMP_IF, 0);
+        let jmp_then = heap_get_arg(e);   // tail = the JUMP_IF instr
+
+        // compile else first (if present), then patch
+        let else_n = heap_get_domain(node);
+        let jmp_end = 0;
+        if else_n != 0 {
+            compile_stmt(e, else_n);
+            emit_instr(e, OP_JUMP, 0);
+            jmp_end = heap_get_arg(e);
+        }
+
+        // patch JUMP_IF to current tail+1 (the then block start)
+        let then_start = heap_get_arg(e);  // tail right now
+        emit_patch_jump(jmp_then, then_start);
+        compile_stmt(e, heap_get_arg(node));
+
+        if jmp_end != 0 {
+            let after_then = heap_get_arg(e);
+            emit_patch_jump(jmp_end, after_then);
+        }
+        return;
+    }
+
+    // while: cond_start, JUMP_IF body, body, JUMP cond_start, body_end
+    if tag == AST_WHILE {
+        let cond_start = heap_get_arg(e);  // save current tail
+        compile_expr(e, heap_get_body(node));
+        emit_instr(e, OP_JUMP_IF, 0);
+        let jmp_body = heap_get_arg(e);
+        // placeholder: jump past loop if false
+        emit_instr(e, OP_JUMP, 0);
+        let jmp_exit = heap_get_arg(e);
+
+        emit_patch_jump(jmp_body, heap_get_arg(e));
+        compile_stmt(e, heap_get_arg(node));
+        emit_instr(e, OP_JUMP, cond_start);  // loop back
+        emit_patch_jump(jmp_exit, heap_get_arg(e));
+        return;
+    }
+
+    // Block of statements
+    if tag == AST_BLOCK || tag == AST_BLOCK+1 {
+        // Detect which variant: AST_BLOCK is the block node; AST_BLOCK+1 is a chain node
+        if tag == AST_BLOCK {
+            let cur = heap_get_body(node);
+            while cur != 0 { compile_stmt(e, heap_get_body(cur)); cur = heap_get_arg(cur); }
+        } else {
+            compile_stmt(e, heap_get_body(node));
+        }
+        return;
+    }
+
+    // Expression statement (result discarded)
+    compile_expr(e, node);
+    emit_instr(e, OP_POP, 0);
+    return;
+}
+
+// ── Top-level compile ─────────────────────────────────────────────────────
+pub fn compile(ast:i64) -> i64 {
+    let e = emit_new();
+    compile_stmt(e, ast);
+    emit_instr(e, OP_HALT, 0);
+    return emit_head(e);
+}
+
+// ── Instruction count (for testing) ──────────────────────────────────────
+pub fn ir_count(head:i64) -> i64 {
+    let n=0; let cur=head;
+    while cur!=0 { n=n+1; cur=heap_get_domain(cur); }
+    return n;
+}
+
+pub fn main() -> i64 {
+    // Test 1: compile integer literal → PUSH 42, HALT
+    let prog1 = compile(ast_int(42));
+    if ir_count(prog1) != 2 { return 1; }
+    if heap_get_body(prog1) != OP_PUSH { return 2; }
+    if heap_get_arg(prog1) != 42       { return 3; }
+
+    // Test 2: compile addition → PUSH 3, PUSH 4, ADD, HALT
+    let prog2 = compile(ast_binop(BOP_ADD, ast_int(3), ast_int(4)));
+    if ir_count(prog2) != 4 { return 4; }
+
+    // Test 3: compile let statement → expr, STORE slot, HALT
+    let prog3 = compile(ast_let(0, ast_int(99)));
+    // PUSH 99, STORE 0, HALT = 3 instructions
+    if ir_count(prog3) != 3 { return 5; }
+
+    // Test 4: let + load back
+    let blk = ast_block_new();
+    ast_block_add(blk, ast_let(0, ast_int(7)));
+    ast_block_add(blk, ast_let(1, ast_int(8)));
+    ast_block_add(blk, ast_ret(ast_binop(BOP_MUL, ast_ident(0), ast_ident(1))));
+    let prog4 = compile(blk);
+    // PUSH7, STORE0, PUSH8, STORE1, LOAD0, LOAD1, MUL, RET, HALT = 9
+    if ir_count(prog4) != 9 { return 6; }
+
+    // Test 5: boolean literal
+    let prog5 = compile(ast_bool(1));
+    if heap_get_body(prog5) != OP_TRUE { return 7; }
+
+    // Test 6: null literal
+    let prog6 = compile(ast_null());
+    if heap_get_body(prog6) != OP_NULL { return 8; }
+
+    // Test 7: comparison expression → PUSH, PUSH, LT, HALT
+    let prog7 = compile(ast_binop(BOP_LT, ast_int(5), ast_int(10)));
+    if ir_count(prog7) != 4 { return 9; }
+
+    // Test 8: negation
+    let prog8 = compile(ast_unop(1, ast_int(5)));
+    // PUSH 5, NEG, HALT = 3
+    if ir_count(prog8) != 3 { return 10; }
+
+    return 111;
+}

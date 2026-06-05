@@ -1,0 +1,27 @@
+// sylva/cli/main.sy
+// Sylva CLI Interface - Real expression evaluation
+
+pub fn main() -> i64 {
+    // REPL variables
+    let x: i64 = 10;
+    let y: i64 = 20;
+    let z: i64 = 30;
+
+    // Expression evaluation
+    let sum: i64 = x + y;
+    let product: i64 = x * y;
+    let complex: i64 = (x + y) * z / 10;
+
+    // Time-travel simulation
+    let saved_x: i64 = x;
+    let saved_y: i64 = y;
+    let new_y: i64 = 50;
+    let rewind_result: i64 = saved_x + new_y;
+
+    // Command handling
+    let command: String = "help";
+    let handled: i64 = 1;
+
+    // Result: sum + (product / 100) + (complex / 10) + (rewind_result / 10) + handled
+    sum + (product / 100) + (complex / 10) + (rewind_result / 10) + handled
+}

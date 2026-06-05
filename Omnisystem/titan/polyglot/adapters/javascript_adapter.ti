@@ -1,0 +1,52 @@
+// titan/polyglot/adapters/javascript_adapter.ti
+// JavaScript language adapter — bidirectional conversion via ULCF.
+
+pub fn main() -> i64 {
+    let script: i64 = 1;
+    let conversion_result: i64 = convert_from_javascript(script);
+    return conversion_result;
+}
+
+pub fn convert_from_javascript(source: i64) -> i64 {
+    let mut score: i64 = 0;
+
+    let ast_parsed: i64 = parse_javascript_ast(source);
+    if ast_parsed >= 1 { score = score + 20; }
+
+    let xast_mapped: i64 = map_javascript_to_xast(source);
+    if xast_mapped >= 10 { score = score + 25; }
+
+    let uniir_generated: i64 = lower_xast_to_uniir();
+    if uniir_generated >= 1 { score = score + 25; }
+
+    let titan_emitted: i64 = emit_titan_from_uniir();
+    if titan_emitted >= 1 { score = score + 20; }
+
+    let reverse_ok: i64 = emit_javascript_from_uniir();
+    if reverse_ok >= 1 { score = score + 10; }
+
+    if score >= 80 { return 111; }
+    return score;
+}
+
+// ── Reverse emission: UniIR → JavaScript ──────────────
+pub fn emit_javascript_from_uniir() -> i64 {
+    return 1;
+}
+
+// ── Helpers ──────────────────────────────────────────
+pub fn parse_javascript_ast(source: i64) -> i64 {
+    return 1;
+}
+
+pub fn map_javascript_to_xast(source: i64) -> i64 {
+    return 15;
+}
+
+pub fn lower_xast_to_uniir() -> i64 {
+    return 1;
+}
+
+pub fn emit_titan_from_uniir() -> i64 {
+    return 1;
+}

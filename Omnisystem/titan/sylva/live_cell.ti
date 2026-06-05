@@ -1,0 +1,114 @@
+// titan/sylva/live_cell.ti — Live Notebook Cell (tags 37300-37399)
+// Models a reactive notebook cell with value, deps, and dirty tracking.
+//
+// Cell layout (heap_alloc, fields 0-7):
+//   field[0] = tag (37300)
+//   field[1] = cell_id
+//   field[2] = value
+//   field[3] = dirty (0=clean, 1=dirty)
+//   field[4] = dep_head (linked list of dep cells)
+//   field[5] = eval_count
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_LIVE_CELL: i64 = 37300;
+const TAG_DEP_EDGE:  i64 = 37301;
+
+pub fn lc_new(cell_id: i64, init_val: i64) -> i64 {
+    let c = heap_alloc();
+    heap_set(c, 0, TAG_LIVE_CELL);
+    heap_set(c, 1, cell_id);
+    heap_set(c, 2, init_val);
+    heap_set(c, 3, 0);
+    heap_set(c, 4, 0);
+    heap_set(c, 5, 0);
+    return c;
+}
+
+pub fn lc_value(cell: i64) -> i64 {
+    return heap_get(cell, 2);
+}
+
+pub fn lc_dirty(cell: i64) -> i64 {
+    return heap_get(cell, 3);
+}
+
+pub fn lc_set(cell: i64, val: i64) {
+    heap_set(cell, 2, val);
+    heap_set(cell, 3, 1);
+}
+
+pub fn lc_eval(cell: i64, new_val: i64) {
+    heap_set(cell, 2, new_val);
+    heap_set(cell, 3, 0);
+    let cnt = heap_get(cell, 5);
+    heap_set(cell, 5, cnt + 1);
+}
+
+pub fn lc_eval_count(cell: i64) -> i64 {
+    return heap_get(cell, 5);
+}
+
+pub fn lc_add_dep(cell: i64, dep_cell: i64) {
+    let edge = heap_alloc();
+    heap_set(edge, 0, TAG_DEP_EDGE);
+    heap_set(edge, 1, dep_cell);
+    heap_set(edge, 2, heap_get(cell, 4));
+    heap_set(cell, 4, edge);
+}
+
+pub fn lc_mark_deps_dirty(cell: i64) {
+    let mut edge = heap_get(cell, 4);
+    let mut stop: i64 = 0;
+    if edge == 0 { stop = 1; }
+    if stop == 0 {
+        let dep = heap_get(edge, 1);
+        heap_set(dep, 3, 1);
+        edge = heap_get(edge, 2);
+        if edge == 0 { stop = 1; }
+        if stop == 0 {
+            let dep2 = heap_get(edge, 1);
+            heap_set(dep2, 3, 1);
+            edge = heap_get(edge, 2);
+            if edge == 0 { stop = 1; }
+            if stop == 0 {
+                let dep3 = heap_get(edge, 1);
+                heap_set(dep3, 3, 1);
+            }
+        }
+    }
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: Create cell with value 42, dirty=0
+    let c1 = lc_new(1, 42);
+    if lc_value(c1) == 42 {
+        if lc_dirty(c1) == 0 {
+            score = score + 37;
+        }
+    }
+
+    // Step 2: Set new value, cell becomes dirty
+    lc_set(c1, 99);
+    if lc_dirty(c1) == 1 {
+        score = score + 37;
+    }
+
+    // Step 3: Eval with new value, dirty cleared, eval_count == 1
+    lc_eval(c1, 99);
+    if lc_dirty(c1) == 0 {
+        if lc_eval_count(c1) == 1 {
+            score = score + 37;
+        }
+    }
+
+    return score;
+}

@@ -1,0 +1,122 @@
+// test_omniwindow.ti — OmniWindow + OmniCanvas integration tests
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn heap_set_domain(a:i64,b:i64);
+    fn heap_get_domain(a:i64)->i64;
+    fn window_create(w:i64,h:i64,x:i64,y:i64)->i64;
+    fn window_show(wid:i64);
+    fn window_poll_event(wid:i64)->i64;
+    fn window_destroy(wid:i64);
+    fn surface_create(wid:i64,w:i64,h:i64)->i64;
+    fn surface_clear(sid:i64,color:i64);
+    fn surface_draw_rect(sid:i64,x:i64,y:i64,w:i64,h:i64,color:i64);
+    fn surface_present(sid:i64);
+    fn repl_print_int(v:i64);
+    fn repl_print_newline();
+}
+
+const T_TEST_WIN:i64=29500;
+const T_TEST_SURF:i64=29501;
+const TEST_W:i64=640;
+const TEST_H:i64=480;
+
+pub fn test_window_create()->i64{
+    let wid:i64=window_create(TEST_W,TEST_H,50,50);
+    if wid==0{return 0;}
+    return 1;
+}
+
+pub fn test_surface_create()->i64{
+    let wid:i64=window_create(TEST_W,TEST_H,50,50);
+    if wid==0{return 0;}
+    let sid:i64=surface_create(wid,TEST_W,TEST_H);
+    if sid==0{
+        window_destroy(wid);
+        return 0;
+    }
+    window_destroy(wid);
+    return 1;
+}
+
+pub fn test_surface_draw()->i64{
+    let wid:i64=window_create(TEST_W,TEST_H,50,50);
+    if wid==0{return 0;}
+    let sid:i64=surface_create(wid,TEST_W,TEST_H);
+    if sid==0{window_destroy(wid);return 0;}
+    surface_clear(sid,0);
+    surface_draw_rect(sid,10,10,100,50,255);
+    surface_draw_rect(sid,120,10,100,50,65280);
+    surface_draw_rect(sid,230,10,100,50,16711680);
+    surface_present(sid);
+    window_destroy(wid);
+    return 1;
+}
+
+pub fn test_event_poll()->i64{
+    let wid:i64=window_create(TEST_W,TEST_H,50,50);
+    if wid==0{return 0;}
+    window_show(wid);
+    let mut i:i64=0;
+    while i<4{
+        window_poll_event(wid);
+        i=i+1;
+    }
+    window_destroy(wid);
+    return 1;
+}
+
+pub fn test_heap_window_record()->i64{
+    let term:i64=heap_alloc_term();
+    let wid:i64=window_create(TEST_W,TEST_H,50,50);
+    heap_set_tag(term,T_TEST_WIN);
+    heap_set_body(term,wid);
+    heap_set_arg(term,TEST_W);
+    heap_set_domain(term,TEST_H);
+    let got_tag:i64=heap_get_tag(term);
+    let got_wid:i64=heap_get_body(term);
+    let got_w:i64=heap_get_arg(term);
+    if got_tag==T_TEST_WIN{
+        if got_w==TEST_W{
+            window_destroy(got_wid);
+            return 1;
+        }
+    }
+    window_destroy(got_wid);
+    return 0;
+}
+
+pub fn test_multi_window()->i64{
+    let w1:i64=window_create(400,300,10,10);
+    let w2:i64=window_create(400,300,420,10);
+    if w1==0{return 0;}
+    if w2==0{window_destroy(w1);return 0;}
+    window_show(w1);
+    window_show(w2);
+    window_destroy(w1);
+    window_destroy(w2);
+    return 1;
+}
+
+pub fn main()->i64{
+    let mut score:i64=0;
+    let r1:i64=test_window_create();
+    if r1==1{score=score+1;}
+    let r2:i64=test_surface_create();
+    if r2==1{score=score+1;}
+    let r3:i64=test_surface_draw();
+    if r3==1{score=score+1;}
+    let r4:i64=test_event_poll();
+    if r4==1{score=score+1;}
+    let r5:i64=test_heap_window_record();
+    if r5==1{score=score+1;}
+    let r6:i64=test_multi_window();
+    if r6==1{score=score+1;}
+    if score==6{return 111;}
+    return score;
+}

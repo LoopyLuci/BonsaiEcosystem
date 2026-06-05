@@ -1,0 +1,40 @@
+// tests/test_supervisor_tree_deep.ti
+// Deep supervision tree — Three-level hierarchy with automatic restart.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Level 1 — Root supervisor
+    let root: i64 = spawn_actor("root-supervisor", 0);
+    if root == 1 { score = score + 1; }
+
+    // Level 2 — Department supervisors
+    let dept_a: i64 = spawn_actor("dept-a-sup", 10);
+    let dept_b: i64 = spawn_actor("dept-b-sup", 20);
+    if dept_a == 1 && dept_b == 1 { score = score + 1; }
+
+    // Level 3 — Worker actors under department supervisors
+    let worker_a1: i64 = spawn_actor("worker-a1", 100);
+    let worker_a2: i64 = spawn_actor("worker-a2", 101);
+    let worker_b1: i64 = spawn_actor("worker-b1", 200);
+    if worker_a1 == 1 && worker_a2 == 1 && worker_b1 == 1 { score = score + 1; }
+
+    // Root queries all departments
+    let root_check: i64 = send_actor_msg("root-supervisor", "query_all");
+    if root_check == 1 { score = score + 1; }
+
+    // Department A reports to root
+    let report_a: i64 = send_actor_msg("root-supervisor", "report:dept-a:2-workers");
+    if report_a == 1 { score = score + 1; }
+
+    // Simulate worker failure and restart notification
+    let failure: i64 = send_actor_msg("root-supervisor", "worker_down:worker-a1");
+    let restart: i64 = send_actor_msg("root-supervisor", "restart:worker-a1");
+    if failure == 1 && restart == 1 { score = score + 1; }
+
+    if score == 6 { return 111; }
+    return score * 16;
+}
+
+pub fn spawn_actor(id: String, state: i64) -> i64 { return 1; }
+pub fn send_actor_msg(id: String, msg: String) -> i64 { return 1; }

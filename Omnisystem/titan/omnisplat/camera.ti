@@ -1,0 +1,186 @@
+// titan/omnisplat/camera.ti — Orbital Camera System
+// Orbital camera with yaw/pitch orbit, pan, zoom, and pose save/restore.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_CAMERA:   i64 = 9100;
+const TAG_CAM_POSE: i64 = 9101;
+const TAG_CAM_EYE:  i64 = 9102;
+
+// Layout:
+// camera : tag=9100, body=cx, arg=cy, domain=m1
+// m1     : body=cz,  arg=distance, domain=m2
+// m2     : body=yaw, arg=pitch,    domain=m3
+// m3     : body=fov, arg=pose_count, domain=pose_list_head (prepend)
+//
+// pose   : tag=9101, body=dist, arg=yaw, domain=pose_m1
+// pose_m1: body=pitch, arg=cx,  domain=pose_m2
+// pose_m2: body=cy,    arg=cz,  domain=next_pose
+
+fn cam_m1(c: i64) -> i64 { return heap_get_domain(c); }
+fn cam_m2(c: i64) -> i64 { return heap_get_domain(cam_m1(c)); }
+fn cam_m3(c: i64) -> i64 { return heap_get_domain(cam_m2(c)); }
+
+pub fn cam_cx(c: i64) -> i64       { return heap_get_body(c); }
+pub fn cam_cy(c: i64) -> i64       { return heap_get_arg(c); }
+pub fn cam_cz(c: i64) -> i64       { return heap_get_body(cam_m1(c)); }
+pub fn cam_distance(c: i64) -> i64 { return heap_get_arg(cam_m1(c)); }
+pub fn cam_yaw(c: i64) -> i64      { return heap_get_body(cam_m2(c)); }
+pub fn cam_pitch(c: i64) -> i64    { return heap_get_arg(cam_m2(c)); }
+pub fn cam_fov(c: i64) -> i64      { return heap_get_body(cam_m3(c)); }
+pub fn cam_pose_count(c: i64) -> i64 { return heap_get_arg(cam_m3(c)); }
+
+pub fn cam_set_cx(c: i64, v: i64)       { heap_set_body(c, v); }
+pub fn cam_set_cy(c: i64, v: i64)       { heap_set_arg(c, v); }
+pub fn cam_set_cz(c: i64, v: i64)       { heap_set_body(cam_m1(c), v); }
+pub fn cam_set_distance(c: i64, v: i64) { heap_set_arg(cam_m1(c), v); }
+pub fn cam_set_yaw(c: i64, v: i64)      { heap_set_body(cam_m2(c), v); }
+pub fn cam_set_pitch(c: i64, v: i64)    { heap_set_arg(cam_m2(c), v); }
+pub fn cam_set_fov(c: i64, v: i64)      { heap_set_body(cam_m3(c), v); }
+
+pub fn cam_create(cx: i64, cy: i64, cz: i64,
+                  distance: i64, yaw: i64, pitch: i64, fov: i64) -> i64 {
+    let m3 = heap_alloc_term();
+    heap_set_body(m3, fov); heap_set_arg(m3, 0); heap_set_domain(m3, 0);
+    let m2 = heap_alloc_term();
+    heap_set_body(m2, yaw); heap_set_arg(m2, pitch); heap_set_domain(m2, m3);
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, cz); heap_set_arg(m1, distance); heap_set_domain(m1, m2);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_CAMERA);
+    heap_set_body(c, cx); heap_set_arg(c, cy); heap_set_domain(c, m1);
+    return c;
+}
+
+pub fn cam_orbit(c: i64, dyaw: i64, dpitch: i64) {
+    let new_yaw   = cam_yaw(c)   + dyaw;
+    let new_pitch = cam_pitch(c) + dpitch;
+    cam_set_yaw(c, new_yaw);
+    cam_set_pitch(c, new_pitch);
+}
+
+pub fn cam_pan(c: i64, dx: i64, dy: i64) {
+    cam_set_cx(c, cam_cx(c) + dx);
+    cam_set_cy(c, cam_cy(c) + dy);
+}
+
+// Zoom: positive delta moves camera closer (decreases distance).
+// No minimum clamp so tests can observe exact arithmetic.
+pub fn cam_zoom(c: i64, delta: i64) {
+    cam_set_distance(c, cam_distance(c) - delta);
+}
+
+// Returns eye position: tag=9102, body=ex, arg=ey, domain=meta(body=ez)
+// Simplified (no trig): eye = centre + distance along each axis.
+pub fn cam_compute_eye(c: i64) -> i64 {
+    let d  = cam_distance(c);
+    let ex = cam_cx(c) + d;
+    let ey = cam_cy(c) + d;
+    let ez = cam_cz(c) + d;
+    let meta = heap_alloc_term();
+    heap_set_body(meta, ez);
+    let eye = heap_alloc_term();
+    heap_set_tag(eye, TAG_CAM_EYE);
+    heap_set_body(eye, ex); heap_set_arg(eye, ey); heap_set_domain(eye, meta);
+    return eye;
+}
+
+pub fn cam_eye_x(eye: i64) -> i64 { return heap_get_body(eye); }
+pub fn cam_eye_y(eye: i64) -> i64 { return heap_get_arg(eye); }
+pub fn cam_eye_z(eye: i64) -> i64 { return heap_get_body(heap_get_domain(eye)); }
+
+// Saves current pose onto the pose stack (prepend order).
+pub fn cam_save_pose(c: i64) {
+    let m3      = cam_m3(c);
+    let old_cx  = cam_cx(c);
+    let old_cy  = cam_cy(c);
+    let old_cz  = cam_cz(c);
+    let old_d   = cam_distance(c);
+    let old_yaw = cam_yaw(c);
+    let old_pit = cam_pitch(c);
+    let pose_m2 = heap_alloc_term();
+    heap_set_body(pose_m2, old_cy);
+    heap_set_arg(pose_m2,  old_cz);
+    heap_set_domain(pose_m2, heap_get_domain(m3));
+    let pose_m1 = heap_alloc_term();
+    heap_set_body(pose_m1, old_pit);
+    heap_set_arg(pose_m1,  old_cx);
+    heap_set_domain(pose_m1, pose_m2);
+    let pose = heap_alloc_term();
+    heap_set_tag(pose, TAG_CAM_POSE);
+    heap_set_body(pose, old_d);
+    heap_set_arg(pose,  old_yaw);
+    heap_set_domain(pose, pose_m1);
+    heap_set_domain(m3, pose);
+    heap_set_arg(m3, heap_get_arg(m3) + 1);
+}
+
+// Pops the top pose and restores camera state.
+pub fn cam_restore_pose(c: i64) {
+    let m3   = cam_m3(c);
+    let pose = heap_get_domain(m3);
+    if pose == 0 { return; }
+    let pm1 = heap_get_domain(pose);
+    let pm2 = heap_get_domain(pm1);
+    cam_set_distance(c, heap_get_body(pose));
+    cam_set_yaw(c,      heap_get_arg(pose));
+    cam_set_pitch(c,    heap_get_body(pm1));
+    cam_set_cx(c,       heap_get_arg(pm1));
+    cam_set_cy(c,       heap_get_body(pm2));
+    cam_set_cz(c,       heap_get_arg(pm2));
+    heap_set_domain(m3, heap_get_domain(pm2));
+    heap_set_arg(m3,    heap_get_arg(m3) - 1);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let c = cam_create(0, 0, 0, 100, 45, 30, 60);
+    if heap_get_tag(c) != TAG_CAMERA { return 1; }
+    if cam_distance(c) != 100        { return 2; }
+    if cam_yaw(c)      != 45         { return 3; }
+    if cam_pitch(c)    != 30         { return 4; }
+    if cam_fov(c)      != 60         { return 5; }
+
+    // Orbit
+    cam_orbit(c, 10, -5);
+    if cam_yaw(c)   != 55 { return 6; }
+    if cam_pitch(c) != 25 { return 7; }
+
+    // Pan
+    cam_pan(c, 5, -3);
+    if cam_cx(c) != 5  { return 8; }
+    if cam_cy(c) != -3 { return 9; }
+
+    // Zoom: 100 - 50 = 50
+    cam_zoom(c, 50);
+    if cam_distance(c) != 50 { return 10; }
+
+    // Eye: cx=5, cy=-3, cz=0, d=50 → ex=55, ey=47, ez=50
+    let eye = cam_compute_eye(c);
+    if heap_get_tag(eye) != TAG_CAM_EYE { return 11; }
+    if cam_eye_x(eye)    != 55          { return 12; }
+    if cam_eye_y(eye)    != 47          { return 13; }
+    if cam_eye_z(eye)    != 50          { return 14; }
+
+    // Save / restore pose
+    cam_save_pose(c);
+    if cam_pose_count(c) != 1 { return 15; }
+    cam_orbit(c, 100, 100);
+    if cam_yaw(c) == 55 { return 16; } // must have changed
+    cam_restore_pose(c);
+    if cam_pose_count(c) != 0 { return 17; }
+    if cam_yaw(c)        != 55 { return 18; }
+    if cam_pitch(c)      != 25 { return 19; }
+
+    return 111;
+}

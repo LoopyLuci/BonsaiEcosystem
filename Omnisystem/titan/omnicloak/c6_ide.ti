@@ -1,0 +1,61 @@
+// titan/omnicloak/c6_ide.ti — IDE Integration
+// Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_PNL6:   i64 = 23500;
+const T_RELAY6: i64 = 23501;
+const T_META6:  i64 = 23502;
+
+// panel: tag=T_PNL6, body=name, arg=visible, domain=0
+pub fn c6_panel_create(name: i64, visible: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T_PNL6); heap_set_body(p, name); heap_set_arg(p, visible); heap_set_domain(p, 0);
+    return p;
+}
+
+pub fn c6_panel_visible(p: i64) -> i64 { return heap_get_arg(p); }
+
+pub fn c6_panel_toggle(p: i64) {
+    if heap_get_arg(p) == 1 { heap_set_arg(p, 0); }
+    else { heap_set_arg(p, 1); }
+}
+
+// relay: tag=T_RELAY6, body=running(0/1), arg=0
+pub fn c6_relay_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, T_RELAY6); heap_set_body(r, 0); heap_set_arg(r, 0);
+    return r;
+}
+
+pub fn c6_relay_start(r: i64)  { heap_set_body(r, 1); }
+pub fn c6_relay_stop(r: i64)   { heap_set_body(r, 0); }
+pub fn c6_relay_running(r: i64) -> i64 { return heap_get_body(r); }
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let p = c6_panel_create(100, 1);
+    if c6_panel_visible(p) != 1   { return 1; }
+    c6_panel_toggle(p);
+    if c6_panel_visible(p) != 0   { return 2; }
+    c6_panel_toggle(p);
+    if c6_panel_visible(p) != 1   { return 3; }
+
+    let r = c6_relay_create();
+    if c6_relay_running(r) != 0   { return 4; }
+    c6_relay_start(r);
+    if c6_relay_running(r) != 1   { return 5; }
+    c6_relay_stop(r);
+    if c6_relay_running(r) != 0   { return 6; }
+    return 111;
+}

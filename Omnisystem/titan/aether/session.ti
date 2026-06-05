@@ -1,0 +1,117 @@
+// titan/aether/session.ti — Session Type Protocols (tags 38200-38299)
+// Models typed communication channels with send/recv sequencing.
+//
+// Channel cell layout:
+//   field[0] = tag (38200)
+//   field[1] = channel_id
+//   field[2] = state (0=IDLE, 1=SENDING, 2=RECEIVING, 3=CLOSED)
+//   field[3] = message_count
+//   field[4] = msg_head (linked list)
+//
+// Message cell layout:
+//   field[0] = tag (38201)
+//   field[1] = msg_type
+//   field[2] = payload
+//   field[3] = next
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_CHANNEL: i64 = 38200;
+const TAG_MESSAGE: i64 = 38201;
+
+const CHAN_IDLE:      i64 = 0;
+const CHAN_SENDING:   i64 = 1;
+const CHAN_RECEIVING: i64 = 2;
+const CHAN_CLOSED:    i64 = 3;
+
+const MSG_DATA:  i64 = 1;
+const MSG_ACK:   i64 = 2;
+const MSG_CLOSE: i64 = 3;
+
+pub fn chan_new(chan_id: i64) -> i64 {
+    let c = heap_alloc();
+    heap_set(c, 0, TAG_CHANNEL);
+    heap_set(c, 1, chan_id);
+    heap_set(c, 2, CHAN_IDLE);
+    heap_set(c, 3, 0);
+    heap_set(c, 4, 0);
+    return c;
+}
+
+pub fn chan_send(ch: i64, msg_type: i64, payload: i64) -> i64 {
+    if heap_get(ch, 2) == CHAN_CLOSED {
+        return 0;
+    }
+    let m = heap_alloc();
+    heap_set(m, 0, TAG_MESSAGE);
+    heap_set(m, 1, msg_type);
+    heap_set(m, 2, payload);
+    heap_set(m, 3, heap_get(ch, 4));
+    heap_set(ch, 4, m);
+    let cnt = heap_get(ch, 3);
+    heap_set(ch, 3, cnt + 1);
+    heap_set(ch, 2, CHAN_SENDING);
+    return 1;
+}
+
+pub fn chan_recv(ch: i64) -> i64 {
+    let head = heap_get(ch, 4);
+    if head == 0 {
+        return 0;
+    }
+    let payload = heap_get(head, 2);
+    heap_set(ch, 4, heap_get(head, 3));
+    let cnt = heap_get(ch, 3);
+    heap_set(ch, 3, cnt - 1);
+    heap_set(ch, 2, CHAN_RECEIVING);
+    return payload;
+}
+
+pub fn chan_msg_count(ch: i64) -> i64 {
+    return heap_get(ch, 3);
+}
+
+pub fn chan_state(ch: i64) -> i64 {
+    return heap_get(ch, 2);
+}
+
+pub fn chan_close(ch: i64) {
+    heap_set(ch, 2, CHAN_CLOSED);
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: Send 2 messages, count == 2
+    let ch = chan_new(1);
+    chan_send(ch, MSG_DATA, 42);
+    chan_send(ch, MSG_DATA, 99);
+    if chan_msg_count(ch) == 2 {
+        score = score + 37;
+    }
+
+    // Step 2: Recv one message (LIFO — gets 99), count == 1
+    let v = chan_recv(ch);
+    if v == 99 {
+        if chan_msg_count(ch) == 1 {
+            score = score + 37;
+        }
+    }
+
+    // Step 3: Close channel, send returns 0
+    chan_close(ch);
+    let ok = chan_send(ch, MSG_DATA, 55);
+    if ok == 0 {
+        if chan_state(ch) == CHAN_CLOSED {
+            score = score + 37;
+        }
+    }
+
+    return score;
+}

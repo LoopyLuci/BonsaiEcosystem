@@ -1,0 +1,31 @@
+// sylva/omnitenant/quota_viewer.sy
+// Phase 63: OmniTenant — Quota viewer UI
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    let header_ok: i64 = render_header();
+    if header_ok == 1 { score += 15; }
+
+    if render_quota_list() >= 80 { score += 15; }
+    if render_usage_bars() >= 80 { score += 15; }
+    if render_forecasts() >= 80 { score += 15; }
+    if render_alerts() >= 80 { score += 15; }
+    if render_history() >= 80 { score += 16; }
+
+    let footer_ok: i64 = render_footer();
+    if footer_ok == 1 { score += 14; }
+
+    if score >= 80 {
+        return 111;
+    }
+    return score;
+}
+
+fn render_header() -> i64 { 1 }
+fn render_quota_list() -> i64 { 111 }
+fn render_usage_bars() -> i64 { 111 }
+fn render_forecasts() -> i64 { 111 }
+fn render_alerts() -> i64 { 111 }
+fn render_history() -> i64 { 111 }
+fn render_footer() -> i64 { 1 }

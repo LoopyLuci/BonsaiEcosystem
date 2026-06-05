@@ -1,0 +1,399 @@
+// titan/bootstrap/lexer.ti
+// Titan Bootstrap Lexer — Tokenizes Titan source code.
+// This is the first component of the self-hosting compiler chain.
+// Written in Titan Stage 0 subset so it can compile itself.
+
+// ── Token kinds ──────────────────────────────────────────────
+pub enum TokenKind {
+    // Literals
+    INT_LIT,
+    FLOAT_LIT,
+    STRING_LIT,
+    BOOL_LIT,
+
+    // Keywords
+    KW_FN,
+    KW_PUB,
+    KW_LET,
+    KW_MUT,
+    KW_RETURN,
+    KW_IF,
+    KW_ELSE,
+    KW_WHILE,
+    KW_LOOP,
+    KW_MATCH,
+    KW_STRUCT,
+    KW_ENUM,
+    KW_IMPL,
+    KW_EFFECT,
+    KW_UNSAFE,
+    KW_EXTERN,
+    KW_WHERE,
+    KW_SELF,
+    KW_REF,
+
+    // Types
+    TYPE_I8, TYPE_I16, TYPE_I32, TYPE_I64,
+    TYPE_U8, TYPE_U16, TYPE_U32, TYPE_U64,
+    TYPE_F32, TYPE_F64,
+    TYPE_BOOL,
+    TYPE_STR,
+    TYPE_VOID,
+
+    // Symbols
+    LPAREN, RPAREN,
+    LBRACE, RBRACE,
+    LBRACKET, RBRACKET,
+    SEMICOLON, COLON,
+    COMMA, DOT, DOTDOT,
+    ARROW, FAT_ARROW,
+    PLUS, MINUS, STAR, SLASH, PERCENT,
+    EQ, EQEQ, NEQ,
+    LT, GT, LE, GE,
+    AND, OR, NOT,
+    AMPERSAND, PIPE, CARET, TILDE,
+    PLUS_EQ, MINUS_EQ, STAR_EQ, SLASH_EQ,
+
+    IDENT,
+    EOF,
+    ERROR,
+}
+
+// ── Token struct ─────────────────────────────────────────────
+pub struct Token {
+    pub kind: TokenKind,
+    pub lexeme: String,
+    pub line: i64,
+    pub col: i64,
+    pub value: String,  // for literals, the string representation
+}
+
+// ── Lexer state ──────────────────────────────────────────────
+pub struct Lexer {
+    pub source: String,
+    pub pos: i64,
+    pub line: i64,
+    pub col: i64,
+    pub tokens: Vec<Token>,
+}
+
+impl Lexer {
+    pub fn new(source: String) -> Lexer {
+        Lexer {
+            source: source,
+            pos: 0,
+            line: 1,
+            col: 1,
+            tokens: Vec::new(),
+        }
+    }
+
+    pub fn tokenize(&mut self) -> Vec<Token> {
+        while !self.is_at_end() {
+            self.skip_whitespace_and_comments();
+            if self.is_at_end() {
+                break;
+            }
+            self.scan_token();
+        }
+        self.emit(TokenKind::EOF, "", "");
+        self.tokens.clone()
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.pos >= self.source.len() as i64
+    }
+
+    fn peek(&self, offset: i64) -> u8 {
+        let idx = self.pos + offset;
+        if idx >= self.source.len() as i64 {
+            0
+        } else {
+            self.source.as_bytes()[idx as usize]
+        }
+    }
+
+    fn advance(&mut self) -> u8 {
+        let ch = self.source.as_bytes()[self.pos as usize];
+        self.pos = self.pos + 1;
+        if ch == '\n' as u8 {
+            self.line = self.line + 1;
+            self.col = 1;
+        } else {
+            self.col = self.col + 1;
+        }
+        ch
+    }
+
+    fn match_char(&mut self, expected: u8) -> bool {
+        if self.is_at_end() {
+            return false;
+        }
+        if self.source.as_bytes()[self.pos as usize] != expected {
+            return false;
+        }
+        self.pos = self.pos + 1;
+        self.col = self.col + 1;
+        true
+    }
+
+    fn emit(&mut self, kind: TokenKind, lexeme: &str, value: &str) {
+        self.tokens.push(Token {
+            kind: kind,
+            lexeme: lexeme.to_string(),
+            line: self.line,
+            col: self.col,
+            value: value.to_string(),
+        });
+    }
+
+    fn skip_whitespace_and_comments(&mut self) {
+        loop {
+            if self.is_at_end() {
+                return;
+            }
+            let ch = self.peek(0);
+            if ch == ' ' as u8 || ch == '\t' as u8 || ch == '\r' as u8 || ch == '\n' as u8 {
+                self.advance();
+            } else if ch == '/' as u8 && self.peek(1) == '/' as u8 {
+                while !self.is_at_end() && self.peek(0) != '\n' as u8 {
+                    self.advance();
+                }
+            } else if ch == '/' as u8 && self.peek(1) == '*' as u8 {
+                self.advance();
+                self.advance();
+                while !self.is_at_end() {
+                    if self.peek(0) == '*' as u8 && self.peek(1) == '/' as u8 {
+                        self.advance();
+                        self.advance();
+                        break;
+                    }
+                    self.advance();
+                }
+            } else {
+                return;
+            }
+        }
+    }
+
+    fn scan_token(&mut self) {
+        let ch = self.advance();
+        match ch {
+            '(' as u8 => self.emit(TokenKind::LPAREN, "(", ""),
+            ')' as u8 => self.emit(TokenKind::RPAREN, ")", ""),
+            '{' as u8 => self.emit(TokenKind::LBRACE, "{", ""),
+            '}' as u8 => self.emit(TokenKind::RBRACE, "}", ""),
+            '[' as u8 => self.emit(TokenKind::LBRACKET, "[", ""),
+            ']' as u8 => self.emit(TokenKind::RBRACKET, "]", ""),
+            ';' as u8 => self.emit(TokenKind::SEMICOLON, ";", ""),
+            ':' as u8 => {
+                if self.match_char(':' as u8) {
+                    self.emit(TokenKind::COLON, "::", "");
+                } else {
+                    self.emit(TokenKind::COLON, ":", "");
+                }
+            }
+            ',' as u8 => self.emit(TokenKind::COMMA, ",", ""),
+            '.' as u8 => {
+                if self.match_char('.' as u8) {
+                    self.emit(TokenKind::DOTDOT, "..", "");
+                } else {
+                    self.emit(TokenKind::DOT, ".", "");
+                }
+            }
+            '+' as u8 => {
+                if self.match_char('=' as u8) {
+                    self.emit(TokenKind::PLUS_EQ, "+=", "");
+                } else {
+                    self.emit(TokenKind::PLUS, "+", "");
+                }
+            }
+            '-' as u8 => {
+                if self.match_char('>' as u8) {
+                    self.emit(TokenKind::ARROW, "->", "");
+                } else if self.match_char('=' as u8) {
+                    self.emit(TokenKind::MINUS_EQ, "-=", "");
+                } else {
+                    self.emit(TokenKind::MINUS, "-", "");
+                }
+            }
+            '*' as u8 => {
+                if self.match_char('=' as u8) {
+                    self.emit(TokenKind::STAR_EQ, "*=", "");
+                } else {
+                    self.emit(TokenKind::STAR, "*", "");
+                }
+            }
+            '/' as u8 => {
+                if self.match_char('=' as u8) {
+                    self.emit(TokenKind::SLASH_EQ, "/=", "");
+                } else {
+                    self.emit(TokenKind::SLASH, "/", "");
+                }
+            }
+            '%' as u8 => self.emit(TokenKind::PERCENT, "%", ""),
+            '=' as u8 => {
+                if self.match_char('=' as u8) {
+                    self.emit(TokenKind::EQEQ, "==", "");
+                } else if self.match_char('>' as u8) {
+                    self.emit(TokenKind::FAT_ARROW, "=>", "");
+                } else {
+                    self.emit(TokenKind::EQ, "=", "");
+                }
+            }
+            '!' as u8 => {
+                if self.match_char('=' as u8) {
+                    self.emit(TokenKind::NEQ, "!=", "");
+                } else {
+                    self.emit(TokenKind::NOT, "!", "");
+                }
+            }
+            '<' as u8 => {
+                if self.match_char('=' as u8) {
+                    self.emit(TokenKind::LE, "<=", "");
+                } else {
+                    self.emit(TokenKind::LT, "<", "");
+                }
+            }
+            '>' as u8 => {
+                if self.match_char('=' as u8) {
+                    self.emit(TokenKind::GE, ">=", "");
+                } else {
+                    self.emit(TokenKind::GT, ">", "");
+                }
+            }
+            '&' as u8 => {
+                if self.match_char('&' as u8) {
+                    self.emit(TokenKind::AND, "&&", "");
+                } else {
+                    self.emit(TokenKind::AMPERSAND, "&", "");
+                }
+            }
+            '|' as u8 => {
+                if self.match_char('|' as u8) {
+                    self.emit(TokenKind::OR, "||", "");
+                } else {
+                    self.emit(TokenKind::PIPE, "|", "");
+                }
+            }
+            '^' as u8 => self.emit(TokenKind::CARET, "^", ""),
+            '~' as u8 => self.emit(TokenKind::TILDE, "~", ""),
+            '"' as u8 => self.scan_string(),
+            '\'' as u8 => self.scan_lifetime(),
+            c if self.is_digit(c) => self.scan_number(c),
+            c if self.is_alpha(c) || c == '_' as u8 => self.scan_ident(c),
+            _ => self.emit(TokenKind::ERROR, "?", ""),
+        }
+    }
+
+    fn scan_string(&mut self) {
+        let start = self.pos;
+        while !self.is_at_end() && self.peek(0) != '"' as u8 {
+            if self.peek(0) == '\\' as u8 {
+                self.advance();
+            }
+            self.advance();
+        }
+        if self.is_at_end() {
+            self.emit(TokenKind::ERROR, "unterminated string", "");
+            return;
+        }
+        let end = self.pos;
+        self.advance();
+        let value = self.source[start as usize..end as usize].to_string();
+        self.emit(TokenKind::STRING_LIT, &value, &value);
+    }
+
+    fn scan_lifetime(&mut self) {
+        let start = self.pos;
+        while !self.is_at_end() && (self.is_alpha(self.peek(0)) || self.is_digit(self.peek(0))) {
+            self.advance();
+        }
+        let name = self.source[start as usize..self.pos as usize].to_string();
+        self.emit(TokenKind::IDENT, &name, &name);
+    }
+
+    fn scan_number(&mut self, first: u8) {
+        let start = self.pos - 1;
+        let mut is_float = false;
+        while !self.is_at_end() && self.is_digit(self.peek(0)) {
+            self.advance();
+        }
+        if !self.is_at_end() && self.peek(0) == '.' as u8 && self.is_digit(self.peek(1)) {
+            is_float = true;
+            self.advance();
+            while !self.is_at_end() && self.is_digit(self.peek(0)) {
+                self.advance();
+            }
+        }
+        let lexeme = self.source[start as usize..self.pos as usize].to_string();
+        if is_float {
+            self.emit(TokenKind::FLOAT_LIT, &lexeme, &lexeme);
+        } else {
+            self.emit(TokenKind::INT_LIT, &lexeme, &lexeme);
+        }
+    }
+
+    fn scan_ident(&mut self, first: u8) {
+        let start = self.pos - 1;
+        while !self.is_at_end() {
+            let ch = self.peek(0);
+            if self.is_alpha(ch) || self.is_digit(ch) || ch == '_' as u8 {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        let lexeme = self.source[start as usize..self.pos as usize].to_string();
+        let kind = self.lookup_keyword(&lexeme);
+        self.emit(kind, &lexeme, &lexeme);
+    }
+
+    fn lookup_keyword(&self, word: &str) -> TokenKind {
+        match word {
+            "fn" => TokenKind::KW_FN,
+            "pub" => TokenKind::KW_PUB,
+            "let" => TokenKind::KW_LET,
+            "mut" => TokenKind::KW_MUT,
+            "return" => TokenKind::KW_RETURN,
+            "if" => TokenKind::KW_IF,
+            "else" => TokenKind::KW_ELSE,
+            "while" => TokenKind::KW_WHILE,
+            "loop" => TokenKind::KW_LOOP,
+            "match" => TokenKind::KW_MATCH,
+            "struct" => TokenKind::KW_STRUCT,
+            "enum" => TokenKind::KW_ENUM,
+            "impl" => TokenKind::KW_IMPL,
+            "effect" => TokenKind::KW_EFFECT,
+            "unsafe" => TokenKind::KW_UNSAFE,
+            "extern" => TokenKind::KW_EXTERN,
+            "where" => TokenKind::KW_WHERE,
+            "self" => TokenKind::KW_SELF,
+            "ref" => TokenKind::KW_REF,
+            "i8" => TokenKind::TYPE_I8,
+            "i16" => TokenKind::TYPE_I16,
+            "i32" => TokenKind::TYPE_I32,
+            "i64" => TokenKind::TYPE_I64,
+            "u8" => TokenKind::TYPE_U8,
+            "u16" => TokenKind::TYPE_U16,
+            "u32" => TokenKind::TYPE_U32,
+            "u64" => TokenKind::TYPE_U64,
+            "f32" => TokenKind::TYPE_F32,
+            "f64" => TokenKind::TYPE_F64,
+            "bool" => TokenKind::TYPE_BOOL,
+            "str" => TokenKind::TYPE_STR,
+            "void" => TokenKind::TYPE_VOID,
+            "true" => TokenKind::BOOL_LIT,
+            "false" => TokenKind::BOOL_LIT,
+            _ => TokenKind::IDENT,
+        }
+    }
+
+    fn is_digit(&self, ch: u8) -> bool {
+        ch >= '0' as u8 && ch <= '9' as u8
+    }
+
+    fn is_alpha(&self, ch: u8) -> bool {
+        (ch >= 'a' as u8 && ch <= 'z' as u8) || (ch >= 'A' as u8 && ch <= 'Z' as u8)
+    }
+}

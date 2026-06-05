@@ -1,0 +1,125 @@
+// titan/omnirouter/r2_token.ti — OmniToken Integration: pluggable filters & compression pipeline
+// Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_FLT2: i64 = 22100;
+const T_REG2: i64 = 22101;
+const T_MET2: i64 = 22102;
+const T_WRP2: i64 = 22103;
+
+// filter: tag=T_FLT2, body=ftype, arg=prio, domain=meta
+// meta: tag=T_MET2, body=name, arg=enabled
+// wrapper: tag=T_WRP2, body=filter, domain=next_wrapper
+
+pub fn r2_filter_create(ftype: i64, prio: i64, name: i64, enabled: i64) -> i64 {
+    let f = heap_alloc_term();
+    heap_set_tag(f, T_FLT2); heap_set_body(f, ftype); heap_set_arg(f, prio);
+    let m = heap_alloc_term();
+    heap_set_tag(m, T_MET2); heap_set_body(m, name); heap_set_arg(m, enabled);
+    heap_set_domain(f, m);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP2); heap_set_body(w, f); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn r2_filter_type(w: i64) -> i64 {
+    let f = heap_get_body(w);
+    return heap_get_body(f);
+}
+pub fn r2_filter_prio(w: i64) -> i64 {
+    let f = heap_get_body(w);
+    return heap_get_arg(f);
+}
+pub fn r2_filter_enabled(w: i64) -> i64 {
+    let f = heap_get_body(w);
+    let m = heap_get_domain(f);
+    return heap_get_arg(m);
+}
+
+// registry: tag=T_REG2, body=count, arg=list_head(wrappers)
+pub fn r2_registry_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, T_REG2); heap_set_body(r, 0); heap_set_arg(r, 0);
+    return r;
+}
+
+pub fn r2_registry_add(r: i64, w: i64) {
+    let h = heap_get_arg(r);
+    if h == 0 { heap_set_arg(r, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn r2_registry_count(r: i64) -> i64 { return heap_get_body(r); }
+
+pub fn r2_registry_get(r: i64, idx: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(r); let mut i: i64 = 0;
+    while cur != 0 {
+        if i == idx { return cur; }
+        i = i + 1; cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+// Apply enabled filters in order; type=1 → *6/10, type=2 → *7/10; floor=tokens/10
+pub fn r2_compress(r: i64, tokens: i64) -> i64 {
+    let n = heap_get_body(r);
+    let mut result: i64 = tokens;
+    let mut i: i64 = 0;
+    while i < n {
+        let w = r2_registry_get(r, i);
+        if w != 0 {
+            if r2_filter_enabled(w) == 1 {
+                let ft = r2_filter_type(w);
+                if ft == 1 { result = result * 6 / 10; }
+                else { if ft == 2 { result = result * 7 / 10; } }
+            }
+        }
+        i = i + 1;
+    }
+    let floor: i64 = tokens / 10;
+    if result < floor { result = floor; }
+    return result;
+}
+
+pub fn r2_savings(orig: i64, compressed: i64) -> i64 {
+    return orig - compressed;
+}
+
+// ===== Self-test =====
+// filters: w1(t=1,on)→*6/10, w2(t=2,on)→*7/10, w3(t=1,off)→skip
+// compress(100): 100→60→42; floor=10; result=42; savings=58
+pub fn main() -> i64 {
+    let r = r2_registry_create();
+    let w1 = r2_filter_create(1,  5, 100, 1);
+    let w2 = r2_filter_create(2, 10, 200, 1);
+    let w3 = r2_filter_create(1, 20, 300, 0);
+    r2_registry_add(r, w1);
+    r2_registry_add(r, w2);
+    r2_registry_add(r, w3);
+    if r2_registry_count(r) != 3    { return 1; }
+    if r2_filter_type(w1) != 1      { return 2; }
+    if r2_filter_prio(w2) != 10     { return 3; }
+    if r2_filter_enabled(w3) != 0   { return 4; }
+    let got = r2_registry_get(r, 1);
+    if got != w2                     { return 5; }
+    let c = r2_compress(r, 100);
+    if c != 42                       { return 6; }
+    if r2_savings(100, c) != 58      { return 7; }
+    return 111;
+}

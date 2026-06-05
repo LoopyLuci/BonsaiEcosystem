@@ -1,0 +1,88 @@
+// titan/ui/inspector.ti — Right-hand dockable Inspector with Write-Back
+// Four lenses: PROPS, MANIFEST, CONSOLE (Axiom tactics), PROOF (proof tree).
+// insp_handle_writeback validates via cc_validate_change then emits EVT_CONFIG_CHANGE.
+// insp_submit_tactic reuses the same validated write-back path for tactic submission.
+import "titan/omnicore/events.ti"
+// import "titan/ui/proof_explorer.ti"
+// import "titan/ui/axiom_console.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_INSP:      i64 = 65100;
+
+const LENS_PROPS:    i64 = 0;
+const LENS_MANIFEST: i64 = 1;
+const LENS_CONSOLE:  i64 = 2;   // Axiom tactic console
+const LENS_PROOF:    i64 = 3;   // Proof Explorer tree
+const LENS_COUNT:    i64 = 4;
+
+// Inspector cell:
+//   body   = target subsystem id
+//   arg    = active lens (0–3)
+//   domain = dirty flag (1 = pending write-back)
+pub fn insp_create() -> i64 {
+    let i = heap_alloc_term();
+    heap_set_tag(i, TAG_INSP);
+    heap_set_body(i, 0);
+    heap_set_arg(i, 0);
+    heap_set_domain(i, 0);
+    return i;
+}
+
+pub fn insp_set_target(i: i64, sys_id: i64) { heap_set_body(i, sys_id); }
+pub fn insp_set_lens(i: i64, lens: i64)     { heap_set_arg(i, lens); }
+pub fn insp_target(i: i64) -> i64           { return heap_get_body(i); }
+pub fn insp_lens(i: i64) -> i64             { return heap_get_arg(i); }
+pub fn insp_is_dirty(i: i64) -> i64         { return heap_get_domain(i); }
+pub fn insp_mark_dirty(i: i64)              { heap_set_domain(i, 1); }
+pub fn insp_mark_clean(i: i64)              { heap_set_domain(i, 0); }
+
+// Cycle: PROPS → MANIFEST → CONSOLE → PROOF → PROPS
+pub fn insp_cycle_lens(i: i64) {
+    let l = heap_get_arg(i);
+    if l >= LENS_COUNT - 1 {
+        heap_set_arg(i, 0);
+    } else {
+        heap_set_arg(i, l + 1);
+    }
+}
+
+// Write-back gate: validate then emit EVT_CONFIG_CHANGE; returns 0 on failure
+pub fn insp_handle_writeback(sys_id: i64, prop_key: i64, new_val: i64) -> i64 {
+    let valid: i64 = cc_validate_change(sys_id, prop_key, new_val);
+    if valid == 0 { return 0; }
+    return evt_create(EVT_CONFIG_CHANGE, sys_id, prop_key, new_val);
+}
+
+// Proof lens: returns a proof tree for the target subsystem
+// Stub — future: look up persisted tree by sys_id from the Supervisor
+pub fn insp_get_proof_tree(i: i64) -> i64 {
+    return pe_tree_create();
+}
+
+// Console lens: returns an Axiom goal stack for the target subsystem
+// Stub — future: look up active stack by sys_id
+pub fn insp_get_axiom_stack(i: i64) -> i64 {
+    return ac_stack_create();
+}
+
+// Tactic submission: reuses write-back path (goal_id as prop_key, tactic as val)
+pub fn insp_submit_tactic(sys_id: i64, goal_id: i64, tactic: i64) -> i64 {
+    return insp_handle_writeback(sys_id, goal_id, tactic);
+}
+
+/*
+pub fn main() -> i64 {
+...
+}
+*/

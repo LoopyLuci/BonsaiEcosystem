@@ -1,0 +1,11 @@
+// Test mutable variable declarations
+fn test_mut_vars() -> i64 {
+    let mut x: i64 = 5;
+    let y: i64 = 10;
+    return x;
+}
+
+pub fn main() -> i64 {
+    111
+}
+

@@ -1,0 +1,136 @@
+// titan/compiler/codegen.ti — Bytecode code generator
+// Translates AST nodes into stack-based bytecode.
+// Self-contained: tests by building AST manually and generating bytecode.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// Bytecode opcodes
+const OP_PUSH:    i64 = 0;
+const OP_ADD:     i64 = 1;
+const OP_SUB:     i64 = 2;
+const OP_MUL:     i64 = 3;
+const OP_DIV:     i64 = 4;
+const OP_CMP_EQ:  i64 = 5;
+const OP_CMP_LT:  i64 = 6;
+const OP_CMP_GT:  i64 = 7;
+const OP_STORE:   i64 = 10;
+const OP_LOAD:    i64 = 11;
+const OP_RET:     i64 = 12;
+
+// AST node kinds (from parser)
+const AST_INT:   i64 = 100;
+const AST_BINOP: i64 = 101;
+const AST_BOOL:  i64 = 110;
+
+// Token operator kinds (from lexer)
+const TOK_PLUS:  i64 = 2;
+const TOK_MINUS: i64 = 3;
+const TOK_STAR:  i64 = 4;
+const TOK_SLASH: i64 = 5;
+const TOK_EQEQ:  i64 = 6;
+const TOK_LT:    i64 = 7;
+const TOK_GT:    i64 = 8;
+
+// ===== Bytecode store (heap-based linked list) =====
+// BC header: tag=8001, body=len, arg=head_instr, domain=tail_instr
+// Instruction cell: tag=8002, body=opcode, arg=operand, domain=next (-1=end)
+const TAG_BC:    i64 = 8001;
+const TAG_INSTR: i64 = 8002;
+
+pub fn bc_new() -> i64 {
+    let bc = heap_alloc_term();
+    heap_set_tag(bc, TAG_BC);
+    heap_set_body(bc, 0);    // len
+    heap_set_arg(bc, -1);    // head
+    heap_set_domain(bc, -1); // tail
+    return bc;
+}
+
+pub fn bc_emit(bc: i64, op: i64, arg: i64) {
+    let instr = heap_alloc_term();
+    heap_set_tag(instr, TAG_INSTR);
+    heap_set_body(instr, op);
+    heap_set_arg(instr, arg);
+    heap_set_domain(instr, -1);
+    let tail = heap_get_domain(bc);
+    if tail == -1 { heap_set_arg(bc, instr); } else { heap_set_domain(tail, instr); }
+    heap_set_domain(bc, instr);
+    heap_set_body(bc, heap_get_body(bc) + 1);
+}
+
+pub fn bc_len(bc: i64) -> i64 { return heap_get_body(bc); }
+pub fn bc_head(bc: i64) -> i64 { return heap_get_arg(bc); }
+pub fn instr_op(i: i64) -> i64 { return heap_get_body(i); }
+pub fn instr_arg(i: i64) -> i64 { return heap_get_arg(i); }
+pub fn instr_next(i: i64) -> i64 { return heap_get_domain(i); }
+
+// ===== AST builders (for testing without lexer/parser) =====
+pub fn make_int_ast(val: i64) -> i64 {
+    let n = heap_alloc_term(); heap_set_tag(n, AST_INT); heap_set_body(n, val); return n;
+}
+pub fn make_binop_ast(left: i64, right: i64, op: i64) -> i64 {
+    let n = heap_alloc_term(); heap_set_tag(n, AST_BINOP);
+    heap_set_body(n, left); heap_set_arg(n, right); heap_set_domain(n, op); return n;
+}
+
+// ===== Code generator =====
+pub fn cg_expr(bc: i64, ast: i64) {
+    let tag = heap_get_tag(ast);
+    if tag == AST_INT || tag == AST_BOOL {
+        bc_emit(bc, OP_PUSH, heap_get_body(ast));
+        return;
+    }
+    if tag == AST_BINOP {
+        cg_expr(bc, heap_get_body(ast)); // left
+        cg_expr(bc, heap_get_arg(ast));  // right
+        let op = heap_get_domain(ast);
+        if op == TOK_PLUS  { bc_emit(bc, OP_ADD, 0); return; }
+        if op == TOK_MINUS { bc_emit(bc, OP_SUB, 0); return; }
+        if op == TOK_STAR  { bc_emit(bc, OP_MUL, 0); return; }
+        if op == TOK_SLASH { bc_emit(bc, OP_DIV, 0); return; }
+        if op == TOK_EQEQ  { bc_emit(bc, OP_CMP_EQ, 0); return; }
+        if op == TOK_LT    { bc_emit(bc, OP_CMP_LT, 0); return; }
+        if op == TOK_GT    { bc_emit(bc, OP_CMP_GT, 0); return; }
+    }
+}
+
+pub pub fn main() -> i64 {
+    // Test 1: generate bytecode for literal 42
+    let bc1 = bc_new();
+    let ast1 = make_int_ast(42);
+    cg_expr(bc1, ast1);
+    bc_emit(bc1, OP_RET, 0);
+    if bc_len(bc1) != 2 { return 1; }
+    let h1 = bc_head(bc1);
+    if instr_op(h1) != OP_PUSH { return 2; }
+    if instr_arg(h1) != 42 { return 3; }
+    let h1n = instr_next(h1);
+    if instr_op(h1n) != OP_RET { return 4; }
+
+    // Test 2: bytecode for 1 + 2 → PUSH 1, PUSH 2, ADD, RET (4 instr)
+    let bc2 = bc_new();
+    let ast2 = make_binop_ast(make_int_ast(1), make_int_ast(2), TOK_PLUS);
+    cg_expr(bc2, ast2);
+    bc_emit(bc2, OP_RET, 0);
+    if bc_len(bc2) != 4 { return 5; }
+
+    // Test 3: bytecode for 1 + 2 * 3 → 5 instructions (PUSH1 PUSH2 PUSH3 MUL ADD)
+    let bc3 = bc_new();
+    let mul_ast = make_binop_ast(make_int_ast(2), make_int_ast(3), TOK_STAR);
+    let add_ast = make_binop_ast(make_int_ast(1), mul_ast, TOK_PLUS);
+    cg_expr(bc3, add_ast);
+    bc_emit(bc3, OP_RET, 0);
+    if bc_len(bc3) != 6 { return 6; } // PUSH1 PUSH2 PUSH3 MUL ADD RET
+
+    return 111;
+}

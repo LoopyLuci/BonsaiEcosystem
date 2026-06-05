@@ -1,0 +1,110 @@
+// OmniBrowser shell -- window + parser/style/layout/compositor pipeline
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+
+    fn platform_window_create(title_id: i64, width: i64, height: i64) -> i64;
+    fn platform_window_show(handle: i64);
+    fn platform_window_should_close(handle: i64) -> bool;
+    fn platform_window_poll_events() -> i64;
+    fn platform_window_close(handle: i64);
+
+    fn renderer_init(window_handle: i64) -> i64;
+    fn renderer_begin_frame(surface: i64);
+    fn renderer_end_frame(surface: i64);
+    fn renderer_clear(surface: i64, color: i64);
+    fn renderer_fill_rect(surf: i64, x: i64, y: i64, w: i64, h: i64, color: i64);
+}
+
+const TAG_DOM: i64 = 3000;
+const NODE_ELEMENT: i64 = 0;
+const NODE_TEXT: i64 = 1;
+
+pub fn color_white() -> i64 { return (255 * 16777216) + (255 * 65536) + (255 * 256) + 255; }
+pub fn color_blue() -> i64 { return (80 * 16777216) + (110 * 65536) + (255 * 256) + 255; }
+
+pub fn parser_build_demo_dom() -> i64 {
+    let root = heap_alloc_term();
+    heap_set_tag(root, TAG_DOM);
+    heap_set_body(root, NODE_ELEMENT);
+    heap_set_arg(root, heap_alloc_term());
+    heap_set_domain(root, 0);
+
+    let text = heap_alloc_term();
+    heap_set_tag(text, TAG_DOM);
+    heap_set_body(text, NODE_TEXT);
+    heap_set_arg(text, heap_alloc_term());
+    heap_set_domain(text, 0);
+
+    heap_set_domain(root, text);
+    return root;
+}
+
+pub fn layout_create(node: i64) -> i64 {
+    let dims = heap_alloc_term();
+    heap_set_body(dims, 1024);
+    heap_set_arg(dims, 120);
+    heap_set_domain(dims, 0);
+
+    let box_id = heap_alloc_term();
+    heap_set_body(box_id, node);
+    heap_set_arg(box_id, 0);
+    heap_set_domain(box_id, dims);
+    return box_id;
+}
+
+pub fn compositor_render(surface: i64, layout_root: i64) {
+    let dims = heap_get_domain(layout_root);
+    let w = heap_get_body(dims);
+    let h = heap_get_arg(dims);
+    renderer_fill_rect(surface, 0, 0, w, h, color_blue());
+    return;
+}
+
+pub fn browser_open(title_id: i64, _url: i64) -> i64 {
+    let win = platform_window_create(title_id, 1024, 768);
+    if win < 0 { return 1; }
+
+    let surface = renderer_init(win);
+    if surface < 0 {
+        platform_window_close(win);
+        return 2;
+    }
+
+    platform_window_show(win);
+
+    let dom_root = parser_build_demo_dom();
+    let layout_root = layout_create(dom_root);
+
+    let mut frame_count: i64 = 0;
+    while !platform_window_should_close(win) {
+        let _evt = platform_window_poll_events();
+
+        renderer_begin_frame(surface);
+        renderer_clear(surface, color_white());
+        compositor_render(surface, layout_root);
+        renderer_end_frame(surface);
+
+        frame_count = frame_count + 1;
+        if frame_count >= 1 {
+            break;
+        }
+    }
+
+    platform_window_close(win);
+    return 0;
+}
+
+pub fn main() -> i64 {
+    let title = heap_alloc_term();
+    let rc = browser_open(title, 0);
+    if rc != 0 { return 1; }
+    return 111;
+}

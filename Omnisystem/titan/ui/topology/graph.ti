@@ -1,0 +1,211 @@
+// titan/ui/topology/graph.ti — Force-directed graph engine for topology visualization
+// Nodes and edges are stored in separate data cells wrapped in list-ref cells,
+// so the linked-list domain pointer never corrupts node/edge data fields.
+// Tags start at 63000 (clear of aether/protocol.ti at 60000).
+import "titan/ui/renderer.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_NODE:    i64 = 63000;  // data: body=id, arg=label, domain=color
+const TAG_NODEREF: i64 = 63001;  // list: body=node_ptr, arg=x_pos, domain=next
+const TAG_EDGE:    i64 = 63002;  // data: body=from_id, arg=to_id, domain=weight
+const TAG_EDGEREF: i64 = 63003;  // list: body=edge_ptr, domain=next
+const TAG_GRAPH:   i64 = 63004;  // body=node_count, arg=noderef_head, domain=edgeref_head
+
+// ── Node ─────────────────────────────────────────────────────────────────────
+
+pub fn tg_node_create(id: i64, label: i64, color: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_NODE);
+    heap_set_body(n, id);
+    heap_set_arg(n, label);
+    heap_set_domain(n, color);
+    return n;
+}
+
+pub fn tg_node_id(n: i64) -> i64    { return heap_get_body(n); }
+pub fn tg_node_label(n: i64) -> i64 { return heap_get_arg(n); }
+pub fn tg_node_color(n: i64) -> i64 { return heap_get_domain(n); }
+
+// noderef wraps a node in a list cell; arg holds the node's x-position (layout)
+pub fn noderef_new(node: i64, x_pos: i64) -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_NODEREF);
+    heap_set_body(r, node);
+    heap_set_arg(r, x_pos);
+    heap_set_domain(r, 0);
+    return r;
+}
+
+pub fn noderef_node(ref: i64) -> i64  { return heap_get_body(ref); }
+pub fn noderef_xpos(ref: i64) -> i64  { return heap_get_arg(ref); }
+pub fn noderef_next(ref: i64) -> i64  { return heap_get_domain(ref); }
+pub fn noderef_set_xpos(ref: i64, x: i64) { heap_set_arg(ref, x); }
+pub fn noderef_set_next(ref: i64, nxt: i64) { heap_set_domain(ref, nxt); }
+
+// ── Edge ─────────────────────────────────────────────────────────────────────
+
+pub fn tg_edge_create(from_id: i64, to_id: i64, weight: i64) -> i64 {
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_EDGE);
+    heap_set_body(e, from_id);
+    heap_set_arg(e, to_id);
+    heap_set_domain(e, weight);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_EDGEREF);
+    heap_set_body(w, e);
+    heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tg_edge_from(w: i64) -> i64   { return heap_get_body(heap_get_body(w)); }
+pub fn tg_edge_to(w: i64) -> i64     { return heap_get_arg(heap_get_body(w)); }
+pub fn tg_edge_weight(w: i64) -> i64 { return heap_get_domain(heap_get_body(w)); }
+
+// ── Graph ─────────────────────────────────────────────────────────────────────
+
+pub fn tg_graph_create() -> i64 {
+    let g = heap_alloc_term();
+    heap_set_tag(g, TAG_GRAPH);
+    heap_set_body(g, 0);
+    heap_set_arg(g, 0);
+    heap_set_domain(g, 0);
+    return g;
+}
+
+pub fn tg_graph_add_node(g: i64, n: i64) {
+    // Initial x-position = node_id * 80 (evenly spaced)
+    let ref = noderef_new(n, tg_node_id(n) * 80);
+    let h = heap_get_arg(g);
+    if h == 0 {
+        heap_set_arg(g, ref);
+    } else {
+        let mut cur: i64 = h;
+        while noderef_next(cur) != 0 { cur = noderef_next(cur); }
+        noderef_set_next(cur, ref);
+    }
+    heap_set_body(g, heap_get_body(g) + 1);
+}
+
+pub fn tg_graph_node_count(g: i64) -> i64 { return heap_get_body(g); }
+
+pub fn tg_graph_add_edge(g: i64, w: i64) {
+    let h = heap_get_domain(g);
+    if h == 0 {
+        heap_set_domain(g, w);
+    } else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+}
+
+pub fn tg_edge_count(g: i64) -> i64 {
+    let mut cur: i64 = heap_get_domain(g);
+    let mut n: i64 = 0;
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+// ── Force-directed layout step ────────────────────────────────────────────────
+// Each iteration: apply a simple repulsion — nodes spread apart by 1 unit.
+// Attraction along edges: nodes connected by an edge are pulled 1 unit closer.
+// Positions are stored in noderef_xpos. Real 2D would add a y-channel.
+
+pub fn tg_find_noderef(g: i64, node_id: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(g);
+    let mut found: i64 = 0;
+    let mut stop: i64 = 0;
+    if cur == 0 { stop = 1; }
+    while stop == 0 {
+        if tg_node_id(noderef_node(cur)) == node_id {
+            found = cur;
+            stop = 1;
+        }
+        if stop == 0 {
+            cur = noderef_next(cur);
+            if cur == 0 { stop = 1; }
+        }
+    }
+    return found;
+}
+
+pub fn tg_force_directed_step(g: i64, iterations: i64) {
+    let n = tg_graph_node_count(g);
+    if n < 2 { return; }
+    let mut iter: i64 = 0;
+    while iter < iterations {
+        // Repulsion: spread all nodes slightly
+        let mut ar: i64 = heap_get_arg(g);
+        while ar != 0 {
+            let pos = noderef_xpos(ar);
+            let id  = tg_node_id(noderef_node(ar));
+            noderef_set_xpos(ar, pos + id);   // deterministic spread by id
+            ar = noderef_next(ar);
+        }
+        // Attraction: pull edge endpoints 1 unit closer
+        let mut er: i64 = heap_get_domain(g);
+        while er != 0 {
+            let from_id = tg_edge_from(er);
+            let to_id   = tg_edge_to(er);
+            let from_ref = tg_find_noderef(g, from_id);
+            let to_ref   = tg_find_noderef(g, to_id);
+            if from_ref != 0 {
+                if to_ref != 0 {
+                    let fp = noderef_xpos(from_ref);
+                    let tp = noderef_xpos(to_ref);
+                    let mut dx: i64 = fp - tp;
+                    if dx < 0 { dx = 0 - dx; }
+                    if dx > 0 {
+                        noderef_set_xpos(from_ref, fp - 1);
+                        noderef_set_xpos(to_ref, tp + 1);
+                    }
+                }
+            }
+            er = heap_get_domain(er);
+        }
+        iter = iter + 1;
+    }
+}
+
+pub fn main() -> i64 {
+    let g = tg_graph_create();
+
+    // Test 1: Add 3 nodes, count correct, node data preserved
+    let n1 = tg_node_create(0, 10, ui_color(28, 31, 38));
+    let n2 = tg_node_create(1, 20, ui_color(13, 27, 42));
+    let n3 = tg_node_create(2, 30, ui_color(0, 180, 216));
+    tg_graph_add_node(g, n1);
+    tg_graph_add_node(g, n2);
+    tg_graph_add_node(g, n3);
+    if tg_graph_node_count(g) != 3 { return 1; }
+
+    // Node data is not corrupted by list linking
+    if tg_node_id(n1) != 0 { return 2; }
+    if ui_color_g(tg_node_color(n3)) != 180 { return 3; }
+
+    // Test 2: Add 2 edges, count correct, edge data preserved
+    let e1 = tg_edge_create(0, 1, 5);
+    let e2 = tg_edge_create(1, 2, 3);
+    tg_graph_add_edge(g, e1);
+    tg_graph_add_edge(g, e2);
+    if tg_edge_count(g) != 2 { return 4; }
+    if tg_edge_from(e1) != 0 { return 5; }
+    if tg_edge_to(e2)   != 2 { return 6; }
+    if tg_edge_weight(e1) != 5 { return 7; }
+
+    // Test 3: Force step runs without crash
+    tg_force_directed_step(g, 10);
+
+    return 111;
+}

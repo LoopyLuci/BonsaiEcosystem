@@ -1,0 +1,208 @@
+// titan/ai/completion_engine.ti — Streaming Completion Engine
+// Generates streaming code completions from context using keyword/symbol matching.
+// Body-for-meta: token.body=meta1, token.domain=next_token (is_final safe in meta1.domain).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+}
+
+const TAG_COMPL_REQUEST: i64 = 8100;
+const TAG_COMPL_TOKEN:   i64 = 8101;
+
+// Completion request layout:
+//   req:   tag=TAG_COMPL_REQUEST, body=meta1, arg=0, domain=meta2
+//   meta1: body=prefix_id, arg=suffix_id, domain=0
+//   meta2: body=file_id, arg=line, domain=meta3
+//   meta3: body=col, arg=max_tokens, domain=0
+
+pub fn compl_request_create(prefix_id: i64, suffix_id: i64, file_id: i64,
+                             line: i64, col: i64, max_tokens: i64) -> i64 {
+    let meta3 = heap_alloc_term();
+    heap_set_body(meta3, col);
+    heap_set_arg(meta3, max_tokens);
+    heap_set_domain(meta3, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, file_id);
+    heap_set_arg(meta2, line);
+    heap_set_domain(meta2, meta3);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, prefix_id);
+    heap_set_arg(meta1, suffix_id);
+    heap_set_domain(meta1, 0);
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_COMPL_REQUEST);
+    heap_set_body(r, meta1);
+    heap_set_arg(r, 0);
+    heap_set_domain(r, meta2);
+    return r;
+}
+
+pub fn compl_request_prefix(r: i64) -> i64 { return heap_get_body(heap_get_body(r)); }   // meta1.body
+pub fn compl_request_suffix(r: i64) -> i64 { return heap_get_arg(heap_get_body(r)); }    // meta1.arg
+
+// Token layout:
+//   token: tag=TAG_COMPL_TOKEN, body=meta1, arg=0, domain=next_token
+//   meta1: body=text_id, arg=confidence, domain=is_final(0 or 1)
+// domain is ONLY used as next-pointer → no collision with is_final.
+
+pub fn compl_token_create(text_id: i64, confidence: i64, is_final: bool) -> i64 {
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, text_id);
+    heap_set_arg(meta1, confidence);
+    let mut fin: i64 = 0;
+    if is_final { fin = 1; }
+    heap_set_domain(meta1, fin);
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_COMPL_TOKEN);
+    heap_set_body(t, meta1);
+    heap_set_arg(t, 0);
+    heap_set_domain(t, 0);    // next_token; safe to overwrite in list
+    return t;
+}
+
+pub fn compl_token_text(t: i64) -> i64       { return heap_get_body(heap_get_body(t)); }   // meta1.body
+pub fn compl_token_confidence(t: i64) -> i64 { return heap_get_arg(heap_get_body(t)); }    // meta1.arg
+pub fn compl_token_is_final(t: i64) -> bool  { return heap_get_domain(heap_get_body(t)) != 0; } // meta1.domain
+
+// Build a completion token list for the given request.
+// Prepends tokens so the last prepended is the head. Final token goes last (head).
+pub fn completion_generate(request: i64, model: i64) -> i64 {
+    let prefix     = compl_request_prefix(request);
+    let prefix_len = str_len(prefix);
+    let mut results: i64 = 0;
+
+    if prefix_len == 0 {
+        // Suggest common keywords
+        let t3 = compl_token_create(heap_alloc_term(), 90, false);
+        heap_set_domain(t3, results); results = t3;
+
+        let t2 = compl_token_create(heap_alloc_term(), 92, false);
+        heap_set_domain(t2, results); results = t2;
+
+        let t1 = compl_token_create(heap_alloc_term(), 95, false);
+        heap_set_domain(t1, results); results = t1;
+    } else {
+        let first_char = str_at(prefix, 0);
+        if first_char == 102 {       // 'f' → fn suggestion
+            let t = compl_token_create(heap_alloc_term(), 95, false);
+            heap_set_domain(t, results); results = t;
+        }
+        if first_char == 108 {       // 'l' → let suggestion
+            let t = compl_token_create(heap_alloc_term(), 95, false);
+            heap_set_domain(t, results); results = t;
+        }
+        if first_char == 114 {       // 'r' → return suggestion
+            let t = compl_token_create(heap_alloc_term(), 95, false);
+            heap_set_domain(t, results); results = t;
+        }
+        // Fallback: always produce at least one suggestion
+        if results == 0 {
+            let t = compl_token_create(heap_alloc_term(), 80, false);
+            heap_set_domain(t, results); results = t;
+        }
+    }
+
+    // Final token marks end-of-stream
+    let fin = compl_token_create(heap_alloc_term(), 0, true);
+    heap_set_domain(fin, results);
+    results = fin;
+
+    return results;
+}
+
+pub fn compl_token_count(tokens: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = tokens;
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    return count;
+}
+
+pub fn compl_has_final(tokens: i64) -> bool {
+    let mut curr = tokens;
+    while curr != 0 {
+        if compl_token_is_final(curr) { return true; }
+        curr = heap_get_domain(curr);
+    }
+    return false;
+}
+
+// Streaming state
+static mut COMPL_STREAM_TOKENS: i64 = 0;
+static mut COMPL_STREAM_POS:    i64 = 0;
+
+pub fn compl_stream_start(request: i64, model: i64) {
+    COMPL_STREAM_TOKENS = completion_generate(request, model);
+    COMPL_STREAM_POS    = 0;
+}
+
+pub fn compl_stream_next() -> i64 {
+    let mut curr = COMPL_STREAM_TOKENS;
+    let mut pos:  i64 = 0;
+    while curr != 0 {
+        if pos == COMPL_STREAM_POS {
+            COMPL_STREAM_POS = COMPL_STREAM_POS + 1;
+            return curr;
+        }
+        pos  = pos + 1;
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+pub fn compl_stream_has_more() -> bool {
+    let mut curr = COMPL_STREAM_TOKENS;
+    let mut pos:  i64 = 0;
+    while curr != 0 {
+        if pos == COMPL_STREAM_POS { return true; }
+        pos  = pos + 1;
+        curr = heap_get_domain(curr);
+    }
+    return false;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    COMPL_STREAM_TOKENS = 0;
+    COMPL_STREAM_POS    = 0;
+
+    let prefix = heap_alloc_term();
+    let req = compl_request_create(prefix, heap_alloc_term(), heap_alloc_term(), 10, 5, 20);
+    if heap_get_tag(req) != TAG_COMPL_REQUEST { return 1; }
+
+    // Generate with empty-string prefix (str_len of heap cell → likely 0)
+    let tokens = completion_generate(req, 0);
+    if compl_token_count(tokens) < 1 { return 2; }
+    if !compl_has_final(tokens)      { return 3; }
+
+    // Token accessors
+    let tok = tokens;
+    if heap_get_tag(tok) != TAG_COMPL_TOKEN { return 4; }
+
+    // Stream start and drain
+    compl_stream_start(req, 0);
+    if !compl_stream_has_more()   { return 5; }
+    let t = compl_stream_next();
+    if t == 0                     { return 6; }
+
+    while compl_stream_has_more() { compl_stream_next(); }
+    if compl_stream_has_more()    { return 7; }
+
+    // Non-empty prefix — 'f' branch
+    let prefix2 = heap_alloc_term();
+    let req2 = compl_request_create(prefix2, heap_alloc_term(), heap_alloc_term(), 1, 0, 10);
+    let tokens2 = completion_generate(req2, 0);
+    if compl_token_count(tokens2) < 1 { return 8; }
+
+    return 111;
+}

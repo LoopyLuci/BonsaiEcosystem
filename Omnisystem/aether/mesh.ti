@@ -1,0 +1,274 @@
+// aether/mesh.ti — Aether cluster mesh: distributed actor registry and routing
+// Actors are addressed by a URI: node_id * 1_000_000 + local_id
+// The mesh maintains a routing table (actor_uri → node_id) and forwards
+// messages across nodes using the omni-p2p transport layer (simulated here).
+// Work stealing is cluster-aware: pull from the busiest remote node.
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+const TAG_NODE:    i64 = 66000;  // cluster node descriptor
+const TAG_ROUTE:   i64 = 66001;  // routing table entry: actor_uri → node_id
+const TAG_CLUSTER: i64 = 66002;  // cluster state
+const TAG_RMSG:    i64 = 66003;  // routed message
+const TAG_LIST:    i64 = 66004;
+
+const NODE_SCALE: i64 = 1000000;   // actor_uri = node_id * SCALE + local_id
+
+// ── URI arithmetic ─────────────────────────────────────────────────────────
+pub fn uri_make(node_id:i64, local_id:i64) -> i64 { return node_id * NODE_SCALE + local_id; }
+pub fn uri_node(uri:i64) -> i64 { return uri / NODE_SCALE; }
+pub fn uri_local(uri:i64) -> i64 { return uri - uri_node(uri) * NODE_SCALE; }
+
+// ── Cluster node ───────────────────────────────────────────────────────────
+// body=node_id, arg=load (message queue depth), domain=next_node_in_list
+pub fn node_new(node_id:i64) -> i64 {
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_NODE);
+    heap_set_body(n,node_id); heap_set_arg(n,0); heap_set_domain(n,0); return n;
+}
+
+pub fn node_id(n:i64) -> i64   { return heap_get_body(n); }
+pub fn node_load(n:i64) -> i64 { return heap_get_arg(n); }
+pub fn node_set_load(n:i64, l:i64) { heap_set_arg(n,l); return; }
+pub fn node_inc_load(n:i64) { heap_set_arg(n, heap_get_arg(n)+1); return; }
+pub fn node_dec_load(n:i64) { if heap_get_arg(n)>0 { heap_set_arg(n, heap_get_arg(n)-1); } return; }
+
+// ── Routing table ─────────────────────────────────────────────────────────
+// Entry: body=actor_uri, arg=node_id, domain=next_entry
+pub fn route_new(actor_uri:i64, nid:i64) -> i64 {
+    let r=heap_alloc_term(); heap_set_tag(r,TAG_ROUTE);
+    heap_set_body(r,actor_uri); heap_set_arg(r,nid); heap_set_domain(r,0); return r;
+}
+
+// ── Cluster state ──────────────────────────────────────────────────────────
+// body=node_list_head, arg=route_table_head, domain=message_queue_head
+let g_node_list:   i64 = 0;
+let g_node_count:  i64 = 0;
+let g_route_head:  i64 = 0;
+let g_route_count: i64 = 0;
+let g_msg_head:    i64 = 0;
+let g_msg_count:   i64 = 0;
+let g_local_node:  i64 = 1;   // this node's ID
+
+pub fn cluster_new(local_node_id:i64) -> i64 {
+    g_node_list  = 0; g_node_count  = 0;
+    g_route_head = 0; g_route_count = 0;
+    g_msg_head   = 0; g_msg_count   = 0;
+    g_local_node = local_node_id;
+    return local_node_id;
+}
+
+// ── Node management ────────────────────────────────────────────────────────
+pub fn cluster_add_node(node_id:i64) {
+    let n = node_new(node_id);
+    let ln=heap_alloc_term(); heap_set_tag(ln,TAG_LIST);
+    heap_set_body(ln,n); heap_set_arg(ln,g_node_list);
+    g_node_list=ln; g_node_count=g_node_count+1;
+    return;
+}
+
+pub fn cluster_find_node(node_id:i64) -> i64 {
+    let cur=g_node_list;
+    while cur!=0 {
+        let n=heap_get_body(cur);
+        if node_id(n)==node_id { return n; }
+        cur=heap_get_arg(cur);
+    }
+    return -1;
+}
+
+pub fn cluster_node_count() -> i64 { return g_node_count; }
+
+// ── Actor registry ─────────────────────────────────────────────────────────
+pub fn cluster_register(actor_uri:i64, node_id:i64) {
+    let r = route_new(actor_uri, node_id);
+    let ln=heap_alloc_term(); heap_set_tag(ln,TAG_LIST);
+    heap_set_body(ln,r); heap_set_arg(ln,g_route_head);
+    g_route_head=ln; g_route_count=g_route_count+1;
+    return;
+}
+
+pub fn cluster_deregister(actor_uri:i64) {
+    let cur=g_route_head; let prev=0;
+    while cur!=0 {
+        let r=heap_get_body(cur);
+        if heap_get_body(r)==actor_uri {
+            if prev==0 { g_route_head=heap_get_arg(cur); }
+            else { heap_set_arg(prev,heap_get_arg(cur)); }
+            g_route_count=g_route_count-1;
+            return;
+        }
+        prev=cur; cur=heap_get_arg(cur);
+    }
+    return;
+}
+
+pub fn cluster_lookup(actor_uri:i64) -> i64 {
+    let cur=g_route_head;
+    while cur!=0 {
+        let r=heap_get_body(cur);
+        if heap_get_body(r)==actor_uri { return heap_get_arg(r); }
+        cur=heap_get_arg(cur);
+    }
+    return -1;
+}
+
+pub fn cluster_registry_size() -> i64 { return g_route_count; }
+
+// ── Message routing ────────────────────────────────────────────────────────
+// Routed message: body=from_uri, arg=to_uri, domain=payload
+pub fn rmsg_new(from_uri:i64, to_uri:i64, payload:i64) -> i64 {
+    let m=heap_alloc_term(); heap_set_tag(m,TAG_RMSG);
+    heap_set_body(m,from_uri); heap_set_arg(m,to_uri); heap_set_domain(m,payload); return m;
+}
+
+pub fn rmsg_from(m:i64) -> i64    { return heap_get_body(m); }
+pub fn rmsg_to(m:i64) -> i64      { return heap_get_arg(m); }
+pub fn rmsg_payload(m:i64) -> i64 { return heap_get_domain(m); }
+
+// Send: if destination is local, deliver directly; otherwise enqueue for P2P transport
+pub fn cluster_send(from_uri:i64, to_uri:i64, payload:i64) -> i64 {
+    let dest_node = cluster_lookup(to_uri);
+    if dest_node < 0 { return -1; }  // unknown actor
+
+    let msg = rmsg_new(from_uri, to_uri, payload);
+
+    if dest_node == g_local_node {
+        // Local delivery — in real kernel this wakes the target actor
+        // Here we enqueue to the local message queue
+        let ln=heap_alloc_term(); heap_set_tag(ln,TAG_LIST);
+        heap_set_body(ln,msg); heap_set_arg(ln,g_msg_head);
+        g_msg_head=ln; g_msg_count=g_msg_count+1;
+        return 0;  // local delivery
+    }
+
+    // Remote: increment load on dest node (simulates P2P enqueue)
+    let dn = cluster_find_node(dest_node);
+    if dn >= 0 { node_inc_load(dn); }
+
+    // In production: omni-p2p sends the serialized message to dest_node
+    // Here we model it as delivered
+    let ln=heap_alloc_term(); heap_set_tag(ln,TAG_LIST);
+    heap_set_body(ln,msg); heap_set_arg(ln,g_msg_head);
+    g_msg_head=ln; g_msg_count=g_msg_count+1;
+    return 1;  // remote delivery
+}
+
+pub fn cluster_msg_count() -> i64 { return g_msg_count; }
+
+// ── Work stealing ─────────────────────────────────────────────────────────
+// Returns the node_id of the most loaded remote node (to steal work from)
+pub fn cluster_busiest_remote() -> i64 {
+    let best_node = -1; let best_load = -1;
+    let cur=g_node_list;
+    while cur!=0 {
+        let n=heap_get_body(cur);
+        if node_id(n) != g_local_node {
+            let l = node_load(n);
+            if l > best_load { best_node = node_id(n); best_load = l; }
+        }
+        cur=heap_get_arg(cur);
+    }
+    return best_node;
+}
+
+// Steal: claim one actor from busiest node by reassigning its route to local
+pub fn cluster_steal_from(source_node_id:i64) -> i64 {
+    // Find any actor registered on source_node_id and re-register locally
+    let cur=g_route_head; let stolen=0;
+    while cur!=0 && stolen==0 {
+        let r=heap_get_body(cur);
+        if heap_get_arg(r)==source_node_id {
+            heap_set_arg(r, g_local_node);  // reassign to local
+            let sn = cluster_find_node(source_node_id);
+            if sn >= 0 { node_dec_load(sn); }
+            stolen=1;
+        }
+        cur=heap_get_arg(cur);
+    }
+    return stolen;
+}
+
+// ── Consistent hashing for actor placement ─────────────────────────────────
+// Hash-based placement: actor_uri mod node_count → preferred node index
+pub fn cluster_preferred_node(actor_uri:i64) -> i64 {
+    if g_node_count == 0 { return g_local_node; }
+    let idx = actor_uri - (actor_uri / g_node_count) * g_node_count;
+    // Walk to idx-th node in list
+    let cur=g_node_list; let i=0;
+    while cur!=0 {
+        if i == idx { return node_id(heap_get_body(cur)); }
+        i=i+1; cur=heap_get_arg(cur);
+    }
+    return g_local_node;
+}
+
+pub fn main() -> i64 {
+    cluster_new(1);
+
+    // Test 1: URI arithmetic
+    let uri = uri_make(3, 42);
+    if uri_node(uri) != 3  { return 1; }
+    if uri_local(uri) != 42 { return 2; }
+
+    // Test 2: add nodes
+    cluster_add_node(1); cluster_add_node(2); cluster_add_node(3);
+    if cluster_node_count() != 3 { return 3; }
+    let n2 = cluster_find_node(2);
+    if n2 < 0 { return 4; }
+    if node_id(n2) != 2 { return 5; }
+
+    // Test 3: register actors
+    let a1 = uri_make(1, 100);
+    let a2 = uri_make(2, 200);
+    let a3 = uri_make(1, 300);
+    cluster_register(a1, 1);
+    cluster_register(a2, 2);
+    cluster_register(a3, 1);
+    if cluster_registry_size() != 3 { return 6; }
+
+    // Test 4: lookup
+    if cluster_lookup(a1) != 1 { return 7; }
+    if cluster_lookup(a2) != 2 { return 8; }
+    if cluster_lookup(9999) != -1 { return 9; }  // unknown
+
+    // Test 5: deregister
+    cluster_deregister(a3);
+    if cluster_registry_size() != 2 { return 10; }
+    if cluster_lookup(a3) != -1 { return 11; }
+
+    // Test 6: local send
+    let sent = cluster_send(a1, a1, 42);   // a1 is on local node (1)
+    if sent != 0 { return 12; }             // 0 = local delivery
+    if cluster_msg_count() != 1 { return 13; }
+
+    // Test 7: remote send
+    let sent2 = cluster_send(a1, a2, 99);  // a2 is on node 2
+    if sent2 != 1 { return 14; }            // 1 = remote delivery
+    if cluster_msg_count() != 2 { return 15; }
+
+    // Test 8: load tracking and work stealing
+    cluster_new(1);
+    cluster_add_node(1); cluster_add_node(2); cluster_add_node(3);
+    cluster_register(uri_make(2,1), 2); cluster_register(uri_make(2,2), 2);
+    cluster_register(uri_make(3,1), 3);
+    // Simulate load on node 2
+    let n2b = cluster_find_node(2);
+    node_set_load(n2b, 10);
+    let n3b = cluster_find_node(3);
+    node_set_load(n3b, 2);
+
+    let busiest = cluster_busiest_remote();
+    if busiest != 2 { return 16; }  // node 2 has load=10
+
+    let stolen = cluster_steal_from(2);
+    if stolen != 1 { return 17; }
+    if node_load(n2b) != 9 { return 18; }  // decremented
+
+    // Test 9: consistent hash placement
+    cluster_new(1);
+    cluster_add_node(1); cluster_add_node(2);
+    let pref = cluster_preferred_node(uri_make(5, 1));
+    if pref < 1 { return 19; }  // must be a valid node
+
+    return 111;
+}

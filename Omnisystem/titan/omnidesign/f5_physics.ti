@@ -1,0 +1,10 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_BODY5:i64=25400;const T_WORLD5:i64=25401;const T_WRP5:i64=25402;
+pub fn f5_body_create(mass:i64,px:i64,py:i64)->i64{let b=heap_alloc_term();heap_set_tag(b,T_BODY5);heap_set_body(b,mass);heap_set_arg(b,px);heap_set_domain(b,py);let w=heap_alloc_term();heap_set_tag(w,T_WRP5);heap_set_body(w,b);heap_set_domain(w,0);return w;}
+pub fn f5_body_mass(w:i64)->i64{return heap_get_body(heap_get_body(w));}
+pub fn f5_body_px(w:i64)->i64{return heap_get_arg(heap_get_body(w));}
+pub fn f5_world_create()->i64{let w=heap_alloc_term();heap_set_tag(w,T_WORLD5);heap_set_body(w,0);heap_set_arg(w,0);return w;}
+pub fn f5_world_add(world:i64,w:i64){let h=heap_get_arg(world);if h==0{heap_set_arg(world,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(world,heap_get_body(world)+1);}
+pub fn f5_world_body_count(w:i64)->i64{return heap_get_body(w);}
+pub fn f5_collision_test(a:i64,b:i64)->i64{let ax=f5_body_px(a);let ay=heap_get_domain(heap_get_body(a));let bx=f5_body_px(b);let by=heap_get_domain(heap_get_body(b));let mut dx:i64=ax-bx;let mut dy:i64=ay-by;if dx<0{dx=-dx;}if dy<0{dy=-dy;}if dx<5{if dy<5{return 1;}}return 0;}
+pub fn main()->i64{let w=f5_world_create();let b1=f5_body_create(10,0,0);let b2=f5_body_create(5,3,4);f5_world_add(w,b1);f5_world_add(w,b2);if f5_world_body_count(w)!=2{return 1;}if f5_body_mass(b1)!=10{return 2;}if f5_collision_test(b1,b2)!=1{return 3;}return 111;}

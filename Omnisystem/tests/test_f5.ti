@@ -1,0 +1,6 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_BD:i64=25400;const tT_WL:i64=25401;const tT_WR:i64=25402;
+pub fn tf5_body_create(mass:i64,px:i64,py:i64)->i64{let b=heap_alloc_term();heap_set_tag(b,tT_BD);heap_set_body(b,mass);heap_set_arg(b,px);heap_set_domain(b,py);let w=heap_alloc_term();heap_set_tag(w,tT_WR);heap_set_body(w,b);heap_set_domain(w,0);return w;}
+pub fn tf5_world_create()->i64{let w=heap_alloc_term();heap_set_tag(w,tT_WL);heap_set_body(w,0);heap_set_arg(w,0);return w;}
+pub fn tf5_world_add(world:i64,w:i64){let h=heap_get_arg(world);if h==0{heap_set_arg(world,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(world,heap_get_body(world)+1);}
+pub fn main()->i64{let w=tf5_world_create();tf5_world_add(w,tf5_body_create(2,10,20));if heap_get_body(w)!=1{return 1;}return 111;}

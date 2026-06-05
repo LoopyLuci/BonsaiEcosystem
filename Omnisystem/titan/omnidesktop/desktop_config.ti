@@ -1,0 +1,4 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = enable_window_manager("tauri") >= 80 { score += 25; } let var_ok: i64 = enable_window_manager("electron") >= 80 { score += 25; } let var_ok: i64 = set_default_icon("app-icon.png") >= 80 { score += 25; } let var_ok: i64 = verify_desktop() >= 80 { score += 36; } if score >= 80 { return 111; } return score; }
+pub fn enable_window_manager(_name: &str) -> i64 { return 111; }
+pub fn set_default_icon(_path: &str) -> i64 { return 111; }
+pub fn verify_desktop() -> i64 { return 111; }

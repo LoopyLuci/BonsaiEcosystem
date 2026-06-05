@@ -1,0 +1,226 @@
+// OmniLib Sort -- insertion sort and merge sort on heap-backed vectors
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_VEC: i64 = 7060;
+const TAG_VNODE: i64 = 7061;
+
+pub fn vec_new() -> i64 {
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_VEC);
+    heap_set_body(v, 0);
+    heap_set_arg(v, 0);
+    heap_set_domain(v, 0);
+    return v;
+}
+
+pub fn vec_len(v: i64) -> i64 { return heap_get_arg(v); }
+
+pub fn vec_push(v: i64, x: i64) {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_VNODE);
+    heap_set_body(n, x);
+    heap_set_domain(n, 0);
+
+    if vec_len(v) == 0 {
+        heap_set_body(v, n);
+        heap_set_domain(v, n);
+    } else {
+        let tail = heap_get_domain(v);
+        heap_set_domain(tail, n);
+        heap_set_domain(v, n);
+    }
+
+    heap_set_arg(v, vec_len(v) + 1);
+}
+
+pub fn vec_get(v: i64, idx: i64) -> i64 {
+    if idx < 0 || idx >= vec_len(v) { return 0; }
+    let mut cur = heap_get_body(v);
+    let mut i: i64 = 0;
+    while i < idx {
+        cur = heap_get_domain(cur);
+        i = i + 1;
+    }
+    return heap_get_body(cur);
+}
+
+pub fn vec_set(v: i64, idx: i64, x: i64) {
+    if idx < 0 || idx >= vec_len(v) { return; }
+    let mut cur = heap_get_body(v);
+    let mut i: i64 = 0;
+    while i < idx {
+        cur = heap_get_domain(cur);
+        i = i + 1;
+    }
+    heap_set_body(cur, x);
+}
+
+pub fn vec_pop(v: i64) -> i64 {
+    let len = vec_len(v);
+    if len == 0 { return 0; }
+    if len == 1 {
+        let only = heap_get_body(v);
+        let val = heap_get_body(only);
+        heap_set_body(v, 0);
+        heap_set_domain(v, 0);
+        heap_set_arg(v, 0);
+        return val;
+    }
+    let mut prev = heap_get_body(v);
+    let mut i: i64 = 0;
+    while i < len - 2 {
+        prev = heap_get_domain(prev);
+        i = i + 1;
+    }
+    let last = heap_get_domain(prev);
+    let val = heap_get_body(last);
+    heap_set_domain(prev, 0);
+    heap_set_domain(v, prev);
+    heap_set_arg(v, len - 1);
+    return val;
+}
+
+pub fn insertion_sort(v: i64) {
+    let len = vec_len(v);
+    let mut i: i64 = 1;
+    while i < len {
+        let key = vec_get(v, i);
+        let mut j: i64 = i - 1;
+        while j >= 0 {
+            if vec_get(v, j) <= key { break; }
+            vec_set(v, j + 1, vec_get(v, j));
+            if j == 0 {
+                j = -1;
+            } else {
+                j = j - 1;
+            }
+        }
+        vec_set(v, j + 1, key);
+        i = i + 1;
+    }
+}
+
+// Check if vector is sorted
+pub fn is_sorted(v: i64) -> bool {
+    let len = vec_len(v);
+    let mut i: i64 = 0;
+    while i < len - 1 {
+        if vec_get(v, i) > vec_get(v, i + 1) {
+            return false;
+        }
+        i = i + 1;
+    }
+    true
+}
+
+pub fn merge(v: i64, left: i64, mid: i64, right: i64) {
+    let n1 = mid - left + 1;
+    let n2 = right - mid;
+    
+    let left_vec = vec_new();
+    let right_vec = vec_new();
+    
+    // Copy left portion
+    let mut i: i64 = 0;
+    while i < n1 {
+        vec_push(left_vec, vec_get(v, left + i));
+        i = i + 1;
+    }
+    
+    // Copy right portion
+    i = 0;
+    while i < n2 {
+        vec_push(right_vec, vec_get(v, mid + 1 + i));
+        i = i + 1;
+    }
+    
+    // Merge back
+    i = 0;
+    let mut j: i64 = 0;
+    let mut k: i64 = left;
+    
+    while i < n1 && j < n2 {
+        if vec_get(left_vec, i) <= vec_get(right_vec, j) {
+            vec_set(v, k, vec_get(left_vec, i));
+            i = i + 1;
+        } else {
+            vec_set(v, k, vec_get(right_vec, j));
+            j = j + 1;
+        }
+        k = k + 1;
+    }
+    
+    // Copy remaining from left
+    while i < n1 {
+        vec_set(v, k, vec_get(left_vec, i));
+        i = i + 1;
+        k = k + 1;
+    }
+    
+    // Copy remaining from right
+    while j < n2 {
+        vec_set(v, k, vec_get(right_vec, j));
+        j = j + 1;
+        k = k + 1;
+    }
+}
+
+pub fn mergesort_helper(v: i64, left: i64, right: i64) {
+    if left < right {
+        let mid = left + (right - left) / 2;
+        mergesort_helper(v, left, mid);
+        mergesort_helper(v, mid + 1, right);
+        merge(v, left, mid, right);
+    }
+}
+
+pub fn mergesort(v: i64) {
+    let len = vec_len(v);
+    if len > 1 {
+        mergesort_helper(v, 0, len - 1);
+    }
+}
+
+pub fn main() -> i64 {
+    let v = vec_new();
+    vec_push(v, 64);
+    vec_push(v, 25);
+    vec_push(v, 12);
+    vec_push(v, 22);
+    vec_push(v, 11);
+
+    insertion_sort(v);
+    if vec_get(v, 0) != 11 { return 1; }
+    if vec_get(v, 1) != 12 { return 2; }
+    if vec_get(v, 2) != 22 { return 3; }
+    if vec_get(v, 3) != 25 { return 4; }
+    if vec_get(v, 4) != 64 { return 5; }
+
+    let v2 = vec_new();
+    vec_push(v2, 64);
+    vec_push(v2, 25);
+    vec_push(v2, 12);
+    vec_push(v2, 22);
+    vec_push(v2, 11);
+
+    mergesort(v2);
+    if vec_get(v2, 0) != 11 { return 6; }
+    if vec_get(v2, 1) != 12 { return 7; }
+    if vec_get(v2, 2) != 22 { return 8; }
+    if vec_get(v2, 3) != 25 { return 9; }
+    if vec_get(v2, 4) != 64 { return 10; }
+
+    if !is_sorted(v) { return 11; }
+    if !is_sorted(v2) { return 12; }
+
+    return 111;
+}

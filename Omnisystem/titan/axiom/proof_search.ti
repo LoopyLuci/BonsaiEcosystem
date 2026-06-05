@@ -1,0 +1,135 @@
+// titan/axiom/proof_search.ti — Tactic-Based Proof Engine (tags 39100-39199)
+// Manages proof goals, hypothesis context, and tactic application.
+//
+// Goal cell layout:
+//   field[0] = tag (39100)
+//   field[1] = goal_id
+//   field[2] = prop_type (1=equality, 2=implication, 3=conjunction, 4=disjunction)
+//   field[3] = lhs
+//   field[4] = rhs
+//   field[5] = status (0=open, 1=proved, 2=failed)
+//   field[6] = next_goal (linked list)
+//
+// ProofCtx cell layout:
+//   field[0] = tag (39101)
+//   field[1] = open_count
+//   field[2] = proved_count
+//   field[3] = goal_head
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_GOAL:      i64 = 39100;
+const TAG_PROOF_CTX: i64 = 39101;
+
+const PROP_EQ:   i64 = 1;
+const PROP_IMPL: i64 = 2;
+const PROP_AND:  i64 = 3;
+const PROP_OR:   i64 = 4;
+
+const GOAL_OPEN:   i64 = 0;
+const GOAL_PROVED: i64 = 1;
+const GOAL_FAILED: i64 = 2;
+
+pub fn pctx_new() -> i64 {
+    let ctx = heap_alloc();
+    heap_set(ctx, 0, TAG_PROOF_CTX);
+    heap_set(ctx, 1, 0);
+    heap_set(ctx, 2, 0);
+    heap_set(ctx, 3, 0);
+    return ctx;
+}
+
+pub fn pctx_add_goal(ctx: i64, prop: i64, lhs: i64, rhs: i64) -> i64 {
+    let g = heap_alloc();
+    heap_set(g, 0, TAG_GOAL);
+    heap_set(g, 1, heap_get(ctx, 1) + heap_get(ctx, 2) + 1);
+    heap_set(g, 2, prop);
+    heap_set(g, 3, lhs);
+    heap_set(g, 4, rhs);
+    heap_set(g, 5, GOAL_OPEN);
+    heap_set(g, 6, heap_get(ctx, 3));
+    heap_set(ctx, 3, g);
+    let oc = heap_get(ctx, 1);
+    heap_set(ctx, 1, oc + 1);
+    return g;
+}
+
+pub fn tactic_refl(ctx: i64, goal: i64) -> i64 {
+    if heap_get(goal, 5) != GOAL_OPEN {
+        return 0;
+    }
+    if heap_get(goal, 2) != PROP_EQ {
+        return 0;
+    }
+    if heap_get(goal, 3) != heap_get(goal, 4) {
+        return 0;
+    }
+    heap_set(goal, 5, GOAL_PROVED);
+    let oc = heap_get(ctx, 1);
+    heap_set(ctx, 1, oc - 1);
+    let pc = heap_get(ctx, 2);
+    heap_set(ctx, 2, pc + 1);
+    return 1;
+}
+
+pub fn tactic_exact(ctx: i64, goal: i64, witness: i64) -> i64 {
+    if heap_get(goal, 5) != GOAL_OPEN {
+        return 0;
+    }
+    if witness == heap_get(goal, 4) {
+        heap_set(goal, 5, GOAL_PROVED);
+        let oc = heap_get(ctx, 1);
+        heap_set(ctx, 1, oc - 1);
+        let pc = heap_get(ctx, 2);
+        heap_set(ctx, 2, pc + 1);
+        return 1;
+    }
+    return 0;
+}
+
+pub fn pctx_open_count(ctx: i64) -> i64 {
+    return heap_get(ctx, 1);
+}
+
+pub fn pctx_proved_count(ctx: i64) -> i64 {
+    return heap_get(ctx, 2);
+}
+
+pub fn pctx_all_proved(ctx: i64) -> i64 {
+    if heap_get(ctx, 1) == 0 {
+        return 1;
+    }
+    return 0;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: Add 2 goals, open_count == 2
+    let ctx = pctx_new();
+    let g1 = pctx_add_goal(ctx, PROP_EQ, 5, 5);
+    let g2 = pctx_add_goal(ctx, PROP_EQ, 7, 7);
+    if pctx_open_count(ctx) == 2 {
+        score = score + 37;
+    }
+
+    // Step 2: Apply refl to both, proved_count == 2
+    tactic_refl(ctx, g1);
+    tactic_refl(ctx, g2);
+    if pctx_proved_count(ctx) == 2 {
+        score = score + 37;
+    }
+
+    // Step 3: All proved, open_count == 0
+    if pctx_all_proved(ctx) == 1 {
+        score = score + 37;
+    }
+
+    return score;
+}

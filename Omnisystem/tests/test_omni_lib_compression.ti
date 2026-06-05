@@ -1,0 +1,303 @@
+// Integration test for Phase 124 compression algorithms (self-contained)
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_VEC: i64 = 3130;
+const TAG_VEC_NODE: i64 = 3131;
+const TAG_HUFF_NODE: i64 = 1120;
+const TAG_HUFF_LEAF: i64 = 1121;
+
+pub fn vec_new() -> i64 {
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_VEC);
+    heap_set_body(v, 0);
+    heap_set_arg(v, 0);
+    heap_set_domain(v, 0);
+    return v;
+}
+
+pub fn vec_len(v: i64) -> i64 { return heap_get_arg(v); }
+
+pub fn vec_push(v: i64, value: i64) {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_VEC_NODE);
+    heap_set_body(n, value);
+    heap_set_domain(n, 0);
+
+    if vec_len(v) == 0 {
+        heap_set_body(v, n);
+        heap_set_domain(v, n);
+    } else {
+        let tail = heap_get_domain(v);
+        heap_set_domain(tail, n);
+        heap_set_domain(v, n);
+    }
+
+    heap_set_arg(v, vec_len(v) + 1);
+}
+
+pub fn vec_get(v: i64, index: i64) -> i64 {
+    let len = vec_len(v);
+    if index < 0 || index >= len { return 0; }
+
+    let mut cur = heap_get_body(v);
+    let mut i: i64 = 0;
+    while i < index {
+        cur = heap_get_domain(cur);
+        i = i + 1;
+    }
+    return heap_get_body(cur);
+}
+
+pub fn vec_set(v: i64, index: i64, value: i64) {
+    let len = vec_len(v);
+    if index < 0 || index >= len { return; }
+
+    let mut cur = heap_get_body(v);
+    let mut i: i64 = 0;
+    while i < index {
+        cur = heap_get_domain(cur);
+        i = i + 1;
+    }
+    heap_set_body(cur, value);
+}
+
+pub fn vec_pop(v: i64) -> i64 {
+    let len = vec_len(v);
+    if len == 0 { return 0; }
+
+    if len == 1 {
+        let only = heap_get_body(v);
+        let val = heap_get_body(only);
+        heap_set_body(v, 0);
+        heap_set_domain(v, 0);
+        heap_set_arg(v, 0);
+        return val;
+    }
+
+    let mut prev = heap_get_body(v);
+    let mut i: i64 = 0;
+    while i < len - 2 {
+        prev = heap_get_domain(prev);
+        i = i + 1;
+    }
+
+    let last = heap_get_domain(prev);
+    let val = heap_get_body(last);
+    heap_set_domain(prev, 0);
+    heap_set_domain(v, prev);
+    heap_set_arg(v, len - 1);
+    return val;
+}
+
+pub fn ensure_size(v: i64, need_len: i64) {
+    while vec_len(v) < need_len {
+        vec_push(v, 0);
+    }
+}
+
+// RLE
+pub fn rle_encode(input: i64) -> i64 {
+    let len = vec_len(input);
+    if len == 0 { return vec_new(); }
+
+    let output = vec_new();
+    let mut i: i64 = 0;
+    while i < len {
+        let value = vec_get(input, i);
+        let mut count: i64 = 1;
+        let mut j: i64 = i + 1;
+        while j < len {
+            if vec_get(input, j) != value { break; }
+            if count >= 127 { break; }
+            count = count + 1;
+            j = j + 1;
+        }
+        vec_push(output, value);
+        vec_push(output, count);
+        i = j;
+    }
+
+    return output;
+}
+
+pub fn rle_decode(input: i64) -> i64 {
+    let len = vec_len(input);
+    if len == 0 { return vec_new(); }
+
+    let output = vec_new();
+    let mut i: i64 = 0;
+    while i + 1 < len {
+        let value = vec_get(input, i);
+        let count = vec_get(input, i + 1);
+        let mut k: i64 = 0;
+        while k < count {
+            vec_push(output, value);
+            k = k + 1;
+        }
+        i = i + 2;
+    }
+
+    return output;
+}
+
+// Delta
+pub fn delta_encode(input: i64) -> i64 {
+    let len = vec_len(input);
+    if len == 0 { return vec_new(); }
+
+    let out = vec_new();
+    vec_push(out, vec_get(input, 0));
+
+    let mut i: i64 = 1;
+    while i < len {
+        vec_push(out, vec_get(input, i) - vec_get(input, i - 1));
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn delta_decode(input: i64) -> i64 {
+    let len = vec_len(input);
+    if len == 0 { return vec_new(); }
+
+    let out = vec_new();
+    let mut cur = vec_get(input, 0);
+    vec_push(out, cur);
+
+    let mut i: i64 = 1;
+    while i < len {
+        cur = cur + vec_get(input, i);
+        vec_push(out, cur);
+        i = i + 1;
+    }
+    return out;
+}
+
+// Huffman
+pub fn huff_leaf(symbol: i64, freq: i64) -> i64 {
+    let node = heap_alloc_term();
+    heap_set_tag(node, TAG_HUFF_LEAF);
+    heap_set_body(node, symbol);
+    heap_set_arg(node, freq);
+    heap_set_domain(node, 0);
+    return node;
+}
+
+pub fn huff_node(left: i64, right: i64) -> i64 {
+    let node = heap_alloc_term();
+    heap_set_tag(node, TAG_HUFF_NODE);
+    heap_set_body(node, left);
+    heap_set_domain(node, right);
+    heap_set_arg(node, heap_get_arg(left) + heap_get_arg(right));
+    return node;
+}
+
+pub fn huff_freq(node: i64) -> i64 { return heap_get_arg(node); }
+
+pub fn huff_extract_min(nodes: i64) -> i64 {
+    let len = vec_len(nodes);
+    if len == 0 { return 0; }
+
+    let mut min_idx: i64 = 0;
+    let mut min_freq = huff_freq(vec_get(nodes, 0));
+    let mut i: i64 = 1;
+    while i < len {
+        let f = huff_freq(vec_get(nodes, i));
+        if f < min_freq {
+            min_freq = f;
+            min_idx = i;
+        }
+        i = i + 1;
+    }
+
+    let result = vec_get(nodes, min_idx);
+    let last = vec_pop(nodes);
+    if min_idx < vec_len(nodes) {
+        vec_set(nodes, min_idx, last);
+    }
+    return result;
+}
+
+pub fn huff_build_tree(frequencies: i64, symbol_count: i64) -> i64 {
+    let nodes = vec_new();
+    let mut i: i64 = 0;
+    while i < symbol_count {
+        let f = vec_get(frequencies, i);
+        if f > 0 { vec_push(nodes, huff_leaf(i, f)); }
+        i = i + 1;
+    }
+
+    while vec_len(nodes) > 1 {
+        let a = huff_extract_min(nodes);
+        let b = huff_extract_min(nodes);
+        vec_push(nodes, huff_node(a, b));
+    }
+
+    if vec_len(nodes) == 0 { return 0; }
+    return vec_get(nodes, 0);
+}
+
+pub fn huff_assign_codes(root: i64, codes: i64, prefix: i64, depth: i64) {
+    if root == 0 { return; }
+
+    if heap_get_tag(root) == TAG_HUFF_LEAF {
+        let sym = heap_get_body(root);
+        let idx0 = sym * 2;
+        let idx1 = idx0 + 1;
+        ensure_size(codes, idx1 + 1);
+        vec_set(codes, idx0, prefix);
+        vec_set(codes, idx1, depth);
+        return;
+    }
+
+    huff_assign_codes(heap_get_body(root), codes, prefix * 2, depth + 1);
+    huff_assign_codes(heap_get_domain(root), codes, prefix * 2 + 1, depth + 1);
+}
+
+pub fn main() -> i64 {
+    // RLE round-trip
+    let rle_data = vec_new();
+    vec_push(rle_data, 7); vec_push(rle_data, 7);
+    vec_push(rle_data, 7); vec_push(rle_data, 9);
+    let rle_enc = rle_encode(rle_data);
+    let rle_dec = rle_decode(rle_enc);
+    if vec_len(rle_dec) != 4 { return 1; }
+    if vec_get(rle_dec, 0) != 7 { return 2; }
+    if vec_get(rle_dec, 3) != 9 { return 3; }
+
+    // Delta round-trip
+    let delta_data = vec_new();
+    vec_push(delta_data, 200);
+    vec_push(delta_data, 210);
+    vec_push(delta_data, 220);
+    vec_push(delta_data, 225);
+    let delta_enc = delta_encode(delta_data);
+    let delta_dec = delta_decode(delta_enc);
+    if vec_len(delta_dec) != 4 { return 4; }
+    if vec_get(delta_dec, 0) != 200 { return 5; }
+    if vec_get(delta_dec, 3) != 225 { return 6; }
+
+    // Huffman tree construction
+    let freqs = vec_new();
+    vec_push(freqs, 5); vec_push(freqs, 2);
+    vec_push(freqs, 1); vec_push(freqs, 1);
+    let root = huff_build_tree(freqs, 4);
+    if root == 0 { return 7; }
+    if huff_freq(root) != 9 { return 8; }
+
+    let codes = vec_new();
+    huff_assign_codes(root, codes, 0, 0);
+    if vec_get(codes, 1) == 0 { return 9; }
+
+    return 111;
+}

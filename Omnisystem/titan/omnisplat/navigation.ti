@@ -1,0 +1,188 @@
+// titan/omnisplat/navigation.ti — Walk Mode Navigation & Voxel Collision
+// Walk-mode walker with AABB collision, voxel grid built from splat bounds.
+// Inlines gsplat_data helpers with nav_ prefix.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_WALKER:      i64 = 9200;
+const TAG_VOXEL_GRID:  i64 = 9201;
+
+// ===== Inlined gsplat_data (3D, nav_ prefix) =====
+// vertex: body=px, arg=py, domain=m1(body=pz)
+// data  : tag=8800, body=count, arg=list_head(wrappers), domain=0
+// wrapper: body=vertex, domain=next (APPEND order)
+
+pub fn nav_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, 8800); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn nav_data_add(data: i64, splat: i64) {
+    let w = heap_alloc_term(); heap_set_body(w, splat); heap_set_domain(w, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, w); }
+    else {
+        let mut c = head;
+        while heap_get_domain(c) != 0 { c = heap_get_domain(c); }
+        heap_set_domain(c, w);
+    }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+pub fn nav_data_count(data: i64) -> i64 { return heap_get_body(data); }
+pub fn nav_data_get(data: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(data);
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index { return heap_get_body(curr); }
+        i = i + 1; curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+pub fn nav_vertex_create(px: i64, py: i64, pz: i64) -> i64 {
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, pz); heap_set_arg(m1, 0); heap_set_domain(m1, 0);
+    let v = heap_alloc_term();
+    heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, m1);
+    return v;
+}
+pub fn nav_vx(s: i64) -> i64 { return heap_get_body(s); }
+pub fn nav_vy(s: i64) -> i64 { return heap_get_arg(s); }
+pub fn nav_vz(s: i64) -> i64 { return heap_get_body(heap_get_domain(s)); }
+
+// ===== Walker =====
+// walker: tag=9200, body=px, arg=py, domain=m1
+// m1    : body=pz, arg=speed, domain=0
+
+pub fn walker_create(px: i64, py: i64, pz: i64, speed: i64) -> i64 {
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, pz); heap_set_arg(m1, speed); heap_set_domain(m1, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WALKER);
+    heap_set_body(w, px); heap_set_arg(w, py); heap_set_domain(w, m1);
+    return w;
+}
+
+pub fn walker_px(w: i64) -> i64    { return heap_get_body(w); }
+pub fn walker_py(w: i64) -> i64    { return heap_get_arg(w); }
+pub fn walker_pz(w: i64) -> i64    { return heap_get_body(heap_get_domain(w)); }
+pub fn walker_speed(w: i64) -> i64 { return heap_get_arg(heap_get_domain(w)); }
+
+// Moves walker by (dx,dy,dz) * speed.
+pub fn walker_move(w: i64, dx: i64, dy: i64, dz: i64) {
+    let s  = walker_speed(w);
+    let m1 = heap_get_domain(w);
+    heap_set_body(w,  heap_get_body(w)  + dx * s);
+    heap_set_arg(w,   heap_get_arg(w)   + dy * s);
+    heap_set_body(m1, heap_get_body(m1) + dz * s);
+}
+
+// Returns true when walker position is inside the given AABB.
+pub fn walker_check_collision(w: i64,
+                               min_x: i64, min_y: i64, min_z: i64,
+                               max_x: i64, max_y: i64, max_z: i64) -> bool {
+    let px = walker_px(w);
+    let py = walker_py(w);
+    let pz = walker_pz(w);
+    return px >= min_x && px <= max_x
+        && py >= min_y && py <= max_y
+        && pz >= min_z && pz <= max_z;
+}
+
+// Builds a voxel grid covering the axis-aligned bounding box of all splats.
+// voxel_count = ceil_cells_x * ceil_cells_y * ceil_cells_z.
+// grid: tag=9201, body=voxel_count, arg=voxel_size, domain=bounds_m1
+// bounds_m1: body=min_x, arg=min_y, domain=bounds_m2
+// bounds_m2: body=min_z, arg=max_x, domain=bounds_m3
+// bounds_m3: body=max_y, arg=max_z, domain=0
+pub fn walker_build_collision_grid(data: i64, voxel_size: i64) -> i64 {
+    let count = nav_data_count(data);
+    if count == 0 {
+        let g = heap_alloc_term();
+        heap_set_tag(g, TAG_VOXEL_GRID); heap_set_body(g, 0); heap_set_arg(g, voxel_size);
+        return g;
+    }
+    let first  = nav_data_get(data, 0);
+    let mut min_x = nav_vx(first); let mut max_x = min_x;
+    let mut min_y = nav_vy(first); let mut max_y = min_y;
+    let mut min_z = nav_vz(first); let mut max_z = min_z;
+    let mut i: i64 = 1;
+    while i < count {
+        let s = nav_data_get(data, i);
+        if s != 0 {
+            let sx = nav_vx(s); let sy = nav_vy(s); let sz = nav_vz(s);
+            if sx < min_x { min_x = sx; } if sx > max_x { max_x = sx; }
+            if sy < min_y { min_y = sy; } if sy > max_y { max_y = sy; }
+            if sz < min_z { min_z = sz; } if sz > max_z { max_z = sz; }
+        }
+        i = i + 1;
+    }
+    let nx = (max_x - min_x) / voxel_size + 1;
+    let ny = (max_y - min_y) / voxel_size + 1;
+    let nz = (max_z - min_z) / voxel_size + 1;
+
+    let bm3 = heap_alloc_term();
+    heap_set_body(bm3, max_y); heap_set_arg(bm3, max_z); heap_set_domain(bm3, 0);
+    let bm2 = heap_alloc_term();
+    heap_set_body(bm2, min_z); heap_set_arg(bm2, max_x); heap_set_domain(bm2, bm3);
+    let bm1 = heap_alloc_term();
+    heap_set_body(bm1, min_x); heap_set_arg(bm1, min_y); heap_set_domain(bm1, bm2);
+
+    let g = heap_alloc_term();
+    heap_set_tag(g, TAG_VOXEL_GRID);
+    heap_set_body(g, nx * ny * nz);
+    heap_set_arg(g, voxel_size);
+    heap_set_domain(g, bm1);
+    return g;
+}
+
+pub fn walker_count_occupied_voxels(grid: i64) -> i64 {
+    return heap_get_body(grid);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Walker creation
+    let w = walker_create(50, 0, 100, 5);
+    if heap_get_tag(w) != TAG_WALKER { return 1; }
+    if walker_px(w)    != 50         { return 2; }
+    if walker_pz(w)    != 100        { return 3; }
+    if walker_speed(w) != 5          { return 4; }
+
+    // Move: dx=1,dy=0,dz=0 → px = 50 + 1*5 = 55
+    walker_move(w, 1, 0, 0);
+    if walker_px(w) != 55 { return 5; }
+
+    // AABB: walker at (55,0,100) inside (0,-10,50)-(100,10,150)
+    if !walker_check_collision(w, 0, -10, 50, 100, 10, 150) { return 6; }
+    // Outside (200,200,200)-(300,300,300)
+    if walker_check_collision(w, 200, 200, 200, 300, 300, 300) { return 7; }
+
+    // Voxel grid: s1=(10,20,30), s2=(50,60,70), voxel_size=10
+    // nx=(50-10)/10+1=5, ny=5, nz=5 → 125 voxels
+    let data = nav_data_create();
+    let s1 = nav_vertex_create(10, 20, 30);
+    let s2 = nav_vertex_create(50, 60, 70);
+    nav_data_add(data, s1); nav_data_add(data, s2);
+    let grid = walker_build_collision_grid(data, 10);
+    if heap_get_tag(grid) != TAG_VOXEL_GRID       { return 8; }
+    let voxels = walker_count_occupied_voxels(grid);
+    if voxels <= 0                                { return 9; }
+    if voxels != 125                              { return 10; }
+
+    // Empty data → 0 voxels
+    let empty = nav_data_create();
+    let eg = walker_build_collision_grid(empty, 10);
+    if walker_count_occupied_voxels(eg) != 0      { return 11; }
+
+    return 111;
+}

@@ -1,0 +1,133 @@
+// titan/omnirender/g2_browser3d.ti — OmniBrowser 3D Integration
+// Self-contained. Wrapper-node APPEND for element registry.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_SPLATEL: i64 = 20100;
+const T_CANVAS3D: i64 = 20101;
+const T_ELREG:   i64 = 20102;
+const T_WRP2:    i64 = 20103;
+
+// ===== Splat element =====
+// e: tag=T_SPLATEL, body=src, arg=width, domain=meta
+// meta: body=height, arg=loaded(1)
+
+pub fn g2_splat_element(src: i64, w: i64, h: i64) -> i64 {
+    let m = heap_alloc_term();
+    heap_set_body(m, h); heap_set_arg(m, 1); heap_set_domain(m, 0);
+    let e = heap_alloc_term();
+    heap_set_tag(e, T_SPLATEL); heap_set_body(e, src); heap_set_arg(e, w); heap_set_domain(e, m);
+    return e;
+}
+
+pub fn g2_splat_src(e: i64) -> i64    { return heap_get_body(e); }
+pub fn g2_splat_width(e: i64) -> i64  { return heap_get_arg(e); }
+pub fn g2_splat_height(e: i64) -> i64 { return heap_get_body(heap_get_domain(e)); }
+pub fn g2_splat_loaded(e: i64) -> i64 { return heap_get_arg(heap_get_domain(e)); }
+
+// ===== Canvas3D element =====
+// c: tag=T_CANVAS3D, body=width, arg=height, domain=shader_list_head(PREPEND)
+// shader node: body=shader_id, domain=next_shader_node
+
+pub fn g2_canvas3d_element(w: i64, h: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_CANVAS3D); heap_set_body(c, w); heap_set_arg(c, h); heap_set_domain(c, 0);
+    return c;
+}
+
+pub fn g2_canvas3d_set_shader(c: i64, shader: i64) {
+    let m = heap_alloc_term();
+    heap_set_body(m, shader); heap_set_domain(m, heap_get_domain(c));
+    heap_set_domain(c, m);
+}
+
+pub fn g2_canvas3d_shader_count(c: i64) -> i64 {
+    let mut cur: i64 = heap_get_domain(c); let mut n: i64 = 0;
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+pub fn g2_canvas3d_width(c: i64) -> i64  { return heap_get_body(c); }
+pub fn g2_canvas3d_height(c: i64) -> i64 { return heap_get_arg(c); }
+
+// ===== Element registry =====
+// reg: tag=T_ELREG, body=count, arg=list_head(wrappers)
+// wrapper: tag=T_WRP2, body=element, domain=next_wrapper
+
+pub fn g2_element_registry() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, T_ELREG); heap_set_body(r, 0); heap_set_arg(r, 0); heap_set_domain(r, 0);
+    return r;
+}
+
+pub fn g2_reg_register(r: i64, el: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP2); heap_set_body(w, el); heap_set_domain(w, 0);
+    let h = heap_get_arg(r);
+    if h == 0 { heap_set_arg(r, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn g2_reg_count(r: i64) -> i64 { return heap_get_body(r); }
+
+pub fn g2_reg_get(r: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(r); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Splat element
+    let sp = g2_splat_element(42, 800, 600);
+    if g2_splat_src(sp) != 42    { return 1; }
+    if g2_splat_width(sp) != 800 { return 2; }
+    if g2_splat_height(sp) != 600 { return 3; }
+    if g2_splat_loaded(sp) != 1  { return 4; }
+
+    // Canvas3D: 2 shaders (prepend — count only)
+    let cv = g2_canvas3d_element(1024, 768);
+    if g2_canvas3d_width(cv) != 1024  { return 5; }
+    if g2_canvas3d_height(cv) != 768  { return 6; }
+    g2_canvas3d_set_shader(cv, 10);
+    g2_canvas3d_set_shader(cv, 20);
+    if g2_canvas3d_shader_count(cv) != 2 { return 7; }
+
+    // Element registry: 2 elements
+    let reg = g2_element_registry();
+    g2_reg_register(reg, sp);
+    g2_reg_register(reg, cv);
+    if g2_reg_count(reg) != 2     { return 8; }
+
+    // Retrieve by index
+    let e0 = g2_reg_get(reg, 0);
+    if e0 != sp                    { return 9; }
+    let e1 = g2_reg_get(reg, 1);
+    if e1 != cv                    { return 10; }
+
+    // Independent registry — isolation
+    let reg2 = g2_element_registry();
+    g2_reg_register(reg2, sp);
+    if g2_reg_count(reg2) != 1    { return 11; }
+    if g2_reg_count(reg) != 2     { return 12; }
+
+    return 111;
+}

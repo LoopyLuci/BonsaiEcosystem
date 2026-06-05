@@ -1,0 +1,112 @@
+// OmniLib HashMap -- heap-backed linked entry map
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_MAP: i64 = 7300;
+const TAG_MAP_ENTRY: i64 = 7301;
+
+// Map layout: body=head_entry, domain=count
+// Entry layout: body=key, arg=value, domain=next_entry
+pub fn map_new() -> i64 {
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_MAP);
+    heap_set_body(m, 0);
+    heap_set_domain(m, 0);
+    return m;
+}
+
+pub fn map_hash(key: i64) -> i64 {
+    if key < 0 { return -key; }
+    return key;
+}
+
+pub fn map_put(m: i64, key: i64, value: i64) {
+    let mut cur = heap_get_body(m);
+    while cur != 0 {
+        if heap_get_body(cur) == key {
+            heap_set_arg(cur, value);
+            return;
+        }
+        cur = heap_get_domain(cur);
+    }
+
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_MAP_ENTRY);
+    heap_set_body(e, key);
+    heap_set_arg(e, value);
+    heap_set_domain(e, heap_get_body(m));
+    heap_set_body(m, e);
+    heap_set_domain(m, heap_get_domain(m) + 1);
+    return;
+}
+
+pub fn map_get(m: i64, key: i64) -> i64 {
+    let mut cur = heap_get_body(m);
+    while cur != 0 {
+        if heap_get_body(cur) == key {
+            return heap_get_arg(cur);
+        }
+        cur = heap_get_domain(cur);
+    }
+    return -1;
+}
+
+pub fn map_remove(m: i64, key: i64) {
+    let mut prev: i64 = 0;
+    let mut cur = heap_get_body(m);
+    while cur != 0 {
+        if heap_get_body(cur) == key {
+            let next = heap_get_domain(cur);
+            if prev == 0 {
+                heap_set_body(m, next);
+            } else {
+                heap_set_domain(prev, next);
+            }
+            heap_set_domain(m, heap_get_domain(m) - 1);
+            return;
+        }
+        prev = cur;
+        cur = heap_get_domain(cur);
+    }
+    return;
+}
+
+pub fn map_count(m: i64) -> i64 {
+    return heap_get_domain(m);
+}
+
+pub fn main() -> i64 {
+    let m = map_new();
+    if map_count(m) != 0 { return 1; }
+
+    map_put(m, 42, 100);
+    if map_get(m, 42) != 100 { return 2; }
+    if map_count(m) != 1 { return 3; }
+
+    map_put(m, 42, 200);
+    if map_get(m, 42) != 200 { return 4; }
+    if map_count(m) != 1 { return 5; }
+
+    map_put(m, 7, 300);
+    if map_get(m, 7) != 300 { return 6; }
+    if map_count(m) != 2 { return 7; }
+
+    if map_get(m, 99) != -1 { return 8; }
+
+    map_remove(m, 42);
+    if map_get(m, 42) != -1 { return 9; }
+    if map_count(m) != 1 { return 10; }
+
+    map_remove(m, 7);
+    if map_count(m) != 0 { return 11; }
+
+    return 111;
+}

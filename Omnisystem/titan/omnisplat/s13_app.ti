@@ -1,0 +1,168 @@
+// titan/omnisplat/s13_app.ti — OmniSplat Application Shell
+// Self-contained. All sub-system helpers inlined with s13_ prefix.
+//
+// App node layout (no domain collisions):
+//   app:   body=splat_count, arg=meta1, domain=meta2
+//   meta1: body=dataset_ptr, arg=camera_ptr,   domain=0
+//   meta2: body=timeline_ptr, arg=undo_ptr,    domain=selection_ptr
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const S13_T_APP: i64 = 10000;
+const S13_T_DS:  i64 = 8800;
+const S13_T_WRP: i64 = 8802;
+const S13_T_EXP: i64 = 9500;
+const S13_F_PLY: i64 = 0;
+const S13_T_TL:  i64 = 9401;
+const S13_T_STK: i64 = 9301;
+const S13_T_CAM: i64 = 10001;
+const S13_T_SEL: i64 = 10002;
+
+// ===== Inlined dataset helpers (s8 subset) =====
+pub fn s13_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, S13_T_DS); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn s13_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn s13_export_ply(d: i64) -> i64 {
+    let hdr = heap_alloc_term();
+    heap_set_tag(hdr, S13_T_EXP); heap_set_body(hdr, S13_F_PLY); heap_set_arg(hdr, s13_cnt(d));
+    heap_set_domain(hdr, 0);
+    return hdr;
+}
+pub fn s13_export_count(exp: i64) -> i64 { return heap_get_arg(exp); }
+
+// ===== Inlined timeline stub =====
+pub fn s13_tl() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, S13_T_TL); heap_set_body(t, 0); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+
+// ===== Inlined undo stack stub =====
+pub fn s13_stack() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, S13_T_STK); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+// ===== App shell =====
+
+pub fn s13_app_init() -> i64 {
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, 0); heap_set_arg(meta1, 0); heap_set_domain(meta1, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, 0); heap_set_arg(meta2, 0); heap_set_domain(meta2, 0);
+    let a = heap_alloc_term();
+    heap_set_tag(a, S13_T_APP); heap_set_body(a, 0); heap_set_arg(a, meta1); heap_set_domain(a, meta2);
+    return a;
+}
+
+// Simulate loading: create dataset, hardcode count=splat_count, store in meta1.body.
+// Also writes count into app.body so s13_app_step can return it.
+pub fn s13_app_load_splat(app: i64, path: i64) -> i64 {
+    let d = s13_sd();
+    heap_set_body(d, 5);
+    let meta1 = heap_get_arg(app);
+    heap_set_body(meta1, d);
+    heap_set_body(app, 5);
+    return d;
+}
+
+pub fn s13_app_dataset(app: i64) -> i64 {
+    return heap_get_body(heap_get_arg(app));
+}
+
+// Camera: store in meta1.arg
+pub fn s13_app_camera(app: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, S13_T_CAM); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    let meta1 = heap_get_arg(app);
+    heap_set_arg(meta1, c);
+    return c;
+}
+
+// Selection: store in meta2.domain
+pub fn s13_app_selection(app: i64) -> i64 {
+    let d = s13_app_dataset(app);
+    let n = s13_cnt(d);
+    let sa = heap_alloc_term();
+    heap_set_tag(sa, S13_T_SEL); heap_set_body(sa, n); heap_set_arg(sa, 0); heap_set_domain(sa, 0);
+    let meta2 = heap_get_domain(app);
+    heap_set_domain(meta2, sa);
+    return sa;
+}
+
+// Timeline: store in meta2.body
+pub fn s13_app_timeline(app: i64) -> i64 {
+    let tl = s13_tl();
+    let meta2 = heap_get_domain(app);
+    heap_set_body(meta2, tl);
+    return tl;
+}
+
+// Export: fetch dataset from meta1.body, build PLY descriptor
+pub fn s13_app_export(app: i64, fmt: i64) -> i64 {
+    let d = s13_app_dataset(app);
+    return s13_export_ply(d);
+}
+
+// Undo: create two stacks (undo/redo), store undo in meta2.arg
+pub fn s13_app_undo(app: i64) -> i64 {
+    let su = s13_stack();
+    let sr = s13_stack();
+    let meta2 = heap_get_domain(app);
+    heap_set_arg(meta2, su);
+    return su;
+}
+
+// Step: returns splat count stored in app.body after load
+pub fn s13_app_step(app: i64) -> i64 { return heap_get_body(app); }
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let app = s13_app_init();
+    if heap_get_tag(app) != S13_T_APP { return 1; }
+
+    let d = s13_app_load_splat(app, 0);
+    if d == 0                          { return 2; }
+    if s13_cnt(d) != 5                 { return 3; }
+    if s13_app_step(app) != 5         { return 4; }
+
+    let cam = s13_app_camera(app);
+    if cam == 0                        { return 5; }
+    if heap_get_tag(cam) != S13_T_CAM { return 6; }
+
+    let sel = s13_app_selection(app);
+    if sel == 0                        { return 7; }
+    if heap_get_body(sel) != 5        { return 8; }
+
+    let tl = s13_app_timeline(app);
+    if tl == 0                         { return 9; }
+    if heap_get_tag(tl) != S13_T_TL   { return 10; }
+
+    let exp = s13_app_export(app, 0);
+    if exp == 0                        { return 11; }
+    if s13_export_count(exp) != 5     { return 12; }
+
+    let su = s13_app_undo(app);
+    if su == 0                         { return 13; }
+    if heap_get_tag(su) != S13_T_STK  { return 14; }
+
+    // Dataset still accessible and unchanged
+    if s13_app_step(app) != 5         { return 15; }
+    if s13_cnt(s13_app_dataset(app)) != 5 { return 16; }
+
+    return 111;
+}

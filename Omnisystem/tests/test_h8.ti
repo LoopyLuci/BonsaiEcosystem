@@ -1,0 +1,7 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_PF:i64=24700;const tT_IV:i64=24701;
+pub fn th8_proof_create(name:i64,valid:i64)->i64{let p=heap_alloc_term();heap_set_tag(p,tT_PF);heap_set_body(p,name);heap_set_arg(p,valid);return p;}
+pub fn th8_proof_valid(p:i64)->i64{return heap_get_arg(p);}
+pub fn th8_inv_create(cond:i64)->i64{let inv=heap_alloc_term();heap_set_tag(inv,tT_IV);heap_set_body(inv,cond);heap_set_arg(inv,1);return inv;}
+pub fn th8_inv_check(inv:i64,actual:i64)->i64{if actual==0{heap_set_arg(inv,0);return 0;}return heap_get_arg(inv);}
+pub fn main()->i64{let p=th8_proof_create(5,1);if th8_proof_valid(p)!=1{return 1;}let inv=th8_inv_create(10);if th8_inv_check(inv,1)!=1{return 2;}return 111;}

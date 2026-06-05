@@ -1,0 +1,160 @@
+// titan/aion/aion_native_gui_stage.ti — Native GUI Automation Stage for Aion
+// Registers a 9th pipeline stage (STAGE_GUI_AUTOMATION=8) and executes it.
+// Inlines pipeline_runner + native agent.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+}
+
+// ===== Pipeline stage constants =====
+const STAGE_SPECIFICATION: i64 = 0;
+const STAGE_ARCHITECTURE:  i64 = 1;
+const STAGE_CODEGEN:       i64 = 2;
+const STAGE_TEST:          i64 = 3;
+const STAGE_VERIFY:        i64 = 4;
+const STAGE_PACKAGE:       i64 = 5;
+const STAGE_DEPLOY:        i64 = 6;
+const STAGE_MONITOR:       i64 = 7;
+const STAGE_GUI_AUTOMATION: i64 = 8;
+
+const TAG_PIPELINE_STAGE: i64 = 8400;
+const CAP_CHAT:         i64 = 2;
+const CAP_REASONING:    i64 = 4;
+const CAP_PROOF_SEARCH: i64 = 8;
+const CAP_CODE_GEN:     i64 = 16;
+const CAP_GUI:          i64 = 32;
+
+const TEMPLATE_REST_API: i64 = 0;
+const TEMPLATE_WEB_APP:  i64 = 1;
+const TEMPLATE_CLI_TOOL: i64 = 2;
+const TEMPLATE_LIBRARY:  i64 = 3;
+
+// Stage layout: body=meta1, domain=next_stage
+// meta1: body=stage_type, arg=name_id, domain=meta2
+// meta2: body=description_id, arg=order, domain=required_cap
+pub fn ngs_stage_create(stage_type: i64, name_id: i64, description_id: i64,
+                         order: i64, required_cap: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, description_id);
+    heap_set_arg(meta2, order);
+    heap_set_domain(meta2, required_cap);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, stage_type);
+    heap_set_arg(meta1, name_id);
+    heap_set_domain(meta1, meta2);
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_PIPELINE_STAGE);
+    heap_set_body(s, meta1);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);
+    return s;
+}
+pub fn ngs_stage_type(s: i64) -> i64  { return heap_get_body(heap_get_body(s)); }
+pub fn ngs_stage_order(s: i64) -> i64 { return heap_get_arg(heap_get_domain(heap_get_body(s))); }
+
+static mut PIPELINE_STAGES: i64 = 0;
+static mut PIPELINE_COUNT:  i64 = 0;
+
+pub fn pipeline_init() {
+    PIPELINE_STAGES = 0; PIPELINE_COUNT = 0;
+    let s7 = ngs_stage_create(STAGE_MONITOR,       heap_alloc_term(), heap_alloc_term(), 7, CAP_CHAT);
+    heap_set_domain(s7, PIPELINE_STAGES); PIPELINE_STAGES = s7;
+    let s6 = ngs_stage_create(STAGE_DEPLOY,        heap_alloc_term(), heap_alloc_term(), 6, CAP_CHAT);
+    heap_set_domain(s6, PIPELINE_STAGES); PIPELINE_STAGES = s6;
+    let s5 = ngs_stage_create(STAGE_PACKAGE,       heap_alloc_term(), heap_alloc_term(), 5, CAP_CODE_GEN);
+    heap_set_domain(s5, PIPELINE_STAGES); PIPELINE_STAGES = s5;
+    let s4 = ngs_stage_create(STAGE_VERIFY,        heap_alloc_term(), heap_alloc_term(), 4, CAP_PROOF_SEARCH);
+    heap_set_domain(s4, PIPELINE_STAGES); PIPELINE_STAGES = s4;
+    let s3 = ngs_stage_create(STAGE_TEST,          heap_alloc_term(), heap_alloc_term(), 3, CAP_CODE_GEN);
+    heap_set_domain(s3, PIPELINE_STAGES); PIPELINE_STAGES = s3;
+    let s2 = ngs_stage_create(STAGE_CODEGEN,       heap_alloc_term(), heap_alloc_term(), 2, CAP_CODE_GEN);
+    heap_set_domain(s2, PIPELINE_STAGES); PIPELINE_STAGES = s2;
+    let s1 = ngs_stage_create(STAGE_ARCHITECTURE,  heap_alloc_term(), heap_alloc_term(), 1, CAP_REASONING);
+    heap_set_domain(s1, PIPELINE_STAGES); PIPELINE_STAGES = s1;
+    let s0 = ngs_stage_create(STAGE_SPECIFICATION, heap_alloc_term(), heap_alloc_term(), 0, CAP_CHAT);
+    heap_set_domain(s0, PIPELINE_STAGES); PIPELINE_STAGES = s0;
+    PIPELINE_COUNT = 8;
+}
+
+pub fn pipeline_count() -> i64 { return PIPELINE_COUNT; }
+
+// Append GUI stage to the tail of the linked list
+pub fn native_gui_stage_register() {
+    let new_stage = ngs_stage_create(STAGE_GUI_AUTOMATION,
+                                     heap_alloc_term(), heap_alloc_term(),
+                                     STAGE_GUI_AUTOMATION, CAP_GUI);
+    // walk to tail (where domain == 0)
+    let mut curr = PIPELINE_STAGES;
+    if curr == 0 { PIPELINE_STAGES = new_stage; PIPELINE_COUNT = PIPELINE_COUNT + 1; return; }
+    while heap_get_domain(curr) != 0 {
+        curr = heap_get_domain(curr);
+    }
+    heap_set_domain(curr, new_stage);
+    PIPELINE_COUNT = PIPELINE_COUNT + 1;
+}
+
+// ===== Native agent (inlined) =====
+const TAG_NATIVE_AGENT: i64 = 8550;
+const AGENT_IDLE:    i64 = 0;
+const AGENT_RUNNING: i64 = 1;
+const AGENT_DONE:    i64 = 2;
+
+pub fn ngs_agent_create(instruction_id: i64, max_steps: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, 0); heap_set_arg(meta, max_steps); heap_set_domain(meta, 0);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_NATIVE_AGENT);
+    heap_set_body(a, instruction_id); heap_set_arg(a, AGENT_IDLE); heap_set_domain(a, meta);
+    return a;
+}
+pub fn ngs_agent_status(a: i64) -> i64 { return heap_get_arg(a); }
+pub fn ngs_agent_step_count(a: i64) -> i64 { return heap_get_body(heap_get_domain(a)); }
+pub fn ngs_agent_max_steps(a: i64) -> i64  { return heap_get_arg(heap_get_domain(a)); }
+pub fn ngs_agent_inc_step(a: i64) {
+    let meta = heap_get_domain(a);
+    heap_set_body(meta, heap_get_body(meta) + 1);
+}
+pub fn ngs_agent_step(agent: i64) -> i64 {
+    let step = ngs_agent_step_count(agent);
+    let maxs = ngs_agent_max_steps(agent);
+    if step >= maxs { heap_set_arg(agent, AGENT_DONE); return AGENT_DONE; }
+    ngs_agent_inc_step(agent);
+    return AGENT_RUNNING;
+}
+
+// Execute the GUI automation stage for a pipeline run
+pub fn native_gui_stage_execute(instruction_id: i64) -> i64 {
+    let agent = ngs_agent_create(instruction_id, 3);
+    heap_set_arg(agent, AGENT_RUNNING);
+    while ngs_agent_status(agent) == AGENT_RUNNING {
+        ngs_agent_step(agent);
+    }
+    return ngs_agent_status(agent);
+}
+
+pub fn main() -> i64 {
+    PIPELINE_STAGES = 0; PIPELINE_COUNT = 0;
+    pipeline_init();
+    let before = pipeline_count();
+    if before != 8 { return 1; }
+
+    native_gui_stage_register();
+    let after = pipeline_count();
+    if after != before + 1 { return 2; }
+
+    let result = native_gui_stage_execute(heap_alloc_term());
+    if result != AGENT_DONE { return 3; }
+
+    return 111;
+}

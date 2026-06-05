@@ -1,0 +1,110 @@
+// OmniLib Atomic — atomic i64 operations for lock-free programming
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn int_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+    fn atomic_create(initial: i64) -> i64;
+    fn atomic_load(atom: i64) -> i64;
+    fn atomic_store(atom: i64, value: i64);
+    fn atomic_add(atom: i64, delta: i64) -> i64;
+    fn atomic_sub(atom: i64, delta: i64) -> i64;
+    fn atomic_swap(atom: i64, value: i64) -> i64;
+    fn atomic_cas(atom: i64, expected: i64, desired: i64) -> bool;
+}
+
+const TAG_ATOMIC: i64 = 1020;
+
+pub fn atomic_new(initial: i64) -> i64 {
+    let raw = atomic_create(initial);
+    if raw < 0 {
+        panic(0);
+        return -1;
+    }
+    let atom = heap_alloc_term();
+    heap_set_tag(atom, TAG_ATOMIC);
+    heap_set_body(atom, raw);
+    atom
+}
+
+pub fn atomic_load(atom: i64) -> i64 {
+    let raw = heap_get_body(atom);
+    atomic_load(raw)
+}
+
+pub fn atomic_store(atom: i64, value: i64) {
+    let raw = heap_get_body(atom);
+    atomic_store(raw, value)
+}
+
+pub fn atomic_add(atom: i64, delta: i64) -> i64 {
+    let raw = heap_get_body(atom);
+    atomic_add(raw, delta)
+}
+
+pub fn atomic_sub(atom: i64, delta: i64) -> i64 {
+    let raw = heap_get_body(atom);
+    atomic_sub(raw, delta)
+}
+
+pub fn atomic_swap(atom: i64, value: i64) -> i64 {
+    let raw = heap_get_body(atom);
+    atomic_swap(raw, value)
+}
+
+pub fn atomic_cas(atom: i64, expected: i64, desired: i64) -> bool {
+    let raw = heap_get_body(atom);
+    atomic_cas(raw, expected, desired)
+}
+
+pub fn atomic_increment(atom: i64) -> i64 {
+    atomic_add(atom, 1)
+}
+
+pub fn atomic_decrement(atom: i64) -> i64 {
+    atomic_sub(atom, 1)
+}
+
+pub pub fn main() -> i64 {
+    let atom = atomic_new(0);
+    if atom == -1 { return 1; }
+    if heap_get_tag(atom) != TAG_ATOMIC { return 2; }
+
+    let val = atomic_load(atom);
+    if val != 0 { return 3; }
+
+    atomic_store(atom, 42);
+    if atomic_load(atom) != 42 { return 4; }
+
+    let prev = atomic_add(atom, 8);
+    if prev != 42 { return 5; }
+    if atomic_load(atom) != 50 { return 6; }
+
+    let prev2 = atomic_sub(atom, 25);
+    if prev2 != 50 { return 7; }
+    if atomic_load(atom) != 25 { return 8; }
+
+    let prev3 = atomic_swap(atom, 100);
+    if prev3 != 25 { return 9; }
+    if atomic_load(atom) != 100 { return 10; }
+
+    let cas_ok = atomic_cas(atom, 100, 200);
+    if !cas_ok { return 11; }
+    if atomic_load(atom) != 200 { return 12; }
+
+    let cas_fail = atomic_cas(atom, 999, 300);
+    if cas_fail { return 13; }
+    if atomic_load(atom) != 200 { return 14; }
+
+    atomic_increment(atom);
+    if atomic_load(atom) != 201 { return 15; }
+    atomic_decrement(atom);
+    if atomic_load(atom) != 200 { return 16; }
+
+    return 111;
+}

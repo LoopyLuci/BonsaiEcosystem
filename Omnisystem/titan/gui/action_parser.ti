@@ -1,0 +1,94 @@
+// titan/gui/action_parser.ti — GUI Action Parser
+// Defines the action vocabulary used by all GUI agents.
+// Body-for-meta: action.body=meta1, action.domain unused (actions not in lists).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+const TAG_ACTION: i64 = 8500;
+
+// Action types
+const ACT_CLICK:  i64 = 0;
+const ACT_TYPE:   i64 = 1;
+const ACT_SCROLL: i64 = 2;
+const ACT_DONE:   i64 = 3;
+const ACT_WAIT:   i64 = 4;
+const ACT_KEY:    i64 = 5;
+
+// Action cell layout (body-for-meta):
+//   action: tag=TAG_ACTION, body=meta1, arg=0, domain=0
+//   meta1:  body=action_type, arg=x, domain=meta2
+//   meta2:  body=y, arg=text_id, domain=delta
+
+pub fn action_create(action_type: i64, x: i64, y: i64, text_id: i64, delta: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, y);
+    heap_set_arg(meta2, text_id);
+    heap_set_domain(meta2, delta);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, action_type);
+    heap_set_arg(meta1, x);
+    heap_set_domain(meta1, meta2);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_ACTION);
+    heap_set_body(a, meta1);
+    heap_set_arg(a, 0);
+    heap_set_domain(a, 0);
+    return a;
+}
+
+pub fn action_type(a: i64) -> i64  { return heap_get_body(heap_get_body(a)); }
+pub fn action_x(a: i64) -> i64     { return heap_get_arg(heap_get_body(a)); }
+pub fn action_y(a: i64) -> i64     { return heap_get_body(heap_get_domain(heap_get_body(a))); }
+pub fn action_text(a: i64) -> i64  { return heap_get_arg(heap_get_domain(heap_get_body(a))); }
+pub fn action_delta(a: i64) -> i64 { return heap_get_domain(heap_get_domain(heap_get_body(a))); }
+
+// Parse a string token into an action type constant.
+pub fn parse_action_type(token_id: i64) -> i64 {
+    let len = str_len(token_id);
+    if len == 0 { return ACT_DONE; }
+    let first = str_at(token_id, 0);
+    if first == 99  { return ACT_CLICK; }   // 'c'
+    if first == 116 { return ACT_TYPE; }    // 't'
+    if first == 115 { return ACT_SCROLL; }  // 's'
+    if first == 100 { return ACT_DONE; }    // 'd'
+    if first == 107 { return ACT_KEY; }     // 'k'
+    return ACT_WAIT;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // CLICK action
+    let a1 = action_create(ACT_CLICK, 100, 200, 0, 0);
+    if heap_get_tag(a1) != TAG_ACTION  { return 1; }
+    if action_type(a1) != ACT_CLICK    { return 2; }
+    if action_x(a1) != 100             { return 3; }
+    if action_y(a1) != 200             { return 4; }
+
+    // TYPE action
+    let a2 = action_create(ACT_TYPE, 0, 0, 42, 0);
+    if action_type(a2) != ACT_TYPE     { return 5; }
+    if action_text(a2) != 42           { return 6; }
+
+    // SCROLL action
+    let a3 = action_create(ACT_SCROLL, 50, 50, 0, 10);
+    if action_type(a3) != ACT_SCROLL   { return 7; }
+    if action_delta(a3) != 10          { return 8; }
+
+    // DONE action
+    let a4 = action_create(ACT_DONE, 0, 0, 0, 0);
+    if action_type(a4) != ACT_DONE     { return 9; }
+
+    return 111;
+}

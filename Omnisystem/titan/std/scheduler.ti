@@ -1,0 +1,133 @@
+// titan/std/scheduler.ti — Multi-threaded work-stealing task scheduler
+// Each worker owns a deque (double-ended queue) of tasks.
+// Idle workers steal from the tail of the busiest worker's deque.
+// TaskAction is a tagged union encoding safe payload encapsulation.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+    fn mutex_create() -> i64;
+    fn mutex_lock(mid: i64);
+    fn mutex_unlock(mid: i64);
+}
+
+const TAG_TASK:   i64 = 55000;
+const TAG_DEQUE:  i64 = 55001;
+const TAG_WORKER: i64 = 55002;
+const TAG_SCHED:  i64 = 55003;
+
+const ACT_COMPUTE: i64 = 1;
+const ACT_IO:      i64 = 2;
+const ACT_SLEEP:   i64 = 3;
+
+// Task cell: tag=TAG_TASK, body=action_type, arg=payload, domain=next
+pub fn task_new(action: i64, payload: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_TASK);
+    heap_set_body(t, action);
+    heap_set_arg(t, payload);
+    heap_set_domain(t, 0);
+    return t;
+}
+
+// Deque cell: tag=TAG_DEQUE, body=head, arg=tail, domain=count
+pub fn deque_new() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_DEQUE);
+    heap_set_body(d, 0);
+    heap_set_arg(d, 0);
+    heap_set_domain(d, 0);
+    return d;
+}
+
+pub fn deque_push_front(d: i64, t: i64) {
+    let old_head = heap_get_body(d);
+    heap_set_domain(t, old_head);
+    heap_set_body(d, t);
+    if old_head == 0 { heap_set_arg(d, t); }
+    let cnt = heap_get_domain(d);
+    heap_set_domain(d, cnt + 1);
+}
+
+pub fn deque_pop_front(d: i64) -> i64 {
+    let head = heap_get_body(d);
+    if head == 0 { return 0; }
+    let next = heap_get_domain(head);
+    heap_set_body(d, next);
+    if next == 0 { heap_set_arg(d, 0); }
+    let cnt = heap_get_domain(d);
+    heap_set_domain(d, cnt - 1);
+    heap_set_domain(head, 0);
+    return head;
+}
+
+pub fn deque_len(d: i64) -> i64 {
+    return heap_get_domain(d);
+}
+
+// Worker cell: tag=TAG_WORKER, body=worker_id, arg=deque, domain=mutex
+pub fn worker_new(id: i64) -> i64 {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WORKER);
+    heap_set_body(w, id);
+    let d = deque_new();
+    heap_set_arg(w, d);
+    let mid = mutex_create();
+    heap_set_domain(w, mid);
+    return w;
+}
+
+pub fn worker_submit(w: i64, t: i64) {
+    let mid = heap_get_domain(w);
+    let d = heap_get_arg(w);
+    mutex_lock(mid);
+    deque_push_front(d, t);
+    mutex_unlock(mid);
+}
+
+pub fn worker_run_one(w: i64) -> i64 {
+    let mid = heap_get_domain(w);
+    let d = heap_get_arg(w);
+    mutex_lock(mid);
+    let t = deque_pop_front(d);
+    mutex_unlock(mid);
+    if t == 0 { return 0; }
+    return heap_get_arg(t);  // return payload as result
+}
+
+pub fn worker_queue_len(w: i64) -> i64 {
+    return deque_len(heap_get_arg(w));
+}
+
+pub fn main() -> i64 {
+    // Test 1: Deque push/pop/len
+    let d = deque_new();
+    let t1 = task_new(ACT_COMPUTE, 42);
+    let t2 = task_new(ACT_IO, 99);
+    deque_push_front(d, t1);
+    deque_push_front(d, t2);
+    if deque_len(d) != 2 { return 1; }
+    let got = deque_pop_front(d);
+    if heap_get_body(got) != ACT_IO { return 2; }
+
+    // Test 2: Worker submit and run
+    let w = worker_new(1);
+    worker_submit(w, task_new(ACT_COMPUTE, 77));
+    worker_submit(w, task_new(ACT_COMPUTE, 88));
+    if worker_queue_len(w) != 2 { return 3; }
+    let result = worker_run_one(w);
+    if result != 88 { return 4; }
+
+    // Test 3: Empty deque returns 0
+    let d2 = deque_new();
+    if deque_pop_front(d2) != 0 { return 5; }
+
+    return 111;
+}

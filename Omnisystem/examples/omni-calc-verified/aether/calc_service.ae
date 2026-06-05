@@ -1,0 +1,49 @@
+// aether/calc_service.ae – Aether actor wrapping Titan arithmetic
+//
+// This actor is fully standalone. It can be spawned and used without any
+// other part of the Omnisystem.
+
+use titan::calc_core;
+
+pub actor CalcService {
+    var request_count: i64,
+    var total_computations: i64,
+
+    pub init() -> CalcService {
+        CalcService {
+            request_count: 0,
+            total_computations: 0,
+        }
+    }
+
+    // Handle a computation request. Returns the result as a string.
+    pub message Compute(op: i32, left: i64, right: i64) -> String {
+        self.request_count = self.request_count + 1;
+
+        // Call the Titan function directly (no FFI, same UniIR process)
+        let result = calc_core::eval_binary(op, left, right);
+
+        match result {
+            Ok(value) => {
+                self.total_computations = self.total_computations + 1;
+                let op_str = calc_core::op_name(op);
+                format("Result: {} {} {} = {}", left, op_str, right, value)
+            },
+            Err(e) => {
+                format("Error: {}", e)
+            }
+        }
+    }
+
+    // Return how many requests have been processed.
+    pub message GetStats() -> (i64, i64) {
+        (self.request_count, self.total_computations)
+    }
+
+    // Reset counters
+    pub message Reset() -> String {
+        self.request_count = 0;
+        self.total_computations = 0;
+        String::from_literal("Counters reset")
+    }
+}

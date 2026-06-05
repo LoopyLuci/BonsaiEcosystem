@@ -1,0 +1,16 @@
+// titan/omniview/generative_ui.ti
+// Generative UI engine in Titan — natural language to component trees.
+
+pub fn main() -> i64 {
+    let description: i64 = 1;
+    let component: i64 = generate_component(description);
+    return component;
+}
+
+pub fn generate_component(description_code: i64) -> i64 {
+    if description_code == 1 { return 10; }
+    if description_code == 2 { return 8; }
+    if description_code == 3 { return 6; }
+    if description_code == 4 { return 12; }
+    return 0;
+}

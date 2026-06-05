@@ -1,0 +1,102 @@
+// tests/test_r6.ti — Phase R6 Security & Multi-Tenant Integration Test
+// All helpers inlined with tr6_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR6_T_KEY:   i64 = 22500;
+const TR6_T_TEN:   i64 = 22501;
+const TR6_T_VAULT: i64 = 22502;
+const TR6_T_META:  i64 = 22503;
+const TR6_T_WRP:   i64 = 22504;
+
+pub fn tr6_key_create(key_hash: i64, tenant: i64, active: i64) -> i64 {
+    let k = heap_alloc_term();
+    heap_set_tag(k, TR6_T_KEY); heap_set_body(k, key_hash); heap_set_arg(k, tenant);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TR6_T_META); heap_set_body(m, active);
+    heap_set_domain(k, m);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TR6_T_WRP); heap_set_body(w, k); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tr6_key_hash(w: i64) -> i64 {
+    let k = heap_get_body(w);
+    return heap_get_body(k);
+}
+
+pub fn tr6_tenant_create(id: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TR6_T_TEN); heap_set_body(t, id); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+
+pub fn tr6_tenant_add_key(t: i64, w: i64) {
+    let h = heap_get_domain(t);
+    heap_set_domain(w, h);
+    heap_set_domain(t, w);
+    heap_set_arg(t, heap_get_arg(t) + 1);
+}
+
+pub fn tr6_vault_create() -> i64 {
+    let v = heap_alloc_term();
+    heap_set_tag(v, TR6_T_VAULT); heap_set_body(v, 0); heap_set_arg(v, 0);
+    return v;
+}
+
+pub fn tr6_vault_add_tenant(v: i64, t: i64) {
+    heap_set_body(v, heap_get_body(v) + 1);
+}
+
+pub fn tr6_hmac_sign(w: i64, msg: i64) -> i64 {
+    return tr6_key_hash(w) * 31 + msg;
+}
+
+pub fn tr6_verify(w: i64, msg: i64, sig: i64) -> i64 {
+    let expected = tr6_hmac_sign(w, msg);
+    if expected == sig { return 1; }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let w = tr6_key_create(999, 10, 1);
+    let t = tr6_tenant_create(10);
+    tr6_tenant_add_key(t, w);
+    if heap_get_arg(t) != 1          { return 1; }
+
+    let v = tr6_vault_create();
+    tr6_vault_add_tenant(v, t);
+    if heap_get_body(v) != 1         { return 2; }
+
+    let sig = tr6_hmac_sign(w, 7);
+    let expected = tr6_key_hash(w) * 31 + 7;
+    if sig != expected               { return 3; }
+
+    // verify roundtrip
+    if tr6_verify(w, 7, sig) != 1    { return 4; }
+    if tr6_verify(w, 7, 0) != 0      { return 5; }
+
+    // Multiple keys in tenant
+    let w2 = tr6_key_create(111, 10, 1);
+    let w3 = tr6_key_create(222, 10, 0);
+    tr6_tenant_add_key(t, w2);
+    tr6_tenant_add_key(t, w3);
+    if heap_get_arg(t) != 3          { return 6; }
+
+    // HMAC with different key
+    let sig2 = tr6_hmac_sign(w2, 100);
+    if tr6_verify(w2, 100, sig2) != 1 { return 7; }
+
+    return 111;
+}

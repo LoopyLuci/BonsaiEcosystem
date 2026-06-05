@@ -1,0 +1,91 @@
+// titan/omnitoken/t3_abstract.ti — Abstractive Compressor
+// Self-contained. Ratio stored in domain to avoid collision with body=count.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_ABS:  i64 = 21200;
+const T_TOK3: i64 = 21201;
+const T_WRP3: i64 = 21202;
+
+// ===== Token =====
+pub fn t3_token_create(content: i64, len: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TOK3); heap_set_body(t, content); heap_set_arg(t, len); heap_set_domain(t, 0);
+    return t;
+}
+pub fn t3_token_len(t: i64) -> i64 { return heap_get_arg(t); }
+
+// ===== Compressor =====
+// comp: tag=T_ABS, body=token_count(starts 0), arg=list_head(wrappers), domain=ratio
+// wrapper: tag=T_WRP3, body=token, domain=next_wrapper
+
+pub fn t3_compressor_create(ratio: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_ABS); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, ratio);
+    return c;
+}
+
+pub fn t3_compressor_add(c: i64, tok: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP3); heap_set_body(w, tok); heap_set_domain(w, 0);
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+pub fn t3_compressor_token_count(c: i64) -> i64 { return heap_get_body(c); }
+pub fn t3_compressor_ratio(c: i64) -> i64        { return heap_get_domain(c); }
+
+// target = n * ratio / 100, minimum 1
+pub fn t3_compress(c: i64) -> i64 {
+    let n = heap_get_body(c);
+    let ratio = heap_get_domain(c);
+    let mut target: i64 = n * ratio / 100;
+    if target < 1 { target = 1; }
+    return target;
+}
+
+// ===== Self-test =====
+// 5 tokens, ratio=40 → target = 5*40/100 = 2
+pub fn main() -> i64 {
+    let c = t3_compressor_create(40);
+    if t3_compressor_ratio(c) != 40          { return 1; }
+    t3_compressor_add(c, t3_token_create(1, 5));
+    t3_compressor_add(c, t3_token_create(2, 3));
+    t3_compressor_add(c, t3_token_create(3, 1));
+    t3_compressor_add(c, t3_token_create(4, 6));
+    t3_compressor_add(c, t3_token_create(5, 2));
+    if t3_compressor_token_count(c) != 5     { return 2; }
+    if t3_compress(c) != 2                   { return 3; }
+
+    // ratio=100 → target = n
+    let c2 = t3_compressor_create(100);
+    t3_compressor_add(c2, t3_token_create(1, 1));
+    t3_compressor_add(c2, t3_token_create(2, 2));
+    t3_compressor_add(c2, t3_token_create(3, 3));
+    if t3_compress(c2) != 3                  { return 4; }
+
+    // ratio=10, n=3 → 3*10/100=0 → capped to 1
+    let c3 = t3_compressor_create(10);
+    t3_compressor_add(c3, t3_token_create(1, 4));
+    t3_compressor_add(c3, t3_token_create(2, 4));
+    t3_compressor_add(c3, t3_token_create(3, 4));
+    if t3_compress(c3) != 1                  { return 5; }
+
+    return 111;
+}

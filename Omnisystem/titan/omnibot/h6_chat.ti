@@ -1,0 +1,10 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_SESSION:i64=24500;const T_MSG:i64=24501;const T_WRP:i64=24502;
+pub fn h6_msg_create(role:i64,content:i64)->i64{let m=heap_alloc_term();heap_set_tag(m,T_MSG);heap_set_body(m,role);heap_set_arg(m,content);heap_set_domain(m,0);let w=heap_alloc_term();heap_set_tag(w,T_WRP);heap_set_body(w,m);heap_set_domain(w,0);return w;}
+pub fn h6_msg_role(w:i64)->i64{return heap_get_body(heap_get_body(w));}
+pub fn h6_msg_content(w:i64)->i64{return heap_get_arg(heap_get_body(w));}
+pub fn h6_session_create()->i64{let s=heap_alloc_term();heap_set_tag(s,T_SESSION);heap_set_body(s,0);heap_set_arg(s,0);return s;}
+pub fn h6_session_add_msg(s:i64,w:i64){let h=heap_get_arg(s);if h==0{heap_set_arg(s,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(s,heap_get_body(s)+1);}
+pub fn h6_session_msg_count(s:i64)->i64{return heap_get_body(s);}
+pub fn h6_mascot_set_mood(mood:i64)->i64{return mood;}
+pub fn main()->i64{let s=h6_session_create();let w1=h6_msg_create(0,100);let w2=h6_msg_create(1,200);let w3=h6_msg_create(0,300);h6_session_add_msg(s,w1);h6_session_add_msg(s,w2);h6_session_add_msg(s,w3);if h6_session_msg_count(s)!=3{return 1;}if h6_msg_role(w2)!=1{return 2;}if h6_msg_content(w3)!=300{return 3;}if h6_mascot_set_mood(1)!=1{return 4;}return 111;}

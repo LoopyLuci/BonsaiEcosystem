@@ -1,0 +1,78 @@
+{
+  "version": "P2.3",
+  "python_checker": "Z:\\Projects\\Omnisystem\\titan\\stage0\\borrow_checker.py",
+  "titan_checker": "Z:\\Projects\\Omnisystem\\titan\\stage3b\\borrow_checker.ti",
+  "borrow_checker_ti_compiled": {
+    "def_count": 72,
+    "hash": "a88bafdddfac61d4",
+    "defs_sample": [
+      "STATE_ALIVE",
+      "STATE_MOVED",
+      "STATE_DEAD",
+      "STATE_UNBORN",
+      "OWN_OWNED",
+      "OWN_BORROWED",
+      "OWN_MUT_BORROWED",
+      "OWN_COPY",
+      "LT_STATIC",
+      "LT_NAMED",
+      "LT_ELIDED",
+      "LT_INFERRED",
+      "ERR_USE_AFTER_MOVE",
+      "ERR_DOUBLE_BORROW",
+      "ERR_MISSING_LIFETIME"
+    ]
+  },
+  "test_programs": {
+    "clean_copy_arithmetic": {
+      "error_count": 0,
+      "expected_error_count": 0,
+      "hash": "692b21d872fad39393b9560642efb644bae3c9416154f9173a638d3e7892d1d7"
+    },
+    "clean_struct_field_multi": {
+      "error_count": 0,
+      "expected_error_count": 0,
+      "hash": "95349318a0c3f6e178c6365ef888c49506068b80d4dda111df5d9ff2b5cb82f8"
+    },
+    "clean_mut_while": {
+      "error_count": 0,
+      "expected_error_count": 0,
+      "hash": "b9f1e642cd990a25d6ce6726720faaaf10ae44a09da8199afa9deffe8e001fd1"
+    },
+    "clean_str_copy": {
+      "error_count": 0,
+      "expected_error_count": 0,
+      "hash": "00d44523af57c85de1075e32187c4dbde2db1d982a5576301b048463ce18ceb4"
+    },
+    "clean_struct_literal": {
+      "error_count": 0,
+      "expected_error_count": 0,
+      "hash": "d545d57805ab4eb99b36e151a21bc995ce1dd8e48e2e556929da4947b20dd4e0"
+    },
+    "clean_nested_fns": {
+      "error_count": 0,
+      "expected_error_count": 0,
+      "hash": "fe9c83315f60d7b1d82300749ad9413aca1a0b7fd271bd86a7d6db132187092c"
+    },
+    "clean_if_else": {
+      "error_count": 0,
+      "expected_error_count": 0,
+      "hash": "4fb4df8e1a0c45444775a309e6b2726fef4741dc40100095bcc8683ba3ba28a2"
+    },
+    "error_use_after_move": {
+      "error_count": 1,
+      "expected_error_count": 1,
+      "hash": "ae0e4625e5f7fc9af8cd81295ff45daf39c775ca7855dc4cf94d0ed38c47e005"
+    },
+    "error_undefined_var": {
+      "error_count": 1,
+      "expected_error_count": 1,
+      "hash": "d0812f962ffed7cdae048a013f9d0c00e17f1f3150b80df64b978633c584cab5"
+    },
+    "error_immutable_assign": {
+      "error_count": 1,
+      "expected_error_count": 1,
+      "hash": "57a48fad0108a340f581e3ec00ea944df8d6b04873274f04dcfd0bf955982561"
+    }
+  }
+}

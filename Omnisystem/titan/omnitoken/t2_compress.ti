@@ -1,0 +1,165 @@
+// titan/omnitoken/t2_compress.ti — Selective Deletion & Dictionary Encoding
+// Self-contained. T1 scorer/token helpers inlined with t2_ prefix.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_SELDEL: i64 = 21100;
+const T_DICT:   i64 = 21101;
+const T_ENTRY:  i64 = 21102;
+const T_WRPT2:  i64 = 21103;
+
+// Inlined T1 types
+const T2_T_TOKEN:  i64 = 21000;
+const T2_T_SCORER: i64 = 21001;
+const T2_T_WSCR:   i64 = 21002;
+
+// ===== Inlined T1 token/scorer helpers =====
+pub fn t2_token_create(content: i64, len: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T2_T_TOKEN); heap_set_body(t, content); heap_set_arg(t, len); heap_set_domain(t, 0);
+    return t;
+}
+pub fn t2_scorer_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T2_T_SCORER); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+pub fn t2_scorer_add_token(s: i64, token: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T2_T_WSCR); heap_set_body(w, token); heap_set_domain(w, 0);
+    let h = heap_get_arg(s);
+    if h == 0 { heap_set_arg(s, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+pub fn t2_scorer_token_count(s: i64) -> i64 { return heap_get_body(s); }
+pub fn t2_scorer_get_token(s: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(s); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+pub fn t2_score_token(token: i64) -> i64 {
+    let len = heap_get_arg(token);
+    if len > 3 { return 90; }
+    if len > 1 { return 70; }
+    return 50;
+}
+
+// ===== Selective deletion =====
+// seldel: tag=T_SELDEL, body=threshold, arg=kept_count(after apply)
+
+pub fn t2_seldel_create(threshold: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_SELDEL); heap_set_body(s, threshold); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn t2_seldel_threshold(s: i64) -> i64 { return heap_get_body(s); }
+pub fn t2_seldel_kept(s: i64) -> i64       { return heap_get_arg(s); }
+
+pub fn t2_seldel_apply(s: i64, scorer: i64) -> i64 {
+    let n = t2_scorer_token_count(scorer);
+    let th = t2_seldel_threshold(s);
+    let mut kept: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let t = t2_scorer_get_token(scorer, i);
+        if t != 0 { if t2_score_token(t) >= th { kept = kept + 1; } }
+        i = i + 1;
+    }
+    heap_set_arg(s, kept);
+    return kept;
+}
+
+// ===== Dictionary =====
+// dict: tag=T_DICT, body=entry_count, arg=list_head(wrappers)
+// wrapper: tag=T_WRPT2, body=entry, domain=next_wrapper
+// entry: tag=T_ENTRY, body=key, arg=value
+
+pub fn t2_dict_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, T_DICT); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+
+pub fn t2_dict_add_entry(d: i64, key: i64, value: i64) {
+    let e = heap_alloc_term();
+    heap_set_tag(e, T_ENTRY); heap_set_body(e, key); heap_set_arg(e, value); heap_set_domain(e, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRPT2); heap_set_body(w, e); heap_set_domain(w, 0);
+    let h = heap_get_arg(d);
+    if h == 0 { heap_set_arg(d, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(d, heap_get_body(d) + 1);
+}
+
+pub fn t2_dict_entry_count(d: i64) -> i64 { return heap_get_body(d); }
+
+pub fn t2_dict_lookup(d: i64, key: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(d);
+    while w != 0 {
+        let e = heap_get_body(w);
+        if heap_get_body(e) == key { return heap_get_arg(e); }
+        w = heap_get_domain(w);
+    }
+    return -1;
+}
+
+pub fn t2_roundtrip_test(d: i64, key: i64, value: i64) -> i64 {
+    t2_dict_add_entry(d, key, value);
+    let found = t2_dict_lookup(d, key);
+    if found == value { return 1; }
+    return 0;
+}
+
+// ===== Self-test =====
+// Tokens: len5→90, len1→50, len2→70, len4→90. Threshold=70 → kept=3.
+pub fn main() -> i64 {
+    let s = t2_seldel_create(70);
+    if t2_seldel_threshold(s) != 70    { return 1; }
+
+    let sc = t2_scorer_create();
+    t2_scorer_add_token(sc, t2_token_create(1, 5));
+    t2_scorer_add_token(sc, t2_token_create(2, 1));
+    t2_scorer_add_token(sc, t2_token_create(3, 2));
+    t2_scorer_add_token(sc, t2_token_create(4, 4));
+    let kept = t2_seldel_apply(s, sc);
+    if kept != 3                        { return 2; }
+    if t2_seldel_kept(s) != 3          { return 3; }
+
+    // Dictionary roundtrip
+    let d = t2_dict_create();
+    if t2_roundtrip_test(d, 100, 200) != 1 { return 4; }
+    if t2_roundtrip_test(d, 300, 400) != 1 { return 5; }
+    if t2_dict_entry_count(d) != 2         { return 6; }
+    if t2_dict_lookup(d, 100) != 200       { return 7; }
+    if t2_dict_lookup(d, 300) != 400       { return 8; }
+    if t2_dict_lookup(d, 999) != -1        { return 9; }
+
+    // Threshold at 90: only len5 and len4 qualify → kept=2
+    let s2 = t2_seldel_create(90);
+    let kept2 = t2_seldel_apply(s2, sc);
+    if kept2 != 2                       { return 10; }
+
+    return 111;
+}

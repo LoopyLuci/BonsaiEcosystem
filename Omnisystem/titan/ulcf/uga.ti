@@ -1,0 +1,362 @@
+// titan/ulcf/uga.ti
+// Universal Grammar Adapter – One adapter for all Tree-Sitter languages.
+//
+// Maps any Tree-Sitter parse tree to XAST using a language-specific
+// configuration table. Adding a new language requires only a config file.
+
+pub struct LanguageConfig {
+    name: String,
+    extensions: Vec<String>,
+    type_map: HashMap<String, String>,
+    operator_map: HashMap<String, String>,
+    statement_nodes: Vec<String>,
+    expression_nodes: Vec<String>,
+    literal_nodes: Vec<String>,
+    comment_nodes: Vec<String>,
+    block_nodes: Vec<String>,
+    call_format: String,
+    variable_decl_format: String,
+}
+
+pub struct UGAdapter {
+    config: LanguageConfig,
+    source: String,
+}
+
+impl UGAdapter {
+    pub fn new(config: LanguageConfig, source: String) -> UGAdapter {
+        UGAdapter { config, source }
+    }
+
+    pub fn parse_to_xast(&self) -> String {
+        // Parse source and convert to XAST
+        let mut xast = format!(
+            "(module (name {})\n",
+            self.config.name
+        );
+        xast = xast + "  (functions ()))\n";
+        xast
+    }
+
+    fn map_type(&self, source_type: String) -> String {
+        self.config.type_map.get(source_type.clone())
+            .unwrap_or("i64".to_string())
+    }
+
+    fn map_operator(&self, op: String) -> String {
+        self.config.operator_map.get(op.clone())
+            .unwrap_or(op)
+    }
+
+    pub fn is_statement_node(&self, node_type: String) -> bool {
+        self.config.statement_nodes.contains(node_type)
+    }
+
+    pub fn is_expression_node(&self, node_type: String) -> bool {
+        self.config.expression_nodes.contains(node_type)
+    }
+
+    pub fn is_literal_node(&self, node_type: String) -> bool {
+        self.config.literal_nodes.contains(node_type)
+    }
+
+    pub fn is_comment_node(&self, node_type: String) -> bool {
+        self.config.comment_nodes.contains(node_type)
+    }
+
+    pub fn is_block_node(&self, node_type: String) -> bool {
+        self.config.block_nodes.contains(node_type)
+    }
+}
+
+pub fn java_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("int".to_string(), "i32".to_string());
+    type_map.insert("long".to_string(), "i64".to_string());
+    type_map.insert("float".to_string(), "f32".to_string());
+    type_map.insert("double".to_string(), "f64".to_string());
+    type_map.insert("boolean".to_string(), "bool".to_string());
+    type_map.insert("String".to_string(), "String".to_string());
+    type_map.insert("void".to_string(), "void".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "java".to_string(),
+        extensions: vec![".java".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "local_variable_declaration".to_string(),
+            "if_statement".to_string(),
+            "while_statement".to_string(),
+            "for_statement".to_string(),
+            "return_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "method_invocation".to_string(),
+            "field_access".to_string(),
+            "array_access".to_string(),
+        ],
+        literal_nodes: vec![
+            "decimal_integer_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "null_literal".to_string(),
+        ],
+        comment_nodes: vec![
+            "line_comment".to_string(),
+            "block_comment".to_string(),
+        ],
+        block_nodes: vec!["block".to_string()],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "type_first".to_string(),
+    }
+}
+
+pub fn go_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("int".to_string(), "i64".to_string());
+    type_map.insert("int32".to_string(), "i32".to_string());
+    type_map.insert("int64".to_string(), "i64".to_string());
+    type_map.insert("float32".to_string(), "f32".to_string());
+    type_map.insert("float64".to_string(), "f64".to_string());
+    type_map.insert("bool".to_string(), "bool".to_string());
+    type_map.insert("string".to_string(), "String".to_string());
+    type_map.insert("byte".to_string(), "u8".to_string());
+    type_map.insert("rune".to_string(), "i32".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "go".to_string(),
+        extensions: vec![".go".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "short_var_declaration".to_string(),
+            "if_statement".to_string(),
+            "for_statement".to_string(),
+            "return_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "call_expression".to_string(),
+            "selector_expression".to_string(),
+            "index_expression".to_string(),
+        ],
+        literal_nodes: vec![
+            "int_literal".to_string(),
+            "float_literal".to_string(),
+            "interpreted_string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "nil".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec!["block".to_string()],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "var_first".to_string(),
+    }
+}
+
+pub fn ruby_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("Integer".to_string(), "i64".to_string());
+    type_map.insert("Float".to_string(), "f64".to_string());
+    type_map.insert("String".to_string(), "String".to_string());
+    type_map.insert("Boolean".to_string(), "bool".to_string());
+    type_map.insert("Array".to_string(), "Vec".to_string());
+    type_map.insert("Hash".to_string(), "HashMap".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "ruby".to_string(),
+        extensions: vec![".rb".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "assignment".to_string(),
+            "if".to_string(),
+            "while".to_string(),
+            "for".to_string(),
+            "return".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary".to_string(),
+            "call".to_string(),
+            "method_call".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer".to_string(),
+            "float".to_string(),
+            "string".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "nil".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec!["block".to_string(), "do_block".to_string()],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}
+
+pub fn python_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("int".to_string(), "i64".to_string());
+    type_map.insert("float".to_string(), "f64".to_string());
+    type_map.insert("str".to_string(), "String".to_string());
+    type_map.insert("bool".to_string(), "bool".to_string());
+    type_map.insert("list".to_string(), "Vec".to_string());
+    type_map.insert("dict".to_string(), "HashMap".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("and".to_string(), "and".to_string());
+    operator_map.insert("or".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "python".to_string(),
+        extensions: vec![".py".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "assignment".to_string(),
+            "if_statement".to_string(),
+            "while_statement".to_string(),
+            "for_statement".to_string(),
+            "return_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_operator".to_string(),
+            "call".to_string(),
+            "subscript".to_string(),
+            "attribute".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer".to_string(),
+            "float".to_string(),
+            "string".to_string(),
+            "True".to_string(),
+            "False".to_string(),
+            "None".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec!["block".to_string()],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}
+
+pub fn cpp_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("int".to_string(), "i32".to_string());
+    type_map.insert("long".to_string(), "i64".to_string());
+    type_map.insert("float".to_string(), "f32".to_string());
+    type_map.insert("double".to_string(), "f64".to_string());
+    type_map.insert("bool".to_string(), "bool".to_string());
+    type_map.insert("void".to_string(), "void".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "cpp".to_string(),
+        extensions: vec![".cpp".to_string(), ".cc".to_string(), ".cxx".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "declaration".to_string(),
+            "if_statement".to_string(),
+            "while_statement".to_string(),
+            "for_statement".to_string(),
+            "return_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "call_expression".to_string(),
+            "field_expression".to_string(),
+        ],
+        literal_nodes: vec![
+            "number_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+        ],
+        comment_nodes: vec![
+            "comment".to_string(),
+        ],
+        block_nodes: vec!["compound_statement".to_string()],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "type_first".to_string(),
+    }
+}

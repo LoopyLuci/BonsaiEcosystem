@@ -1,0 +1,155 @@
+// tests/test_repl_parser.ti
+// Test the Sylva REPL expression parser with hardcoded inputs
+// Verifies parsing and evaluation of arithmetic expressions
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: Simple addition "2+3"
+    let r1: i64 = eval_expr("2+3");
+    if r1 == 5 { score = score + 1; }
+
+    // Test 2: Subtraction "10-4"
+    let r2: i64 = eval_expr("10-4");
+    if r2 == 6 { score = score + 1; }
+
+    // Test 3: Multiplication "6*7"
+    let r3: i64 = eval_expr("6*7");
+    if r3 == 42 { score = score + 1; }
+
+    // Test 4: Larger numbers "100+11"
+    let r4: i64 = eval_expr("100+11");
+    if r4 == 111 { score = score + 1; }
+
+    // Test 5: Subtraction with result "50-20"
+    let r5: i64 = eval_expr("50-20");
+    if r5 == 30 { score = score + 1; }
+
+    // Test 6: Multiplication chain "12*5"
+    let r6: i64 = eval_expr("12*5");
+    if r6 == 60 { score = score + 1; }
+
+    // All 6 tests pass
+    if score >= 6 { return 111; }
+    return score * 15;
+}
+
+// Parse and evaluate simple arithmetic expressions: "2+3", "10-4", "6*7"
+// Returns result if valid, -1 if invalid
+pub fn eval_expr(input: String) -> i64 {
+    let len: i64 = input.len();
+    let mut op_index: i64 = -1;
+    let mut op_char: i64 = 0; // 0=+, 1=-, 2=*
+
+    // Scan for operators (skip first char)
+    let mut i: i64 = 1;
+    while i < len {
+        let ch: i64 = char_code_at(input, i);
+        if ch == 43 { // +
+            op_index = i;
+            op_char = 0;
+            break;
+        }
+        if ch == 45 && i > 0 { // - (not first char)
+            op_index = i;
+            op_char = 1;
+            break;
+        }
+        if ch == 42 { // *
+            op_index = i;
+            op_char = 2;
+            break;
+        }
+        i = i + 1;
+    }
+
+    if op_index < 0 {
+        return -1;
+    }
+
+    // Split into left and right
+    let left_str: String = substring(input, 0, op_index);
+    let right_str: String = substring(input, op_index + 1, len);
+
+    // Parse as numbers
+    let left_num: i64 = parse_number(left_str);
+    let right_num: i64 = parse_number(right_str);
+
+    if left_num < 0 || right_num < 0 {
+        return -1;
+    }
+
+    // Apply operation
+    if op_char == 0 {
+        return left_num + right_num;
+    }
+    if op_char == 1 {
+        return left_num - right_num;
+    }
+    if op_char == 2 {
+        return left_num * right_num;
+    }
+
+    return -1;
+}
+
+// Parse numeric string
+pub fn parse_number(s: String) -> i64 {
+    let len: i64 = s.len();
+    if len == 0 { return -1; }
+
+    let mut result: i64 = 0;
+    let mut i: i64 = 0;
+    while i < len {
+        let ch: i64 = char_code_at(s, i);
+        if ch < 48 || ch > 57 { // 0-9
+            return -1;
+        }
+        let digit: i64 = ch - 48;
+        result = result * 10 + digit;
+        i = i + 1;
+    }
+    return result;
+}
+
+// Get character code at index
+pub fn char_code_at(s: String, index: i64) -> i64 {
+    if index < 0 || index >= s.len() { return -1; }
+    let byte_slice: Vec<u8> = s.as_bytes();
+    let ch: i64 = byte_slice[index];
+    return ch;
+}
+
+// Extract substring from start to end
+pub fn substring(s: String, start: i64, end: i64) -> String {
+    if start < 0 || end > s.len() || start > end { return ""; }
+    
+    let mut result: String = "";
+    let mut i: i64 = start;
+    while i < end {
+        let ch: i64 = char_code_at(s, i);
+        if ch >= 0 {
+            result = result + char_from_code(ch);
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// Convert character code to string
+pub fn char_from_code(code: i64) -> String {
+    if code == 43 { return "+"; }
+    if code == 45 { return "-"; }
+    if code == 42 { return "*"; }
+    if code == 48 { return "0"; }
+    if code == 49 { return "1"; }
+    if code == 50 { return "2"; }
+    if code == 51 { return "3"; }
+    if code == 52 { return "4"; }
+    if code == 53 { return "5"; }
+    if code == 54 { return "6"; }
+    if code == 55 { return "7"; }
+    if code == 56 { return "8"; }
+    if code == 57 { return "9"; }
+    return "";
+}

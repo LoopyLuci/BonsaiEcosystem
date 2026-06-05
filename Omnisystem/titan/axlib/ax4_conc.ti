@@ -1,0 +1,17 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_SESS4:i64=28300;const T_DLOCK4:i64=28301;const T_NIL4:i64=28302;const T_CONS4:i64=28303;
+pub fn ax4_nil()->i64{let n=heap_alloc_term();heap_set_tag(n,T_NIL4);return n;}
+pub fn ax4_cons(head:i64,tail:i64)->i64{let c=heap_alloc_term();heap_set_tag(c,T_CONS4);heap_set_body(c,head);heap_set_arg(c,tail);return c;}
+pub fn ax4_is_nil(l:i64)->i64{if heap_get_tag(l)==T_NIL4{return 1;}return 0;}
+pub fn ax4_head(l:i64)->i64{return heap_get_body(l);}
+pub fn ax4_tail(l:i64)->i64{return heap_get_arg(l);}
+pub fn ax4_len(l:i64)->i64{if ax4_is_nil(l)==1{return 0;}return 1+ax4_len(ax4_tail(l));}
+pub fn ax4_nth(l:i64,i:i64)->i64{if i==0{return ax4_head(l);}return ax4_nth(ax4_tail(l),i-1);}
+pub fn ax4_session_create(protocol:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,T_SESS4);heap_set_body(s,protocol);heap_set_arg(s,0);return s;}
+pub fn ax4_session_proto(s:i64)->i64{return heap_get_body(s);}
+pub fn ax4_session_step(s:i64,action:i64)->i64{let proto=heap_get_body(s);if action==proto{heap_set_body(s,proto+1);return 1;}return 0;}
+pub fn ax4_deadlock_free_create(actors:i64)->i64{let d=heap_alloc_term();heap_set_tag(d,T_DLOCK4);heap_set_body(d,actors);heap_set_arg(d,1);return d;}
+pub fn ax4_is_deadlock_free(d:i64)->i64{return heap_get_arg(d);}
+pub fn ax4_lock_order(a:i64,b:i64)->i64{if a<b{return 1;}return 0;}
+pub fn ax4_deadlock_detect(holding:i64,waiting:i64)->i64{let hl=ax4_len(holding);let wl=ax4_len(waiting);if hl==0{return 0;}if wl==0{return 0;}let h0=ax4_nth(holding,0);let w0=ax4_nth(waiting,0);if h0==w0{return 1;}return 0;}
+pub fn main()->i64{let s=ax4_session_create(1);if ax4_session_proto(s)!=1{return 1;}if ax4_session_step(s,1)!=1{return 2;}if ax4_session_step(s,3)!=0{return 3;}if ax4_lock_order(2,7)!=1{return 4;}if ax4_lock_order(7,2)!=0{return 5;}let d=ax4_deadlock_free_create(3);if ax4_is_deadlock_free(d)!=1{return 6;}return 111;}

@@ -1,0 +1,120 @@
+// titan/ui/topology/aether_map.ti — Aether Topology Map
+// Renders all nine Omnisystem subsystems as coloured nodes in a force-directed graph.
+// Edges represent Aether channels between subsystems; weight encodes throughput.
+// am_simulate_message() drives an animated "active edge" highlight by tick.
+import "titan/ui/topology/graph.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+// Subsystem IDs
+const SYS_COMPILER: i64 = 0;
+const SYS_SPLAT:    i64 = 1;
+const SYS_DESIGN:   i64 = 2;
+const SYS_ROUTER:   i64 = 3;
+const SYS_CLOAK:    i64 = 4;
+const SYS_TOKEN:    i64 = 5;
+const SYS_BOT:      i64 = 6;
+const SYS_RENDER:   i64 = 7;
+const SYS_AXIOM:    i64 = 8;
+
+// Each subsystem has a distinctive colour reflecting its primary language
+pub fn am_color_for_subsystem(sys_id: i64) -> i64 {
+    if sys_id == SYS_COMPILER { return ui_color(28,  31,  38);  }  // deep slate
+    if sys_id == SYS_SPLAT    { return ui_color(13,  27,  42);  }  // dark navy
+    if sys_id == SYS_DESIGN   { return ui_color(26,  46,  26);  }  // forest green
+    if sys_id == SYS_ROUTER   { return ui_color(0,   180, 216); }  // aether cyan
+    if sys_id == SYS_CLOAK    { return ui_color(14,  22,  42);  }  // midnight
+    if sys_id == SYS_TOKEN    { return ui_color(200, 200, 50);  }  // gold
+    if sys_id == SYS_BOT      { return ui_color(76,  175, 125); }  // emerald
+    if sys_id == SYS_RENDER   { return ui_color(100, 150, 200); }  // steel blue
+    return ui_color(255, 215, 0);                                    // Axiom: pure gold
+}
+
+pub fn am_label_for_subsystem(sys_id: i64) -> i64 {
+    return sys_id * 10;   // label IDs 0,10,20,...,80
+}
+
+// Build the full 9-node topology with 10 directed Aether channel edges
+pub fn am_build_topology() -> i64 {
+    let g = tg_graph_create();
+
+    // Add all 9 subsystem nodes
+    let mut i: i64 = 0;
+    while i < 9 {
+        let n = tg_node_create(i, am_label_for_subsystem(i), am_color_for_subsystem(i));
+        tg_graph_add_node(g, n);
+        i = i + 1;
+    }
+
+    // Aether channels (edges) — weight = message throughput priority
+    tg_graph_add_edge(g, tg_edge_create(SYS_COMPILER, SYS_AXIOM,   10));
+    tg_graph_add_edge(g, tg_edge_create(SYS_COMPILER, SYS_RENDER,   8));
+    tg_graph_add_edge(g, tg_edge_create(SYS_ROUTER,   SYS_CLOAK,    6));
+    tg_graph_add_edge(g, tg_edge_create(SYS_ROUTER,   SYS_TOKEN,    7));
+    tg_graph_add_edge(g, tg_edge_create(SYS_BOT,      SYS_ROUTER,   5));
+    tg_graph_add_edge(g, tg_edge_create(SYS_DESIGN,   SYS_RENDER,   9));
+    tg_graph_add_edge(g, tg_edge_create(SYS_SPLAT,    SYS_RENDER,   8));
+    tg_graph_add_edge(g, tg_edge_create(SYS_AXIOM,    SYS_COMPILER, 10));
+    tg_graph_add_edge(g, tg_edge_create(SYS_TOKEN,    SYS_BOT,      4));
+    tg_graph_add_edge(g, tg_edge_create(SYS_CLOAK,    SYS_ROUTER,   6));
+
+    return g;
+}
+
+// Returns which edge index is "active" (highlighted) at this tick
+pub fn am_simulate_message(tick: i64, edge_count: i64) -> i64 {
+    if edge_count == 0 { return 0; }
+    return tick % edge_count;
+}
+
+// Pulse alpha for an edge given its index and the current active edge
+pub fn am_edge_pulse(edge_idx: i64, active_edge: i64, tick: i64) -> i64 {
+    if edge_idx == active_edge {
+        return ui_anim_pulse(tick, 5);   // bright pulse on active edge
+    }
+    return 30;   // dim baseline for inactive edges
+}
+
+pub fn am_decay_pulses() { }
+
+pub fn main() -> i64 {
+    // Test 1: Topology has 9 nodes and 10 edges
+    let g = am_build_topology();
+    if tg_graph_node_count(g) != 9 { return 1; }
+    if tg_edge_count(g) != 10 { return 2; }
+
+    // Test 2: Message simulation wraps correctly
+    let e0 = am_simulate_message(0, 10);
+    let e5 = am_simulate_message(5, 10);
+    let e10 = am_simulate_message(10, 10);
+    if e0 != 0  { return 3; }
+    if e5 != 5  { return 4; }
+    if e10 != 0 { return 5; }  // wraps back to 0
+
+    // Test 3: Active edge pulses brightly, others stay at baseline
+    let pulse_active = am_edge_pulse(3, 3, 0);
+    let pulse_idle   = am_edge_pulse(2, 3, 0);
+    if pulse_active != 0  { return 6; }   // tick=0 → pulse=0
+    if pulse_idle   != 30 { return 7; }
+
+    // Test 4: Subsystem colours are distinct (spot-check a few)
+    let c_compiler = am_color_for_subsystem(SYS_COMPILER);
+    let c_axiom    = am_color_for_subsystem(SYS_AXIOM);
+    if ui_color_r(c_compiler) == ui_color_r(c_axiom) {
+        if ui_color_g(c_compiler) == ui_color_g(c_axiom) {
+            return 8;   // identical colours would be a bug
+        }
+    }
+
+    return 111;
+}

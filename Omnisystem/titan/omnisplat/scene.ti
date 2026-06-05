@@ -1,0 +1,144 @@
+// titan/omnisplat/scene.ti — Scene Graph & Infinite Grid
+// Manages content root, camera nodes, splat children, and grid metadata.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_SCENE:      i64 = 9150;
+const TAG_SCENE_NODE: i64 = 9151;
+const TAG_GRID:       i64 = 9152;
+
+const NODE_ROOT:   i64 = 0;
+const NODE_SPLAT:  i64 = 1;
+const NODE_CAMERA: i64 = 2;
+const NODE_GRID:   i64 = 3;
+
+// Layout:
+// scene     : tag=9150, body=content_root, arg=total_node_count, domain=scene_m1
+// scene_m1  : body=grid_node, arg=0, domain=0
+//
+// content_root: tag=9151, body=NODE_ROOT, arg=child_count, domain=child_list_head
+// child wrapper: body=child_node, domain=next_wrapper (APPEND order)
+//
+// scene_node: tag=9151, body=node_type, arg=0, domain=0
+// grid_node : tag=9152, body=cell_size, arg=0, domain=0
+
+fn scene_m1(s: i64) -> i64 { return heap_get_domain(s); }
+
+pub fn scene_content_root(s: i64) -> i64  { return heap_get_body(s); }
+pub fn scene_node_count(s: i64) -> i64    { return heap_get_arg(s); }
+pub fn scene_grid_node(s: i64) -> i64     { return heap_get_body(scene_m1(s)); }
+pub fn scene_grid_cell_size(s: i64) -> i64 {
+    return heap_get_body(scene_grid_node(s));
+}
+
+pub fn scene_create(grid_cell_size: i64) -> i64 {
+    let root = heap_alloc_term();
+    heap_set_tag(root, TAG_SCENE_NODE);
+    heap_set_body(root, NODE_ROOT);
+    heap_set_arg(root, 0); heap_set_domain(root, 0);
+
+    let grid = heap_alloc_term();
+    heap_set_tag(grid, TAG_GRID);
+    heap_set_body(grid, grid_cell_size);
+    heap_set_arg(grid, 0); heap_set_domain(grid, 0);
+
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, grid); heap_set_arg(m1, 0); heap_set_domain(m1, 0);
+
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SCENE);
+    heap_set_body(s, root);
+    heap_set_arg(s, 1); // content_root counts as 1
+    heap_set_domain(s, m1);
+    return s;
+}
+
+// Append data node to content_root's child list.
+pub fn scene_add_splat(s: i64, data: i64) {
+    let root = scene_content_root(s);
+    let w = heap_alloc_term();
+    heap_set_body(w, data); heap_set_domain(w, 0);
+    let head = heap_get_domain(root);
+    if head == 0 {
+        heap_set_domain(root, w);
+    } else {
+        let mut c = head;
+        while heap_get_domain(c) != 0 { c = heap_get_domain(c); }
+        heap_set_domain(c, w);
+    }
+    heap_set_arg(root, heap_get_arg(root) + 1);
+    heap_set_arg(s,    heap_get_arg(s)    + 1);
+}
+
+pub fn scene_splat_count(s: i64) -> i64 {
+    return heap_get_arg(scene_content_root(s));
+}
+
+// Adds a camera node to the scene (tracked in total_node_count only).
+pub fn scene_add_camera(s: i64, cam: i64) -> i64 {
+    let node = heap_alloc_term();
+    heap_set_tag(node, TAG_SCENE_NODE);
+    heap_set_body(node, NODE_CAMERA);
+    heap_set_arg(node, 0); heap_set_domain(node, cam);
+    heap_set_arg(s, heap_get_arg(s) + 1);
+    return node;
+}
+
+pub fn scene_get_splat(s: i64, index: i64) -> i64 {
+    let root = scene_content_root(s);
+    let mut curr = heap_get_domain(root);
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index { return heap_get_body(curr); }
+        i = i + 1;
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let s = scene_create(100);
+    if heap_get_tag(s) != TAG_SCENE             { return 1; }
+    if scene_grid_cell_size(s) != 100           { return 2; }
+    if scene_splat_count(s) != 0               { return 3; }
+    if scene_node_count(s) != 1               { return 4; } // content_root
+
+    // Add 3 splat data nodes
+    let d1 = heap_alloc_term(); heap_set_body(d1, 11);
+    let d2 = heap_alloc_term(); heap_set_body(d2, 22);
+    let d3 = heap_alloc_term(); heap_set_body(d3, 33);
+    scene_add_splat(s, d1);
+    scene_add_splat(s, d2);
+    scene_add_splat(s, d3);
+    if scene_splat_count(s) != 3  { return 5; }
+    if scene_node_count(s)  != 4  { return 6; } // root + 3 splats
+
+    // Verify append order: index 0 = d1
+    let got0 = scene_get_splat(s, 0);
+    if heap_get_body(got0) != 11 { return 7; }
+    let got2 = scene_get_splat(s, 2);
+    if heap_get_body(got2) != 33 { return 8; }
+
+    // Add camera node
+    let cam_stub = heap_alloc_term();
+    scene_add_camera(s, cam_stub);
+    if scene_node_count(s) != 5 { return 9; }
+
+    // Content root tag
+    let root = scene_content_root(s);
+    if heap_get_tag(root) != TAG_SCENE_NODE { return 10; }
+    if heap_get_body(root) != NODE_ROOT     { return 11; }
+
+    return 111;
+}

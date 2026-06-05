@@ -1,0 +1,68 @@
+// Omnisystem Data Pipeline Example
+// Demonstrates Sylva notebook with Titan compute and telemetry visualization
+
+// [1] Load data from file
+// In a real implementation, omni load would read CSV/JSON
+let data = [
+    [1.0, 2.0, 3.0],
+    [4.0, 5.0, 6.0],
+    [7.0, 8.0, 9.0]
+];
+
+print("Loaded data: 3x3 matrix");
+
+// [2] Normalize data using Titan function
+// This calls into titan/math.ti for vectorized operations
+// import 2aa62a0a1e1b1fe3 as math
+// let normalized = math::normalize_matrix(data);
+
+// For now, use built-in operations
+let row1 = [1.0, 2.0, 3.0];
+let row2 = [4.0, 5.0, 6.0];
+
+// [3] Call Titan vector operations
+// These run native code compiled from Titan
+let sum = add_vectors(row1, row2);
+
+print("Row 1 + Row 2 = [5.0, 7.0, 9.0]");
+print("Result: " + str(sum));
+
+// [4] Track computation with telemetry
+// Every function call emits telemetry automatically
+// :trace in REPL shows the execution history
+// :replay verifies deterministic re-evaluation
+
+// [5] Transform the pipeline
+// Filter rows where sum > 5
+let filtered_rows = [];
+for row in [row1, row2] {
+    let total = row[0] + row[1] + row[2];
+    if total > 5 {
+        filtered_rows = filtered_rows + [row];
+    }
+}
+
+print("Filtered " + str(len(filtered_rows)) + " rows");
+
+// [6] Compute aggregates
+let row_sums = [];
+for row in [row1, row2] {
+    let s = row[0] + row[1] + row[2];
+    row_sums = row_sums + [s];
+}
+
+print("Row sums: " + str(row_sums));
+
+// [7] Export results
+// In a real implementation:
+//   omni export results.json row_sums
+//   omni observe --plot=timeseries  # visualize telemetry
+
+// [8] Time-travel debugging
+// Try these REPL commands:
+//   :trace                    # show all expressions evaluated
+//   :rewind 3                 # jump back to step 3
+//   x = row1[0] * 10          # try different computation
+//   :replay                   # see if results changed
+
+print("Pipeline complete. Use :trace to inspect execution.");

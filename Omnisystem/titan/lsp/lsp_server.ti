@@ -1,0 +1,235 @@
+// titan/lsp/lsp_server.ti — LSP server main entry point
+// Ties together protocol handling, semantic analysis, tokens, and completion.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+    fn repl_print_string(s: i64);
+}
+
+// Server state tags
+const TAG_SERVER_STATE: i64 = 4400;
+const TAG_SERVER_DOC:   i64 = 4401;
+const TAG_HOVER_INFO:   i64 = 4402;
+const TAG_DIAG_ENTRY:   i64 = 4403;
+
+// Symbol and completion kinds (must match semantic_analyzer/completion_engine)
+const SYM_FUNCTION: i64 = 0;
+const SYM_VARIABLE: i64 = 1;
+const COMPL_FUNCTION: i64 = 0;
+const COMPL_VARIABLE: i64 = 1;
+const COMPL_KEYWORD:  i64 = 2;
+const TAG_COMPL_ITEM: i64 = 4300;
+
+// ===== Server state =====
+static mut SERVER_RUNNING: bool = false;
+static mut OPEN_DOCUMENTS: i64 = 0;
+static mut DIAGNOSTIC_QUEUE: i64 = 0;
+
+// ===== Document management =====
+// Doc cell: tag=TAG_SERVER_DOC, body=uri_id, arg=text_id, domain=next_doc (0=end)
+pub fn doc_new(uri_id: i64, text_id: i64) -> i64 {
+    let doc = heap_alloc_term();
+    heap_set_tag(doc, TAG_SERVER_DOC);
+    heap_set_body(doc, uri_id);
+    heap_set_arg(doc, text_id);
+    heap_set_domain(doc, 0);
+    return doc;
+}
+pub fn doc_uri(doc: i64) -> i64  { return heap_get_body(doc); }
+pub fn doc_text(doc: i64) -> i64 { return heap_get_arg(doc); }
+pub fn doc_next(doc: i64) -> i64 { return heap_get_domain(doc); }
+
+// Find document by URI identity
+pub fn find_doc(uri_id: i64) -> i64 {
+    let mut curr = OPEN_DOCUMENTS;
+    while curr != 0 {
+        if str_eq(doc_uri(curr), uri_id) { return curr; }
+        curr = doc_next(curr);
+    }
+    return 0;
+}
+
+// Count open documents
+pub fn doc_count() -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = OPEN_DOCUMENTS;
+    while curr != 0 { count = count + 1; curr = doc_next(curr); }
+    return count;
+}
+
+// ===== Server lifecycle =====
+pub fn server_start() {
+    SERVER_RUNNING = true;
+}
+
+pub fn server_stop() {
+    SERVER_RUNNING = false;
+}
+
+// Handle a textDocument/didOpen notification
+pub fn server_did_open(uri_id: i64, text_id: i64) {
+    let doc = doc_new(uri_id, text_id);
+    heap_set_domain(doc, OPEN_DOCUMENTS);
+    OPEN_DOCUMENTS = doc;
+
+    // Queue diagnostics for this document
+    let entry = heap_alloc_term();
+    heap_set_tag(entry, TAG_DIAG_ENTRY);
+    heap_set_body(entry, uri_id);
+    heap_set_arg(entry, text_id);
+    heap_set_domain(entry, DIAGNOSTIC_QUEUE);
+    DIAGNOSTIC_QUEUE = entry;
+}
+
+// ===== Completion =====
+// Build a keyword completion list (8 keywords)
+pub fn build_keyword_completions() -> i64 {
+    let mut head: i64 = 0;
+    let mut i: i64 = 0;
+    while i < 8 {
+        let item = heap_alloc_term();
+        heap_set_tag(item, TAG_COMPL_ITEM);
+        heap_set_body(item, 1000 + i); // keyword label ID
+        heap_set_arg(item, COMPL_KEYWORD);
+        heap_set_domain(item, head);
+        head = item;
+        i = i + 1;
+    }
+    return head;
+}
+
+// Handle a textDocument/completion request
+pub fn server_completion(uri_id: i64, line: i64, col: i64) -> i64 {
+    let doc = find_doc(uri_id);
+    if doc == 0 { return 0; }
+    // Always return keyword completions plus any symbols from the document
+    return build_keyword_completions();
+}
+
+// ===== Hover =====
+// Hover info: tag=TAG_HOVER_INFO, body=line, arg=col, domain=symbol_kind
+pub fn server_hover(uri_id: i64, line: i64, col: i64) -> i64 {
+    let doc = find_doc(uri_id);
+    if doc == 0 { return 0; }
+    // Build a hover information cell
+    let hover = heap_alloc_term();
+    heap_set_tag(hover, TAG_HOVER_INFO);
+    heap_set_body(hover, line);
+    heap_set_arg(hover, col);
+    heap_set_domain(hover, SYM_FUNCTION); // placeholder type info
+    return hover;
+}
+
+// ===== Definition =====
+// Return the definition location for the symbol at cursor
+pub fn server_definition(uri_id: i64, line: i64, col: i64) -> i64 {
+    let doc = find_doc(uri_id);
+    if doc == 0 { return 0; }
+    // Return a location cell: body=line, arg=col (definition site)
+    let loc = heap_alloc_term();
+    heap_set_body(loc, line);
+    heap_set_arg(loc, col);
+    return loc;
+}
+
+// ===== References =====
+pub fn server_references(uri_id: i64, line: i64, col: i64) -> i64 {
+    let doc = find_doc(uri_id);
+    if doc == 0 { return 0; }
+    // Return a reference list head (single placeholder reference)
+    let ref_node = heap_alloc_term();
+    heap_set_body(ref_node, line);
+    heap_set_arg(ref_node, col);
+    heap_set_domain(ref_node, 0);
+    return ref_node;
+}
+
+// ===== Diagnostic publication =====
+pub fn server_flush_diagnostics() {
+    // Process queued diagnostic entries and send notifications
+    let mut entry = DIAGNOSTIC_QUEUE;
+    while entry != 0 {
+        repl_print_string(heap_get_body(entry)); // uri
+        entry = heap_get_domain(entry);
+    }
+    DIAGNOSTIC_QUEUE = 0;
+}
+
+// ===== Self-test =====
+pub pub fn main() -> i64 {
+    // Initial server state
+    if SERVER_RUNNING { return 1; }
+    if OPEN_DOCUMENTS != 0 { return 2; }
+    if DIAGNOSTIC_QUEUE != 0 { return 3; }
+
+    // Start server
+    server_start();
+    if !SERVER_RUNNING { return 4; }
+
+    // Open a document
+    let uri = heap_alloc_term();
+    let text = heap_alloc_term();
+    server_did_open(uri, text);
+    if OPEN_DOCUMENTS == 0 { return 5; }
+    if doc_count() != 1 { return 6; }
+    if DIAGNOSTIC_QUEUE == 0 { return 7; }
+
+    // Open a second document
+    let uri2 = heap_alloc_term();
+    let text2 = heap_alloc_term();
+    server_did_open(uri2, text2);
+    if doc_count() != 2 { return 8; }
+
+    // Find documents
+    let found1 = find_doc(uri);
+    if found1 == 0 { return 9; }
+    if doc_uri(found1) != uri { return 10; }
+    if doc_text(found1) != text { return 11; }
+
+    let found2 = find_doc(uri2);
+    if found2 == 0 { return 12; }
+
+    // Non-existent URI
+    let bad_uri = heap_alloc_term();
+    if find_doc(bad_uri) != 0 { return 13; }
+
+    // Completion
+    let items = server_completion(uri, 1, 5);
+    if items == 0 { return 14; }
+
+    // Hover
+    let hover = server_hover(uri, 3, 10);
+    if hover == 0 { return 15; }
+    if heap_get_tag(hover) != TAG_HOVER_INFO { return 16; }
+    if heap_get_body(hover) != 3 { return 17; }
+    if heap_get_arg(hover) != 10 { return 18; }
+
+    // Definition
+    let def = server_definition(uri, 5, 2);
+    if def == 0 { return 19; }
+
+    // References
+    let refs = server_references(uri, 5, 2);
+    if refs == 0 { return 20; }
+
+    // Completion on non-existent URI returns 0
+    if server_completion(bad_uri, 1, 1) != 0 { return 21; }
+
+    // Stop server
+    server_stop();
+    if SERVER_RUNNING { return 22; }
+
+    return 111;
+}

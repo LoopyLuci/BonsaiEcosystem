@@ -1,0 +1,94 @@
+// tests/test_r5.ti — Phase R5 Combo System Integration Test
+// All helpers inlined with tr5_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR5_T_CMB: i64 = 22400;
+const TR5_T_ENT: i64 = 22401;
+const TR5_T_REG: i64 = 22402;
+const TR5_T_WRP: i64 = 22403;
+
+pub fn tr5_entry_create(ep_id: i64, weight: i64) -> i64 {
+    let e = heap_alloc_term();
+    heap_set_tag(e, TR5_T_ENT); heap_set_body(e, ep_id); heap_set_arg(e, weight); heap_set_domain(e, 0);
+    return e;
+}
+pub fn tr5_entry_ep(e: i64) -> i64     { return heap_get_body(e); }
+pub fn tr5_entry_weight(e: i64) -> i64 { return heap_get_arg(e); }
+
+pub fn tr5_combo_create(name: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TR5_T_CMB); heap_set_body(c, name); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    return c;
+}
+
+pub fn tr5_combo_add_entry(c: i64, e: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TR5_T_WRP); heap_set_body(w, e); heap_set_domain(w, 0);
+    let h = heap_get_domain(c);
+    if h == 0 { heap_set_domain(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_arg(c, heap_get_arg(c) + 1);
+}
+
+pub fn tr5_combo_entry_count(c: i64) -> i64 { return heap_get_arg(c); }
+
+pub fn tr5_combo_select(c: i64) -> i64 {
+    let n = heap_get_arg(c);
+    if n == 0 { return 0; }
+    let mut best_w: i64 = 0;
+    let mut best: i64 = 0;
+    let mut cur: i64 = heap_get_domain(c);
+    while cur != 0 {
+        let e = heap_get_body(cur);
+        let w = tr5_entry_weight(e);
+        if w > best_w { best_w = w; best = tr5_entry_ep(e); }
+        cur = heap_get_domain(cur);
+    }
+    return best;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let c = tr5_combo_create(5);
+    let e1 = tr5_entry_create(50, 10);
+    let e2 = tr5_entry_create(60, 90);
+    tr5_combo_add_entry(c, e1);
+    tr5_combo_add_entry(c, e2);
+    if tr5_combo_entry_count(c) != 2   { return 1; }
+    let sel = tr5_combo_select(c);
+    if sel != 60                        { return 2; }
+
+    // Empty combo → select returns 0
+    let c2 = tr5_combo_create(99);
+    if tr5_combo_select(c2) != 0        { return 3; }
+
+    // Single entry
+    let c3 = tr5_combo_create(1);
+    tr5_combo_add_entry(c3, tr5_entry_create(77, 42));
+    if tr5_combo_select(c3) != 77       { return 4; }
+
+    // Three entries, middle wins
+    let c4 = tr5_combo_create(2);
+    tr5_combo_add_entry(c4, tr5_entry_create(10, 30));
+    tr5_combo_add_entry(c4, tr5_entry_create(20, 95));
+    tr5_combo_add_entry(c4, tr5_entry_create(30, 60));
+    if tr5_combo_select(c4) != 20       { return 5; }
+    if tr5_combo_entry_count(c4) != 3   { return 6; }
+
+    return 111;
+}

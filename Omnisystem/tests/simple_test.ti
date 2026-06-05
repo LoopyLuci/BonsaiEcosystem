@@ -1,0 +1,9 @@
+// Simple test to verify bootstrap compiler works
+fn get_simple_value() -> i64 {
+    42
+}
+
+pub fn main() -> i64 {
+    111
+}
+

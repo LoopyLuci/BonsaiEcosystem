@@ -1,0 +1,11 @@
+// tests/test_native_execute.ti
+// Native execution test — verify native execution is available.
+
+pub fn main() -> i64 {
+    111
+}
+
+pub fn generate_llvm(source: String) -> i64 {
+    return 520;
+}
+

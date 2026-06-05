@@ -1,0 +1,85 @@
+{
+  "version": "P2.2",
+  "python_parser": "Z:\\Projects\\Omnisystem\\titan\\stage0\\parser.py",
+  "titan_parser": "Z:\\Projects\\Omnisystem\\titan\\stage3b\\parser.ti",
+  "parser_ti_compiled": {
+    "def_count": 128,
+    "hash": "936fbe5763a4d083",
+    "defs_sample": [
+      "TY_PRIM",
+      "TY_REF",
+      "TY_ARRAY",
+      "TY_NAMED",
+      "TY_FUN",
+      "TY_UNIT",
+      "EX_LIT",
+      "EX_VAR",
+      "EX_BINOP",
+      "EX_UNOP"
+    ]
+  },
+  "test_programs": {
+    "minimal_function": {
+      "decl_count": 1,
+      "error_count": 0,
+      "hash": "f36a667b55c85cfb695514863b2cc2d3b758a80dd30def6d111726cf095a88d2"
+    },
+    "function_with_params": {
+      "decl_count": 1,
+      "error_count": 0,
+      "hash": "dd61127d9c94de4b747ca7f3732f9de08304c3c412ba05f262fbaf0efd7025b7"
+    },
+    "let_and_operations": {
+      "decl_count": 1,
+      "error_count": 0,
+      "hash": "6d79fe003279991ce5134e48c02f4d63a42da386c519aaf153fa3e8c8f2da108"
+    },
+    "control_flow": {
+      "decl_count": 1,
+      "error_count": 0,
+      "hash": "5b227dc227f1f8a153d445e7b1b4248b562b769792ac5294d241c7aa0fbfa859"
+    },
+    "loop_construct": {
+      "decl_count": 1,
+      "error_count": 0,
+      "hash": "5547ef292c01561a696fe9f39ecf2e4f5a9290ff2b25a45a3c83aa4cbb4e3d3e"
+    },
+    "struct_definition": {
+      "decl_count": 2,
+      "error_count": 0,
+      "hash": "e46bd28d8c1d929e8fbc12bb9cbfcd74cf23b4709cf5f1417bdbf515c5e5ce25"
+    },
+    "struct_literal": {
+      "decl_count": 2,
+      "error_count": 0,
+      "hash": "a4d70d2c7c28298b58b4539340c74afac583a89e8244398587da7b537e902cf2"
+    },
+    "complex_expressions": {
+      "decl_count": 1,
+      "error_count": 0,
+      "hash": "f4a3ba19a4a062fc825ab3105c3aef1a69af3d0421572f57e4431a9fdbbda45e"
+    },
+    "nested_calls": {
+      "decl_count": 2,
+      "error_count": 0,
+      "hash": "02f4ece2f3f175e65abef72b8bb49a90017949c89d7582a8aeb47f89d6f00f37"
+    },
+    "mutual_recursion": {
+      "decl_count": 2,
+      "error_count": 0,
+      "hash": "26f555aaaf570159f7238d0e39be2b0de60c8c8fd2329fd3e618e84bc87562d6"
+    }
+  },
+  "ast_golden": {
+    "minimal_function": "fn main() { return 42; }",
+    "function_with_params": "fn add(a: i64, b: i64) -> i64 { return (a + b); }",
+    "let_and_operations": "fn compute() -> i64 { let x = 10;; let y = (x + 5);; let z = (y * 2);; return z; }",
+    "control_flow": "fn sign(n: i64) -> i64 { if (n > 0) { return 1; } else { return 0; } }",
+    "loop_construct": "fn countdown(n: i64) -> i64 { let mut i = n;; while (i > 0) { i = (i - 1); }; return i; }",
+    "struct_definition": "struct Point { x: i64, y: i64 }\nfn origin() {  }",
+    "struct_literal": "struct Vec2 { x: i64, y: i64 }\npub fn make_vec(x: i64, y: i64) -> Vec2 { return Vec2 { x: x, y: y }; }",
+    "complex_expressions": "fn evaluate(a: i64, b: i64) -> bool { let x = (a + (b * 2));; let y = (a == b);; let z = (!y || (x > 100));; return z; }",
+    "nested_calls": "fn outer() -> i64 { return inner(5); }\nfn inner(n: i64) -> i64 { return (n * 2); }",
+    "mutual_recursion": "fn is_even(n: i64) -> bool { return (n == 0); }\nfn is_odd(n: i64) -> bool { return !is_even(n); }"
+  }
+}

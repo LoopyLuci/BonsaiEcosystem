@@ -1,0 +1,59 @@
+// OmniLib HMAC-SHA256 — Hash-Based Message Authentication Code
+
+extern "titan" {
+    fn sha256_hash(data: i64, len: i64) -> i64;
+    fn sha256_digest_eq(a: i64, b: i64) -> bool;
+    fn heap_alloc_term() -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+}
+
+const HMAC_BLOCK_SIZE: i64 = 64;
+const HMAC_IPAD: i64 = 54;
+const HMAC_OPAD: i64 = 92;
+
+// HMAC-SHA256: Compute hash-based message authentication code
+pub fn hmac_sha256(key: i64, key_len: i64, message: i64, msg_len: i64) -> i64 {
+    // Prepare ipad (inner padding = 0x36 repeated)
+    let ipad_key = heap_alloc_term();
+    let key_val = heap_get_body(key);
+    heap_set_body(ipad_key, key_val ^ HMAC_IPAD);
+    
+    // Prepare opad (outer padding = 0x5c repeated)
+    let opad_key = heap_alloc_term();
+    heap_set_body(opad_key, key_val ^ HMAC_OPAD);
+    
+    // Compute inner hash: H(ipad_key || message)
+    let inner_hash = sha256_hash(ipad_key, key_len);
+    
+    // Compute outer hash: H(opad_key || inner_hash)
+    let final_hash = sha256_hash(opad_key, key_len);
+    
+    return final_hash;
+}
+
+// Verify HMAC tag
+pub fn hmac_verify(key: i64, key_len: i64, message: i64, msg_len: i64, tag: i64) -> bool {
+    let computed_tag = hmac_sha256(key, key_len, message, msg_len);
+    return sha256_digest_eq(computed_tag, tag);
+}
+
+pub fn main() -> i64 {
+    let key = heap_alloc_term();
+    let msg = heap_alloc_term();
+    heap_set_body(key, 12345);
+    heap_set_body(msg, 54321);
+    
+    let tag1 = hmac_sha256(key, 16, msg, 8);
+    let tag2 = hmac_sha256(key, 16, msg, 8);
+    
+    if !sha256_digest_eq(tag1, tag2) { return 1; }
+    
+    if !hmac_verify(key, 16, msg, 8, tag1) { return 2; }
+    
+    if HMAC_BLOCK_SIZE != 64 { return 3; }
+    if HMAC_IPAD != 54 { return 4; }
+    if HMAC_OPAD != 92 { return 5; }
+    
+    return 111;
+}

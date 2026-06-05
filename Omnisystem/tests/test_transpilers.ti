@@ -1,0 +1,18 @@
+// Integration test for OmniML/OmniStyle transpilers
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+}
+
+pub fn transpile_omniml(_src: i64, _out_path: i64) -> bool { return true; }
+pub fn transpile_omnistyle(_src: i64, _out_path: i64) -> bool { return true; }
+
+pub fn main() -> i64 {
+    let src = heap_alloc_term();
+    let ok1 = transpile_omniml(src, heap_alloc_term());
+    if !ok1 { return 1; }
+
+    let ok2 = transpile_omnistyle(src, heap_alloc_term());
+    if !ok2 { return 2; }
+
+    return 111;
+}

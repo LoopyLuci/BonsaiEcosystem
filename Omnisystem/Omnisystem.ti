@@ -1,0 +1,58 @@
+// Omnisystem.ti
+import "titan/ui/omni_ui_master.ti"
+import "titan/ui/ring_buffer.ti"
+import "titan/ui/error_boundary.ti"
+import "titan/ui/lenses/router_lens.ti"
+import "titan/ui/lenses/compiler_lens.ti"
+import "titan/ui/lenses/splat_lens.ti"
+import "titan/omnicore/events.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn window_create(w: i64, h: i64, x: i64, y: i64) -> i64;
+    fn window_show(wid: i64);
+    fn window_poll_quit(wid: i64) -> i64;
+    fn window_destroy(wid: i64);
+    fn surface_create(wid: i64, w: i64, h: i64) -> i64;
+    fn surface_begin_frame(sid: i64);
+    fn surface_clear(sid: i64, color: i64);
+    fn surface_fill_rect(sid: i64, x: i64, y: i64, w: i64, h: i64, color: i64);
+    fn surface_present(sid: i64);
+    fn window_sleep(ms: i64);
+}
+
+pub fn main() -> i64 {
+    let rb = rb_create(32);
+    let eb = eb_create();
+    let m = heap_alloc_term();
+    heap_set_body(m, 0);
+    
+    rb_push(rb, evt_create(12, 0, 8, 100));
+
+    let w = window_create(1620, 1080, 10, 10);
+    if w < 0 { return 1; }
+    let s = surface_create(w, 1620, 1080);
+    if s < 0 { return 2; }
+    window_show(w);
+
+    let mut running: i64 = 1;
+    while running == 1 {
+        if window_poll_quit(w) == 1 { running = 0; }
+        
+        let ui_state: i64 = ui_master_tick_live(m, rb, eb);
+        rb_push(rb, 100);
+        
+        surface_begin_frame(s);
+        surface_clear(s, 1973780);
+        surface_fill_rect(s, 10, 10, 400, 200, 2960703);
+        surface_fill_rect(s, 420, 10, 400, 200, 2960703);
+        surface_fill_rect(s, 10, 220, 810, 200, 2960703);
+        surface_present(s);
+        
+        window_sleep(16);
+    }
+    
+    window_destroy(w);
+    return 111;
+}

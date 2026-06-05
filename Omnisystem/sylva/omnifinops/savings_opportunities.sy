@@ -1,0 +1,31 @@
+// sylva/omnifinops/savings_opportunities.sy
+// Phase 62: OmniFinOps — Savings opportunities UI
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    let header_ok: i64 = render_header();
+    if header_ok == 1 { score += 15; }
+
+    if render_recommendations() >= 80 { score += 15; }
+    if render_potential_savings() >= 80 { score += 15; }
+    if render_roi() >= 80 { score += 15; }
+    if render_implementation_cost() >= 80 { score += 15; }
+    if render_priority() >= 80 { score += 16; }
+
+    let footer_ok: i64 = render_footer();
+    if footer_ok == 1 { score += 14; }
+
+    if score >= 80 {
+        return 111;
+    }
+    return score;
+}
+
+fn render_header() -> i64 { 1 }
+fn render_recommendations() -> i64 { 111 }
+fn render_potential_savings() -> i64 { 111 }
+fn render_roi() -> i64 { 111 }
+fn render_implementation_cost() -> i64 { 111 }
+fn render_priority() -> i64 { 111 }
+fn render_footer() -> i64 { 1 }

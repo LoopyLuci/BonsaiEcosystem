@@ -1,0 +1,221 @@
+// titan/ai/model_router.ti — Smart Model Router
+// Selects the best model for each task using scoring heuristics.
+// Inlines all model registry functions; body-for-meta throughout.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+}
+
+// ===== Model registry (inlined) =====
+const TAG_MODEL_ENTRY:  i64 = 8000;
+const CAP_COMPLETION:   i64 = 1;
+const CAP_CHAT:         i64 = 2;
+const CAP_REASONING:    i64 = 4;
+const CAP_PROOF_SEARCH: i64 = 8;
+const CAP_CODE_GEN:     i64 = 16;
+const CAP_EMBEDDING:    i64 = 32;
+const MODEL_LOCAL:      i64 = 0;
+const MODEL_CLOUD:      i64 = 1;
+const MODEL_WASM:       i64 = 2;
+
+static mut MODEL_LIST:  i64 = 0;
+static mut MODEL_COUNT: i64 = 0;
+
+pub fn model_create_r(name_id: i64, source: i64, capabilities: i64,
+                      token_limit: i64, cost_per_1k: i64, endpoint_id: i64) -> i64 {
+    let meta3 = heap_alloc_term();
+    heap_set_body(meta3, cost_per_1k);
+    heap_set_arg(meta3, endpoint_id);
+    heap_set_domain(meta3, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, capabilities);
+    heap_set_arg(meta2, token_limit);
+    heap_set_domain(meta2, meta3);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, name_id);
+    heap_set_arg(meta1, source);
+    heap_set_domain(meta1, meta2);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_MODEL_ENTRY);
+    heap_set_body(m, meta1);
+    heap_set_arg(m, 0);
+    heap_set_domain(m, 0);
+    return m;
+}
+pub fn model_source_r(m: i64) -> i64       { return heap_get_arg(heap_get_body(m)); }
+pub fn model_capabilities_r(m: i64) -> i64 { return heap_get_body(heap_get_domain(heap_get_body(m))); }
+pub fn model_token_limit_r(m: i64) -> i64  { return heap_get_arg(heap_get_domain(heap_get_body(m))); }
+pub fn model_cost_r(m: i64) -> i64         { return heap_get_body(heap_get_domain(heap_get_domain(heap_get_body(m)))); }
+pub fn model_has_capability_r(m: i64, cap: i64) -> bool {
+    return (model_capabilities_r(m) & cap) != 0;
+}
+pub fn registry_register_r(name_id: i64, source: i64, capabilities: i64,
+                            token_limit: i64, cost: i64, endpoint_id: i64) -> i64 {
+    let m = model_create_r(name_id, source, capabilities, token_limit, cost, endpoint_id);
+    heap_set_domain(m, MODEL_LIST);
+    MODEL_LIST  = m;
+    MODEL_COUNT = MODEL_COUNT + 1;
+    return m;
+}
+pub fn registry_count_r() -> i64 { return MODEL_COUNT; }
+pub fn registry_seed_defaults_r() {
+    registry_register_r(heap_alloc_term(), MODEL_LOCAL,
+                        CAP_COMPLETION | CAP_CODE_GEN, 4096, 0, heap_alloc_term());
+    registry_register_r(heap_alloc_term(), MODEL_CLOUD,
+                        CAP_CHAT | CAP_REASONING | CAP_CODE_GEN, 128000, 3, heap_alloc_term());
+    registry_register_r(heap_alloc_term(), MODEL_LOCAL,
+                        CAP_EMBEDDING, 512, 0, heap_alloc_term());
+    registry_register_r(heap_alloc_term(), MODEL_LOCAL,
+                        CAP_PROOF_SEARCH, 8192, 0, heap_alloc_term());
+}
+
+// ===== Routing =====
+const TAG_ROUTE_REQUEST: i64 = 8300;
+
+// Task categories
+const TASK_COMPLETION: i64 = 0;
+const TASK_CHAT:       i64 = 1;
+const TASK_REASONING:  i64 = 2;
+const TASK_PROOF:      i64 = 3;
+const TASK_CODE_GEN:   i64 = 4;
+const TASK_EMBEDDING:  i64 = 5;
+
+// route request layout:
+//   req:   tag=TAG_ROUTE_REQUEST, body=meta1, arg=0, domain=0
+//   meta1: body=task_type, arg=complexity, domain=meta2
+//   meta2: body=token_budget, arg=prefer_local(0/1), domain=0
+
+pub fn route_request_create(task_type: i64, complexity: i64,
+                             token_budget: i64, prefer_local: bool) -> i64 {
+    let mut pref: i64 = 0;
+    if prefer_local { pref = 1; }
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, token_budget);
+    heap_set_arg(meta2, pref);
+    heap_set_domain(meta2, 0);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, task_type);
+    heap_set_arg(meta1, complexity);
+    heap_set_domain(meta1, meta2);
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_ROUTE_REQUEST);
+    heap_set_body(r, meta1);
+    heap_set_arg(r, 0);
+    heap_set_domain(r, 0);
+    return r;
+}
+
+pub fn route_task_type(r: i64) -> i64     { return heap_get_body(heap_get_body(r)); }
+pub fn route_token_budget(r: i64) -> i64  { return heap_get_body(heap_get_domain(heap_get_body(r))); }
+pub fn route_prefer_local(r: i64) -> bool { return heap_get_arg(heap_get_domain(heap_get_body(r))) != 0; }
+
+pub fn route_required_capability(task_type: i64) -> i64 {
+    if task_type == TASK_COMPLETION { return CAP_COMPLETION; }
+    if task_type == TASK_CHAT       { return CAP_CHAT; }
+    if task_type == TASK_REASONING  { return CAP_REASONING; }
+    if task_type == TASK_PROOF      { return CAP_PROOF_SEARCH; }
+    if task_type == TASK_CODE_GEN   { return CAP_CODE_GEN; }
+    if task_type == TASK_EMBEDDING  { return CAP_EMBEDDING; }
+    return CAP_COMPLETION;
+}
+
+pub fn route_select_model(request: i64) -> i64 {
+    let task_type    = route_task_type(request);
+    let token_budget = route_token_budget(request);
+    let prefer_local = route_prefer_local(request);
+    let required_cap = route_required_capability(task_type);
+
+    let mut best_model: i64 = 0;
+    let mut best_score: i64 = 0;
+    let mut have_best: bool = false;
+
+    let mut curr = MODEL_LIST;
+    while curr != 0 {
+        if model_has_capability_r(curr, required_cap) {
+            let mut score: i64 = 0;
+
+            // Token limit coverage
+            let limit = model_token_limit_r(curr);
+            if limit >= token_budget {
+                score = score + 50;
+            } else {
+                score = score + (limit * 50) / token_budget;
+            }
+
+            // Local preference bonus
+            if prefer_local && model_source_r(curr) == MODEL_LOCAL {
+                score = score + 30;
+            }
+
+            // Cloud bonus for reasoning tasks
+            if task_type == TASK_REASONING && model_source_r(curr) == MODEL_CLOUD {
+                score = score + 30;
+            }
+
+            // Cost bonus (free models win)
+            let cost = model_cost_r(curr);
+            if cost == 0 {
+                score = score + 20;
+            } else {
+                score = score + 20 / cost;
+            }
+
+            if !have_best || score > best_score {
+                best_score = score;
+                best_model = curr;
+                have_best  = true;
+            }
+        }
+        curr = heap_get_domain(curr);
+    }
+    return best_model;
+}
+
+pub fn route_execute(request: i64) -> i64 {
+    return route_select_model(request);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    MODEL_LIST  = 0;
+    MODEL_COUNT = 0;
+    registry_seed_defaults_r();
+    if registry_count_r() != 4 { return 1; }
+
+    // Completion — prefer local
+    let req1 = route_request_create(TASK_COMPLETION, 1, 256, true);
+    let m1   = route_select_model(req1);
+    if m1 == 0                                    { return 2; }
+    if !model_has_capability_r(m1, CAP_COMPLETION) { return 3; }
+
+    // Reasoning — prefer cloud
+    let req2 = route_request_create(TASK_REASONING, 8, 64000, false);
+    let m2   = route_select_model(req2);
+    if m2 == 0                                    { return 4; }
+    if !model_has_capability_r(m2, CAP_REASONING)  { return 5; }
+    if model_source_r(m2) != MODEL_CLOUD           { return 6; }
+
+    // Embedding — local
+    let req3 = route_request_create(TASK_EMBEDDING, 1, 256, true);
+    let m3   = route_select_model(req3);
+    if m3 == 0                                    { return 7; }
+    if !model_has_capability_r(m3, CAP_EMBEDDING)  { return 8; }
+
+    // Code gen — prefer local
+    let req4 = route_request_create(TASK_CODE_GEN, 5, 4096, true);
+    let m4   = route_select_model(req4);
+    if m4 == 0                                    { return 9; }
+    if !model_has_capability_r(m4, CAP_CODE_GEN)   { return 10; }
+
+    return 111;
+}

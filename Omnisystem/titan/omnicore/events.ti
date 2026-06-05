@@ -1,0 +1,109 @@
+// titan/omnicore/events.ti — Omnisystem event bus: typed event nodes + config-change validation
+// Events flow from subsystems → Supervisor event queue → handlers.
+// EVT_CONFIG_CHANGE (type 5) is gated by cc_validate_change before being emitted.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_EVENT:   i64 = 66000;
+const TAG_PAYLOAD: i64 = 66001;
+
+// Event types
+pub const EVT_BOOT:          i64 = 1;
+pub const EVT_FAULT:         i64 = 2;
+pub const EVT_RESTART:       i64 = 3;
+pub const EVT_SHUTDOWN:      i64 = 4;
+pub const EVT_CONFIG_CHANGE: i64 = 5;
+pub const EVT_STATUS:        i64 = 6;
+pub const EVT_MSG_ROUTED:    i64 = 12;
+
+// Event cell: body=type, arg=source_id, domain=payload_ptr
+// Payload cell: body=key, arg=value
+pub fn evt_create(etype: i64, source: i64, key: i64, val: i64) -> i64 {
+    let payload = heap_alloc_term();
+    heap_set_tag(payload, TAG_PAYLOAD);
+    heap_set_body(payload, key);
+    heap_set_arg(payload, val);
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_EVENT);
+    heap_set_body(e, etype);
+    heap_set_arg(e, source);
+    heap_set_domain(e, payload);
+    return e;
+}
+
+pub fn evt_type(e: i64) -> i64   { return heap_get_body(e); }
+pub fn evt_source(e: i64) -> i64 { return heap_get_arg(e); }
+pub fn evt_key(e: i64) -> i64    { return heap_get_body(heap_get_domain(e)); }
+pub fn evt_val(e: i64) -> i64    { return heap_get_arg(heap_get_domain(e)); }
+
+// cc_validate_change: gate for EVT_CONFIG_CHANGE
+//   sys_id must be > 0 (valid subsystem)
+//   prop_key must be >= 0 (negative keys are reserved/invalid)
+//   new_val is unconstrained
+pub fn cc_validate_change(sys_id: i64, prop_key: i64, new_val: i64) -> i64 {
+    if sys_id <= 0 { return 0; }
+    if prop_key < 0 { return 0; }
+    return 1;
+}
+
+// Event queue: body=count, arg=head (newest first)
+const TAG_EVT_QUEUE: i64 = 66002;
+
+pub fn evtq_new() -> i64 {
+    let q = heap_alloc_term();
+    heap_set_tag(q, TAG_EVT_QUEUE);
+    heap_set_body(q, 0);
+    heap_set_arg(q, 0);
+    return q;
+}
+
+pub fn evtq_push(q: i64, e: i64) {
+    heap_set_domain(e, heap_get_arg(q));
+    heap_set_arg(q, e);
+    heap_set_body(q, heap_get_body(q) + 1);
+}
+
+pub fn evtq_count(q: i64) -> i64 { return heap_get_body(q); }
+
+pub fn evtq_pop(q: i64) -> i64 {
+    let head = heap_get_arg(q);
+    if head == 0 { return 0; }
+    heap_set_arg(q, heap_get_domain(head));
+    heap_set_body(q, heap_get_body(q) - 1);
+    return head;
+}
+
+pub fn main() -> i64 {
+    // Test 1: evt_create, evt_type, evt_source, evt_key, evt_val
+    let e = evt_create(EVT_CONFIG_CHANGE, 3, 1, 500);
+    if evt_type(e)   != EVT_CONFIG_CHANGE { return 1; }
+    if evt_source(e) != 3   { return 2; }
+    if evt_key(e)    != 1   { return 3; }
+    if evt_val(e)    != 500 { return 4; }
+
+    // Test 2: cc_validate_change gates
+    if cc_validate_change(3,  1,  500) != 1 { return 5; }   // valid
+    if cc_validate_change(3, -1,  500) != 0 { return 6; }   // bad key
+    if cc_validate_change(0,  1,  500) != 0 { return 7; }   // bad sys_id
+
+    // Test 3: event queue push/pop
+    let q = evtq_new();
+    evtq_push(q, evt_create(EVT_BOOT, 1, 0, 0));
+    evtq_push(q, evt_create(EVT_STATUS, 2, 0, 0));
+    if evtq_count(q) != 2 { return 8; }
+    let popped = evtq_pop(q);
+    if evt_type(popped) != EVT_STATUS { return 9; }
+    if evtq_count(q) != 1 { return 10; }
+
+    return 111;
+}

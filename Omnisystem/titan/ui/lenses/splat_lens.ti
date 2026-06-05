@@ -1,0 +1,58 @@
+// titan/ui/lenses/splat_lens.ti — OmniSplat Viewport Lens
+// Projects Subsystem 2 (OmniSplat Viewport) spatial pipeline metrics into isolated cell layout.
+// TAG_SPLAT_LENS=73000 is clear of all existing tag ranges.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_SPLAT_LENS: i64 = 73000;
+
+// Lens cell: body=polys (visible polygon count), arg=latency_ms (frame render time)
+// Returns 0 if sys_id is not OmniSplat (subsystem 2), polys < 0, or latency_ms < 0.
+pub fn sl_render_metrics(sys_id: i64, polys: i64, latency_ms: i64) -> i64 {
+    if sys_id != 2     { return 0; }
+    if polys < 0       { return 0; }
+    if latency_ms < 0  { return 0; }
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_SPLAT_LENS);
+    heap_set_body(v, polys);
+    heap_set_arg(v, latency_ms);
+    return v;
+}
+
+pub fn sl_polys(v: i64)      -> i64 { return heap_get_body(v); }
+pub fn sl_latency(v: i64)    -> i64 { return heap_get_arg(v); }
+
+pub fn main() -> i64 {
+    // Test 1: valid sys_id=2, real-world geometry load
+    let v = sl_render_metrics(2, 50000, 11);
+    if v == 0                         { return 1; }
+    if heap_get_tag(v) != TAG_SPLAT_LENS { return 2; }
+    if sl_polys(v)   != 50000         { return 3; }
+    if sl_latency(v) != 11            { return 4; }
+
+    // Test 2: subsystem boundary guards
+    if sl_render_metrics(1, 100,   5) != 0 { return 5; }
+    if sl_render_metrics(3, 100,   5) != 0 { return 6; }
+
+    // Test 3: negative geometry and latency rejected
+    if sl_render_metrics(2,  -50,  11) != 0 { return 7; }
+    if sl_render_metrics(2, 50000, -1) != 0 { return 8; }
+
+    // Test 4: zero polys and zero latency are valid (idle frame)
+    let idle = sl_render_metrics(2, 0, 0);
+    if idle == 0          { return 9; }
+    if sl_polys(idle) != 0   { return 10; }
+    if sl_latency(idle) != 0 { return 11; }
+
+    return 111;
+}

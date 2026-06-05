@@ -1,0 +1,93 @@
+// axiom/crypto/merkle_hash.ti
+// Merkle tree hash combining: combine(l, r) = fnv1a(l XOR r)
+
+fn fnv1a_round(h: i64, b: i64) -> i64 {
+    let prime = 1099511628211;
+    return bit_xor(h, b) * prime;
+}
+
+fn hash_combine(left: i64, right: i64) -> i64 {
+    let offset = -3750763034362895579;
+    let xored = bit_xor(left, right);
+    let b0 = bit_and(xored, 255);
+    let b1 = bit_and(bit_shr(xored, 8), 255);
+    let b2 = bit_and(bit_shr(xored, 16), 255);
+    let b3 = bit_and(bit_shr(xored, 24), 255);
+    let h0 = fnv1a_round(offset, b0);
+    let h1 = fnv1a_round(h0, b1);
+    let h2 = fnv1a_round(h1, b2);
+    let h3 = fnv1a_round(h2, b3);
+    return h3;
+}
+
+fn merkle_root_4(a: i64, b: i64, c: i64, d: i64) -> i64 {
+    let l = hash_combine(a, b);
+    let r = hash_combine(c, d);
+    return hash_combine(l, r);
+}
+
+fn verify_commutativity_of_xor_base() -> i64 {
+    let a = 1000;
+    let b = 2000;
+    let h1 = hash_combine(a, b);
+    let h2 = hash_combine(b, a);
+    if h1 != h2 {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_distinct_roots() -> i64 {
+    let r1 = merkle_root_4(1, 2, 3, 4);
+    let r2 = merkle_root_4(1, 2, 3, 5);
+    let r3 = merkle_root_4(10, 20, 30, 40);
+    if r1 == r2 {
+        return 0;
+    }
+    if r1 == r3 {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_deterministic() -> i64 {
+    let r1 = merkle_root_4(42, 43, 44, 45);
+    let r2 = merkle_root_4(42, 43, 44, 45);
+    if r1 != r2 {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_hex_combine() -> i64 {
+    let h = hash_combine(0xDEAD, 0xBEEF);
+    let h2 = hash_combine(0xDEAD, 0xBEEF);
+    if h != h2 {
+        return 0;
+    }
+    let h3 = hash_combine(0xBEEF, 0xDEAD);
+    if h != h3 {
+        return 0;
+    }
+    return 1;
+}
+
+fn main() -> i64 {
+    let ok1 = verify_commutativity_of_xor_base();
+    if ok1 == 0 {
+        return 0;
+    }
+    let ok2 = verify_distinct_roots();
+    if ok2 == 0 {
+        return 0;
+    }
+    let ok3 = verify_deterministic();
+    if ok3 == 0 {
+        return 0;
+    }
+    let ok4 = verify_hex_combine();
+    if ok4 == 0 {
+        return 0;
+    }
+    return 111;
+}

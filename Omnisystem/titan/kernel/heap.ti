@@ -1,0 +1,36 @@
+// titan/kernel/heap.ti — Axiom kernel heap allocator
+// Tests that heap_alloc / heap_get / heap_set work correctly.
+// heap_alloc()          -> i64  (allocate 8-field cell, return id)
+// heap_get(id, field)   -> i64  (read field 0-7)
+// heap_set(id, field, v)-> i64  (write field, return 0)
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: allocate and read/write a single field
+    let id = heap_alloc();
+    heap_set(id, 0, 42);
+    let v = heap_get(id, 0);
+    if v == 42 { score = score + 37; }
+
+    // Test 2: all 8 fields are independent
+    let id2 = heap_alloc();
+    heap_set(id2, 0, 10);
+    heap_set(id2, 1, 20);
+    heap_set(id2, 2, 30);
+    heap_set(id2, 3, 40);
+    heap_set(id2, 4, 50);
+    heap_set(id2, 5, 60);
+    heap_set(id2, 6, 70);
+    heap_set(id2, 7, 80);
+    let ok = heap_get(id2, 0) + heap_get(id2, 1) + heap_get(id2, 2) + heap_get(id2, 3)
+           + heap_get(id2, 4) + heap_get(id2, 5) + heap_get(id2, 6) + heap_get(id2, 7);
+    if ok == 360 { score = score + 37; }
+
+    // Test 3: first cell unaffected by second allocation
+    let v2 = heap_get(id, 0);
+    if v2 == 42 { score = score + 37; }
+
+    if score >= 100 { return 111; }
+    return score;
+}

@@ -1,0 +1,125 @@
+// titan/ui/axiom_console.ti — Interactive tactic console
+// Goal stack for the Axiom proof engine. Tactics pop goals and may push subgoals.
+// ac_tactic_intro discharges the outermost universal quantifier.
+// ac_tactic_exact discharges a goal by providing a witness term.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_GL:  i64 = 62000;   // goal node
+const TAG_TAC: i64 = 62001;   // tactic record (for history)
+const TAG_WRP: i64 = 62002;   // list wrapper
+
+// Goal cell: body=hypothesis_set_id, arg=target_term_id
+pub fn ac_goal_create(hyps: i64, target: i64) -> i64 {
+    let g = heap_alloc_term();
+    heap_set_tag(g, TAG_GL);
+    heap_set_body(g, hyps);
+    heap_set_arg(g, target);
+    return g;
+}
+
+pub fn ac_goal_hyps(g: i64) -> i64   { return heap_get_body(g); }
+pub fn ac_goal_target(g: i64) -> i64 { return heap_get_arg(g); }
+
+// Goal stack: body=depth, arg=wrapper-list head (append to tail, pop from tail)
+pub fn ac_stack_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_body(s, 0);
+    heap_set_arg(s, 0);
+    return s;
+}
+
+pub fn ac_push(s: i64, g: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WRP);
+    heap_set_body(w, g);
+    heap_set_domain(w, 0);
+    let h = heap_get_arg(s);
+    if h == 0 {
+        heap_set_arg(s, w);
+    } else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+
+// Pop from tail — returns the goal node (body of the wrapper), 0 if empty
+pub fn ac_pop(s: i64) -> i64 {
+    let h = heap_get_arg(s);
+    if h == 0 { return 0; }
+    let mut prev: i64 = 0;
+    let mut cur: i64 = h;
+    while heap_get_domain(cur) != 0 { prev = cur; cur = heap_get_domain(cur); }
+    if prev == 0 {
+        heap_set_arg(s, 0);
+    } else {
+        heap_set_domain(prev, 0);
+    }
+    heap_set_body(s, heap_get_body(s) - 1);
+    return heap_get_body(cur);   // goal node stored in wrapper body
+}
+
+pub fn ac_depth(s: i64) -> i64 { return heap_get_body(s); }
+
+// Tactic: intro — pops the current goal (discharges a forall/implication head)
+pub fn ac_tactic_intro(s: i64) -> i64 {
+    if ac_depth(s) == 0 { return 0; }
+    ac_pop(s);
+    return 1;
+}
+
+// Tactic: exact — proves the current goal with a given witness term
+pub fn ac_tactic_exact(s: i64, term: i64) -> i64 {
+    if ac_depth(s) == 0 { return 0; }
+    ac_pop(s);
+    return 1;
+}
+
+// Tactic: split — replaces one goal with two subgoals (conjunction introduction)
+pub fn ac_tactic_split(s: i64, left_target: i64, right_target: i64) -> i64 {
+    if ac_depth(s) == 0 { return 0; }
+    let g = ac_pop(s);
+    let hyps = ac_goal_hyps(g);
+    ac_push(s, ac_goal_create(hyps, left_target));
+    ac_push(s, ac_goal_create(hyps, right_target));
+    return 2;
+}
+
+pub fn main() -> i64 {
+    let s = ac_stack_create();
+
+    // Test 1: Push 2 goals, depth == 2
+    ac_push(s, ac_goal_create(0, 10));
+    ac_push(s, ac_goal_create(0, 20));
+    if ac_depth(s) != 2 { return 1; }
+
+    // Test 2: exact discharges one goal, depth == 1
+    ac_tactic_exact(s, 0);
+    if ac_depth(s) != 1 { return 2; }
+
+    // Test 3: intro discharges the last goal, depth == 0
+    ac_tactic_intro(s);
+    if ac_depth(s) != 0 { return 3; }
+
+    // Test 4: split on empty stack returns 0 (safe no-op)
+    if ac_tactic_split(s, 5, 6) != 0 { return 4; }
+
+    // Test 5: split on a real goal yields depth 2
+    ac_push(s, ac_goal_create(1, 99));
+    ac_tactic_split(s, 50, 60);
+    if ac_depth(s) != 2 { return 5; }
+
+    return 111;
+}

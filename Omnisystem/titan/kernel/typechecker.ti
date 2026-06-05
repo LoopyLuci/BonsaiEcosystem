@@ -1,0 +1,144 @@
+// titan/kernel/typechecker.ti — Bidirectional dependent type checker
+//
+// Context stored on heap as a linked list:
+//   CtxNil  (tag 6): empty
+//   CtxCons (tag 7): [tag, ty_id, rest_id]
+//
+// infer(ctx, t) -> i64   returns type id, or negative on error
+// check(ctx, t, ty) -> i64   returns 1 if ok, 0 otherwise
+
+pub fn var_ref(idx: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 0); heap_set(id, 1, idx); return id;
+}
+pub fn lam(body: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 1); heap_set(id, 1, body); return id;
+}
+pub fn app(func: i64, arg: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 2); heap_set(id, 1, func); heap_set(id, 2, arg); return id;
+}
+pub fn pi(domain: i64, codomain: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 3); heap_set(id, 1, domain); heap_set(id, 2, codomain); return id;
+}
+pub fn sort(level: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 4); heap_set(id, 1, level); return id;
+}
+pub fn const_term(name: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 5); heap_set(id, 1, name); return id;
+}
+pub fn make_id() -> i64 { return lam(var_ref(0)); }
+
+pub fn ctx_nil() -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 6); return id;
+}
+pub fn ctx_cons(ty: i64, rest: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 7); heap_set(id, 1, ty); heap_set(id, 2, rest); return id;
+}
+pub fn ctx_lookup(ctx: i64, idx: i64) -> i64 {
+    let tag = heap_get(ctx, 0);
+    if tag == 6 { return 0 - 1; }
+    if idx == 0 { return heap_get(ctx, 1); }
+    return ctx_lookup(heap_get(ctx, 2), idx - 1);
+}
+
+pub fn eq_term(a: i64, b: i64) -> i64 {
+    let ta = heap_get(a, 0); let tb = heap_get(b, 0);
+    if ta != tb { return 0; }
+    if ta == 0 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 1 { return eq_term(heap_get(a, 1), heap_get(b, 1)); }
+    if ta == 2 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 3 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 4 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 5 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    return 0;
+}
+pub fn shift(t: i64, cutoff: i64, amount: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx >= cutoff { return var_ref(idx + amount); } return var_ref(idx); }
+    if tag == 1 { return lam(shift(heap_get(t, 1), cutoff + 1, amount)); }
+    if tag == 2 { return app(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff, amount)); }
+    if tag == 3 { return pi(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff + 1, amount)); }
+    return t;
+}
+pub fn lift(t: i64, cutoff: i64) -> i64 { return shift(t, cutoff, 1); }
+pub fn subst(s: i64, index: i64, t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx == index { return s; } if idx > index { return var_ref(idx - 1); } return var_ref(idx); }
+    if tag == 1 { let s2 = lift(s, 0); return lam(subst(s2, index + 1, heap_get(t, 1))); }
+    if tag == 2 { return app(subst(s, index, heap_get(t, 1)), subst(s, index, heap_get(t, 2))); }
+    if tag == 3 { let s2 = lift(s, 0); return pi(subst(s, index, heap_get(t, 1)), subst(s2, index + 1, heap_get(t, 2))); }
+    return t;
+}
+pub fn whnf(t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 2 {
+        let func = whnf(heap_get(t, 1));
+        if heap_get(func, 0) == 1 { return whnf(subst(heap_get(t, 2), 0, heap_get(func, 1))); }
+        return app(func, heap_get(t, 2));
+    }
+    return t;
+}
+pub fn conv(a: i64, b: i64) -> i64 { return eq_term(whnf(a), whnf(b)); }
+
+pub fn infer(ctx: i64, t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 {
+        let idx = heap_get(t, 1);
+        return ctx_lookup(ctx, idx);
+    }
+    if tag == 2 {
+        let fty = infer(ctx, heap_get(t, 1));
+        if fty < 0 { return 0 - 1; }
+        if heap_get(fty, 0) != 3 { return 0 - 1; }
+        let dom = heap_get(fty, 1);
+        if check(ctx, heap_get(t, 2), dom) == 0 { return 0 - 1; }
+        return subst(heap_get(t, 2), 0, heap_get(fty, 2));
+    }
+    if tag == 4 {
+        return sort(heap_get(t, 1) + 1);
+    }
+    return 0 - 1;
+}
+
+pub fn check(ctx: i64, t: i64, ty: i64) -> i64 {
+    let ttag = heap_get(t, 0);
+    if ttag == 1 {
+        let ty_nf = whnf(ty);
+        if heap_get(ty_nf, 0) != 3 { return 0; }
+        let dom = heap_get(ty_nf, 1);
+        let cod = heap_get(ty_nf, 2);
+        let new_ctx = ctx_cons(dom, ctx);
+        return check(new_ctx, heap_get(t, 1), cod);
+    }
+    let inf = infer(ctx, t);
+    if inf < 0 { return 0; }
+    return conv(inf, ty);
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    let ty0 = sort(0);
+    let ty1 = sort(1);
+    let ctx = ctx_nil();
+
+    // Test 1: sort(0) : sort(1)  (Type0 : Type1)
+    let inf = infer(ctx, ty0);
+    if inf >= 0 {
+        if eq_term(inf, ty1) == 1 { score = score + 37; }
+    }
+
+    // Test 2: check (λ x. x) : Type0 -> Type0
+    let id = make_id();
+    let pi_ty = pi(ty0, ty0);
+    if check(ctx, id, pi_ty) == 1 { score = score + 37; }
+
+    // Test 3: in context [Type0], Var(0) : Type0
+    let ctx1 = ctx_cons(ty0, ctx);
+    let v0 = var_ref(0);
+    let vty = infer(ctx1, v0);
+    if vty >= 0 {
+        if conv(vty, ty0) == 1 { score = score + 37; }
+    }
+
+    if score >= 111 { return 111; }
+    return score;
+}

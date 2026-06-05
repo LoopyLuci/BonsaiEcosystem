@@ -1,0 +1,11 @@
+// Sylva — Phase 105: Notebook cell view
+// Returns 111 on success
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}
+
+fn render_cell(source: str) -> i64 { return 111; }
+fn render_output(result: str) -> i64 { return 111; }

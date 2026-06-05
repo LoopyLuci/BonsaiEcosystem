@@ -1,0 +1,11 @@
+// Explicit return test
+fn verify_explicit_return() -> i64 {
+    let x = 10;
+    let y = 20;
+    return x + y;
+}
+
+pub fn main() -> i64 {
+    111
+}
+

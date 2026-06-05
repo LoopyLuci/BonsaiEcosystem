@@ -1,0 +1,202 @@
+// OmniShell PS Lexer -- tokenises PowerShell-like script text
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+const TOK_EOF: i64 = 0;
+const TOK_IDENT: i64 = 1;
+const TOK_VAR: i64 = 2;
+const TOK_STRING: i64 = 3;
+const TOK_INT: i64 = 4;
+const TOK_PIPE: i64 = 5;
+const TOK_SEMI: i64 = 6;
+const TOK_LBRACE: i64 = 7;
+const TOK_RBRACE: i64 = 8;
+const TOK_LPAREN: i64 = 9;
+const TOK_RPAREN: i64 = 10;
+const TOK_LBRACKET: i64 = 11;
+const TOK_RBRACKET: i64 = 12;
+const TOK_EQ: i64 = 13;
+const TOK_DOT: i64 = 14;
+const TOK_COMMA: i64 = 15;
+const TOK_AT: i64 = 16;
+const TOK_DASH: i64 = 17;
+const TOK_PLUS: i64 = 18;
+const TOK_MINUS: i64 = 19;
+const TOK_STAR: i64 = 20;
+const TOK_SLASH: i64 = 21;
+const TOK_EQEQ: i64 = 22;
+const TOK_NEQ: i64 = 23;
+const TOK_LT: i64 = 24;
+const TOK_GT: i64 = 25;
+const TOK_LE: i64 = 26;
+const TOK_GE: i64 = 27;
+const TOK_AND: i64 = 28;
+const TOK_OR: i64 = 29;
+const TOK_NOT: i64 = 30;
+const TOK_IF: i64 = 31;
+const TOK_ELSE: i64 = 32;
+const TOK_FOR: i64 = 33;
+const TOK_WHILE: i64 = 34;
+const TOK_FUNCTION: i64 = 35;
+const TOK_RETURN: i64 = 36;
+const TOK_NEWLINE: i64 = 37;
+
+static mut SRC: i64 = 0;
+static mut POS: i64 = 0;
+static mut LEN: i64 = 0;
+
+pub fn lexer_init(src_id: i64) {
+    SRC = src_id;
+    POS = 0;
+    LEN = str_len(src_id);
+    return;
+}
+
+pub fn lexer_peek() -> i64 {
+    if POS >= LEN { return -1; }
+    return str_at(SRC, POS);
+}
+
+pub fn lexer_advance() -> i64 {
+    let ch = lexer_peek();
+    if POS < LEN { POS = POS + 1; }
+    return ch;
+}
+
+pub fn lexer_is_alpha(ch: i64) -> bool {
+    return (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) || ch == 95 || ch == 45;
+}
+
+pub fn lexer_is_digit(ch: i64) -> bool {
+    return ch >= 48 && ch <= 57;
+}
+
+pub fn lexer_skip_whitespace() {
+    let mut ch = lexer_peek();
+    while ch == 32 || ch == 9 || ch == 13 {
+        lexer_advance();
+        ch = lexer_peek();
+    }
+    return;
+}
+
+pub fn lexer_next_token() -> i64 {
+    lexer_skip_whitespace();
+    let ch = lexer_peek();
+    if ch == -1 { return TOK_EOF; }
+    if ch == 10 { lexer_advance(); return TOK_NEWLINE; }
+
+    if ch == 36 {
+        lexer_advance();
+        let start = POS;
+        while lexer_is_alpha(lexer_peek()) || lexer_is_digit(lexer_peek()) { lexer_advance(); }
+        let tok = heap_alloc_term();
+        heap_set_tag(tok, TOK_VAR);
+        heap_set_body(tok, start);
+        heap_set_arg(tok, POS);
+        return tok;
+    }
+
+    if ch == 34 || ch == 39 {
+        let quote = ch;
+        lexer_advance();
+        let start = POS;
+        while lexer_peek() != quote && lexer_peek() != -1 { lexer_advance(); }
+        let end = POS;
+        if lexer_peek() == quote { lexer_advance(); }
+        let tok = heap_alloc_term();
+        heap_set_tag(tok, TOK_STRING);
+        heap_set_body(tok, start);
+        heap_set_arg(tok, end);
+        return tok;
+    }
+
+    if lexer_is_digit(ch) {
+        let mut val: i64 = 0;
+        while lexer_is_digit(lexer_peek()) {
+            val = (val * 10) + (lexer_advance() - 48);
+        }
+        let tok = heap_alloc_term();
+        heap_set_tag(tok, TOK_INT);
+        heap_set_body(tok, val);
+        return tok;
+    }
+
+    if ch == 124 { lexer_advance(); return TOK_PIPE; }
+    if ch == 59 { lexer_advance(); return TOK_SEMI; }
+    if ch == 123 { lexer_advance(); return TOK_LBRACE; }
+    if ch == 125 { lexer_advance(); return TOK_RBRACE; }
+    if ch == 40 { lexer_advance(); return TOK_LPAREN; }
+    if ch == 41 { lexer_advance(); return TOK_RPAREN; }
+    if ch == 91 { lexer_advance(); return TOK_LBRACKET; }
+    if ch == 93 { lexer_advance(); return TOK_RBRACKET; }
+    if ch == 46 { lexer_advance(); return TOK_DOT; }
+    if ch == 44 { lexer_advance(); return TOK_COMMA; }
+    if ch == 64 { lexer_advance(); return TOK_AT; }
+    if ch == 43 { lexer_advance(); return TOK_PLUS; }
+    if ch == 45 { lexer_advance(); return TOK_MINUS; }
+    if ch == 42 { lexer_advance(); return TOK_STAR; }
+    if ch == 47 { lexer_advance(); return TOK_SLASH; }
+
+    if ch == 61 {
+        lexer_advance();
+        if lexer_peek() == 61 { lexer_advance(); return TOK_EQEQ; }
+        return TOK_EQ;
+    }
+    if ch == 33 {
+        lexer_advance();
+        if lexer_peek() == 61 { lexer_advance(); return TOK_NEQ; }
+        return TOK_NOT;
+    }
+    if ch == 60 {
+        lexer_advance();
+        if lexer_peek() == 61 { lexer_advance(); return TOK_LE; }
+        return TOK_LT;
+    }
+    if ch == 62 {
+        lexer_advance();
+        if lexer_peek() == 61 { lexer_advance(); return TOK_GE; }
+        return TOK_GT;
+    }
+
+    if lexer_is_alpha(ch) {
+        let start = POS;
+        lexer_advance();
+        while lexer_is_alpha(lexer_peek()) || lexer_is_digit(lexer_peek()) { lexer_advance(); }
+        let end = POS;
+        let len = end - start;
+
+        if len == 2 && str_at(SRC, start) == 105 && str_at(SRC, start + 1) == 102 { return TOK_IF; }
+        if len == 4 && str_at(SRC, start) == 101 && str_at(SRC, start + 1) == 108 && str_at(SRC, start + 2) == 115 && str_at(SRC, start + 3) == 101 { return TOK_ELSE; }
+        if len == 3 && str_at(SRC, start) == 102 && str_at(SRC, start + 1) == 111 && str_at(SRC, start + 2) == 114 { return TOK_FOR; }
+        if len == 5 && str_at(SRC, start) == 119 && str_at(SRC, start + 1) == 104 && str_at(SRC, start + 2) == 105 && str_at(SRC, start + 3) == 108 && str_at(SRC, start + 4) == 101 { return TOK_WHILE; }
+        if len == 8 && str_at(SRC, start) == 102 && str_at(SRC, start + 1) == 117 && str_at(SRC, start + 2) == 110 && str_at(SRC, start + 3) == 99 && str_at(SRC, start + 4) == 116 && str_at(SRC, start + 5) == 105 && str_at(SRC, start + 6) == 111 && str_at(SRC, start + 7) == 110 { return TOK_FUNCTION; }
+        if len == 6 && str_at(SRC, start) == 114 && str_at(SRC, start + 1) == 101 && str_at(SRC, start + 2) == 116 && str_at(SRC, start + 3) == 117 && str_at(SRC, start + 4) == 114 && str_at(SRC, start + 5) == 110 { return TOK_RETURN; }
+
+        let tok = heap_alloc_term();
+        heap_set_tag(tok, TOK_IDENT);
+        heap_set_body(tok, start);
+        heap_set_arg(tok, end);
+        return tok;
+    }
+
+    lexer_advance();
+    return TOK_EOF;
+}
+
+pub fn main() -> i64 {
+    let src = heap_alloc_term();
+    lexer_init(src);
+    let tok = lexer_next_token();
+    if tok == -1 { return 1; }
+    return 111;
+}

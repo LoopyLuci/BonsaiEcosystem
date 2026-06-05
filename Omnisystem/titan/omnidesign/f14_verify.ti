@@ -1,0 +1,8 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_FUZZ14:i64=26300;const T_INV14:i64=26301;
+pub fn f14_fuzz_create(seed:i64)->i64{let f=heap_alloc_term();heap_set_tag(f,T_FUZZ14);heap_set_body(f,seed);heap_set_arg(f,0);return f;}
+pub fn f14_fuzz_next(f:i64)->i64{let x=heap_get_body(f);let y:i64=x*1103515245+12345;let r:i64=(y/65536)%2147483648;heap_set_body(f,y);return r;}
+pub fn f14_fuzz_range(f:i64,max:i64)->i64{let mut r:i64=f14_fuzz_next(f);if r<0{r=-r;}return r%max;}
+pub fn f14_inv_create(cond:i64)->i64{let inv=heap_alloc_term();heap_set_tag(inv,T_INV14);heap_set_body(inv,cond);heap_set_arg(inv,1);return inv;}
+pub fn f14_inv_check(inv:i64,actual:i64)->i64{if actual==0{heap_set_arg(inv,0);return 0;}return heap_get_arg(inv);}
+pub fn main()->i64{let f=f14_fuzz_create(42);let mut i:i64=0;while i<25{let r=f14_fuzz_range(f,100);if r<0{return 1;}i=i+1;}let inv=f14_inv_create(5);if f14_inv_check(inv,1)!=1{return 2;}f14_inv_check(inv,0);if heap_get_arg(inv)!=0{return 3;}return 111;}

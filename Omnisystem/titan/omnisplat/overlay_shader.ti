@@ -1,0 +1,151 @@
+// titan/omnisplat/overlay_shader.ti — Selection Overlay Shader
+// Renders selected splats with highlight colour. Inlines gsplat_data helpers.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_OVERLAY_COLOUR: i64 = 9010;
+const TAG_UNDERLAY_DIM:   i64 = 9011;
+
+// ===== Inlined gsplat_data helpers =====
+const TAG_SPLAT_DATA:  i64 = 8800;
+const TAG_SPLAT_STATE: i64 = 8802;
+const STATE_NONE:      i64 = 0;
+const STATE_SELECTED:  i64 = 1;
+const STATE_LOCKED:    i64 = 2;
+const STATE_DELETED:   i64 = 4;
+
+pub fn ov_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_SPLAT_DATA); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ov_data_add(data: i64, splat: i64) {
+    let w = heap_alloc_term(); heap_set_body(w, splat); heap_set_domain(w, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, w); }
+    else { let mut c = head; while heap_get_domain(c) != 0 { c = heap_get_domain(c); } heap_set_domain(c, w); }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+pub fn ov_data_count(data: i64) -> i64 { return heap_get_body(data); }
+pub fn ov_vertex_create(px: i64, py: i64) -> i64 {
+    let v = heap_alloc_term(); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, 0);
+    return v;
+}
+pub fn ov_state_create(n: i64) -> i64 {
+    let arr = heap_alloc_term();
+    heap_set_tag(arr, TAG_SPLAT_STATE); heap_set_body(arr, n); heap_set_arg(arr, 0);
+    return arr;
+}
+pub fn ov_state_set(arr: i64, index: i64, flags: i64) {
+    let node = heap_alloc_term();
+    heap_set_body(node, index); heap_set_arg(node, flags);
+    heap_set_domain(node, heap_get_arg(arr)); heap_set_arg(arr, node);
+}
+pub fn ov_state_get(arr: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(arr);
+    while curr != 0 {
+        if heap_get_body(curr) == index { return heap_get_arg(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return STATE_NONE;
+}
+pub fn ov_select(data: i64, index: i64) {
+    let arr = heap_get_domain(data);
+    let cur = ov_state_get(arr, index);
+    ov_state_set(arr, index, cur | STATE_SELECTED);
+}
+pub fn ov_is_selected(data: i64, index: i64) -> bool {
+    let arr = heap_get_domain(data);
+    return (ov_state_get(arr, index) & STATE_SELECTED) != 0;
+}
+pub fn ov_selected_count(data: i64) -> i64 {
+    let count = ov_data_count(data);
+    let mut sel: i64 = 0;
+    let mut i: i64 = 0;
+    while i < count { if ov_is_selected(data, i) { sel = sel + 1; } i = i + 1; }
+    return sel;
+}
+
+// ===== Overlay shader functions =====
+
+// colour: tag, body=r, arg=g, domain=b
+pub fn overlay_compute_colour(base_r: i64, base_g: i64, base_b: i64,
+                               selected: bool,
+                               selection_r: i64, selection_g: i64, selection_b: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_OVERLAY_COLOUR);
+    if selected {
+        heap_set_body(c, (selection_r * 70 + base_r * 30) / 100);
+        heap_set_arg(c,  (selection_g * 70 + base_g * 30) / 100);
+        heap_set_domain(c, (selection_b * 70 + base_b * 30) / 100);
+    } else {
+        heap_set_body(c, base_r); heap_set_arg(c, base_g); heap_set_domain(c, base_b);
+    }
+    return c;
+}
+
+// Returns count of selected splats that received the overlay.
+pub fn overlay_apply_to_splats(data: i64, selection_r: i64,
+                                selection_g: i64, selection_b: i64) -> i64 {
+    let count = ov_data_count(data);
+    let mut overlay_count: i64 = 0;
+    let mut i: i64 = 0;
+    while i < count {
+        if ov_is_selected(data, i) { overlay_count = overlay_count + 1; }
+        i = i + 1;
+    }
+    return overlay_count;
+}
+
+// dim: tag, body=r*factor/100, arg=g*factor/100, domain=b*factor/100
+pub fn underlay_colour(r: i64, g: i64, b: i64, factor: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_UNDERLAY_DIM);
+    heap_set_body(c, (r * factor) / 100);
+    heap_set_arg(c,  (g * factor) / 100);
+    heap_set_domain(c, (b * factor) / 100);
+    return c;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let data = ov_data_create();
+    let s1 = ov_vertex_create(10, 20);
+    let s2 = ov_vertex_create(30, 40);
+    ov_data_add(data, s1); ov_data_add(data, s2);
+    let state_arr = ov_state_create(2);
+    heap_set_domain(data, state_arr);
+    ov_select(data, 0);
+
+    let overlay_count = overlay_apply_to_splats(data, 0, 255, 0);
+    if overlay_count != 1                      { return 1; }
+
+    // Selected colour: 70% green + 30% red base
+    let colour = overlay_compute_colour(255, 0, 0, true, 0, 255, 0);
+    if heap_get_tag(colour) != TAG_OVERLAY_COLOUR { return 2; }
+    if heap_get_body(colour) <= 0              { return 3; } // some red remains
+    if heap_get_arg(colour) <= 0               { return 4; } // green component high
+
+    // Non-selected: base colour unchanged
+    let plain = overlay_compute_colour(100, 150, 200, false, 0, 0, 255);
+    if heap_get_body(plain) != 100             { return 5; }
+    if heap_get_arg(plain) != 150              { return 6; }
+
+    // Underlay dim: 20% of (0, 255, 0)
+    let dim = underlay_colour(0, 255, 0, 20);
+    if heap_get_tag(dim) != TAG_UNDERLAY_DIM   { return 7; }
+    if heap_get_body(dim) != 0                 { return 8; }
+    if heap_get_arg(dim) != 51                 { return 9; } // 255*20/100 = 51
+
+    return 111;
+}

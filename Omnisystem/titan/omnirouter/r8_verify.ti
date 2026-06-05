@@ -1,0 +1,142 @@
+// titan/omnirouter/r8_verify.ti — Axiom Verification & Stress Testing
+// Self-contained. R5 combo helpers inlined with r8_ prefix. No || operator.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_FUZZ8: i64 = 22700;
+const T_INV8:  i64 = 22701;
+const T_CMB8:  i64 = 22400;
+const T_ENT8:  i64 = 22401;
+const T_WRP8:  i64 = 22403;
+
+// ===== Inlined combo helpers (R5) =====
+pub fn r8_entry_create(ep_id: i64, weight: i64) -> i64 {
+    let e = heap_alloc_term();
+    heap_set_tag(e, T_ENT8); heap_set_body(e, ep_id); heap_set_arg(e, weight); heap_set_domain(e, 0);
+    return e;
+}
+pub fn r8_combo_create(name: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_CMB8); heap_set_body(c, name); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    return c;
+}
+pub fn r8_combo_add_entry(c: i64, e: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP8); heap_set_body(w, e); heap_set_domain(w, 0);
+    let h = heap_get_domain(c);
+    if h == 0 { heap_set_domain(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_arg(c, heap_get_arg(c) + 1);
+}
+pub fn r8_combo_select(c: i64) -> i64 {
+    let n = heap_get_arg(c);
+    if n == 0 { return 0; }
+    let mut best_w: i64 = 0;
+    let mut best: i64 = 0;
+    let mut cur: i64 = heap_get_domain(c);
+    while cur != 0 {
+        let e = heap_get_body(cur);
+        let w = heap_get_arg(e);
+        if w > best_w { best_w = w; best = heap_get_body(e); }
+        cur = heap_get_domain(cur);
+    }
+    return best;
+}
+
+// ===== Fuzzer =====
+// fuzz: tag=T_FUZZ8, body=seed
+pub fn r8_fuzz_create(seed: i64) -> i64 {
+    let f = heap_alloc_term();
+    heap_set_tag(f, T_FUZZ8); heap_set_body(f, seed); heap_set_arg(f, 0);
+    return f;
+}
+
+pub fn r8_fuzz_next(f: i64) -> i64 {
+    let x = heap_get_body(f);
+    let y: i64 = x * 1103515245 + 12345;
+    let r: i64 = (y / 65536) % 2147483648;
+    heap_set_body(f, y);
+    return r;
+}
+
+pub fn r8_fuzz_range(f: i64, max: i64) -> i64 {
+    let mut r: i64 = r8_fuzz_next(f);
+    if r < 0 { r = -r; }
+    return r % max;
+}
+
+// ===== Invariant =====
+// inv: tag=T_INV8, body=name, arg=status(1=ok,0=failed)
+pub fn r8_inv_create(name: i64, status: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, T_INV8); heap_set_body(inv, name); heap_set_arg(inv, status); heap_set_domain(inv, 0);
+    return inv;
+}
+pub fn r8_inv_check(inv: i64) -> i64 { return heap_get_arg(inv); }
+pub fn r8_inv_fail(inv: i64)         { heap_set_arg(inv, 0); }
+
+// ===== Stress helpers =====
+pub fn r8_stress_allocate(count: i64) -> i64 {
+    let mut i: i64 = 0;
+    let mut ok: i64 = 0;
+    while i < count {
+        let n = heap_alloc_term();
+        if n != 0 { ok = ok + 1; }
+        i = i + 1;
+    }
+    return ok;
+}
+
+pub fn r8_roundtrip_insert_lookup(ops: i64) -> i64 {
+    let mut i: i64 = 0;
+    let mut ok: i64 = 1;
+    while i < ops {
+        let c = r8_combo_create(i);
+        let e = r8_entry_create(i * 10, i % 100 + 1);
+        r8_combo_add_entry(c, e);
+        let sel = r8_combo_select(c);
+        if sel != i * 10 { ok = 0; }
+        i = i + 1;
+    }
+    return ok;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let f = r8_fuzz_create(42);
+    let mut i: i64 = 0;
+    let mut all_ok: i64 = 1;
+    while i < 20 {
+        let r = r8_fuzz_range(f, 100);
+        if r < 0   { all_ok = 0; }
+        if r >= 100 { all_ok = 0; }
+        i = i + 1;
+    }
+    if all_ok == 0                  { return 1; }
+
+    let inv = r8_inv_create(1, 1);
+    if r8_inv_check(inv) != 1       { return 2; }
+    r8_inv_fail(inv);
+    if r8_inv_check(inv) != 0       { return 3; }
+
+    let alloc = r8_stress_allocate(50);
+    if alloc != 50                   { return 4; }
+
+    let rt = r8_roundtrip_insert_lookup(10);
+    if rt != 1                       { return 5; }
+    return 111;
+}

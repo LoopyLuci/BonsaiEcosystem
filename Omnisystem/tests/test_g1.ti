@@ -1,0 +1,121 @@
+// tests/test_g1.ti — Phase G1 OmniRender Foundation Integration Test
+// All helpers inlined with tg1_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TG1_T_S: i64 = 20000;
+const TG1_T_B: i64 = 20001;
+const TG1_T_C: i64 = 20002;
+const TG1_T_W: i64 = 20003;
+
+// ===== Shader =====
+pub fn tg1_shader_create(src: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TG1_T_S); heap_set_body(s, src); heap_set_arg(s, 1); heap_set_domain(s, 0);
+    return s;
+}
+pub fn tg1_shader_valid(s: i64) -> i64 {
+    if heap_get_tag(s) == TG1_T_S { return 1; }
+    return 0;
+}
+pub fn tg1_shader_src(s: i64) -> i64 { return heap_get_body(s); }
+
+// ===== Buffer =====
+pub fn tg1_buf_create(size: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TG1_T_B); heap_set_body(b, size); heap_set_arg(b, 0); heap_set_domain(b, 0);
+    return b;
+}
+pub fn tg1_buf_size(b: i64) -> i64 { return heap_get_body(b); }
+
+// ===== Command buffer =====
+pub fn tg1_cmdbuf_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TG1_T_C); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    return c;
+}
+pub fn tg1_cmdbuf_add(c: i64, op: i64, arg: i64) {
+    let n = heap_alloc_term();
+    heap_set_body(n, op); heap_set_arg(n, arg); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TG1_T_W); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+pub fn tg1_cmdbuf_count(c: i64) -> i64 { return heap_get_body(c); }
+pub fn tg1_cmdbuf_op(c: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(c); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+pub fn tg1_cmdbuf_arg(c: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(c); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_arg(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Shader validation
+    let s = tg1_shader_create(200);
+    if tg1_shader_valid(s) == 0  { return 1; }
+    if tg1_shader_src(s) != 200  { return 2; }
+
+    // Buffer size preserved
+    let b = tg1_buf_create(512);
+    if tg1_buf_size(b) != 512    { return 3; }
+
+    // Command buffer: 3 ops, verify ops and args
+    let c = tg1_cmdbuf_create();
+    tg1_cmdbuf_add(c, 3, 7);
+    tg1_cmdbuf_add(c, 4, 8);
+    tg1_cmdbuf_add(c, 5, 9);
+    if tg1_cmdbuf_count(c) != 3  { return 4; }
+    if tg1_cmdbuf_op(c, 0) != 3  { return 5; }
+    if tg1_cmdbuf_op(c, 1) != 4  { return 6; }
+    if tg1_cmdbuf_op(c, 2) != 5  { return 7; }
+    if tg1_cmdbuf_arg(c, 0) != 7 { return 8; }
+    if tg1_cmdbuf_arg(c, 1) != 8 { return 9; }
+    if tg1_cmdbuf_arg(c, 2) != 9 { return 10; }
+
+    // Large command buffer via loop
+    let c2 = tg1_cmdbuf_create();
+    let mut i: i64 = 0;
+    while i < 8 { tg1_cmdbuf_add(c2, i * 10, i * 100); i = i + 1; }
+    if tg1_cmdbuf_count(c2) != 8    { return 11; }
+    if tg1_cmdbuf_op(c2, 0) != 0   { return 12; }
+    if tg1_cmdbuf_op(c2, 7) != 70  { return 13; }
+    if tg1_cmdbuf_arg(c2, 7) != 700 { return 14; }
+
+    // Isolation: c still has 3 ops
+    if tg1_cmdbuf_count(c) != 3    { return 15; }
+
+    // Multiple buffers — isolation
+    let b2 = tg1_buf_create(4096);
+    if tg1_buf_size(b2) != 4096   { return 16; }
+    if tg1_buf_size(b) != 512     { return 17; }
+
+    return 111;
+}

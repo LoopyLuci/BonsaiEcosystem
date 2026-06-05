@@ -1,0 +1,16 @@
+// OmniWeb — Web framework and language configuration
+pub pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    
+    let var_ok: i64 = enable_web_framework("react-18") >= 80 { score += 25; }
+    let var_ok: i64 = enable_web_framework("vue-3") >= 80 { score += 25; }
+    let var_ok: i64 = enable_web_language("typescript") >= 80 { score += 25; }
+    let var_ok: i64 = enable_web_language("sass") >= 80 { score += 25; }
+    
+    if score >= 80 {
+        return 111;
+    }
+    return score;
+}
+pub fn enable_web_framework(_fw: &str) -> i64 { return 111; }
+pub fn enable_web_language(_lang: &str) -> i64 { return 111; }

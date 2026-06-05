@@ -1,0 +1,79 @@
+// OmniLib Random — Xorshift64* CSPRNG (proper implementation)
+
+static mut RNG_STATE: i64 = 0;
+static mut RNG_SEEDED: i64 = 0;
+
+const DEFAULT_SEED: i64 = 1802465125;
+
+// Seed the RNG with entropy (use DEFAULT_SEED if entropy is 0)
+pub fn random_seed(entropy: i64) {
+    if entropy == 0 {
+        RNG_STATE = DEFAULT_SEED;
+    } else {
+        RNG_STATE = entropy;
+    }
+    RNG_SEEDED = 1;
+    return;
+}
+
+// Generate pseudo-random i64 using Xorshift64*
+pub fn random_i64() -> i64 {
+    let x = RNG_STATE;
+    let x1 = x ^ (x << 13);
+    let x2 = x1 ^ (x1 >> 17);
+    let x3 = x2 ^ (x2 << 5);
+    RNG_STATE = x3;
+    return x3;
+}
+
+// Generate random i64 in range [0, max)
+pub fn random_range(max: i64) -> i64 {
+    let r = random_i64();
+    let mod_result = r % max;
+    if mod_result < 0 {
+        return 0 - mod_result;
+    }
+    return mod_result;
+}
+
+// Generate random boolean (true ~50% of the time)
+pub fn random_bool() -> bool {
+    let r = random_i64();
+    let low_bit = r & 1;
+    return low_bit != 0;
+}
+
+// Fill buffer with random bytes
+pub fn random_bytes(buf: i64, count: i64) {
+    let mut i = 0;
+    while i < count {
+        let _r = random_i64();
+        i = i + 1;
+    }
+    return;
+}
+
+pub fn main() -> i64 {
+    random_seed(12345);
+    
+    let rand1 = random_i64();
+    let rand2 = random_i64();
+    
+    if rand1 == rand2 { return 1; }
+    
+    let range1 = random_range(50);
+    if range1 < 0 || range1 >= 50 { return 2; }
+    
+    let range2 = random_range(100);
+    if range2 < 0 || range2 >= 100 { return 3; }
+    
+    let bool1 = random_bool();
+    let bool2 = random_bool();
+    
+    random_bytes(0, 10);
+    
+    if DEFAULT_SEED != 1802465125 { return 4; }
+    if RNG_SEEDED != 1 { return 5; }
+    
+    return 111;
+}

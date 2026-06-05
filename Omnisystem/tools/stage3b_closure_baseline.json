@@ -1,0 +1,38 @@
+{
+  "version": "P2.6",
+  "total_passed": 62,
+  "total_failed": 0,
+  "all_ok": true,
+  "modules": {
+    "lexer": {
+      "compiled": true,
+      "def_count": 137,
+      "passed": 16,
+      "failed": 0
+    },
+    "parser": {
+      "compiled": true,
+      "def_count": 128,
+      "passed": 13,
+      "failed": 0
+    },
+    "borrow_checker": {
+      "compiled": true,
+      "def_count": 72,
+      "passed": 11,
+      "failed": 0
+    },
+    "lowering": {
+      "compiled": true,
+      "def_count": 171,
+      "passed": 11,
+      "failed": 0
+    },
+    "codegen": {
+      "compiled": true,
+      "def_count": 137,
+      "passed": 11,
+      "failed": 0
+    }
+  }
+}

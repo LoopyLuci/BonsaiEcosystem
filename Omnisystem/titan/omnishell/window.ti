@@ -1,0 +1,129 @@
+// OmniShell Window Manager -- native window lifecycle and event access
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn panic(msg: i64);
+
+    fn platform_window_create(title_id: i64, width: i64, height: i64) -> i64;
+    fn platform_window_show(handle: i64);
+    fn platform_window_hide(handle: i64);
+    fn platform_window_close(handle: i64);
+    fn platform_window_set_title(handle: i64, title_id: i64);
+    fn platform_window_set_size(handle: i64, width: i64, height: i64);
+    fn platform_window_get_size(handle: i64) -> i64;
+    fn platform_window_is_visible(handle: i64) -> bool;
+    fn platform_window_poll_events() -> i64;
+    fn platform_window_should_close(handle: i64) -> bool;
+
+    fn platform_event_type(event: i64) -> i64;
+    fn platform_event_key_code(event: i64) -> i64;
+    fn platform_event_mouse_x(event: i64) -> i64;
+    fn platform_event_mouse_y(event: i64) -> i64;
+    fn platform_event_mouse_button(event: i64) -> i64;
+    fn platform_event_width(event: i64) -> i64;
+    fn platform_event_height(event: i64) -> i64;
+}
+
+const TAG_WINDOW: i64 = 2000;
+
+const EVENT_NONE: i64 = 0;
+const EVENT_KEY_DOWN: i64 = 1;
+const EVENT_KEY_UP: i64 = 2;
+const EVENT_MOUSE_DOWN: i64 = 3;
+const EVENT_MOUSE_UP: i64 = 4;
+const EVENT_MOUSE_MOVE: i64 = 5;
+const EVENT_RESIZE: i64 = 6;
+const EVENT_CLOSE: i64 = 7;
+const EVENT_FOCUS: i64 = 8;
+const EVENT_BLUR: i64 = 9;
+
+pub fn window_create(title_id: i64, width: i64, height: i64) -> i64 {
+    let raw = platform_window_create(title_id, width, height);
+    if raw < 0 {
+        panic(0);
+        return -1;
+    }
+    let win = heap_alloc_term();
+    heap_set_tag(win, TAG_WINDOW);
+    heap_set_body(win, raw);
+    heap_set_arg(win, width);
+    heap_set_domain(win, height);
+    return win;
+}
+
+pub fn window_show(win: i64) {
+    platform_window_show(heap_get_body(win));
+    return;
+}
+
+pub fn window_hide(win: i64) {
+    platform_window_hide(heap_get_body(win));
+    return;
+}
+
+pub fn window_close(win: i64) {
+    platform_window_close(heap_get_body(win));
+    return;
+}
+
+pub fn window_set_title(win: i64, title_id: i64) {
+    platform_window_set_title(heap_get_body(win), title_id);
+    return;
+}
+
+pub fn window_set_size(win: i64, width: i64, height: i64) {
+    let raw = heap_get_body(win);
+    platform_window_set_size(raw, width, height);
+    heap_set_arg(win, width);
+    heap_set_domain(win, height);
+    return;
+}
+
+pub fn window_get_width(win: i64) -> i64 {
+    return heap_get_arg(win);
+}
+
+pub fn window_get_height(win: i64) -> i64 {
+    return heap_get_domain(win);
+}
+
+pub fn window_should_close(win: i64) -> bool {
+    return platform_window_should_close(heap_get_body(win));
+}
+
+pub fn window_poll_event() -> i64 {
+    return platform_window_poll_events();
+}
+
+pub fn event_type(event: i64) -> i64 { return platform_event_type(event); }
+pub fn event_key_code(event: i64) -> i64 { return platform_event_key_code(event); }
+pub fn event_mouse_x(event: i64) -> i64 { return platform_event_mouse_x(event); }
+pub fn event_mouse_y(event: i64) -> i64 { return platform_event_mouse_y(event); }
+pub fn event_mouse_button(event: i64) -> i64 { return platform_event_mouse_button(event); }
+pub fn event_width(event: i64) -> i64 { return platform_event_width(event); }
+pub fn event_height(event: i64) -> i64 { return platform_event_height(event); }
+
+pub fn main() -> i64 {
+    let title = heap_alloc_term();
+    let win = window_create(title, 800, 600);
+    if win == -1 { return 1; }
+    if heap_get_tag(win) != TAG_WINDOW { return 2; }
+    if window_get_width(win) != 800 { return 3; }
+    if window_get_height(win) != 600 { return 4; }
+
+    window_set_size(win, 1024, 768);
+    if window_get_width(win) != 1024 { return 5; }
+    if window_get_height(win) != 768 { return 6; }
+
+    window_show(win);
+    window_hide(win);
+    window_close(win);
+    return 111;
+}

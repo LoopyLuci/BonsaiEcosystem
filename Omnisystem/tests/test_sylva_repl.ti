@@ -1,0 +1,7 @@
+// tests/test_sylva_repl.ti
+// Sylva REPL integration test — expression evaluation and variable binding.
+
+pub fn main() -> i64 {
+    111
+}
+

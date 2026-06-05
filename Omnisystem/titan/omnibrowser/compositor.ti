@@ -1,0 +1,81 @@
+// GPU Compositor -- paints layout boxes via OmniView renderer externs
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+
+    fn renderer_fill_rect(surf: i64, x: i64, y: i64, w: i64, h: i64, color: i64);
+    fn renderer_draw_text(surf: i64, x: i64, y: i64, text_id: i64, color: i64);
+}
+
+pub fn color_rgba(r: i64, g: i64, b: i64, a: i64) -> i64 {
+    return (r * 16777216) + (g * 65536) + (b * 256) + a;
+}
+
+pub fn color_gray(level: i64) -> i64 {
+    return color_rgba(level, level, level, 255);
+}
+
+pub fn color_black() -> i64 {
+    return color_rgba(0, 0, 0, 255);
+}
+
+// Lightweight layout accessors (compatible with layout.ti box representation)
+pub fn layout_get_x(box_id: i64) -> i64 { return heap_get_arg(box_id); }
+
+pub fn layout_get_y(box_id: i64) -> i64 {
+    let dims = heap_get_domain(box_id);
+    return heap_get_domain(dims);
+}
+
+pub fn layout_get_width(box_id: i64) -> i64 {
+    let dims = heap_get_domain(box_id);
+    return heap_get_body(dims);
+}
+
+pub fn layout_get_height(box_id: i64) -> i64 {
+    let dims = heap_get_domain(box_id);
+    return heap_get_arg(dims);
+}
+
+pub fn compositor_render(surf: i64, layout_root: i64) {
+    let x = layout_get_x(layout_root);
+    let y = layout_get_y(layout_root);
+    let w = layout_get_width(layout_root);
+    let h = layout_get_height(layout_root);
+
+    renderer_fill_rect(surf, x, y, w, h, color_gray(240));
+
+    let dom_node = heap_get_body(layout_root);
+    let maybe_text = heap_get_arg(dom_node);
+    if maybe_text != 0 {
+        renderer_draw_text(surf, x + 4, y + 2, maybe_text, color_black());
+    }
+    return;
+}
+
+pub fn main() -> i64 {
+    let surf = heap_alloc_term();
+
+    let dom = heap_alloc_term();
+    heap_set_arg(dom, heap_alloc_term());
+
+    let dims = heap_alloc_term();
+    heap_set_body(dims, 100);
+    heap_set_arg(dims, 30);
+    heap_set_domain(dims, 10);
+
+    let box_id = heap_alloc_term();
+    heap_set_body(box_id, dom);
+    heap_set_arg(box_id, 8);
+    heap_set_domain(box_id, dims);
+
+    compositor_render(surf, box_id);
+    return 111;
+}

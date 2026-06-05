@@ -1,0 +1,55 @@
+// titan/ui/lenses/compiler_lens.ti — Titan Compiler Editor Lens
+// Projects Subsystem 1 (Titan Compiler) compilation metrics into isolated cell layout.
+// TAG_COMPILER_LENS=72000 is clear of all existing tag ranges.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_COMPILER_LENS: i64 = 72000;
+
+// Lens cell: body=lines (active line volume), arg=errs (syntax/semantic error count)
+// Returns 0 if sys_id is not Titan Compiler (subsystem 1) or errs is negative.
+pub fn cl_render_metrics(sys_id: i64, lines: i64, errs: i64) -> i64 {
+    if sys_id != 1 { return 0; }
+    if errs < 0    { return 0; }
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_COMPILER_LENS);
+    heap_set_body(v, lines);
+    heap_set_arg(v, errs);
+    return v;
+}
+
+pub fn cl_lines(v: i64) -> i64 { return heap_get_body(v); }
+pub fn cl_errs(v: i64)  -> i64 { return heap_get_arg(v); }
+
+pub fn main() -> i64 {
+    // Test 1: valid sys_id=1, clean build
+    let v = cl_render_metrics(1, 1024, 0);
+    if v == 0                          { return 1; }
+    if heap_get_tag(v) != TAG_COMPILER_LENS { return 2; }
+    if cl_lines(v) != 1024             { return 3; }
+    if cl_errs(v)  != 0                { return 4; }
+
+    // Test 2: subsystem boundary guards
+    if cl_render_metrics(3, 10, 0) != 0 { return 5; }
+    if cl_render_metrics(0,  5, 2) != 0 { return 6; }
+
+    // Test 3: negative error count rejected
+    if cl_render_metrics(1, 100, -1) != 0 { return 7; }
+
+    // Test 4: non-zero error count is preserved correctly
+    let v2 = cl_render_metrics(1, 512, 7);
+    if v2 == 0         { return 8; }
+    if cl_errs(v2) != 7 { return 9; }
+
+    return 111;
+}

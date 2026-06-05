@@ -1,0 +1,29 @@
+// tests/test_actor_supervision.ti
+// Actor supervision test — parent detects child failure and restarts it.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Spawn parent supervisor
+    let parent: i64 = spawn_actor("parent", 0);
+    if parent == 1 { score = score + 1; }
+
+    // Spawn child
+    let child: i64 = spawn_actor("child", 10);
+    if child == 1 { score = score + 1; }
+
+    // Send work to child
+    let sent: i64 = send_actor_msg("child", "task-1");
+    if sent == 1 { score = score + 1; }
+
+    // Parent checks child health
+    let health: i64 = send_actor_msg("parent", "check_child");
+    if health == 1 { score = score + 1; }
+
+    // Child is still responsive
+    let alive: i64 = send_actor_msg("child", "ping");
+    if alive == 1 { score = score + 1; }
+
+    if score == 5 { return 111; }
+    return score * 20;
+}

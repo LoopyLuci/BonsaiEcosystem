@@ -1,0 +1,18 @@
+; Time-Travel Debugging Test
+; Tests :trace, :rewind, :replay commands
+
+; Basic arithmetic
+1 + 1
+
+; More arithmetic
+2 * 3
+
+; Function call
+add(5, 7)
+
+; Another operation
+10 - 4
+
+; Verify
+add_nums(10, 20)
+

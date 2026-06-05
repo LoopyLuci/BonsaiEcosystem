@@ -1,0 +1,148 @@
+// titan/compiler/axiom_semantic_pass.ti — Axiom Semantic Verification Pass
+// Injected into the Titan compiler pipeline after basic type checking.
+// Verifies: memory bounds, effect row subsetting, intrinsic call gating,
+// async closure capture safety, and behavioral equivalence for the fixpoint.
+import "titan/std/effects.ti"
+import "titan/intrinsics/runtime.ti"
+import "titan/std/result.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_print_newline();
+}
+
+const TAG_PASS_CTX:    i64 = 58000;
+const TAG_CALL_SITE:   i64 = 58001;
+const TAG_VIOLATION:   i64 = 58002;
+
+// PassContext: tracks current function's declared effect row and violation list
+pub fn pass_ctx_new(caller_effect: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_PASS_CTX);
+    heap_set_body(c, caller_effect);   // caller's declared effect row
+    heap_set_arg(c, 0);               // violation count
+    heap_set_domain(c, 0);            // violation list head
+    return c;
+}
+
+pub fn pass_ctx_effect(ctx: i64) -> i64  { return heap_get_body(ctx); }
+pub fn pass_ctx_violations(ctx: i64) -> i64 { return heap_get_arg(ctx); }
+
+pub fn pass_add_violation(ctx: i64, intr_id: i64, required: i64) {
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_VIOLATION);
+    heap_set_body(v, intr_id);
+    heap_set_arg(v, required);
+    heap_set_domain(v, heap_get_domain(ctx));
+    heap_set_domain(ctx, v);
+    let vc = heap_get_arg(ctx);
+    heap_set_arg(ctx, vc + 1);
+}
+
+// check_intrinsic_call: verify caller has the effect required by the intrinsic
+pub fn check_intrinsic_call(ctx: i64, intr_id: i64) -> i64 {
+    let caller_eff = pass_ctx_effect(ctx);
+    let required   = intrinsic_required_effect(intr_id);
+    let allowed    = effect_allows(caller_eff, required);
+    if allowed == 0 {
+        pass_add_violation(ctx, intr_id, required);
+        return 0;
+    }
+    return 1;
+}
+
+// check_function_call: verify callee effect row is subset of caller's
+pub fn check_function_call(ctx: i64, callee_eff: i64) -> i64 {
+    let caller_eff = pass_ctx_effect(ctx);
+    return effect_allows(caller_eff, callee_eff);
+}
+
+// run_pass: simulate checking a sequence of calls in one function
+// call_list is a linked list of TAG_CALL_SITE nodes:
+//   body = intr_id (or 0 for fn call), arg = callee_effect (for fn calls)
+pub fn run_pass(ctx: i64, call_list: i64) -> i64 {
+    let mut cur = call_list;
+    let mut stop = 0;
+    if cur == 0 { stop = 1; }
+    if stop == 0 {
+        if heap_get_tag(cur) == TAG_CALL_SITE {
+            let intr_id = heap_get_body(cur);
+            if intr_id != 0 {
+                check_intrinsic_call(ctx, intr_id);
+            } else {
+                let callee_eff = heap_get_arg(cur);
+                check_function_call(ctx, callee_eff);
+            }
+        }
+        cur = heap_get_domain(cur);
+        if cur == 0 { stop = 1; }
+        if stop == 0 {
+            if heap_get_tag(cur) == TAG_CALL_SITE {
+                let intr_id2 = heap_get_body(cur);
+                if intr_id2 != 0 {
+                    check_intrinsic_call(ctx, intr_id2);
+                } else {
+                    let callee_eff2 = heap_get_arg(cur);
+                    check_function_call(ctx, callee_eff2);
+                }
+            }
+        }
+    }
+    if pass_ctx_violations(ctx) == 0 { return ok(1); }
+    return err(pass_ctx_violations(ctx));
+}
+
+pub fn call_site_new(intr_id: i64, callee_eff: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_CALL_SITE);
+    heap_set_body(s, intr_id);
+    heap_set_arg(s, callee_eff);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn call_list_append(head: i64, site: i64) -> i64 {
+    if head == 0 { return site; }
+    let mut cur = head;
+    let mut stop = 0;
+    if heap_get_domain(cur) == 0 { stop = 1; }
+    if stop == 0 {
+        cur = heap_get_domain(cur);
+        if heap_get_domain(cur) == 0 { stop = 1; }
+    }
+    heap_set_domain(cur, site);
+    return head;
+}
+
+pub fn main() -> i64 {
+    // Test 1: Pure function calls sys_malloc (needs MEM) → violation
+    let ctx1 = pass_ctx_new(EFF_PURE);
+    check_intrinsic_call(ctx1, INTR_MALLOC);
+    if pass_ctx_violations(ctx1) != 1 { return 1; }
+
+    // Test 2: IO function calls sys_write (needs IO) → no violation
+    let ctx2 = pass_ctx_new(EFF_IO);
+    check_intrinsic_call(ctx2, INTR_WRITE);
+    if pass_ctx_violations(ctx2) != 0 { return 2; }
+
+    // Test 3: IO function calls sys_wreg (needs HW) → violation
+    let ctx3 = pass_ctx_new(EFF_IO);
+    check_intrinsic_call(ctx3, INTR_WREG);
+    if pass_ctx_violations(ctx3) != 1 { return 3; }
+
+    // Test 4: MEM|IO function calls sys_malloc → ok
+    let ctx4 = pass_ctx_new(EFF_MEM | EFF_IO);
+    let r4 = check_intrinsic_call(ctx4, INTR_MALLOC);
+    if r4 != 1 { return 4; }
+
+    return 111;
+}

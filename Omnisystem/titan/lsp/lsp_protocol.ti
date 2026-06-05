@@ -1,0 +1,219 @@
+// titan/lsp/lsp_protocol.ti — LSP JSON-RPC 2.0 message framing and dispatch
+// Handles Content-Length header, method routing, and response serialization.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+    fn repl_print_string(s: i64);
+    fn repl_read_line() -> i64;
+}
+
+// LSP method constants
+const METH_INITIALIZE:      i64 = 0;
+const METH_INITIALIZED:     i64 = 1;
+const METH_SHUTDOWN:        i64 = 2;
+const METH_EXIT:            i64 = 3;
+const METH_DID_OPEN:        i64 = 4;
+const METH_DID_CHANGE:      i64 = 5;
+const METH_DID_CLOSE:       i64 = 6;
+const METH_COMPLETION:      i64 = 7;
+const METH_HOVER:           i64 = 8;
+const METH_DEFINITION:      i64 = 9;
+const METH_REFERENCES:      i64 = 10;
+const METH_SEMANTIC_TOKENS: i64 = 11;
+const METH_DIAGNOSTIC:      i64 = 12;
+const METH_CODE_ACTION:     i64 = 13;
+
+const TAG_LSP_MSG:      i64 = 4000;
+const TAG_LSP_RESPONSE: i64 = 4001;
+const TAG_LSP_HEADER:   i64 = 4002;
+
+// ===== Message construction =====
+// Message cell: tag=TAG_LSP_MSG, body=method, arg=id, domain=payload
+pub fn lsp_msg_new(method: i64, id: i64, payload: i64) -> i64 {
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_LSP_MSG);
+    heap_set_body(msg, method);
+    heap_set_arg(msg, id);
+    heap_set_domain(msg, payload);
+    return msg;
+}
+pub fn lsp_msg_method(msg: i64) -> i64 { return heap_get_body(msg); }
+pub fn lsp_msg_id(msg: i64) -> i64 { return heap_get_arg(msg); }
+pub fn lsp_msg_payload(msg: i64) -> i64 { return heap_get_domain(msg); }
+
+// ===== Content-Length header parsing =====
+// Parse "Content-Length: N\r\n" from stdin line (returned as heap cell by repl_read_line)
+pub fn lsp_read_header() -> i64 {
+    let line = repl_read_line();
+    if str_len(line) == 0 { return 0; }
+    // Skip "Content-Length: " — find the colon then read digits
+    let mut pos: i64 = 0;
+    let len = str_len(line);
+    while pos < len && str_at(line, pos) != 58 { pos = pos + 1; } // 58 = ':'
+    pos = pos + 1; // skip ':'
+    while pos < len && str_at(line, pos) == 32 { pos = pos + 1; } // skip spaces
+    let mut length: i64 = 0;
+    while pos < len {
+        let ch = str_at(line, pos);
+        if ch >= 48 && ch <= 57 { length = length * 10 + (ch - 48); pos = pos + 1; }
+        else { break; }
+    }
+    // Read the blank separator line
+    repl_read_line();
+    return length;
+}
+
+// Parse Content-Length from a String header (for testing without IO)
+pub fn lsp_parse_content_length(header: String) -> i64 {
+    let mut pos: i64 = 0;
+    let len = header.len;
+    while pos < len && header[pos] != 58 { pos = pos + 1; } // skip to ':'
+    pos = pos + 1;
+    while pos < len && header[pos] == 32 { pos = pos + 1; } // skip spaces
+    let mut length: i64 = 0;
+    while pos < len {
+        let ch = header[pos];
+        if ch >= 48 && ch <= 57 { length = length * 10 + (ch - 48); pos = pos + 1; }
+        else { break; }
+    }
+    return length;
+}
+
+// ===== Method routing =====
+// Route first character of method name to method constant
+pub fn lsp_route(first_char: i64) -> i64 {
+    if first_char == 105 { return METH_INITIALIZE; }    // 'i' initialize
+    if first_char == 115 { return METH_SHUTDOWN; }      // 's' shutdown
+    if first_char == 101 { return METH_EXIT; }          // 'e' exit
+    if first_char == 100 { return METH_DID_OPEN; }      // 'd' didOpen/didChange
+    if first_char == 99  { return METH_COMPLETION; }    // 'c' completion
+    if first_char == 104 { return METH_HOVER; }         // 'h' hover
+    if first_char == 114 { return METH_REFERENCES; }    // 'r' references
+    return -1;
+}
+
+// Extract method name start position from a JSON body (heap string)
+pub fn lsp_extract_method(body: i64) -> i64 {
+    let body_len = str_len(body);
+    let mut pos: i64 = 0;
+    // Look for "method" (m=109,e=101,t=116,h=104,o=111,d=100) followed by ":"
+    while pos < body_len - 6 {
+        if str_at(body, pos) == 109 && str_at(body, pos+1) == 101 &&
+           str_at(body, pos+2) == 116 && str_at(body, pos+3) == 104 &&
+           str_at(body, pos+4) == 111 && str_at(body, pos+5) == 100 {
+            pos = pos + 6;
+            // Skip ':' and whitespace and opening '"'
+            while pos < body_len && (str_at(body, pos) == 58 || str_at(body, pos) == 32 || str_at(body, pos) == 34) {
+                pos = pos + 1;
+            }
+            return pos; // start of method name string
+        }
+        pos = pos + 1;
+    }
+    return 0;
+}
+
+// ===== Response construction =====
+// Response cell: tag=TAG_LSP_RESPONSE, body=id, arg=result, domain=0
+pub fn lsp_build_response(id: i64, result: i64) -> i64 {
+    let resp = heap_alloc_term();
+    heap_set_tag(resp, TAG_LSP_RESPONSE);
+    heap_set_body(resp, id);
+    heap_set_arg(resp, result);
+    heap_set_domain(resp, 0);
+    return resp;
+}
+pub fn lsp_response_id(resp: i64) -> i64 { return heap_get_body(resp); }
+pub fn lsp_response_result(resp: i64) -> i64 { return heap_get_arg(resp); }
+
+// Write a response to stdout with Content-Length framing
+pub fn lsp_write_response(response: i64) {
+    repl_print_string(response);
+}
+
+// ===== Main LSP message loop =====
+pub fn lsp_main_loop() {
+    let mut running: bool = true;
+    while running {
+        let length = lsp_read_header();
+        if length <= 0 { running = false; }
+        else {
+            let body = repl_read_line();
+            let method_start = lsp_extract_method(body);
+            let first_char = str_at(body, method_start);
+            let method = lsp_route(first_char);
+            if method == METH_SHUTDOWN { running = false; }
+            else {
+                let response = lsp_build_response(0, heap_alloc_term());
+                lsp_write_response(response);
+            }
+        }
+    }
+}
+
+// ===== Self-test =====
+pub pub fn main() -> i64 {
+    // Verify method constants
+    if METH_INITIALIZE != 0 { return 1; }
+    if METH_INITIALIZED != 1 { return 2; }
+    if METH_SHUTDOWN != 2 { return 3; }
+    if METH_EXIT != 3 { return 4; }
+    if METH_DID_OPEN != 4 { return 5; }
+    if METH_COMPLETION != 7 { return 6; }
+    if METH_HOVER != 8 { return 7; }
+    if METH_DEFINITION != 9 { return 8; }
+    if METH_REFERENCES != 10 { return 9; }
+    if METH_SEMANTIC_TOKENS != 11 { return 10; }
+
+    // Verify message construction
+    let payload = heap_alloc_term();
+    let msg = lsp_msg_new(METH_INITIALIZE, 1, payload);
+    if heap_get_tag(msg) != TAG_LSP_MSG { return 11; }
+    if lsp_msg_method(msg) != METH_INITIALIZE { return 12; }
+    if lsp_msg_id(msg) != 1 { return 13; }
+    if lsp_msg_payload(msg) != payload { return 14; }
+
+    // Verify routing
+    if lsp_route(105) != METH_INITIALIZE { return 15; }
+    if lsp_route(115) != METH_SHUTDOWN { return 16; }
+    if lsp_route(104) != METH_HOVER { return 17; }
+    if lsp_route(99)  != METH_COMPLETION { return 18; }
+    if lsp_route(114) != METH_REFERENCES { return 19; }
+
+    // Verify Content-Length parsing from String
+    let h1 = "Content-Length: 42";
+    if lsp_parse_content_length(h1) != 42 { return 20; }
+    let h2 = "Content-Length: 111";
+    if lsp_parse_content_length(h2) != 111 { return 21; }
+    let h3 = "Content-Length: 1024";
+    if lsp_parse_content_length(h3) != 1024 { return 22; }
+
+    // Verify response construction
+    let result = heap_alloc_term();
+    let resp = lsp_build_response(5, result);
+    if heap_get_tag(resp) != TAG_LSP_RESPONSE { return 23; }
+    if lsp_response_id(resp) != 5 { return 24; }
+    if lsp_response_result(resp) != result { return 25; }
+
+    // Multiple messages with different methods
+    let msg2 = lsp_msg_new(METH_SHUTDOWN, 99, 0);
+    if lsp_msg_method(msg2) != METH_SHUTDOWN { return 26; }
+    if lsp_msg_id(msg2) != 99 { return 27; }
+
+    let msg3 = lsp_msg_new(METH_HOVER, 42, payload);
+    if lsp_msg_method(msg3) != METH_HOVER { return 28; }
+
+    return 111;
+}

@@ -1,0 +1,242 @@
+// tests/test_tactic_proofs.ti — Standalone regression for the tactic engine
+//
+// Self-contained: kernel + tactic monad.
+// Tests intro/exact on multiple goal shapes, multi-intro sequences,
+// and that the produced proof terms type-check via the bidirectional checker.
+//
+// Tags: 0=Var 1=Lam 2=App 3=Pi 4=Sort 9=CtxNil 10=CtxCons
+//       20=Goal 21=TacticState 22=GoalNil
+
+// ── Term constructors ──────────────────────────────────────────────────────
+
+pub fn var_ref(idx: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 0); heap_set(id, 1, idx); return id;
+}
+pub fn lam(body: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 1); heap_set(id, 1, body); return id;
+}
+pub fn app(func: i64, arg: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 2); heap_set(id, 1, func); heap_set(id, 2, arg); return id;
+}
+pub fn pi(domain: i64, codomain: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 3); heap_set(id, 1, domain); heap_set(id, 2, codomain); return id;
+}
+pub fn sort(level: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 4); heap_set(id, 1, level); return id;
+}
+pub fn const_term(name: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 5); heap_set(id, 1, name); return id;
+}
+
+// ── Equality ───────────────────────────────────────────────────────────────
+
+pub fn eq_term(a: i64, b: i64) -> i64 {
+    let ta = heap_get(a, 0); let tb = heap_get(b, 0);
+    if ta != tb { return 0; }
+    if ta == 0 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 1 { return eq_term(heap_get(a, 1), heap_get(b, 1)); }
+    if ta == 2 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 3 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 4 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 5 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    return 0;
+}
+
+// ── Shift, subst, whnf ────────────────────────────────────────────────────
+
+pub fn shift(t: i64, cutoff: i64, amount: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx >= cutoff { return var_ref(idx + amount); } return var_ref(idx); }
+    if tag == 1 { return lam(shift(heap_get(t, 1), cutoff + 1, amount)); }
+    if tag == 2 { return app(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff, amount)); }
+    if tag == 3 { return pi(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff + 1, amount)); }
+    return t;
+}
+pub fn lift(t: i64, cutoff: i64) -> i64 { return shift(t, cutoff, 1); }
+
+pub fn subst(s: i64, index: i64, t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx == index { return s; } if idx > index { return var_ref(idx - 1); } return var_ref(idx); }
+    if tag == 1 { let s2 = lift(s, 0); return lam(subst(s2, index + 1, heap_get(t, 1))); }
+    if tag == 2 { return app(subst(s, index, heap_get(t, 1)), subst(s, index, heap_get(t, 2))); }
+    if tag == 3 { let s2 = lift(s, 0); return pi(subst(s, index, heap_get(t, 1)), subst(s2, index + 1, heap_get(t, 2))); }
+    return t;
+}
+
+pub fn whnf(t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 2 {
+        let func = whnf(heap_get(t, 1));
+        if heap_get(func, 0) == 1 { return whnf(subst(heap_get(t, 2), 0, heap_get(func, 1))); }
+        return app(func, heap_get(t, 2));
+    }
+    return t;
+}
+pub fn conv(a: i64, b: i64) -> i64 { return eq_term(whnf(a), whnf(b)); }
+
+// ── Context ────────────────────────────────────────────────────────────────
+
+pub fn ctx_nil() -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 9); return id;
+}
+pub fn ctx_cons(ty: i64, rest: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 10); heap_set(id, 1, ty); heap_set(id, 2, rest); return id;
+}
+pub fn ctx_lookup(ctx: i64, idx: i64) -> i64 {
+    let tag = heap_get(ctx, 0);
+    if tag == 9 { return 0 - 1; }
+    if idx == 0 { return heap_get(ctx, 1); }
+    return ctx_lookup(heap_get(ctx, 2), idx - 1);
+}
+
+// ── Type checker ───────────────────────────────────────────────────────────
+
+pub fn infer(ctx: i64, t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { return ctx_lookup(ctx, heap_get(t, 1)); }
+    if tag == 2 {
+        let fty = infer(ctx, heap_get(t, 1));
+        if fty < 0 { return 0 - 1; }
+        if heap_get(fty, 0) != 3 { return 0 - 1; }
+        if check(ctx, heap_get(t, 2), heap_get(fty, 1)) == 0 { return 0 - 1; }
+        return subst(heap_get(t, 2), 0, heap_get(fty, 2));
+    }
+    if tag == 4 { return sort(heap_get(t, 1) + 1); }
+    return 0 - 1;
+}
+
+pub fn check(ctx: i64, t: i64, ty: i64) -> i64 {
+    let ttag = heap_get(t, 0);
+    if ttag == 1 {
+        let ty_nf = whnf(ty);
+        if heap_get(ty_nf, 0) != 3 { return 0; }
+        let new_ctx = ctx_cons(heap_get(ty_nf, 1), ctx);
+        return check(new_ctx, heap_get(t, 1), heap_get(ty_nf, 2));
+    }
+    let inf = infer(ctx, t);
+    if inf < 0 { return 0; }
+    return conv(inf, ty);
+}
+
+// ── Tactic monad ──────────────────────────────────────────────────────────
+
+pub fn goal_nil() -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 22); return id;
+}
+pub fn goal_cons(ctx: i64, ty: i64, next: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 20); heap_set(id, 1, ctx); heap_set(id, 2, ty); heap_set(id, 3, next);
+    return id;
+}
+pub fn make_state(goals: i64, proof: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 21); heap_set(id, 1, goals); heap_set(id, 2, proof);
+    return id;
+}
+pub fn state_goals(st: i64) -> i64 { return heap_get(st, 1); }
+pub fn state_proof(st: i64) -> i64 { return heap_get(st, 2); }
+pub fn goal_count(goals: i64) -> i64 {
+    if heap_get(goals, 0) == 22 { return 0; }
+    return 1 + goal_count(heap_get(goals, 3));
+}
+
+pub fn tactic_intro(st: i64) -> i64 {
+    let goals = state_goals(st);
+    if heap_get(goals, 0) != 20 { return st; }
+    let ctx  = heap_get(goals, 1);
+    let ty   = heap_get(goals, 2);
+    let rest = heap_get(goals, 3);
+    let ty_nf = whnf(ty);
+    if heap_get(ty_nf, 0) != 3 { return st; }
+    let dom = heap_get(ty_nf, 1);
+    let cod = heap_get(ty_nf, 2);
+    let new_ctx  = ctx_cons(dom, ctx);
+    let new_goal = goal_cons(new_ctx, cod, rest);
+    return make_state(new_goal, state_proof(st));
+}
+
+pub fn tactic_exact(st: i64, term: i64) -> i64 {
+    let goals = state_goals(st);
+    if heap_get(goals, 0) != 20 { return st; }
+    let rest = heap_get(goals, 3);
+    return make_state(rest, term);
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+pub fn main() -> i64 {
+    let ctx = ctx_nil();
+
+    // Test 1: prove Pi(sort(0), sort(0)) — identity
+    let pi_id = pi(sort(0), sort(0));
+    let g0  = goal_cons(ctx, pi_id, goal_nil());
+    let st0 = make_state(g0, const_term(0 - 1));
+    let st1 = tactic_intro(st0);
+    if goal_count(state_goals(st1)) != 1 { return 1; }
+    // After intro the goal type should be sort(0)
+    let g1 = state_goals(st1);
+    if eq_term(heap_get(g1, 2), sort(0)) != 1 { return 2; }
+    // The new context binds sort(0)
+    let bound = ctx_lookup(heap_get(g1, 1), 0);
+    if eq_term(bound, sort(0)) != 1 { return 3; }
+    // Close with var_ref(0)
+    let st2 = tactic_exact(st1, var_ref(0));
+    if goal_count(state_goals(st2)) != 0 { return 4; }
+    // Build full proof: lam(var_ref(0)), type-check it
+    let proof1 = lam(state_proof(st2));
+    if check(ctx, proof1, pi_id) != 1 { return 5; }
+
+    // Test 2: prove Pi(sort(0), Pi(sort(0), sort(0))) — const/K combinator
+    let pi_k = pi(sort(0), pi(sort(0), sort(0)));
+    let g2  = goal_cons(ctx, pi_k, goal_nil());
+    let st3 = make_state(g2, const_term(0 - 1));
+    let st4 = tactic_intro(st3);
+    if goal_count(state_goals(st4)) != 1 { return 6; }
+    let st5 = tactic_intro(st4);
+    if goal_count(state_goals(st5)) != 1 { return 7; }
+    // After two intros, context is [sort(0), sort(0)]; goal is sort(0)
+    let g5 = state_goals(st5);
+    if eq_term(heap_get(g5, 2), sort(0)) != 1 { return 8; }
+    // var_ref(1) is the outer-bound variable (first intro)
+    let st6 = tactic_exact(st5, var_ref(1));
+    if goal_count(state_goals(st6)) != 0 { return 9; }
+    let proof2 = lam(lam(state_proof(st6)));
+    if check(ctx, proof2, pi_k) != 1 { return 10; }
+
+    // Test 3: prove Pi(sort(1), sort(1)) at a higher universe
+    let pi_id1 = pi(sort(1), sort(1));
+    let g6  = goal_cons(ctx, pi_id1, goal_nil());
+    let st7 = make_state(g6, const_term(0 - 1));
+    let st8 = tactic_intro(st7);
+    if goal_count(state_goals(st8)) != 1 { return 11; }
+    let st9 = tactic_exact(st8, var_ref(0));
+    if goal_count(state_goals(st9)) != 0 { return 12; }
+    let proof3 = lam(state_proof(st9));
+    if check(ctx, proof3, pi_id1) != 1 { return 13; }
+
+    // Test 4: goal_count on a multi-goal list
+    let multi = goal_cons(ctx, sort(0), goal_cons(ctx, sort(1), goal_nil()));
+    if goal_count(multi) != 2 { return 14; }
+    if goal_count(goal_nil()) != 0 { return 15; }
+
+    // Test 5: tactic_intro on a non-Pi goal leaves state unchanged
+    let non_pi = goal_cons(ctx, sort(0), goal_nil());
+    let st_np  = make_state(non_pi, const_term(0));
+    let st_np2 = tactic_intro(st_np);
+    // goal_count should still be 1 (intro did nothing)
+    if goal_count(state_goals(st_np2)) != 1 { return 16; }
+
+    // Test 6: conv through beta — (λ x. x) sort(0) ≡ sort(0)
+    let id_fn = lam(var_ref(0));
+    if conv(app(id_fn, sort(0)), sort(0)) != 1 { return 17; }
+
+    // Test 7: sort inference — infer(ctx, sort(n)) = sort(n+1)
+    let inf0 = infer(ctx, sort(0));
+    if inf0 < 0 { return 18; }
+    if eq_term(inf0, sort(1)) != 1 { return 19; }
+    let inf1 = infer(ctx, sort(1));
+    if inf1 < 0 { return 20; }
+    if eq_term(inf1, sort(2)) != 1 { return 21; }
+
+    return 111;
+}

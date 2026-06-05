@@ -1,0 +1,107 @@
+// titan/omnisplat/gsplat_gpu.ti — GPU Buffer Upload (Simulated)
+// Creates and tracks GPU buffer descriptors as heap nodes.
+// In production these would wrap real GPU API calls; here all operations are pure Titan.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_GPU_BUFFER:  i64 = 8820;
+const TAG_GPU_TEXTURE: i64 = 8821;
+
+// GPU buffer formats
+const GPU_R8:   i64 = 0;
+const GPU_R16U: i64 = 1;
+const GPU_R32F: i64 = 2;
+
+// Splat stride: 16 i64 fields × 8 bytes = 128 bytes per splat
+const SPLAT_STRIDE: i64 = 16;
+
+// buffer: tag=TAG_GPU_BUFFER, body=splat_count, arg=byte_size, domain=format
+// texture: tag=TAG_GPU_TEXTURE, body=width, arg=height, domain=format
+
+pub fn gpu_create_vertex_buffer(splat_count: i64) -> i64 {
+    let byte_size = splat_count * SPLAT_STRIDE * 8;
+    let buf = heap_alloc_term();
+    heap_set_tag(buf, TAG_GPU_BUFFER);
+    heap_set_body(buf, splat_count);
+    heap_set_arg(buf, byte_size);
+    heap_set_domain(buf, GPU_R32F);
+    return buf;
+}
+
+pub fn gpu_create_state_texture(splat_count: i64) -> i64 {
+    let tex = heap_alloc_term();
+    heap_set_tag(tex, TAG_GPU_TEXTURE);
+    heap_set_body(tex, splat_count);
+    heap_set_arg(tex, 1);
+    heap_set_domain(tex, GPU_R8);
+    return tex;
+}
+
+pub fn gpu_create_transform_texture(splat_count: i64) -> i64 {
+    let tex = heap_alloc_term();
+    heap_set_tag(tex, TAG_GPU_TEXTURE);
+    heap_set_body(tex, splat_count);
+    heap_set_arg(tex, 1);
+    heap_set_domain(tex, GPU_R16U);
+    return tex;
+}
+
+pub fn gpu_buffer_byte_size(buf: i64) -> i64  { return heap_get_arg(buf); }
+pub fn gpu_buffer_splat_count(buf: i64) -> i64 { return heap_get_body(buf); }
+pub fn gpu_texture_width(tex: i64) -> i64     { return heap_get_body(tex); }
+
+// Simulated upload — no-op in bootstrap; wired to real GPU API in production
+pub fn gpu_upload_splat_data(buffer: i64, data_id: i64) {
+    // production: copy heap data into GPU vertex buffer
+}
+
+pub fn gpu_upload_state_texture(texture: i64, state_id: i64) {
+    // production: copy state bytes into GPU R8 texture
+}
+
+// Memory estimation: 64 bytes vertex + 1 byte state + 2 bytes transform = 67 bytes/splat
+pub fn gpu_memory_estimate(splat_count: i64) -> i64 {
+    return splat_count * 67;
+}
+
+pub fn gpu_is_feasible(splat_count: i64, max_memory: i64) -> bool {
+    return gpu_memory_estimate(splat_count) <= max_memory;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Memory estimation
+    if gpu_memory_estimate(1000000) != 67000000 { return 1; }
+    if !gpu_is_feasible(1000, 1000000)          { return 2; }
+    if gpu_is_feasible(10000000, 1000000)        { return 3; }
+
+    // Vertex buffer creation
+    let buf = gpu_create_vertex_buffer(100);
+    if buf == 0                                  { return 4; }
+    if heap_get_tag(buf) != TAG_GPU_BUFFER       { return 5; }
+    if gpu_buffer_splat_count(buf) != 100        { return 6; }
+    if gpu_buffer_byte_size(buf) != 100 * 16 * 8 { return 7; }
+
+    // State texture
+    let tex = gpu_create_state_texture(100);
+    if tex == 0                                  { return 8; }
+    if heap_get_tag(tex) != TAG_GPU_TEXTURE      { return 9; }
+    if gpu_texture_width(tex) != 100             { return 10; }
+
+    // Transform texture
+    let ttex = gpu_create_transform_texture(200);
+    if heap_get_tag(ttex) != TAG_GPU_TEXTURE     { return 11; }
+    if gpu_texture_width(ttex) != 200            { return 12; }
+
+    return 111;
+}

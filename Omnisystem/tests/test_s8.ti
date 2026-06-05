@@ -1,0 +1,163 @@
+// tests/test_s8.ti — Phase S8 File I/O & Export Integration Test
+// All helpers inlined with ts8_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS8_T_EXP:    i64 = 9500;
+const TS8_F_PLY:    i64 = 0;
+const TS8_F_SPLAT:  i64 = 1;
+const TS8_F_VIEWER: i64 = 2;
+const TS8_F_PROJ:   i64 = 3;
+const TS8_T_SD:     i64 = 8800;
+const TS8_T_SV:     i64 = 8801;
+const TS8_T_WRP:    i64 = 8802;
+
+// ===== Vertex / data helpers =====
+pub fn ts8_sv(px: i64, py: i64, pz: i64,
+               c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+               r: i64, g: i64, b: i64, op: i64) -> i64 {
+    let n1 = heap_alloc_term(); heap_set_body(n1, pz); heap_set_arg(n1, c0); heap_set_domain(n1, 0);
+    let n2 = heap_alloc_term(); heap_set_body(n2, c1); heap_set_arg(n2, c2); heap_set_domain(n2, n1);
+    let n3 = heap_alloc_term(); heap_set_body(n3, c3); heap_set_arg(n3, c4); heap_set_domain(n3, n2);
+    let n4 = heap_alloc_term(); heap_set_body(n4, c5); heap_set_arg(n4, r);  heap_set_domain(n4, n3);
+    let n5 = heap_alloc_term(); heap_set_body(n5, g);  heap_set_arg(n5, b);  heap_set_domain(n5, n4);
+    let n6 = heap_alloc_term(); heap_set_body(n6, op); heap_set_arg(n6, 0);  heap_set_domain(n6, n5);
+    let v  = heap_alloc_term();
+    heap_set_tag(v, TS8_T_SV); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, n6);
+    return v;
+}
+pub fn ts8_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TS8_T_SD); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ts8_add(d: i64, v: i64) {
+    let w = heap_alloc_term(); heap_set_tag(w, TS8_T_WRP); heap_set_body(w, v); heap_set_domain(w, 0);
+    let c = heap_get_body(d);
+    if c == 0 { heap_set_arg(d, w); }
+    else {
+        let mut t = heap_get_arg(d);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(d, c + 1);
+}
+pub fn ts8_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn ts8_get(d: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(d); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+pub fn ts8_vx(v: i64) -> i64 { return heap_get_body(v); }
+pub fn ts8_vy(v: i64) -> i64 { return heap_get_arg(v); }
+
+// ===== Export descriptor helpers =====
+pub fn ts8_export_ply(d: i64) -> i64 {
+    let hdr = heap_alloc_term();
+    heap_set_tag(hdr, TS8_T_EXP); heap_set_body(hdr, TS8_F_PLY); heap_set_arg(hdr, ts8_cnt(d));
+    heap_set_domain(hdr, 0);
+    return hdr;
+}
+pub fn ts8_export_splat(d: i64) -> i64 {
+    let hdr = heap_alloc_term();
+    heap_set_tag(hdr, TS8_T_EXP); heap_set_body(hdr, TS8_F_SPLAT); heap_set_arg(hdr, ts8_cnt(d));
+    heap_set_domain(hdr, 0);
+    return hdr;
+}
+pub fn ts8_export_viewer(d: i64) -> i64 {
+    let pkg = heap_alloc_term();
+    heap_set_tag(pkg, TS8_T_EXP); heap_set_body(pkg, TS8_F_VIEWER); heap_set_arg(pkg, ts8_cnt(d));
+    heap_set_domain(pkg, 0);
+    return pkg;
+}
+pub fn ts8_export_project(d: i64, tl: i64) -> i64 {
+    let proj = heap_alloc_term();
+    heap_set_tag(proj, TS8_T_EXP); heap_set_body(proj, TS8_F_PROJ); heap_set_arg(proj, ts8_cnt(d));
+    heap_set_domain(proj, tl);
+    return proj;
+}
+pub fn ts8_export_count(exp: i64) -> i64 { return heap_get_arg(exp); }
+pub fn ts8_export_type(exp: i64) -> i64  { return heap_get_body(exp); }
+
+pub fn ts8_ply_header_bytes(n: i64) -> i64    { return n * 16 * 4 + 128; }
+pub fn ts8_viewer_package_size(n: i64) -> i64 { return n * 67 + 4096; }
+pub fn ts8_project_file_count() -> i64        { return 3; }
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Build dataset: 8 splats
+    let d = ts8_sd();
+    let mut i: i64 = 0;
+    while i < 8 {
+        let v = ts8_sv(i*10, i*5, i*3, 0, 0, 0, 0, 0, 0, 128, 64, 32, 255);
+        ts8_add(d, v);
+        i = i + 1;
+    }
+    if ts8_cnt(d) != 8 { return 1; }
+
+    // Verify vertex accessors
+    let v0 = ts8_get(d, 0);
+    if ts8_vx(v0) != 0  { return 2; }
+    if ts8_vy(v0) != 0  { return 3; }
+    let v7 = ts8_get(d, 7);
+    if ts8_vx(v7) != 70 { return 4; }
+    if ts8_vy(v7) != 35 { return 5; }
+
+    // PLY export
+    let ply = ts8_export_ply(d);
+    if heap_get_tag(ply) != TS8_T_EXP       { return 6; }
+    if ts8_export_type(ply) != TS8_F_PLY    { return 7; }
+    if ts8_export_count(ply) != 8           { return 8; }
+
+    // SPLAT export
+    let splat = ts8_export_splat(d);
+    if ts8_export_type(splat) != TS8_F_SPLAT { return 9; }
+    if ts8_export_count(splat) != 8          { return 10; }
+
+    // Viewer export
+    let viewer = ts8_export_viewer(d);
+    if ts8_export_type(viewer) != TS8_F_VIEWER { return 11; }
+    if ts8_export_count(viewer) != 8           { return 12; }
+
+    // Project export with timeline stub
+    let tl = heap_alloc_term();
+    let proj = ts8_export_project(d, tl);
+    if ts8_export_type(proj) != TS8_F_PROJ  { return 13; }
+    if ts8_export_count(proj) != 8          { return 14; }
+    if heap_get_domain(proj) != tl          { return 15; }
+
+    // Size estimates
+    let ply_sz = ts8_ply_header_bytes(8);
+    if ply_sz <= 0                          { return 16; }
+    let view_sz = ts8_viewer_package_size(8);
+    if view_sz <= 0                         { return 17; }
+    if ts8_project_file_count() != 3        { return 18; }
+
+    // PLY size: 8*64+128=640
+    if ply_sz != 640                        { return 19; }
+    // Viewer size: 8*67+4096=4632
+    if view_sz != 4632                      { return 20; }
+
+    // Distinct export descriptors get distinct heap nodes
+    if ply == splat                         { return 21; }
+    if splat == viewer                      { return 22; }
+
+    // Second dataset to verify isolation
+    let d2 = ts8_sd();
+    ts8_add(d2, ts8_sv(1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+    let ply2 = ts8_export_ply(d2);
+    if ts8_export_count(ply2) != 1          { return 23; }
+    if ts8_export_count(ply) != 8           { return 24; }
+
+    return 111;
+}

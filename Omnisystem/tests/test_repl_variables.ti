@@ -1,0 +1,26 @@
+// tests/test_repl_variables.ti
+// REPL variable persistence test — variables survive across expressions.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: Variable binding simulation
+    let x: i64 = 10;
+    let y: i64 = 20;
+    if x == 10 { score = score + 1; }
+
+    // Test 2: Variables survive across expressions
+    let sum: i64 = x + y;
+    if sum == 30 { score = score + 1; }
+
+    // Test 3: Product calculation
+    let product: i64 = x * y;
+    if product == 200 { score = score + 1; }
+
+    // Test 4: Complex expression
+    let expr: i64 = (x + y) * 2;
+    if expr == 60 { score = score + 1; }
+
+    if score == 4 { return 111; }
+    return score * 25;
+}

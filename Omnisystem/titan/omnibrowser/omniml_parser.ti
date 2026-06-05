@@ -1,0 +1,217 @@
+// OmniML Parser -- parses simplified markup into heap-linked DOM nodes
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+const NODE_ELEMENT: i64 = 0;
+const NODE_TEXT: i64 = 1;
+const TAG_DOM: i64 = 3000;
+const TAG_SLICE: i64 = 3001;
+
+static mut SRC: i64 = 0;
+static mut POS: i64 = 0;
+static mut LEN: i64 = 0;
+
+pub fn is_alpha(ch: i64) -> bool {
+    return (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) || ch == 45 || ch == 58;
+}
+
+pub fn is_space(ch: i64) -> bool {
+    return ch == 32 || ch == 10 || ch == 13 || ch == 9;
+}
+
+pub fn parser_init(src_id: i64) {
+    SRC = src_id;
+    POS = 0;
+    LEN = str_len(src_id);
+    return;
+}
+
+pub fn parser_peek() -> i64 {
+    if POS >= LEN { return -1; }
+    return str_at(SRC, POS);
+}
+
+pub fn parser_advance() -> i64 {
+    let ch = parser_peek();
+    if POS < LEN { POS = POS + 1; }
+    return ch;
+}
+
+pub fn parser_peek_next() -> i64 {
+    if POS + 1 >= LEN { return -1; }
+    return str_at(SRC, POS + 1);
+}
+
+pub fn skip_whitespace() {
+    while is_space(parser_peek()) {
+        parser_advance();
+    }
+    return;
+}
+
+pub fn slice_new(start: i64, end: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SLICE);
+    heap_set_body(s, start);
+    heap_set_arg(s, end);
+    return s;
+}
+
+pub fn parse_ident() -> i64 {
+    skip_whitespace();
+    let start = POS;
+    while is_alpha(parser_peek()) || (parser_peek() >= 48 && parser_peek() <= 57) {
+        parser_advance();
+    }
+    return slice_new(start, POS);
+}
+
+pub fn parse_attr_value() -> i64 {
+    skip_whitespace();
+    if parser_peek() == 34 {
+        parser_advance();
+        let start = POS;
+        while parser_peek() != 34 && parser_peek() != -1 {
+            parser_advance();
+        }
+        let end = POS;
+        if parser_peek() == 34 { parser_advance(); }
+        return slice_new(start, end);
+    }
+
+    let start = POS;
+    while !is_space(parser_peek()) && parser_peek() != 62 && parser_peek() != -1 {
+        parser_advance();
+    }
+    return slice_new(start, POS);
+}
+
+// DOM layout: body=node_type, arg=payload(tag/text), domain=first_child_or_next_sibling
+pub fn dom_new(node_type: i64, payload: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_DOM);
+    heap_set_body(n, node_type);
+    heap_set_arg(n, payload);
+    heap_set_domain(n, 0);
+    return n;
+}
+
+pub fn dom_append_child(parent: i64, child: i64) {
+    let head = heap_get_domain(parent);
+    if head == 0 {
+        heap_set_domain(parent, child);
+        return;
+    }
+
+    let mut cur = head;
+    while heap_get_domain(cur) != 0 {
+        cur = heap_get_domain(cur);
+    }
+    heap_set_domain(cur, child);
+    return;
+}
+
+pub fn parse_text() -> i64 {
+    let start = POS;
+    while parser_peek() != 60 && parser_peek() != -1 {
+        parser_advance();
+    }
+    if POS == start { return 0; }
+    let text = slice_new(start, POS);
+    return dom_new(NODE_TEXT, text);
+}
+
+pub fn parse_element() -> i64 {
+    if parser_peek() != 60 { return 0; }
+    parser_advance();
+
+    if parser_peek() == 47 { return 0; }
+
+    let tag = parse_ident();
+
+    while parser_peek() != 62 && parser_peek() != 47 && parser_peek() != -1 {
+        let _attr_name = parse_ident();
+        skip_whitespace();
+        if parser_peek() == 61 {
+            parser_advance();
+            let _attr_value = parse_attr_value();
+        }
+        skip_whitespace();
+    }
+
+    let mut self_closing: i64 = 0;
+    if parser_peek() == 47 {
+        self_closing = 1;
+        parser_advance();
+    }
+    if parser_peek() == 62 { parser_advance(); }
+
+    let node = dom_new(NODE_ELEMENT, tag);
+    if self_closing == 1 { return node; }
+
+    while parser_peek() != -1 {
+        if parser_peek() == 60 && parser_peek_next() == 47 {
+            parser_advance();
+            parser_advance();
+            let _closing_tag = parse_ident();
+            while parser_peek() != 62 && parser_peek() != -1 { parser_advance(); }
+            if parser_peek() == 62 { parser_advance(); }
+            break;
+        }
+
+        let child = parse_node();
+        if child == 0 { break; }
+        dom_append_child(node, child);
+    }
+
+    return node;
+}
+
+pub fn parse_node() -> i64 {
+    skip_whitespace();
+    if parser_peek() == 60 { return parse_element(); }
+    return parse_text();
+}
+
+pub fn parse_document(src_id: i64) -> i64 {
+    parser_init(src_id);
+
+    let root_tag = slice_new(0, 0);
+    let root = dom_new(NODE_ELEMENT, root_tag);
+
+    while parser_peek() != -1 {
+        let child = parse_node();
+        if child == 0 {
+            if parser_peek() != -1 { parser_advance(); }
+        } else {
+            dom_append_child(root, child);
+        }
+    }
+
+    return root;
+}
+
+pub fn dom_node_type(node: i64) -> i64 { return heap_get_body(node); }
+pub fn dom_payload(node: i64) -> i64 { return heap_get_arg(node); }
+pub fn dom_first_child(node: i64) -> i64 { return heap_get_domain(node); }
+pub fn dom_next_sibling(node: i64) -> i64 { return heap_get_domain(node); }
+
+pub fn main() -> i64 {
+    let src_id = heap_alloc_term();
+    let root = parse_document(src_id);
+    if root == 0 { return 1; }
+    if heap_get_tag(root) != TAG_DOM { return 2; }
+    if dom_node_type(root) != NODE_ELEMENT { return 3; }
+    return 111;
+}

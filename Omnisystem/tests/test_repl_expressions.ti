@@ -1,0 +1,25 @@
+// tests/test_repl_expressions.ti
+// REPL expression test — arithmetic, comparison, and compound expressions.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: Direct arithmetic
+    let r1: i64 = 2 + 3;
+    if r1 == 5 { score = score + 1; }
+
+    // Test 2: Subtraction
+    let r2: i64 = 10 - 4;
+    if r2 == 6 { score = score + 1; }
+
+    // Test 3: Multiplication
+    let r3: i64 = 6 * 7;
+    if r3 == 42 { score = score + 1; }
+
+    // Test 4: Compound (order of operations)
+    let r4: i64 = 2 + 3 * 4;
+    if r4 == 14 { score = score + 1; }
+
+    if score == 4 { return 111; }
+    return score * 25;
+}

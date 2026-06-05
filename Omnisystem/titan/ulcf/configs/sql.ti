@@ -1,0 +1,94 @@
+// titan/ulcf/configs/sql.ti
+// SQL language configuration for the Universal Grammar Adapter.
+
+pub fn sql_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("INT".to_string(), "i32".to_string());
+    type_map.insert("INTEGER".to_string(), "i64".to_string());
+    type_map.insert("BIGINT".to_string(), "i64".to_string());
+    type_map.insert("SMALLINT".to_string(), "i16".to_string());
+    type_map.insert("TINYINT".to_string(), "i8".to_string());
+    type_map.insert("FLOAT".to_string(), "f32".to_string());
+    type_map.insert("DOUBLE".to_string(), "f64".to_string());
+    type_map.insert("REAL".to_string(), "f32".to_string());
+    type_map.insert("DECIMAL".to_string(), "f64".to_string());
+    type_map.insert("NUMERIC".to_string(), "f64".to_string());
+    type_map.insert("BOOL".to_string(), "bool".to_string());
+    type_map.insert("BOOLEAN".to_string(), "bool".to_string());
+    type_map.insert("CHAR".to_string(), "String".to_string());
+    type_map.insert("VARCHAR".to_string(), "String".to_string());
+    type_map.insert("TEXT".to_string(), "String".to_string());
+    type_map.insert("DATE".to_string(), "Date".to_string());
+    type_map.insert("TIMESTAMP".to_string(), "Timestamp".to_string());
+    type_map.insert("BLOB".to_string(), "Vec<u8>".to_string());
+    type_map.insert("JSON".to_string(), "String".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("=".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<>".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("AND".to_string(), "and".to_string());
+    operator_map.insert("OR".to_string(), "or".to_string());
+    operator_map.insert("LIKE".to_string(), "add".to_string());
+
+    LanguageConfig {
+        name: "sql".to_string(),
+        extensions: vec![".sql".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "select_statement".to_string(),
+            "insert_statement".to_string(),
+            "update_statement".to_string(),
+            "delete_statement".to_string(),
+            "create_table_statement".to_string(),
+            "drop_table_statement".to_string(),
+            "alter_table_statement".to_string(),
+            "create_index_statement".to_string(),
+            "create_view_statement".to_string(),
+            "begin_statement".to_string(),
+            "commit_statement".to_string(),
+            "rollback_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "function_call".to_string(),
+            "column_reference".to_string(),
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "null_literal".to_string(),
+            "star".to_string(),
+            "subquery".to_string(),
+            "case_expression".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "null".to_string(),
+        ],
+        comment_nodes: vec![
+            "comment".to_string(),
+            "block_comment".to_string(),
+        ],
+        block_nodes: vec![
+            "statement_list".to_string(),
+            "begin_statement".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}

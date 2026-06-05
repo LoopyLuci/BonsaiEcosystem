@@ -1,0 +1,113 @@
+// titan/omnicloak/c7_verify.ti — Axiom Verification
+// Self-contained. C1 circuit helpers inlined with c7_ prefix.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_PROOF7: i64 = 23600;
+const T_INV7:   i64 = 23601;
+const T_C7:     i64 = 23000;
+const T_HOP7:   i64 = 23001;
+const T_WRP7:   i64 = 23003;
+
+// ===== Inlined C1 circuit helpers =====
+pub fn c7_circuit_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_C7); heap_set_body(c, 0); heap_set_arg(c, 0);
+    return c;
+}
+
+pub fn c7_hop_create(node_id: i64, key: i64) -> i64 {
+    let h = heap_alloc_term();
+    heap_set_tag(h, T_HOP7); heap_set_body(h, node_id); heap_set_arg(h, key); heap_set_domain(h, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP7); heap_set_body(w, h); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn c7_circuit_add_hop(c: i64, w: i64) {
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+pub fn c7_encrypt_layer(data: i64, key: i64) -> i64 { return data ^ key; }
+
+pub fn c7_onion_encrypt(c: i64, msg: i64) -> i64 {
+    let mut result: i64 = msg;
+    let mut cur: i64 = heap_get_arg(c);
+    while cur != 0 {
+        let w = cur;
+        let key = heap_get_arg(heap_get_body(w));
+        result = c7_encrypt_layer(result, key);
+        cur = heap_get_domain(cur);
+    }
+    return result;
+}
+
+// ===== Proof & Invariant =====
+// proof: tag=T_PROOF7, body=name, arg=valid(1/0)
+pub fn c7_proof_create(name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T_PROOF7); heap_set_body(p, name); heap_set_arg(p, 1);
+    return p;
+}
+pub fn c7_proof_valid(p: i64) -> i64    { return heap_get_arg(p); }
+pub fn c7_proof_set_valid(p: i64, v: i64) { heap_set_arg(p, v); }
+
+// inv: tag=T_INV7, body=cond, arg=status(1=ok,0=failed)
+pub fn c7_inv_create(cond: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, T_INV7); heap_set_body(inv, cond); heap_set_arg(inv, 1);
+    return inv;
+}
+pub fn c7_inv_check(inv: i64, actual: i64) -> i64 {
+    if actual == 0 { heap_set_arg(inv, 0); return 0; }
+    return heap_get_arg(inv);
+}
+
+pub fn c7_circuit_secrecy(c: i64, msg: i64) -> i64 {
+    let enc = c7_onion_encrypt(c, msg);
+    if enc == msg { return 0; }
+    return 1;
+}
+
+pub fn c7_dht_integrity(peer_rep: i64, threshold: i64) -> i64 {
+    if peer_rep >= threshold { return 1; }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let p = c7_proof_create(1);
+    if c7_proof_valid(p) != 1          { return 1; }
+    c7_proof_set_valid(p, 0);
+    if c7_proof_valid(p) != 0          { return 2; }
+
+    let inv = c7_inv_create(2);
+    if c7_inv_check(inv, 1) != 1       { return 3; }
+    if c7_inv_check(inv, 0) != 0       { return 4; }
+
+    let c = c7_circuit_create();
+    let w = c7_hop_create(1, 3);
+    c7_circuit_add_hop(c, w);
+    if c7_circuit_secrecy(c, 42) != 1  { return 5; }
+
+    if c7_dht_integrity(80, 60) != 1   { return 6; }
+    if c7_dht_integrity(40, 60) != 0   { return 7; }
+    return 111;
+}

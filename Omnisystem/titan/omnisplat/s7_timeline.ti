@@ -1,0 +1,149 @@
+// titan/omnisplat/s7_timeline.ti — Keyframes, Timeline, Animation Player
+// Self-contained. Wrapper-node append for ordered keyframe list.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_KF:  i64 = 9400;
+const T_TL:  i64 = 9401;
+const T_WRP: i64 = 9402;
+
+// Keyframe layout:
+// k  : tag=T_KF,  body=frame, arg=eye_x, domain=m
+// m  : body=eye_y, arg=eye_z, domain=m2
+// m2 : body=tx,   arg=ty,     domain=m3
+// m3 : body=tz,   arg=0,      domain=0
+
+pub fn s7_kf(frame: i64, eye_x: i64, eye_y: i64, eye_z: i64,
+              tx: i64, ty: i64, tz: i64) -> i64 {
+    let m3 = heap_alloc_term(); heap_set_body(m3, tz); heap_set_arg(m3, 0); heap_set_domain(m3, 0);
+    let m2 = heap_alloc_term(); heap_set_body(m2, tx); heap_set_arg(m2, ty); heap_set_domain(m2, m3);
+    let m  = heap_alloc_term(); heap_set_body(m, eye_y); heap_set_arg(m, eye_z); heap_set_domain(m, m2);
+    let k  = heap_alloc_term();
+    heap_set_tag(k, T_KF); heap_set_body(k, frame); heap_set_arg(k, eye_x); heap_set_domain(k, m);
+    return k;
+}
+
+pub fn s7_kf_frame(k: i64) -> i64  { return heap_get_body(k); }
+pub fn s7_kf_eye_x(k: i64) -> i64  { return heap_get_arg(k); }
+pub fn s7_kf_eye_y(k: i64) -> i64  { return heap_get_body(heap_get_domain(k)); }
+pub fn s7_kf_eye_z(k: i64) -> i64  { return heap_get_arg(heap_get_domain(k)); }
+pub fn s7_kf_tx(k: i64) -> i64     { return heap_get_body(heap_get_domain(heap_get_domain(k))); }
+pub fn s7_kf_ty(k: i64) -> i64     { return heap_get_arg(heap_get_domain(heap_get_domain(k))); }
+
+// Timeline:
+// tl: tag=T_TL, body=kf_count, arg=list_head(wrappers), domain=0
+// wrapper: tag=T_WRP, body=kf, domain=next (APPEND order)
+
+pub fn s7_tl() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TL); heap_set_body(t, 0); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+
+pub fn s7_tl_add(tl: i64, kf: i64) {
+    let w = heap_alloc_term(); heap_set_tag(w, T_WRP); heap_set_body(w, kf); heap_set_domain(w, 0);
+    let c = heap_get_body(tl);
+    if c == 0 { heap_set_arg(tl, w); }
+    else {
+        let mut x = heap_get_arg(tl);
+        while heap_get_domain(x) != 0 { x = heap_get_domain(x); }
+        heap_set_domain(x, w);
+    }
+    heap_set_body(tl, c + 1);
+}
+
+pub fn s7_tl_cnt(tl: i64) -> i64 { return heap_get_body(tl); }
+
+pub fn s7_tl_get(tl: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(tl); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+
+// Returns the frame number of the last keyframe visited (simulates playback).
+pub fn s7_player(tl: i64) -> i64 {
+    let n = s7_tl_cnt(tl);
+    if n == 0 { return 0; }
+    let mut f: i64 = 0;
+    let mut cur: i64 = 0;
+    while cur < n {
+        let kf = s7_tl_get(tl, cur);
+        if kf != 0 { f = s7_kf_frame(kf); }
+        cur = cur + 1;
+    }
+    return f;
+}
+
+// Returns frame number of the last keyframe (total animation length).
+pub fn s7_total_frames(tl: i64) -> i64 {
+    let n = s7_tl_cnt(tl);
+    if n == 0 { return 0; }
+    let kf = s7_tl_get(tl, n - 1);
+    if kf == 0 { return 0; }
+    return s7_kf_frame(kf);
+}
+
+pub fn s7_seq_count(tl: i64) -> i64 { return s7_tl_cnt(tl); }
+
+// Linear interpolation between two keyframes at fractional position t/100.
+// Returns interpolated eye_x only (as a demonstration).
+pub fn s7_lerp(ka: i64, kb: i64, t: i64) -> i64 {
+    let ax = s7_kf_eye_x(ka); let bx = s7_kf_eye_x(kb);
+    return ax + (bx - ax) * t / 100;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let tl = s7_tl();
+    let k1 = s7_kf(0,  0,   0, 100, 0, 0, 0);
+    let k2 = s7_kf(30, 100, 0, 100, 0, 0, 0);
+    let k3 = s7_kf(60, 0, 100, 100, 0, 0, 0);
+    let k4 = s7_kf(90, 0,   0, 100, 0, 0, 0);
+    s7_tl_add(tl, k1); s7_tl_add(tl, k2); s7_tl_add(tl, k3); s7_tl_add(tl, k4);
+    if s7_tl_cnt(tl) != 4 { return 1; }
+
+    // Index 0 → frame 0
+    let f1 = s7_tl_get(tl, 0);
+    if s7_kf_frame(f1) != 0  { return 2; }
+
+    // Index 2 → frame 60
+    let f3 = s7_tl_get(tl, 2);
+    if s7_kf_frame(f3) != 60 { return 3; }
+
+    // Total frames = last KF frame = 90
+    let last = s7_total_frames(tl);
+    if last != 90             { return 4; }
+
+    // Player returns last visited frame = 90
+    let played = s7_player(tl);
+    if played != 90           { return 5; }
+
+    // seq_count same as cnt
+    if s7_seq_count(tl) != 4 { return 6; }
+
+    // Keyframe accessors
+    if s7_kf_eye_x(k2) != 100 { return 7; }
+    if s7_kf_eye_y(k3) != 100 { return 8; }
+    if s7_kf_eye_z(k1) != 100 { return 9; }
+
+    // Lerp: midpoint between k1(eye_x=0) and k2(eye_x=100) at t=50 → 50
+    let mid = s7_lerp(k1, k2, 50);
+    if mid != 50              { return 10; }
+
+    // Empty timeline
+    let tl2 = s7_tl();
+    if s7_total_frames(tl2) != 0 { return 11; }
+    if s7_player(tl2) != 0       { return 12; }
+
+    return 111;
+}

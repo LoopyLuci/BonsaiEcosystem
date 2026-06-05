@@ -1,0 +1,106 @@
+// titan/omni_integration.ti — Omnisystem Full Integration Layer
+// Imports all subsystems and exposes a unified status API for the main OS panel.
+import "titan/aether/net_session.ti"
+import "titan/axiom/kernel.ti"
+import "titan/sylva/repl.ti"
+import "titan/lsp/lsp_stdio.ti"
+import "titan/compiler/verified_compiler.ti"
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_OS_STATUS: i64 = 42000;
+
+// os_status cell layout:
+//   field[0] = tag (42000)
+//   field[1] = net_ok      (1 if Aether net session opened socket)
+//   field[2] = kernel_ok   (1 if Axiom kernel selfcheck passed)
+//   field[3] = repl_ok     (1 if Sylva REPL initialized)
+//   field[4] = lsp_ok      (1 if LSP server started)
+//   field[5] = compiler_ok (1 if verified compiler pipeline passed)
+//   field[6] = subsys_score (sum of all checks)
+
+pub fn omni_check_all() -> i64 {
+    let st: i64 = heap_alloc();
+    heap_set(st, 0, TAG_OS_STATUS);
+
+    // 1. Aether network session
+    let ns: i64 = ns_new(1);
+    let net_ok: i64 = ns_is_connected(ns);
+    heap_set(st, 1, net_ok);
+    ns_close(ns);
+
+    // 2. Axiom kernel selfcheck
+    let k: i64 = kernel_new();
+    kernel_add(k, 1, 1, 1, 7001);
+    kernel_add(k, 2, 2, 1, 7002);
+    kernel_add(k, 3, 2, 1, 7003);
+    let kernel_ok: i64 = kernel_selfcheck(k);
+    heap_set(st, 2, kernel_ok);
+
+    // 3. Sylva REPL
+    let rs: i64 = repl_new();
+    let repl_ok: i64 = 0;
+    if heap_get(rs, 0) == TAG_REPL_STATE { repl_ok = 1; }
+    heap_set(st, 3, repl_ok);
+
+    // 4. LSP stdio server
+    let conn: i64 = lsp_conn_new();
+    lsp_dispatch(conn, 1, 0, 0);
+    let lsp_ok: i64 = lsp_is_running(conn);
+    heap_set(st, 4, lsp_ok);
+    lsp_dispatch(conn, 4, 0, 0);
+
+    // 5. Verified compiler pipeline
+    let p: i64 = pipeline_new();
+    pipeline_parse(p);
+    pipeline_typecheck(p);
+    let vok: i64 = pipeline_verify(p);
+    let eok: i64 = pipeline_emit(p);
+    let compiler_ok: i64 = 0;
+    if vok == 1 { if eok == 1 { compiler_ok = 1; } }
+    heap_set(st, 5, compiler_ok);
+
+    let score: i64 = net_ok + kernel_ok + repl_ok + lsp_ok + compiler_ok;
+    heap_set(st, 6, score);
+
+    return st;
+}
+
+pub fn omni_net_ok(st: i64) -> i64      { return heap_get(st, 1); }
+pub fn omni_kernel_ok(st: i64) -> i64   { return heap_get(st, 2); }
+pub fn omni_repl_ok(st: i64) -> i64     { return heap_get(st, 3); }
+pub fn omni_lsp_ok(st: i64) -> i64      { return heap_get(st, 4); }
+pub fn omni_compiler_ok(st: i64) -> i64 { return heap_get(st, 5); }
+pub fn omni_score(st: i64) -> i64       { return heap_get(st, 6); }
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: All subsystems report status without crash
+    let st: i64 = omni_check_all();
+    if heap_get(st, 0) == TAG_OS_STATUS {
+        score = score + 37;
+    }
+
+    // Test 2: Kernel and compiler are deterministically OK
+    if omni_kernel_ok(st) == 1 {
+        if omni_compiler_ok(st) == 1 {
+            score = score + 37;
+        }
+    }
+
+    // Test 3: REPL and LSP are OK
+    if omni_repl_ok(st) == 1 {
+        if omni_lsp_ok(st) == 1 {
+            score = score + 37;
+        }
+    }
+
+    return score;
+}

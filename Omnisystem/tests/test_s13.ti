@@ -1,0 +1,165 @@
+// tests/test_s13.ti — Phase S13 Application Shell Integration Test
+// All helpers inlined with ts13_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS13_T_APP: i64 = 10000;
+const TS13_T_DS:  i64 = 8800;
+const TS13_T_EXP: i64 = 9500;
+const TS13_F_PLY: i64 = 0;
+const TS13_T_TL:  i64 = 9401;
+const TS13_T_STK: i64 = 9301;
+const TS13_T_CAM: i64 = 10001;
+const TS13_T_SEL: i64 = 10002;
+
+// ===== Dataset helpers =====
+pub fn ts13_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TS13_T_DS); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ts13_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn ts13_export_ply(d: i64) -> i64 {
+    let hdr = heap_alloc_term();
+    heap_set_tag(hdr, TS13_T_EXP); heap_set_body(hdr, TS13_F_PLY); heap_set_arg(hdr, ts13_cnt(d));
+    heap_set_domain(hdr, 0);
+    return hdr;
+}
+pub fn ts13_export_count(exp: i64) -> i64 { return heap_get_arg(exp); }
+
+// ===== Timeline stub =====
+pub fn ts13_tl() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TS13_T_TL); heap_set_body(t, 0); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+
+// ===== Undo stack stub =====
+pub fn ts13_stack() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TS13_T_STK); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+// ===== App shell =====
+pub fn ts13_app_init() -> i64 {
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, 0); heap_set_arg(meta1, 0); heap_set_domain(meta1, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, 0); heap_set_arg(meta2, 0); heap_set_domain(meta2, 0);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TS13_T_APP); heap_set_body(a, 0); heap_set_arg(a, meta1); heap_set_domain(a, meta2);
+    return a;
+}
+
+pub fn ts13_app_load(app: i64, count: i64) -> i64 {
+    let d = ts13_sd();
+    heap_set_body(d, count);
+    let meta1 = heap_get_arg(app);
+    heap_set_body(meta1, d);
+    heap_set_body(app, count);
+    return d;
+}
+
+pub fn ts13_app_dataset(app: i64) -> i64 {
+    return heap_get_body(heap_get_arg(app));
+}
+
+pub fn ts13_app_camera(app: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TS13_T_CAM); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    let meta1 = heap_get_arg(app);
+    heap_set_arg(meta1, c);
+    return c;
+}
+
+pub fn ts13_app_selection(app: i64) -> i64 {
+    let n = ts13_cnt(ts13_app_dataset(app));
+    let sa = heap_alloc_term();
+    heap_set_tag(sa, TS13_T_SEL); heap_set_body(sa, n); heap_set_arg(sa, 0); heap_set_domain(sa, 0);
+    let meta2 = heap_get_domain(app);
+    heap_set_domain(meta2, sa);
+    return sa;
+}
+
+pub fn ts13_app_timeline(app: i64) -> i64 {
+    let tl = ts13_tl();
+    let meta2 = heap_get_domain(app);
+    heap_set_body(meta2, tl);
+    return tl;
+}
+
+pub fn ts13_app_export(app: i64) -> i64 {
+    let d = ts13_app_dataset(app);
+    return ts13_export_ply(d);
+}
+
+pub fn ts13_app_undo(app: i64) -> i64 {
+    let su = ts13_stack();
+    let meta2 = heap_get_domain(app);
+    heap_set_arg(meta2, su);
+    return su;
+}
+
+pub fn ts13_app_step(app: i64) -> i64 { return heap_get_body(app); }
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Init
+    let app = ts13_app_init();
+    if heap_get_tag(app) != TS13_T_APP { return 1; }
+    if ts13_app_step(app) != 0         { return 2; }
+
+    // Load with count=5
+    let d = ts13_app_load(app, 5);
+    if d == 0                           { return 3; }
+    if ts13_cnt(d) != 5                 { return 4; }
+    if ts13_app_step(app) != 5         { return 5; }
+
+    // Camera
+    let cam = ts13_app_camera(app);
+    if cam == 0                         { return 6; }
+    if heap_get_tag(cam) != TS13_T_CAM { return 7; }
+
+    // Selection knows splat count
+    let sel = ts13_app_selection(app);
+    if sel == 0                         { return 8; }
+    if heap_get_body(sel) != 5         { return 9; }
+
+    // Timeline
+    let tl = ts13_app_timeline(app);
+    if tl == 0                          { return 10; }
+    if heap_get_tag(tl) != TS13_T_TL   { return 11; }
+
+    // Export: count matches dataset
+    let exp = ts13_app_export(app);
+    if exp == 0                         { return 12; }
+    if ts13_export_count(exp) != 5     { return 13; }
+
+    // Undo stack
+    let su = ts13_app_undo(app);
+    if su == 0                          { return 14; }
+    if heap_get_tag(su) != TS13_T_STK  { return 15; }
+
+    // Dataset still intact after all subsystems wired
+    if ts13_cnt(ts13_app_dataset(app)) != 5 { return 16; }
+    if ts13_app_step(app) != 5              { return 17; }
+
+    // Second app — isolation
+    let app2 = ts13_app_init();
+    ts13_app_load(app2, 12);
+    if ts13_app_step(app2) != 12   { return 18; }
+    if ts13_app_step(app) != 5     { return 19; }
+
+    return 111;
+}

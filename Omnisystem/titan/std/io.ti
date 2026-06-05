@@ -1,0 +1,113 @@
+// OmniLib I/O -- virtual in-memory file table with existence/delete/size
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_FS: i64 = 7070;
+const TAG_FILE: i64 = 7071;
+
+// FS layout: body=head(file nodes)
+// File node: body=path_id, arg=size, domain=next
+pub fn io_mode_read() -> i64 { return 0; }
+pub fn io_mode_write() -> i64 { return 1; }
+pub fn io_mode_append() -> i64 { return 2; }
+pub fn io_mode_read_write() -> i64 { return 3; }
+pub fn io_tag_file_handle() -> i64 { return TAG_FILE; }
+
+pub fn io_fs_new() -> i64 {
+    let fs = heap_alloc_term();
+    heap_set_tag(fs, TAG_FS);
+    heap_set_body(fs, 0);
+    heap_set_arg(fs, 0);
+    heap_set_domain(fs, 0);
+    return fs;
+}
+
+pub fn io_find(fs: i64, path_id: i64) -> i64 {
+    let mut cur = heap_get_body(fs);
+    while cur != 0 {
+        if heap_get_body(cur) == path_id { return cur; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+pub fn io_create(fs: i64, path_id: i64, size: i64) -> bool {
+    if io_find(fs, path_id) != 0 { return false; }
+    let f = heap_alloc_term();
+    heap_set_tag(f, TAG_FILE);
+    heap_set_body(f, path_id);
+    heap_set_arg(f, size);
+    heap_set_domain(f, heap_get_body(fs));
+    heap_set_body(fs, f);
+    return true;
+}
+
+pub fn io_exists_in(fs: i64, path_id: i64) -> bool {
+    return io_find(fs, path_id) != 0;
+}
+
+pub fn io_delete_in(fs: i64, path_id: i64) -> bool {
+    let mut prev: i64 = 0;
+    let mut cur = heap_get_body(fs);
+    while cur != 0 {
+        if heap_get_body(cur) == path_id {
+            let nxt = heap_get_domain(cur);
+            if prev == 0 { heap_set_body(fs, nxt); }
+            else { heap_set_domain(prev, nxt); }
+            return true;
+        }
+        prev = cur;
+        cur = heap_get_domain(cur);
+    }
+    return false;
+}
+
+pub fn io_size_in(fs: i64, path_id: i64) -> i64 {
+    let f = io_find(fs, path_id);
+    if f == 0 { return -1; }
+    return heap_get_arg(f);
+}
+
+// Compatibility helpers using ephemeral empty FS (kept for API completeness)
+pub fn io_exists(path_id: i64) -> bool {
+    let fs = io_fs_new();
+    return io_exists_in(fs, path_id);
+}
+
+pub fn io_delete(path_id: i64) -> bool {
+    let fs = io_fs_new();
+    return io_delete_in(fs, path_id);
+}
+
+pub fn io_size(path_id: i64) -> i64 {
+    let fs = io_fs_new();
+    return io_size_in(fs, path_id);
+}
+
+pub fn main() -> i64 {
+    let fs = io_fs_new();
+
+    if io_exists_in(fs, 101) { return 1; }
+    if io_delete_in(fs, 101) { return 2; }
+    if io_size_in(fs, 101) != -1 { return 3; }
+
+    if !io_create(fs, 101, 64) { return 4; }
+    if !io_exists_in(fs, 101) { return 5; }
+    if io_size_in(fs, 101) != 64 { return 6; }
+
+    if !io_delete_in(fs, 101) { return 7; }
+    if io_exists_in(fs, 101) { return 8; }
+    if io_size_in(fs, 101) != -1 { return 9; }
+
+    if io_mode_read_write() != 3 { return 10; }
+
+    return 111;
+}

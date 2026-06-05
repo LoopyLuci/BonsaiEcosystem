@@ -1,0 +1,160 @@
+// titan/omnisplat/underlay_shader.ti — Underlay Pass Shader
+// Dimmed selection rendering for depth context. Inlines gsplat_data helpers.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_UNDERLAY_CMD:    i64 = 9031;
+const TAG_UNDERLAY_BLEND:  i64 = 9032;
+const TAG_UNDERLAY_COLOUR: i64 = 9030;
+
+// ===== Inlined gsplat_data helpers =====
+const TAG_SPLAT_DATA:  i64 = 8800;
+const TAG_SPLAT_STATE: i64 = 8802;
+const STATE_NONE:      i64 = 0;
+const STATE_SELECTED:  i64 = 1;
+const STATE_LOCKED:    i64 = 2;
+const STATE_DELETED:   i64 = 4;
+
+pub fn un_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_SPLAT_DATA); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn un_data_add(data: i64, splat: i64) {
+    let w = heap_alloc_term(); heap_set_body(w, splat); heap_set_domain(w, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, w); }
+    else { let mut c = head; while heap_get_domain(c) != 0 { c = heap_get_domain(c); } heap_set_domain(c, w); }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+pub fn un_data_count(data: i64) -> i64 { return heap_get_body(data); }
+pub fn un_vertex_create(px: i64, py: i64) -> i64 {
+    let v = heap_alloc_term(); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, 0);
+    return v;
+}
+pub fn un_state_create(n: i64) -> i64 {
+    let arr = heap_alloc_term();
+    heap_set_tag(arr, TAG_SPLAT_STATE); heap_set_body(arr, n); heap_set_arg(arr, 0);
+    return arr;
+}
+pub fn un_state_set(arr: i64, index: i64, flags: i64) {
+    let node = heap_alloc_term();
+    heap_set_body(node, index); heap_set_arg(node, flags);
+    heap_set_domain(node, heap_get_arg(arr)); heap_set_arg(arr, node);
+}
+pub fn un_state_get(arr: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(arr);
+    while curr != 0 {
+        if heap_get_body(curr) == index { return heap_get_arg(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return STATE_NONE;
+}
+pub fn un_select(data: i64, index: i64) {
+    let arr = heap_get_domain(data);
+    let cur = un_state_get(arr, index);
+    un_state_set(arr, index, cur | STATE_SELECTED);
+}
+pub fn un_is_selected(data: i64, index: i64) -> bool {
+    let arr = heap_get_domain(data);
+    return (un_state_get(arr, index) & STATE_SELECTED) != 0;
+}
+pub fn un_selected_count(data: i64) -> i64 {
+    let count = un_data_count(data);
+    let mut sel: i64 = 0;
+    let mut i: i64 = 0;
+    while i < count { if un_is_selected(data, i) { sel = sel + 1; } i = i + 1; }
+    return sel;
+}
+
+// ===== Underlay shader functions =====
+
+// colour: tag=TAG_UNDERLAY_COLOUR, body=r*dim/100, arg=g*dim/100, domain=b*dim/100
+pub fn underlay_compute(selection_r: i64, selection_g: i64,
+                         selection_b: i64, dim_factor: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_UNDERLAY_COLOUR);
+    heap_set_body(c, (selection_r * dim_factor) / 100);
+    heap_set_arg(c,  (selection_g * dim_factor) / 100);
+    heap_set_domain(c, (selection_b * dim_factor) / 100);
+    return c;
+}
+
+// Render underlay only when some (not all) splats are selected.
+pub fn underlay_should_render(splat_count: i64, selected_count: i64) -> bool {
+    return selected_count > 0 && selected_count < splat_count;
+}
+
+// cmd_list: tag=TAG_UNDERLAY_CMD, body=selected_count, arg=dim_factor
+pub fn underlay_build_commands(data: i64, dim_factor: i64) -> i64 {
+    let count = un_data_count(data);
+    let selected = un_selected_count(data);
+    if !underlay_should_render(count, selected) { return 0; }
+    let cmd = heap_alloc_term();
+    heap_set_tag(cmd, TAG_UNDERLAY_CMD);
+    heap_set_body(cmd, selected);
+    heap_set_arg(cmd, dim_factor);
+    heap_set_domain(cmd, 0);
+    return cmd;
+}
+
+// Additive blend clamped to 255.
+pub fn underlay_blend(base_r: i64, base_g: i64, base_b: i64,
+                       under_r: i64, under_g: i64, under_b: i64) -> i64 {
+    let result = heap_alloc_term();
+    heap_set_tag(result, TAG_UNDERLAY_BLEND);
+    let mut r = base_r + under_r; if r > 255 { r = 255; }
+    let mut g = base_g + under_g; if g > 255 { g = 255; }
+    let mut b = base_b + under_b; if b > 255 { b = 255; }
+    heap_set_body(result, r); heap_set_arg(result, g); heap_set_domain(result, b);
+    return result;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Dim 20%: (0, 255, 0) × 20% = (0, 51, 0)
+    let colour = underlay_compute(0, 255, 0, 20);
+    if heap_get_tag(colour) != TAG_UNDERLAY_COLOUR { return 1; }
+    if heap_get_body(colour) != 0                  { return 2; }
+    if heap_get_arg(colour) != 51                  { return 3; }
+
+    // Render logic
+    if !underlay_should_render(10, 3)   { return 4; }
+    if underlay_should_render(10, 0)    { return 5; }
+    if underlay_should_render(10, 10)   { return 6; }
+
+    // Build commands: 2 splats, 1 selected → should render
+    let data = un_data_create();
+    let s1 = un_vertex_create(10, 20);
+    let s2 = un_vertex_create(30, 40);
+    un_data_add(data, s1); un_data_add(data, s2);
+    let state_arr = un_state_create(2);
+    heap_set_domain(data, state_arr);
+    un_select(data, 0);
+
+    let cmds = underlay_build_commands(data, 20);
+    if cmds == 0                               { return 7; }
+    if heap_get_tag(cmds) != TAG_UNDERLAY_CMD  { return 8; }
+    if heap_get_body(cmds) != 1                { return 9; }
+
+    // Additive blend: (100,100,100) + (0,51,0) = (100,151,100)
+    let blended = underlay_blend(100, 100, 100, 0, 51, 0);
+    if heap_get_tag(blended) != TAG_UNDERLAY_BLEND { return 10; }
+    if heap_get_arg(blended) != 151            { return 11; }
+
+    // Clamp: (200,200,200) + (100,100,100) = (255,255,255)
+    let clamped = underlay_blend(200, 200, 200, 100, 100, 100);
+    if heap_get_body(clamped) != 255           { return 12; }
+
+    return 111;
+}

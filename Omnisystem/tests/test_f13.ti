@@ -1,0 +1,5 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_IM13:i64=26200;const tT_EX13:i64=26201;
+pub fn tf13_import_create(fmt:i64)->i64{let imp=heap_alloc_term();heap_set_tag(imp,tT_IM13);heap_set_body(imp,fmt);heap_set_arg(imp,0);heap_set_domain(imp,0);return imp;}
+pub fn tf13_export_create(fmt:i64,data:i64)->i64{let exp=heap_alloc_term();heap_set_tag(exp,tT_EX13);heap_set_body(exp,fmt);heap_set_arg(exp,data);heap_set_domain(exp,0);return exp;}
+pub fn main()->i64{let exp=tf13_export_create(3,77);if heap_get_arg(exp)!=77{return 1;}return 111;}

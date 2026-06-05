@@ -1,0 +1,15 @@
+# Omnisystem language classification for GitHub Linguist
+*.ti linguist-language=Titan
+*.ae linguist-language=Aether
+*.sy linguist-language=Sylva
+*.ax linguist-language=Axiom
+*.omniml linguist-language=HTML
+*.omnistyle linguist-language=CSS
+
+# Ensure consistent line endings
+*.ti text eol=lf
+*.ae text eol=lf
+*.sy text eol=lf
+*.ax text eol=lf
+*.md text eol=lf
+*.ps1 text eol=crlf

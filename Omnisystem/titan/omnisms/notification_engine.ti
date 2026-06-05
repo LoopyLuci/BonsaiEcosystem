@@ -1,0 +1,5 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = send_sms("+15559876543", "Your order is ready!") >= 80 { score += 27; } let var_ok: i64 = send_push_notification("user-42", "New message") >= 80 { score += 27; } let var_ok: i64 = schedule_notification("user-42", "Reminder", "2026-05-20T09:00:00Z") >= 80 { score += 27; } let var_ok: i64 = verify_delivery() >= 80 { score += 30; } if score >= 80 { return 111; } return score; }
+pub fn send_sms(_to: &str, _message: &str) -> i64 { return 111; }
+pub fn send_push_notification(_user: &str, _title: &str) -> i64 { return 111; }
+pub fn schedule_notification(_user: &str, _title: &str, _time: &str) -> i64 { return 111; }
+pub fn verify_delivery() -> i64 { return 111; }

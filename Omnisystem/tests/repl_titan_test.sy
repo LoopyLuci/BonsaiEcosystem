@@ -1,0 +1,5 @@
+; Sylva REPL test with Titan functions
+add_nums(10, 20)
+multiply_nums(5, 7)
+add_vectors([1, 2, 3], [10, 20, 30])
+

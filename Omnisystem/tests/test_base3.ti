@@ -1,0 +1,13 @@
+pub fn base_case_test() -> bool {
+    let z = 0;
+    let r1 = (z + 0) == z;
+    let r2 = (z * 1) == z;
+    let r3 = (0 + z) == z;
+    return r1 && r2 && r3;
+}
+
+pub fn main() -> i64 {
+    let result = base_case_test();
+    if result { return 111; }
+    return 1;
+}

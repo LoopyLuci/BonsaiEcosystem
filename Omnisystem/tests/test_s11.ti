@@ -1,0 +1,107 @@
+// tests/test_s11.ti — Phase S11 Publishing & Deployment Integration Test
+// All helpers inlined with ts11_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS11_T_PUB:    i64 = 9800;
+const TS11_T_DEPLOY: i64 = 9801;
+
+const TS11_PUB_IDLE:   i64 = 0;
+const TS11_PUB_UPLOAD: i64 = 1;
+const TS11_PUB_DONE:   i64 = 2;
+const TS11_PUB_FAIL:   i64 = 3;
+
+// ===== Publish job =====
+pub fn ts11_pub_create(name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TS11_T_PUB); heap_set_body(p, name); heap_set_arg(p, TS11_PUB_IDLE); heap_set_domain(p, 0);
+    return p;
+}
+pub fn ts11_pub_state(p: i64) -> i64      { return heap_get_arg(p); }
+pub fn ts11_pub_url(p: i64) -> i64        { return heap_get_domain(p); }
+pub fn ts11_pub_name(p: i64) -> i64       { return heap_get_body(p); }
+pub fn ts11_pub_start(p: i64)             { heap_set_arg(p, TS11_PUB_UPLOAD); }
+pub fn ts11_pub_complete(p: i64, url: i64) {
+    heap_set_arg(p, TS11_PUB_DONE);
+    heap_set_domain(p, url);
+}
+pub fn ts11_pub_fail(p: i64)              { heap_set_arg(p, TS11_PUB_FAIL); }
+
+// ===== Deploy descriptor =====
+pub fn ts11_deploy_create(target: i64) -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TS11_T_DEPLOY); heap_set_body(d, target); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ts11_deploy_target(d: i64) -> i64  { return heap_get_body(d); }
+pub fn ts11_deploy_to_web(d: i64) -> i64 {
+    let ok = heap_alloc_term();
+    heap_set_tag(ok, TS11_T_DEPLOY + 1); heap_set_body(ok, 1); heap_set_arg(ok, 0); heap_set_domain(ok, 0);
+    return ok;
+}
+pub fn ts11_deploy_to_host(d: i64) -> i64 {
+    let ok = heap_alloc_term();
+    heap_set_tag(ok, TS11_T_DEPLOY + 2); heap_set_body(ok, 1); heap_set_arg(ok, 0); heap_set_domain(ok, 0);
+    return ok;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Basic publish: idle → upload → done
+    let p = ts11_pub_create(50);
+    if ts11_pub_state(p) != TS11_PUB_IDLE   { return 1; }
+    if ts11_pub_name(p) != 50               { return 2; }
+    ts11_pub_start(p);
+    if ts11_pub_state(p) != TS11_PUB_UPLOAD { return 3; }
+    ts11_pub_complete(p, 99);
+    if ts11_pub_state(p) != TS11_PUB_DONE   { return 4; }
+    if ts11_pub_url(p) != 99               { return 5; }
+
+    // Failure path
+    let p2 = ts11_pub_create(75);
+    ts11_pub_start(p2);
+    ts11_pub_fail(p2);
+    if ts11_pub_state(p2) != TS11_PUB_FAIL  { return 6; }
+
+    // p still in DONE state — isolation
+    if ts11_pub_state(p) != TS11_PUB_DONE   { return 7; }
+
+    // Deploy
+    let d = ts11_deploy_create(2);
+    if ts11_deploy_target(d) != 2           { return 8; }
+    let rw = ts11_deploy_to_web(d);
+    if heap_get_body(rw) != 1              { return 9; }
+    if heap_get_tag(rw) != TS11_T_DEPLOY + 1 { return 10; }
+    let rh = ts11_deploy_to_host(d);
+    if heap_get_body(rh) != 1              { return 11; }
+    if heap_get_tag(rh) != TS11_T_DEPLOY + 2 { return 12; }
+
+    // Loop: 3 publish jobs complete with distinct urls
+    let mut i: i64 = 0;
+    while i < 3 {
+        let px = ts11_pub_create(i * 10);
+        ts11_pub_start(px);
+        ts11_pub_complete(px, i * 100);
+        if ts11_pub_state(px) != TS11_PUB_DONE { return 13; }
+        if ts11_pub_url(px) != i * 100         { return 14; }
+        i = i + 1;
+    }
+
+    // Multiple deploy targets — isolation
+    let d1 = ts11_deploy_create(7);
+    let d2 = ts11_deploy_create(8);
+    if ts11_deploy_target(d1) != 7         { return 15; }
+    if ts11_deploy_target(d2) != 8         { return 16; }
+
+    return 111;
+}

@@ -1,0 +1,86 @@
+# Build artifacts
+/build/
+/target/
+/dist/
+*.o
+*.so
+*.dylib
+*.dll
+*.wasm
+*.bc
+*.ll
+
+# Omni build outputs
+*.omni-build/
+.omni-registry/
+.omni-cache/
+
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+ENV/
+
+# Dependencies
+/deps/
+/packages/
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+*.local
+
+# Telemetry logs
+*.telemetry
+*.trace
+
+# Temporary files
+/tmp/
+*.tmp
+*.bak
+
+# Content-addressed cache (local)
+.omni-registry/
+.pytest_cache/
+
+# Secrets
+*.pem
+*.key
+*.cert
+credentials.*
+
+# Compiled artifacts — keep source, not binaries
+*.exe
+!titan-bootstrap/output/titan-compiler.exe
+!Omnisystem.exe
+*.exe.c
+*.o
+*.obj
+
+artifacts/
+
+# Local temporary debug files
+tmp_debug*.ti
+tmp_debug*.ae
+titan-bootstrap/output/compiler.c
+

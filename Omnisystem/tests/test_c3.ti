@@ -1,0 +1,57 @@
+// tests/test_c3.ti — Phase C3 Traffic Cloaking & Obfuscation Integration Test
+// All helpers inlined with tc3_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TC3_T_PROF: i64 = 23200;
+const TC3_T_WRP:  i64 = 23202;
+
+pub fn tc3_profile_create(ptype: i64, enabled: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TC3_T_PROF); heap_set_body(p, ptype); heap_set_arg(p, enabled); heap_set_domain(p, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TC3_T_WRP); heap_set_body(w, p); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tc3_profile_enabled(w: i64) -> i64 { return heap_get_arg(heap_get_body(w)); }
+
+pub fn tc3_padding_apply(size: i64) -> i64 {
+    let r: i64 = size % 16;
+    if r == 0 { return size; }
+    return size + 16 - r;
+}
+
+pub fn tc3_mimicry_encode(data: i64, ptype: i64) -> i64 { return data + ptype * 1000; }
+pub fn tc3_mimicry_decode(data: i64, ptype: i64) -> i64 { return data - ptype * 1000; }
+
+// ===== Integration test =====
+// tc3_padding_apply(200): 200%16=8, 200+16-8=208
+pub fn main() -> i64 {
+    let w = tc3_profile_create(2, 1);
+    if tc3_profile_enabled(w) != 1      { return 1; }
+    if tc3_padding_apply(200) != 208    { return 2; }
+    let enc = tc3_mimicry_encode(7, 5);
+    if tc3_mimicry_decode(enc, 5) != 7  { return 3; }
+
+    // Padding boundary cases
+    if tc3_padding_apply(16) != 16      { return 4; }
+    if tc3_padding_apply(17) != 32      { return 5; }
+    if tc3_padding_apply(1) != 16       { return 6; }
+
+    // Disabled profile
+    let w2 = tc3_profile_create(3, 0);
+    if tc3_profile_enabled(w2) != 0     { return 7; }
+
+    return 111;
+}

@@ -1,0 +1,107 @@
+// aether/studio/event_bus.ae — IDE Event Bus
+// Pub/sub event system connecting all IDE panels. Pure heap-based, no OS I/O.
+
+extern "rust" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_EVENT:      i64 = 8730;
+const TAG_SUBSCRIBER: i64 = 8731;
+
+// Event types
+const EVT_FILE_OPENED:      i64 = 0;
+const EVT_FILE_SAVED:       i64 = 1;
+const EVT_BUILD_STARTED:    i64 = 2;
+const EVT_BUILD_COMPLETE:   i64 = 3;
+const EVT_AGENT_ARTIFACT:   i64 = 4;
+const EVT_DEBUG_BREAKPOINT: i64 = 5;
+const EVT_PIPELINE_STAGE:   i64 = 6;
+
+// event: tag=TAG_EVENT, body=evt_type, arg=source_id, domain=payload
+pub fn event_create(evt_type: i64, source_id: i64, payload: i64) -> i64 {
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_EVENT);
+    heap_set_body(e, evt_type);
+    heap_set_arg(e, source_id);
+    heap_set_domain(e, payload);
+    return e;
+}
+pub fn evt_type(e: i64) -> i64    { return heap_get_body(e); }
+pub fn evt_payload(e: i64) -> i64 { return heap_get_domain(e); }
+
+// subscriber: tag=TAG_SUBSCRIBER, body=evt_type, arg=panel_id, domain=callback_id
+pub fn subscriber_create(evt_type: i64, panel_id: i64, callback_id: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SUBSCRIBER);
+    heap_set_body(s, evt_type);
+    heap_set_arg(s, panel_id);
+    heap_set_domain(s, callback_id);
+    return s;
+}
+
+// Event bus state — singly-linked queues (body=event/subscriber, domain=next)
+static mut EVENT_QUEUE:  i64 = 0;
+static mut SUBSCRIBERS:  i64 = 0;
+static mut QUEUE_COUNT:  i64 = 0;
+
+pub fn bus_subscribe(the_evt_type: i64, panel_id: i64, callback_id: i64) {
+    let s = subscriber_create(the_evt_type, panel_id, callback_id);
+    heap_set_domain(s, SUBSCRIBERS);
+    SUBSCRIBERS = s;
+}
+
+pub fn bus_publish(the_evt_type: i64, source_id: i64, payload: i64) {
+    let e = event_create(the_evt_type, source_id, payload);
+    // Append to queue tail so ordering is FIFO
+    if EVENT_QUEUE == 0 {
+        EVENT_QUEUE = e;
+    } else {
+        let mut tail = EVENT_QUEUE;
+        while heap_get_domain(tail) != 0 { tail = heap_get_domain(tail); }
+        heap_set_domain(tail, e);
+    }
+    QUEUE_COUNT = QUEUE_COUNT + 1;
+}
+
+pub fn bus_pending_events() -> i64 { return QUEUE_COUNT; }
+
+pub fn bus_drain() -> i64 {
+    let count = QUEUE_COUNT;
+    EVENT_QUEUE = 0;
+    QUEUE_COUNT = 0;
+    return count;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    EVENT_QUEUE = 0; SUBSCRIBERS = 0; QUEUE_COUNT = 0;
+
+    bus_subscribe(EVT_FILE_OPENED,    1, 0);
+    bus_subscribe(EVT_BUILD_COMPLETE, 2, 0);
+
+    bus_publish(EVT_FILE_OPENED,    0, heap_alloc_term());
+    bus_publish(EVT_FILE_OPENED,    0, heap_alloc_term());
+    bus_publish(EVT_BUILD_COMPLETE, 0, heap_alloc_term());
+
+    if bus_pending_events() != 3 { return 1; }
+
+    let drained = bus_drain();
+    if drained != 3               { return 2; }
+    if bus_pending_events() != 0  { return 3; }
+
+    // Verify subscriber count
+    let mut subs: i64 = 0;
+    let mut curr = SUBSCRIBERS;
+    while curr != 0 { subs = subs + 1; curr = heap_get_domain(curr); }
+    if subs != 2                  { return 4; }
+
+    return 111;
+}

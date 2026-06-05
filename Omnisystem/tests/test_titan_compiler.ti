@@ -1,0 +1,229 @@
+// tests/test_titan_compiler.ti — Integration test for the Titan compiler pipeline
+// Verifies: lex → parse → codegen → vm → correct numeric result
+// Self-contained: includes full lexer, parser, codegen, and VM.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TOK_EOF: i64=0; const TOK_INT: i64=1; const TOK_PLUS: i64=2;
+const TOK_MINUS: i64=3; const TOK_STAR: i64=4; const TOK_SLASH: i64=5;
+const TOK_EQEQ: i64=6; const TOK_LT: i64=7; const TOK_GT: i64=8;
+const TOK_LPAREN: i64=9; const TOK_RPAREN: i64=10; const TOK_LBRACE: i64=11;
+const TOK_RBRACE: i64=12; const TOK_SEMI: i64=13; const TOK_EQ: i64=14;
+const TOK_FN: i64=15; const TOK_LET: i64=16; const TOK_IF: i64=17;
+const TOK_ELSE: i64=18; const TOK_RETURN: i64=19; const TOK_IDENT: i64=20;
+const TOK_COLON: i64=21; const TOK_ARROW: i64=22; const TOK_I64: i64=23;
+const TOK_BOOL: i64=24; const TOK_TRUE: i64=25; const TOK_FALSE: i64=26;
+const TOK_PUB: i64=27; const TOK_COMMA: i64=28; const TOK_WHILE: i64=29; const TOK_MUT: i64=30;
+
+const AST_INT: i64=100; const AST_BINOP: i64=101; const AST_BOOL: i64=110;
+
+const OP_PUSH: i64=0; const OP_ADD: i64=1; const OP_SUB: i64=2;
+const OP_MUL: i64=3; const OP_DIV: i64=4; const OP_CMP_EQ: i64=5;
+const OP_CMP_LT: i64=6; const OP_CMP_GT: i64=7;
+const OP_STORE: i64=10; const OP_LOAD: i64=11; const OP_RET: i64=12;
+
+const TAG_LEXER: i64=8000; const TAG_BC: i64=8001; const TAG_INSTR: i64=8002;
+const TAG_STACK_FRAME: i64=8003; const TAG_VM: i64=8004; const TAG_VAR: i64=8005;
+const TAG_PARSER: i64=8010;
+
+pub fn lex_new(n: i64) -> i64 { let s=heap_alloc_term(); heap_set_tag(s,TAG_LEXER); heap_set_body(s,0); heap_set_arg(s,n); return s; }
+pub fn lex_adv(st: i64) { heap_set_body(st, heap_get_body(st)+1); }
+pub fn lex_at_end(st: i64) -> bool { return heap_get_body(st) >= heap_get_arg(st); }
+pub fn lex_ch(src: String, st: i64) -> i64 { let p=heap_get_body(st); if p>=heap_get_arg(st) { return -1; } return src[p]; }
+pub fn lex_ch2(src: String, st: i64) -> i64 { let p=heap_get_body(st)+1; if p>=heap_get_arg(st) { return -1; } return src[p]; }
+pub fn lex_pos(st: i64) -> i64 { return heap_get_body(st); }
+pub fn lex_is_alpha(c: i64) -> bool { return (c>=65&&c<=90)||(c>=97&&c<=122)||c==95; }
+pub fn lex_is_digit(c: i64) -> bool { return c>=48&&c<=57; }
+
+pub fn lex_skip_ws(src: String, st: i64) {
+    while !lex_at_end(st) {
+        let c = lex_ch(src, st);
+        if c==32||c==10||c==13||c==9 { lex_adv(st); }
+        else if c==47&&lex_ch2(src,st)==47 { while !lex_at_end(st)&&lex_ch(src,st)!=10 { lex_adv(st); } }
+        else { break; }
+    }
+}
+
+pub fn lex_mktok(k: i64) -> i64 { let t=heap_alloc_term(); heap_set_tag(t,k); return t; }
+
+pub fn lex_next(src: String, st: i64) -> i64 {
+    lex_skip_ws(src, st);
+    if lex_at_end(st) { return lex_mktok(TOK_EOF); }
+    let c = lex_ch(src, st);
+    if c==43 { lex_adv(st); return lex_mktok(TOK_PLUS); }
+    if c==42 { lex_adv(st); return lex_mktok(TOK_STAR); }
+    if c==47 { lex_adv(st); return lex_mktok(TOK_SLASH); }
+    if c==40 { lex_adv(st); return lex_mktok(TOK_LPAREN); }
+    if c==41 { lex_adv(st); return lex_mktok(TOK_RPAREN); }
+    if c==123 { lex_adv(st); return lex_mktok(TOK_LBRACE); }
+    if c==125 { lex_adv(st); return lex_mktok(TOK_RBRACE); }
+    if c==59 { lex_adv(st); return lex_mktok(TOK_SEMI); }
+    if c==44 { lex_adv(st); return lex_mktok(TOK_COMMA); }
+    if c==58 { lex_adv(st); return lex_mktok(TOK_COLON); }
+    if c==60 { lex_adv(st); return lex_mktok(TOK_LT); }
+    if c==62 { lex_adv(st); return lex_mktok(TOK_GT); }
+    if c==45 { lex_adv(st); if lex_ch(src,st)==62 { lex_adv(st); return lex_mktok(TOK_ARROW); } return lex_mktok(TOK_MINUS); }
+    if c==61 { lex_adv(st); if lex_ch(src,st)==61 { lex_adv(st); return lex_mktok(TOK_EQEQ); } return lex_mktok(TOK_EQ); }
+    if lex_is_digit(c) {
+        let mut v: i64 = 0;
+        while !lex_at_end(st)&&lex_is_digit(lex_ch(src,st)) { v=v*10+(lex_ch(src,st)-48); lex_adv(st); }
+        let t=heap_alloc_term(); heap_set_tag(t,TOK_INT); heap_set_body(t,v); return t;
+    }
+    if lex_is_alpha(c) {
+        let s0 = lex_pos(st);
+        while !lex_at_end(st)&&(lex_is_alpha(lex_ch(src,st))||lex_is_digit(lex_ch(src,st))) { lex_adv(st); }
+        let kl = lex_pos(st)-s0;
+        if kl==2&&src[s0]==102&&src[s0+1]==110 { return lex_mktok(TOK_FN); }
+        if kl==3&&src[s0]==108&&src[s0+1]==101&&src[s0+2]==116 { return lex_mktok(TOK_LET); }
+        if kl==3&&src[s0]==109&&src[s0+1]==117&&src[s0+2]==116 { return lex_mktok(TOK_MUT); }
+        if kl==2&&src[s0]==105&&src[s0+1]==102 { return lex_mktok(TOK_IF); }
+        if kl==4&&src[s0]==101&&src[s0+1]==108&&src[s0+2]==115&&src[s0+3]==101 { return lex_mktok(TOK_ELSE); }
+        if kl==6&&src[s0]==114&&src[s0+1]==101&&src[s0+2]==116&&src[s0+3]==117&&src[s0+4]==114&&src[s0+5]==110 { return lex_mktok(TOK_RETURN); }
+        if kl==5&&src[s0]==119&&src[s0+1]==104&&src[s0+2]==105&&src[s0+3]==108&&src[s0+4]==101 { return lex_mktok(TOK_WHILE); }
+        if kl==3&&src[s0]==105&&src[s0+1]==54&&src[s0+2]==52 { return lex_mktok(TOK_I64); }
+        if kl==4&&src[s0]==98&&src[s0+1]==111&&src[s0+2]==111&&src[s0+3]==108 { return lex_mktok(TOK_BOOL); }
+        if kl==4&&src[s0]==116&&src[s0+1]==114&&src[s0+2]==117&&src[s0+3]==101 { return lex_mktok(TOK_TRUE); }
+        if kl==5&&src[s0]==102&&src[s0+1]==97&&src[s0+2]==108&&src[s0+3]==115&&src[s0+4]==101 { return lex_mktok(TOK_FALSE); }
+        if kl==3&&src[s0]==112&&src[s0+1]==117&&src[s0+2]==98 { return lex_mktok(TOK_PUB); }
+        let t=heap_alloc_term(); heap_set_tag(t,TOK_IDENT); heap_set_body(t,s0); heap_set_arg(t,kl); return t;
+    }
+    lex_adv(st); return lex_next(src, st);
+}
+
+pub fn tok_kind(tok: i64) -> i64 { return heap_get_tag(tok); }
+pub fn tok_int_val(tok: i64) -> i64 { return heap_get_body(tok); }
+
+pub fn parser_new(src: String, st: i64) -> i64 {
+    let p=heap_alloc_term(); heap_set_tag(p,TAG_PARSER); heap_set_body(p,lex_next(src,st)); heap_set_arg(p,st); return p;
+}
+pub fn parser_tok(p: i64) -> i64 { return heap_get_body(p); }
+pub fn parser_advance(src: String, p: i64) { heap_set_body(p, lex_next(src, heap_get_arg(p))); }
+
+pub fn make_int(v: i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_INT); heap_set_body(n,v); return n; }
+pub fn make_bool(v: i64) -> i64 { let n=heap_alloc_term(); heap_set_tag(n,AST_BOOL); heap_set_body(n,v); return n; }
+pub fn make_binop(l: i64, r: i64, op: i64) -> i64 {
+    let n=heap_alloc_term(); heap_set_tag(n,AST_BINOP); heap_set_body(n,l); heap_set_arg(n,r); heap_set_domain(n,op); return n;
+}
+
+pub fn parse_expr(src: String, p: i64) -> i64;
+
+pub fn parse_primary(src: String, p: i64) -> i64 {
+    let tok=parser_tok(p); let k=tok_kind(tok);
+    if k==TOK_INT { parser_advance(src,p); return make_int(tok_int_val(tok)); }
+    if k==TOK_TRUE { parser_advance(src,p); return make_bool(1); }
+    if k==TOK_FALSE { parser_advance(src,p); return make_bool(0); }
+    if k==TOK_LPAREN { parser_advance(src,p); let i=parse_expr(src,p); if tok_kind(parser_tok(p))==TOK_RPAREN { parser_advance(src,p); } return i; }
+    return make_int(0);
+}
+
+pub fn parse_mul(src: String, p: i64) -> i64 {
+    let mut l=parse_primary(src,p); let mut c=tok_kind(parser_tok(p));
+    while c==TOK_STAR||c==TOK_SLASH { let op=c; parser_advance(src,p); let r=parse_primary(src,p); l=make_binop(l,r,op); c=tok_kind(parser_tok(p)); }
+    return l;
+}
+
+pub fn parse_add(src: String, p: i64) -> i64 {
+    let mut l=parse_mul(src,p); let mut c=tok_kind(parser_tok(p));
+    while c==TOK_PLUS||c==TOK_MINUS { let op=c; parser_advance(src,p); let r=parse_mul(src,p); l=make_binop(l,r,op); c=tok_kind(parser_tok(p)); }
+    return l;
+}
+
+pub fn parse_cmp(src: String, p: i64) -> i64 {
+    let mut l=parse_add(src,p); let mut c=tok_kind(parser_tok(p));
+    while c==TOK_EQEQ||c==TOK_LT||c==TOK_GT { let op=c; parser_advance(src,p); let r=parse_add(src,p); l=make_binop(l,r,op); c=tok_kind(parser_tok(p)); }
+    return l;
+}
+
+pub fn parse_expr(src: String, p: i64) -> i64 { return parse_cmp(src, p); }
+
+pub fn bc_new() -> i64 {
+    let b=heap_alloc_term(); heap_set_tag(b,TAG_BC); heap_set_body(b,0); heap_set_arg(b,-1); heap_set_domain(b,-1); return b;
+}
+pub fn bc_emit(bc: i64, op: i64, arg: i64) {
+    let i=heap_alloc_term(); heap_set_tag(i,TAG_INSTR); heap_set_body(i,op); heap_set_arg(i,arg); heap_set_domain(i,-1);
+    let tail=heap_get_domain(bc);
+    if tail==-1 { heap_set_arg(bc,i); } else { heap_set_domain(tail,i); }
+    heap_set_domain(bc,i); heap_set_body(bc,heap_get_body(bc)+1);
+}
+pub fn bc_head(bc: i64) -> i64 { return heap_get_arg(bc); }
+pub fn instr_op(i: i64) -> i64 { return heap_get_body(i); }
+pub fn instr_arg(i: i64) -> i64 { return heap_get_arg(i); }
+pub fn instr_next(i: i64) -> i64 { return heap_get_domain(i); }
+
+pub fn cg_expr(bc: i64, ast: i64) {
+    let t=heap_get_tag(ast);
+    if t==AST_INT||t==AST_BOOL { bc_emit(bc,OP_PUSH,heap_get_body(ast)); return; }
+    if t==AST_BINOP {
+        cg_expr(bc,heap_get_body(ast)); cg_expr(bc,heap_get_arg(ast));
+        let op=heap_get_domain(ast);
+        if op==TOK_PLUS { bc_emit(bc,OP_ADD,0); return; }
+        if op==TOK_MINUS { bc_emit(bc,OP_SUB,0); return; }
+        if op==TOK_STAR { bc_emit(bc,OP_MUL,0); return; }
+        if op==TOK_SLASH { bc_emit(bc,OP_DIV,0); return; }
+        if op==TOK_EQEQ { bc_emit(bc,OP_CMP_EQ,0); return; }
+        if op==TOK_LT { bc_emit(bc,OP_CMP_LT,0); return; }
+        if op==TOK_GT { bc_emit(bc,OP_CMP_GT,0); return; }
+    }
+}
+
+pub fn vm_new() -> i64 { let v=heap_alloc_term(); heap_set_tag(v,TAG_VM); heap_set_body(v,-1); return v; }
+pub fn vm_push(vm: i64, val: i64) { let f=heap_alloc_term(); heap_set_tag(f,TAG_STACK_FRAME); heap_set_body(f,val); heap_set_arg(f,heap_get_body(vm)); heap_set_body(vm,f); }
+pub fn vm_pop(vm: i64) -> i64 { let top=heap_get_body(vm); if top==-1 { return 0; } let v=heap_get_body(top); heap_set_body(vm,heap_get_arg(top)); return v; }
+pub fn vars_set(h: i64, n: i64, v: i64) -> i64 { let nd=heap_alloc_term(); heap_set_tag(nd,TAG_VAR); heap_set_body(nd,n); heap_set_arg(nd,v); heap_set_domain(nd,h); return nd; }
+pub fn vars_get(h: i64, n: i64) -> i64 { let mut nd=h; while nd!=-1 { if heap_get_body(nd)==n { return heap_get_arg(nd); } nd=heap_get_domain(nd); } return 0; }
+
+pub fn vm_run(bc: i64) -> i64 {
+    let vm=vm_new(); let mut vars: i64 = -1; let mut instr=bc_head(bc);
+    while instr != -1 {
+        let op=instr_op(instr); let arg=instr_arg(instr);
+        if op==OP_PUSH { vm_push(vm,arg); }
+        else if op==OP_ADD { let b=vm_pop(vm); let a=vm_pop(vm); vm_push(vm,a+b); }
+        else if op==OP_SUB { let b=vm_pop(vm); let a=vm_pop(vm); vm_push(vm,a-b); }
+        else if op==OP_MUL { let b=vm_pop(vm); let a=vm_pop(vm); vm_push(vm,a*b); }
+        else if op==OP_DIV { let b=vm_pop(vm); let a=vm_pop(vm); if b==0 { vm_push(vm,0); } else { vm_push(vm,a/b); } }
+        else if op==OP_CMP_EQ { let b=vm_pop(vm); let a=vm_pop(vm); if a==b { vm_push(vm,1); } else { vm_push(vm,0); } }
+        else if op==OP_CMP_LT { let b=vm_pop(vm); let a=vm_pop(vm); if a<b { vm_push(vm,1); } else { vm_push(vm,0); } }
+        else if op==OP_CMP_GT { let b=vm_pop(vm); let a=vm_pop(vm); if a>b { vm_push(vm,1); } else { vm_push(vm,0); } }
+        else if op==OP_STORE { vars=vars_set(vars,arg,vm_pop(vm)); }
+        else if op==OP_LOAD { vm_push(vm,vars_get(vars,arg)); }
+        else if op==OP_RET { return vm_pop(vm); }
+        instr=instr_next(instr);
+    }
+    return vm_pop(vm);
+}
+
+pub fn compile_and_run(src: String) -> i64 {
+    let st = lex_new(src.len);
+    let p = parser_new(src, st);
+    let ast = parse_expr(src, p);
+    let bc = bc_new();
+    cg_expr(bc, ast);
+    bc_emit(bc, OP_RET, 0);
+    return vm_run(bc);
+}
+
+pub pub fn main() -> i64 {
+    // Core integration test: the expression that earns 111
+    if compile_and_run("1 + 2 * 3") != 7 { return 1; }
+
+    // Additional correctness checks
+    if compile_and_run("10 * 11 + 1") != 111 { return 2; }
+    if compile_and_run("(1 + 2) * 3") != 9 { return 3; }
+    if compile_and_run("100 - 1") != 99 { return 4; }
+    if compile_and_run("4 * 4 / 2") != 8 { return 5; }
+    if compile_and_run("3 == 3") != 1 { return 6; }
+    if compile_and_run("5 > 3") != 1 { return 7; }
+    if compile_and_run("2 < 1") != 0 { return 8; }
+
+    return 111;
+}

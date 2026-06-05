@@ -1,0 +1,92 @@
+// titan/ulcf/configs/typescript.ti
+// TypeScript language configuration for the Universal Grammar Adapter.
+
+pub fn typescript_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("number".to_string(), "f64".to_string());
+    type_map.insert("string".to_string(), "String".to_string());
+    type_map.insert("boolean".to_string(), "bool".to_string());
+    type_map.insert("void".to_string(), "void".to_string());
+    type_map.insert("never".to_string(), "never".to_string());
+    type_map.insert("any".to_string(), "Any".to_string());
+    type_map.insert("unknown".to_string(), "Any".to_string());
+    type_map.insert("Array".to_string(), "Vec<Any>".to_string());
+    type_map.insert("Map".to_string(), "HashMap<Any,Any>".to_string());
+    type_map.insert("Set".to_string(), "Vec<Any>".to_string());
+    type_map.insert("Promise".to_string(), "Future<Any>".to_string());
+    type_map.insert("Record".to_string(), "HashMap<String,Any>".to_string());
+    type_map.insert("Tuple".to_string(), "Tuple".to_string());
+    type_map.insert("null".to_string(), "Option<Any>".to_string());
+    type_map.insert("undefined".to_string(), "Option<Any>".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("===".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("!==".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+    operator_map.insert("??".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "typescript".to_string(),
+        extensions: vec![".ts".to_string(), ".tsx".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "variable_declaration".to_string(),
+            "if_statement".to_string(),
+            "switch_statement".to_string(),
+            "while_statement".to_string(),
+            "do_statement".to_string(),
+            "for_statement".to_string(),
+            "for_in_statement".to_string(),
+            "return_statement".to_string(),
+            "break_statement".to_string(),
+            "continue_statement".to_string(),
+            "try_statement".to_string(),
+            "throw_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "call_expression".to_string(),
+            "identifier".to_string(),
+            "number_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "null_literal".to_string(),
+            "undefined_literal".to_string(),
+            "array_literal".to_string(),
+            "object_literal".to_string(),
+            "arrow_function".to_string(),
+            "function_expression".to_string(),
+            "template_literal".to_string(),
+            "regex_literal".to_string(),
+        ],
+        literal_nodes: vec![
+            "number_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "null".to_string(),
+            "undefined".to_string(),
+        ],
+        comment_nodes: vec![
+            "comment".to_string(),
+            "multiline_comment".to_string(),
+        ],
+        block_nodes: vec!["statement_block".to_string()],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "var_first".to_string(),
+    }
+}

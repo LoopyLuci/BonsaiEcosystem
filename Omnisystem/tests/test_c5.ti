@@ -1,0 +1,53 @@
+// tests/test_c5.ti — Phase C5 Browser UI & Chrome Integration Test
+// All helpers inlined with tc5_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TC5_T_TAB:  i64 = 23400;
+const TC5_T_ABAR: i64 = 23401;
+const TC5_T_WRP:  i64 = 23403;
+
+pub fn tc5_tab_create(url: i64, title: i64, active: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TC5_T_TAB); heap_set_body(t, url); heap_set_arg(t, title); heap_set_domain(t, active);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TC5_T_WRP); heap_set_body(w, t); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tc5_abar_create() -> i64 {
+    let a = heap_alloc_term();
+    heap_set_tag(a, TC5_T_ABAR); heap_set_body(a, 0); heap_set_arg(a, 0);
+    return a;
+}
+
+pub fn tc5_abar_add_tab(a: i64, w: i64) {
+    let h = heap_get_arg(a);
+    if h == 0 { heap_set_arg(a, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(a, heap_get_body(a) + 1);
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let a = tc5_abar_create();
+    tc5_abar_add_tab(a, tc5_tab_create(5, 50, 1));
+    tc5_abar_add_tab(a, tc5_tab_create(6, 60, 1));
+    tc5_abar_add_tab(a, tc5_tab_create(7, 70, 0));
+    if heap_get_body(a) != 3        { return 1; }
+    return 111;
+}

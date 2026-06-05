@@ -1,0 +1,7 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_BN15:i64=26400;const tT_BD15:i64=26401;
+pub fn tf15_bench_create(name:i64)->i64{let b=heap_alloc_term();heap_set_tag(b,tT_BN15);heap_set_body(b,name);heap_set_arg(b,0);heap_set_domain(b,0);return b;}
+pub fn tf15_bench_record(b:i64,r:i64){heap_set_arg(b,r);}
+pub fn tf15_budget_create(total:i64)->i64{let b=heap_alloc_term();heap_set_tag(b,tT_BD15);heap_set_body(b,total);heap_set_arg(b,total);return b;}
+pub fn tf15_budget_spend(b:i64,amount:i64)->i64{let avail=heap_get_arg(b);if amount>avail{return 0;}heap_set_arg(b,avail-amount);return 1;}
+pub fn main()->i64{let b=tf15_budget_create(500);tf15_budget_spend(b,200);if heap_get_arg(b)!=300{return 1;}return 111;}

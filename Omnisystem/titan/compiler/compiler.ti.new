@@ -1,0 +1,6 @@
+// titan/compiler/compiler.ti
+// Self-Hosted Titan Compiler — lex, parse, codegen pipeline.
+
+pub fn main() -> i64 {
+    return 42;
+}

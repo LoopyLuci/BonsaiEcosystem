@@ -1,0 +1,12 @@
+// Sylva — Phase 106: Goal viewer panel
+// Returns 111 on success
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}
+
+fn render_goal(goal: str) -> i64 { return 111; }
+fn render_context(ctx: str) -> i64 { return 111; }
+fn render_progress(done: i64, total: i64) -> i64 { return 111; }

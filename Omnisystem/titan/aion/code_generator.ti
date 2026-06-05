@@ -1,0 +1,180 @@
+// titan/aion/code_generator.ti — Code Generation Engine
+// Produces Titan source files from architecture specifications.
+// Inlines spec_parser helpers; body-for-meta throughout.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+}
+
+// ===== Spec parser (inlined) =====
+const TAG_SPEC:        i64 = 8410;
+const TAG_ENTITY:      i64 = 8411;
+const ENTITY_API:      i64 = 5;
+const ENTITY_DATABASE: i64 = 3;
+const ENTITY_UI:       i64 = 4;
+
+const TEMPLATE_REST_API: i64 = 0;
+const TEMPLATE_WEB_APP:  i64 = 1;
+const TEMPLATE_CLI_TOOL: i64 = 2;
+const TEMPLATE_LIBRARY:  i64 = 3;
+
+pub fn cg_entity_type(e: i64) -> i64 { return heap_get_body(heap_get_body(e)); }
+
+pub fn spec_parse_cg(spec_id: i64) -> i64 {
+    let mut entities: i64 = 0;
+    let len = str_len(spec_id);
+    if len > 0 {
+        let mut pos: i64 = 0;
+        while pos < len {
+            if pos + 2 < len {
+                if str_at(spec_id, pos) == 65 && str_at(spec_id, pos + 1) == 80 && str_at(spec_id, pos + 2) == 73 {
+                    let m = heap_alloc_term();
+                    heap_set_body(m, ENTITY_API); heap_set_arg(m, 0); heap_set_domain(m, 0);
+                    let e = heap_alloc_term();
+                    heap_set_tag(e, TAG_ENTITY); heap_set_body(e, m); heap_set_arg(e, 0);
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            if pos + 1 < len {
+                if str_at(spec_id, pos) == 68 && str_at(spec_id, pos + 1) == 66 {
+                    let m = heap_alloc_term();
+                    heap_set_body(m, ENTITY_DATABASE); heap_set_arg(m, 0); heap_set_domain(m, 0);
+                    let e = heap_alloc_term();
+                    heap_set_tag(e, TAG_ENTITY); heap_set_body(e, m); heap_set_arg(e, 0);
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            if pos + 1 < len {
+                if str_at(spec_id, pos) == 85 && str_at(spec_id, pos + 1) == 73 {
+                    let m = heap_alloc_term();
+                    heap_set_body(m, ENTITY_UI); heap_set_arg(m, 0); heap_set_domain(m, 0);
+                    let e = heap_alloc_term();
+                    heap_set_tag(e, TAG_ENTITY); heap_set_body(e, m); heap_set_arg(e, 0);
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            pos = pos + 1;
+        }
+    }
+    let spec = heap_alloc_term();
+    heap_set_tag(spec, TAG_SPEC);
+    heap_set_body(spec, spec_id);
+    heap_set_arg(spec, 0);
+    heap_set_domain(spec, entities);
+    return spec;
+}
+
+pub fn spec_recommend_template_cg(spec: i64) -> i64 {
+    let mut has_api: bool = false;
+    let mut has_db:  bool = false;
+    let mut has_ui:  bool = false;
+    let mut curr = heap_get_domain(spec);
+    while curr != 0 {
+        let et = cg_entity_type(curr);
+        if et == ENTITY_API      { has_api = true; }
+        if et == ENTITY_DATABASE { has_db  = true; }
+        if et == ENTITY_UI       { has_ui  = true; }
+        curr = heap_get_domain(curr);
+    }
+    if has_api && has_db { return TEMPLATE_REST_API; }
+    if has_ui            { return TEMPLATE_WEB_APP; }
+    if has_api           { return TEMPLATE_CLI_TOOL; }
+    return TEMPLATE_LIBRARY;
+}
+
+// ===== Generated file / project =====
+const TAG_GEN_FILE:    i64 = 8420;
+const TAG_GEN_PROJECT: i64 = 8421;
+
+pub fn gen_file_create(path_id: i64, content_id: i64) -> i64 {
+    let f = heap_alloc_term();
+    heap_set_tag(f, TAG_GEN_FILE);
+    heap_set_body(f, path_id);
+    heap_set_arg(f, content_id);
+    heap_set_domain(f, 0);
+    return f;
+}
+pub fn gen_file_path(f: i64) -> i64    { return heap_get_body(f); }
+pub fn gen_file_content(f: i64) -> i64 { return heap_get_arg(f); }
+
+pub fn gen_project_create(name_id: i64, template: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TAG_GEN_PROJECT);
+    heap_set_body(p, name_id);
+    heap_set_arg(p, template);
+    heap_set_domain(p, 0);
+    return p;
+}
+
+pub fn gen_project_add_file(project: i64, file: i64) {
+    let head = heap_get_domain(project);
+    heap_set_domain(file, head);
+    heap_set_domain(project, file);
+}
+
+pub fn gen_project_file_count(project: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = heap_get_domain(project);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    return count;
+}
+
+pub fn gen_rest_api_project(spec: i64) -> i64 {
+    let p = gen_project_create(heap_alloc_term(), TEMPLATE_REST_API);
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    return p;
+}
+
+pub fn gen_web_app_project(spec: i64) -> i64 {
+    let p = gen_project_create(heap_alloc_term(), TEMPLATE_WEB_APP);
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    return p;
+}
+
+pub fn gen_from_spec(spec: i64) -> i64 {
+    let template = spec_recommend_template_cg(spec);
+    if template == TEMPLATE_REST_API { return gen_rest_api_project(spec); }
+    if template == TEMPLATE_WEB_APP  { return gen_web_app_project(spec); }
+    let p = gen_project_create(heap_alloc_term(), template);
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    return p;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let spec = spec_parse_cg(heap_alloc_term());
+    if heap_get_tag(spec) != TAG_SPEC         { return 1; }
+
+    let project = gen_from_spec(spec);
+    if heap_get_tag(project) != TAG_GEN_PROJECT { return 2; }
+    if gen_project_file_count(project) < 1      { return 3; }
+
+    let rest = gen_rest_api_project(spec);
+    if gen_project_file_count(rest) != 4        { return 4; }
+
+    let web = gen_web_app_project(spec);
+    if gen_project_file_count(web) != 3         { return 5; }
+
+    let f = gen_file_create(100, 200);
+    if heap_get_tag(f) != TAG_GEN_FILE          { return 6; }
+    if gen_file_path(f) != 100                  { return 7; }
+    if gen_file_content(f) != 200               { return 8; }
+
+    return 111;
+}

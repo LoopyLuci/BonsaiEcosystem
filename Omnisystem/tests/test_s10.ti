@@ -1,0 +1,126 @@
+// tests/test_s10.ti — Phase S10 IDE Integration Integration Test
+// All helpers inlined with ts10_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS10_T_PANREG: i64 = 9700;
+const TS10_T_SVC:    i64 = 9701;
+const TS10_T_SKILL:  i64 = 9702;
+const TS10_T_WRP:    i64 = 9703;
+
+const TS10_PT_SPLAT: i64 = 50;
+const TS10_SVC_IDLE: i64 = 0;
+const TS10_SVC_RUN:  i64 = 1;
+
+// ===== Panel Registry =====
+pub fn ts10_panel_reg() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TS10_T_PANREG); heap_set_body(r, 0); heap_set_arg(r, 0); heap_set_domain(r, 0);
+    return r;
+}
+pub fn ts10_preg_add(r: i64, kind: i64, name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_body(p, kind); heap_set_arg(p, name); heap_set_domain(p, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TS10_T_WRP); heap_set_body(w, p); heap_set_domain(w, 0);
+    let c = heap_get_body(r);
+    if c == 0 { heap_set_arg(r, w); }
+    else {
+        let mut t = heap_get_arg(r);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(r, c + 1);
+    return p;
+}
+pub fn ts10_preg_cnt(r: i64) -> i64 { return heap_get_body(r); }
+pub fn ts10_preg_get(r: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(r); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+
+// ===== Service =====
+pub fn ts10_svc_create(kind: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TS10_T_SVC); heap_set_body(s, kind); heap_set_arg(s, TS10_SVC_IDLE); heap_set_domain(s, 0);
+    return s;
+}
+pub fn ts10_svc_start(s: i64)        { heap_set_arg(s, TS10_SVC_RUN); }
+pub fn ts10_svc_stop(s: i64)         { heap_set_arg(s, TS10_SVC_IDLE); }
+pub fn ts10_svc_state(s: i64) -> i64 { return heap_get_arg(s); }
+pub fn ts10_svc_kind(s: i64) -> i64  { return heap_get_body(s); }
+
+// ===== Agent Skill =====
+pub fn ts10_skill_create(name: i64, desc: i64) -> i64 {
+    let k = heap_alloc_term();
+    heap_set_tag(k, TS10_T_SKILL); heap_set_body(k, name); heap_set_arg(k, desc); heap_set_domain(k, 0);
+    return k;
+}
+pub fn ts10_skill_name(k: i64) -> i64 { return heap_get_body(k); }
+pub fn ts10_skill_desc(k: i64) -> i64 { return heap_get_arg(k); }
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Panel registry: 5 panels via loop
+    let r = ts10_panel_reg();
+    let mut i: i64 = 0;
+    while i < 5 { ts10_preg_add(r, TS10_PT_SPLAT + i, i * 10); i = i + 1; }
+    if ts10_preg_cnt(r) != 5 { return 1; }
+
+    // Verify panel kinds by index
+    let rp0 = ts10_preg_get(r, 0);
+    if heap_get_body(rp0) != TS10_PT_SPLAT     { return 2; }
+    let rp4 = ts10_preg_get(r, 4);
+    if heap_get_body(rp4) != TS10_PT_SPLAT + 4 { return 3; }
+
+    // Verify panel names
+    if heap_get_arg(rp0) != 0  { return 4; }
+    if heap_get_arg(rp4) != 40 { return 5; }
+
+    // Service: independent state
+    let s1 = ts10_svc_create(1);
+    let s2 = ts10_svc_create(2);
+    if ts10_svc_state(s1) != TS10_SVC_IDLE { return 6; }
+    if ts10_svc_state(s2) != TS10_SVC_IDLE { return 7; }
+    ts10_svc_start(s1);
+    if ts10_svc_state(s1) != TS10_SVC_RUN  { return 8; }
+    if ts10_svc_state(s2) != TS10_SVC_IDLE { return 9; }
+    ts10_svc_start(s2);
+    ts10_svc_stop(s2);
+    if ts10_svc_state(s2) != TS10_SVC_IDLE { return 10; }
+    if ts10_svc_state(s1) != TS10_SVC_RUN  { return 11; }
+    if ts10_svc_kind(s1) != 1              { return 12; }
+    if ts10_svc_kind(s2) != 2              { return 13; }
+
+    // Skills
+    let k = ts10_skill_create(30, 300);
+    if ts10_skill_name(k) != 30  { return 14; }
+    if ts10_skill_desc(k) != 300 { return 15; }
+
+    // Multiple skills — isolation
+    let ka = ts10_skill_create(11, 111);
+    let kb = ts10_skill_create(22, 222);
+    if ts10_skill_name(ka) != 11  { return 16; }
+    if ts10_skill_name(kb) != 22  { return 17; }
+    if ts10_skill_desc(ka) != 111 { return 18; }
+    if ts10_skill_desc(kb) != 222 { return 19; }
+
+    // Second registry — isolation
+    let r2 = ts10_panel_reg();
+    ts10_preg_add(r2, 99, 999);
+    if ts10_preg_cnt(r2) != 1 { return 20; }
+    if ts10_preg_cnt(r) != 5  { return 21; }
+
+    return 111;
+}

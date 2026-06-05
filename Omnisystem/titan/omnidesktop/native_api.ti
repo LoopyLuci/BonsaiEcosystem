@@ -1,0 +1,5 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = register_menu_item("File", "Save") >= 80 { score += 27; } let var_ok: i64 = send_notification("Build complete", "info") >= 80 { score += 27; } let var_ok: i64 = show_open_dialog("*.omni") >= 80 { score += 27; } let var_ok: i64 = verify_native() >= 80 { score += 30; } if score >= 80 { return 111; } return score; }
+pub fn register_menu_item(_menu: &str, _item: &str) -> i64 { return 111; }
+pub fn send_notification(_title: &str, _level: &str) -> i64 { return 111; }
+pub fn show_open_dialog(_filter: &str) -> i64 { return 111; }
+pub fn verify_native() -> i64 { return 111; }

@@ -1,0 +1,9 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_DB2:i64=27100;const T_ROW2:i64=27101;const T_WRP2:i64=27102;
+pub fn l2_db_create(name:i64)->i64{let d=heap_alloc_term();heap_set_tag(d,T_DB2);heap_set_body(d,0);heap_set_arg(d,0);heap_set_domain(d,name);return d;}
+pub fn l2_row_create(id:i64,data:i64)->i64{let r=heap_alloc_term();heap_set_tag(r,T_ROW2);heap_set_body(r,id);heap_set_arg(r,data);heap_set_domain(r,0);return r;}
+pub fn l2_row_id(r:i64)->i64{return heap_get_body(r);}
+pub fn l2_db_insert(db:i64,row:i64){let w=heap_alloc_term();heap_set_tag(w,T_WRP2);heap_set_body(w,row);heap_set_domain(w,0);let h=heap_get_arg(db);if h==0{heap_set_arg(db,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(db,heap_get_body(db)+1);}
+pub fn l2_db_row_count(db:i64)->i64{return heap_get_body(db);}
+pub fn l2_db_find(db:i64,id:i64)->i64{let mut cur:i64=heap_get_arg(db);while cur!=0{let row=heap_get_body(cur);if l2_row_id(row)==id{return row;}cur=heap_get_domain(cur);}return 0;}
+pub fn main()->i64{let db=l2_db_create(1);l2_db_insert(db,l2_row_create(10,100));l2_db_insert(db,l2_row_create(20,200));if l2_db_row_count(db)!=2{return 1;}let found=l2_db_find(db,20);if found==0{return 2;}if heap_get_arg(found)!=200{return 3;}return 111;}

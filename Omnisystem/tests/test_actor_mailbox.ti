@@ -1,0 +1,24 @@
+// tests/test_actor_mailbox.ti
+// Actor mailbox test — messages delivered in order, retrieved in order.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    let spawned: i64 = spawn_actor("mailbox-test", 0);
+    if spawned == 1 { score = score + 1; }
+
+    // Send three messages in order
+    let s1: i64 = send_actor_msg("mailbox-test", "first");
+    let s2: i64 = send_actor_msg("mailbox-test", "second");
+    let s3: i64 = send_actor_msg("mailbox-test", "third");
+    if s1 == 1 && s2 == 1 && s3 == 1 { score = score + 1; }
+
+    // Receive in order (LIFO from Vec::pop)
+    let m1: String = receive_actor_msg("mailbox-test");
+    let m2: String = receive_actor_msg("mailbox-test");
+    let m3: String = receive_actor_msg("mailbox-test");
+    if m1 == "third" && m2 == "second" && m3 == "first" { score = score + 1; }
+
+    if score == 3 { return 111; }
+    return score * 30;
+}

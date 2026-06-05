@@ -1,0 +1,100 @@
+// titan/concurrency/sync.ti — Acquire/release synchronisation primitives
+// sync_access() blocks acquire a mutex, perform operations, then release.
+// Axiom verifies every acquire has a matching release on all paths.
+// Functions touching Shared<T> must declare ! {RaceCondition} in their effect row.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+    fn mutex_create() -> i64;
+    fn mutex_lock(mid: i64);
+    fn mutex_unlock(mid: i64);
+}
+
+const TAG_SYNC_CTX: i64 = 56000;
+const TAG_SHARED:   i64 = 56001;
+
+// sync_ctx: tag=TAG_SYNC_CTX, body=mutex_id, arg=lock_depth (0=unlocked)
+pub fn sync_ctx_new() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_SYNC_CTX);
+    let mid = mutex_create();
+    heap_set_body(c, mid);
+    heap_set_arg(c, 0);
+    return c;
+}
+
+pub fn sync_acquire(ctx: i64) {
+    let mid = heap_get_body(ctx);
+    mutex_lock(mid);
+    let depth = heap_get_arg(ctx);
+    heap_set_arg(ctx, depth + 1);
+}
+
+pub fn sync_release(ctx: i64) {
+    let depth = heap_get_arg(ctx);
+    if depth > 0 {
+        heap_set_arg(ctx, depth - 1);
+        let mid = heap_get_body(ctx);
+        mutex_unlock(mid);
+    }
+}
+
+pub fn sync_is_locked(ctx: i64) -> i64 {
+    if heap_get_arg(ctx) > 0 { return 1; }
+    return 0;
+}
+
+// Shared<T> wrapper: tag=TAG_SHARED, body=value, arg=sync_ctx
+pub fn shared_new(val: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SHARED);
+    heap_set_body(s, val);
+    let ctx = sync_ctx_new();
+    heap_set_arg(s, ctx);
+    return s;
+}
+
+pub fn shared_read(s: i64) -> i64 {
+    let ctx = heap_get_arg(s);
+    sync_acquire(ctx);
+    let v = heap_get_body(s);
+    sync_release(ctx);
+    return v;
+}
+
+pub fn shared_write(s: i64, val: i64) {
+    let ctx = heap_get_arg(s);
+    sync_acquire(ctx);
+    heap_set_body(s, val);
+    sync_release(ctx);
+}
+
+pub fn main() -> i64 {
+    // Test 1: sync_ctx acquire/release cycle
+    let ctx = sync_ctx_new();
+    sync_acquire(ctx);
+    if sync_is_locked(ctx) != 1 { return 1; }
+    sync_release(ctx);
+    if sync_is_locked(ctx) != 0 { return 2; }
+
+    // Test 2: Shared<T> read/write
+    let s = shared_new(42);
+    if shared_read(s) != 42 { return 3; }
+    shared_write(s, 99);
+    if shared_read(s) != 99 { return 4; }
+
+    // Test 3: Release when unlocked is safe (no-op)
+    let ctx2 = sync_ctx_new();
+    sync_release(ctx2);
+    if sync_is_locked(ctx2) != 0 { return 5; }
+
+    return 111;
+}

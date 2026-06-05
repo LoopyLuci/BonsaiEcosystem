@@ -1,0 +1,16 @@
+// titan/omniview/hot_reload.ti
+// Hot reload engine in Titan — file watching and recompilation.
+
+pub fn main() -> i64 {
+    let file_path: i64 = 1;
+    let modified: i64 = check_modified(file_path);
+    let action: i64 = 0;
+    if modified == 1 { action = 1; }
+    return action;
+}
+
+pub fn check_modified(file_code: i64) -> i64 {
+    // Placeholder: in production, compares file modification timestamps
+    if file_code == 1 { return 1; }
+    return 0;
+}

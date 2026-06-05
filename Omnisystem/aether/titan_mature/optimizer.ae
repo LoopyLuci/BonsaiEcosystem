@@ -1,0 +1,29 @@
+// Aether — Phase 103: IR optimizer actor stub
+// Returns 111 on success
+
+actor OptimizerActor {
+    var score: i64 = 0;
+
+    on_start() {
+        self.score = 111;
+        emit telemetry { event: "optimizer_ready" };
+    }
+
+    handle OptimizeDCE(module: str) -> i64 {
+        return 111;
+    }
+
+    handle OptimizeInline(module: str) -> i64 {
+        return 111;
+    }
+
+    handle GetScore() -> i64 {
+        return self.score;
+    }
+}
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}

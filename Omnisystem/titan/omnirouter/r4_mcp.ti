@@ -1,0 +1,114 @@
+// titan/omnirouter/r4_mcp.ti — MCP Manager
+// Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_SRV4: i64 = 22300;
+const T_TOOL4: i64 = 22301;
+const T_REG4:  i64 = 22302;
+const T_WRP4:  i64 = 22303;
+
+// server: tag=T_SRV4, body=name, arg=state, domain=tool_list(PREPEND)
+// tool: tag=T_TOOL4, body=tool_name, domain=next_tool
+// wrapper: tag=T_WRP4, body=server, domain=next_wrapper
+
+pub fn r4_server_create(name: i64, state: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_SRV4); heap_set_body(s, name); heap_set_arg(s, state); heap_set_domain(s, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP4); heap_set_body(w, s); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn r4_server_name(w: i64) -> i64 {
+    let s = heap_get_body(w);
+    return heap_get_body(s);
+}
+pub fn r4_server_state(w: i64) -> i64 {
+    let s = heap_get_body(w);
+    return heap_get_arg(s);
+}
+pub fn r4_server_set_state(w: i64, st: i64) {
+    let s = heap_get_body(w);
+    heap_set_arg(s, st);
+}
+
+// Add tool via PREPEND into server.domain
+pub fn r4_server_add_tool(w: i64, tool_name: i64) {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TOOL4); heap_set_body(t, tool_name); heap_set_domain(t, 0);
+    let s = heap_get_body(w);
+    let h = heap_get_domain(s);
+    heap_set_domain(t, h);
+    heap_set_domain(s, t);
+}
+
+pub fn r4_server_tool_count(w: i64) -> i64 {
+    let s = heap_get_body(w);
+    let mut cur: i64 = heap_get_domain(s);
+    let mut n: i64 = 0;
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+// registry: tag=T_REG4, body=count, arg=list_head(wrappers)
+pub fn r4_registry_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, T_REG4); heap_set_body(r, 0); heap_set_arg(r, 0);
+    return r;
+}
+
+pub fn r4_registry_add(r: i64, w: i64) {
+    let h = heap_get_arg(r);
+    if h == 0 { heap_set_arg(r, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn r4_registry_count(r: i64) -> i64 { return heap_get_body(r); }
+
+pub fn r4_registry_find_running(r: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(r);
+    while cur != 0 {
+        let w = cur;
+        if r4_server_state(w) == 1 { return w; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let s = r4_server_create(100, 1);
+    r4_server_add_tool(s, 10);
+    r4_server_add_tool(s, 20);
+    r4_server_add_tool(s, 30);
+    if r4_server_tool_count(s) != 3   { return 1; }
+    if r4_server_name(s) != 100       { return 2; }
+    if r4_server_state(s) != 1        { return 3; }
+    r4_server_set_state(s, 0);
+    if r4_server_state(s) != 0        { return 4; }
+
+    let r = r4_registry_create();
+    let s2 = r4_server_create(200, 1);
+    r4_registry_add(r, s);
+    r4_registry_add(r, s2);
+    if r4_registry_count(r) != 2      { return 5; }
+    let found = r4_registry_find_running(r);
+    if found != s2                     { return 6; }
+    return 111;
+}

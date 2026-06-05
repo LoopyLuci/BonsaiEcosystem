@@ -1,0 +1,67 @@
+// tests/test_struct_codegen.ti — verifies struct typedef, literals, field access, impl methods
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+pub struct Point {
+    x: i64,
+    y: i64,
+}
+
+pub struct Rect {
+    width: i64,
+    height: i64,
+    area: i64,
+}
+
+impl Point {
+    pub fn distance_sq(p: Point) -> i64 {
+        return p.x * p.x + p.y * p.y;
+    }
+}
+
+impl Rect {
+    pub fn compute_area(r: Rect) -> i64 {
+        return r.width * r.height;
+    }
+}
+
+pub fn make_point(x: i64, y: i64) -> Point {
+    return Point { x: x, y: y };
+}
+
+pub fn make_rect(w: i64, h: i64) -> Rect {
+    let area: i64 = w * h;
+    return Rect { width: w, height: h, area: area };
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: struct literal and field access
+    let p: Point = Point { x: 3, y: 4 };
+    if p.x == 3 {
+        if p.y == 4 {
+            score = score + 37;
+        }
+    }
+
+    // Test 2: impl method call (distance_sq of (3,4) = 25)
+    let dsq: i64 = Point_distance_sq(p);
+    if dsq == 25 {
+        score = score + 37;
+    }
+
+    // Test 3: Rect struct with computed area field
+    let r: Rect = make_rect(6, 7);
+    if r.area == 42 {
+        score = score + 37;
+    }
+
+    return score;
+}

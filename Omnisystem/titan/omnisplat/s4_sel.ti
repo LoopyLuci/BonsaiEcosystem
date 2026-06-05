@@ -1,0 +1,362 @@
+// titan/omnisplat/s4_sel.ti — Selection System (rect, brush, flood, lasso, sphere, box, eyedropper, manager)
+// All gsplat_data helpers inlined with s4_ prefix. No cross-file references.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_SEL_TOOL: i64 = 9300;
+const S_RECT:   i64 = 0;
+const S_BRUSH:  i64 = 1;
+const S_FLOOD:  i64 = 2;
+const S_LASSO:  i64 = 3;
+const S_SPHERE: i64 = 4;
+const S_BOX:    i64 = 5;
+const S_EYE:    i64 = 6;
+
+// ===== Inlined gsplat_data (s4_ prefix) =====
+// vertex: tag=8801, body=px, arg=py, domain=m6
+// m6: body=opacity, arg=0, domain=m5
+// m5: body=g, arg=b, domain=m4
+// m4: body=c5, arg=r, domain=m3
+// m3: body=c3, arg=c4, domain=m2
+// m2: body=c1, arg=c2, domain=m1
+// m1: body=pz, arg=c0, domain=0
+//
+// data: tag=8800, body=count, arg=list_head(wrappers), domain=state_arr
+// wrapper: body=vertex, domain=next (APPEND order)
+// state_arr: tag=8802, body=n, arg=entry_list_head (PREPEND; first match wins)
+// entry: body=index, arg=flags, domain=next
+
+pub fn s4_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, 8800); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn s4_data_add(data: i64, splat: i64) {
+    let w = heap_alloc_term(); heap_set_body(w, splat); heap_set_domain(w, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, w); }
+    else { let mut c = head; while heap_get_domain(c) != 0 { c = heap_get_domain(c); } heap_set_domain(c, w); }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+pub fn s4_data_count(data: i64) -> i64 { return heap_get_body(data); }
+pub fn s4_data_get(data: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(data); let mut i: i64 = 0;
+    while curr != 0 { if i == index { return heap_get_body(curr); } i = i + 1; curr = heap_get_domain(curr); }
+    return 0;
+}
+pub fn s4_vertex_create(px: i64, py: i64, pz: i64,
+                         c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+                         r: i64, g: i64, b: i64, opacity: i64) -> i64 {
+    let m1 = heap_alloc_term(); heap_set_body(m1, pz); heap_set_arg(m1, c0); heap_set_domain(m1, 0);
+    let m2 = heap_alloc_term(); heap_set_body(m2, c1); heap_set_arg(m2, c2); heap_set_domain(m2, m1);
+    let m3 = heap_alloc_term(); heap_set_body(m3, c3); heap_set_arg(m3, c4); heap_set_domain(m3, m2);
+    let m4 = heap_alloc_term(); heap_set_body(m4, c5); heap_set_arg(m4, r);  heap_set_domain(m4, m3);
+    let m5 = heap_alloc_term(); heap_set_body(m5, g);  heap_set_arg(m5, b);  heap_set_domain(m5, m4);
+    let m6 = heap_alloc_term(); heap_set_body(m6, opacity); heap_set_arg(m6, 0); heap_set_domain(m6, m5);
+    let v = heap_alloc_term();
+    heap_set_tag(v, 8801); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, m6);
+    return v;
+}
+pub fn s4_vx(v: i64) -> i64 { return heap_get_body(v); }
+pub fn s4_vy(v: i64) -> i64 { return heap_get_arg(v); }
+pub fn s4_vz(v: i64) -> i64 {
+    return heap_get_body(heap_get_domain(heap_get_domain(heap_get_domain(heap_get_domain(heap_get_domain(heap_get_domain(v)))))));
+}
+pub fn s4_state_create(n: i64) -> i64 {
+    let arr = heap_alloc_term();
+    heap_set_tag(arr, 8802); heap_set_body(arr, n); heap_set_arg(arr, 0);
+    return arr;
+}
+pub fn s4_state_set(arr: i64, index: i64, flags: i64) {
+    let node = heap_alloc_term();
+    heap_set_body(node, index); heap_set_arg(node, flags);
+    heap_set_domain(node, heap_get_arg(arr));
+    heap_set_arg(arr, node);
+}
+pub fn s4_state_get(arr: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(arr);
+    while curr != 0 {
+        if heap_get_body(curr) == index { return heap_get_arg(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+pub fn s4_select(data: i64, index: i64) {
+    let arr = heap_get_domain(data);
+    let cur = s4_state_get(arr, index);
+    s4_state_set(arr, index, cur | 1);
+}
+pub fn s4_is_selected(data: i64, index: i64) -> bool {
+    let arr = heap_get_domain(data);
+    return (s4_state_get(arr, index) & 1) != 0;
+}
+pub fn s4_selected_count(data: i64) -> i64 {
+    let count = s4_data_count(data);
+    let mut sel: i64 = 0; let mut i: i64 = 0;
+    while i < count { if s4_is_selected(data, i) { sel = sel + 1; } i = i + 1; }
+    return sel;
+}
+pub fn s4_select_none(data: i64) {
+    let arr = heap_get_domain(data);
+    heap_set_arg(arr, 0);
+}
+
+// ===== Selection tool =====
+
+pub fn sel_tool_create(kind: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_SEL_TOOL); heap_set_body(t, kind);
+    return t;
+}
+
+// 2-D rectangle test: (px,py) inside (sx,sy)-(sx+w,sy+h)
+pub fn sel_rect_test(sx: i64, sy: i64, w: i64, h: i64, px: i64, py: i64) -> bool {
+    return px >= sx && px <= sx + w && py >= sy && py <= sy + h;
+}
+
+// 3-D sphere test
+pub fn sel_sphere_test(cx: i64, cy: i64, cz: i64, r: i64,
+                        px: i64, py: i64, pz: i64) -> bool {
+    let dx = px - cx; let dy = py - cy; let dz = pz - cz;
+    return (dx*dx + dy*dy + dz*dz) <= r*r;
+}
+
+// 3-D axis-aligned box test
+pub fn sel_box_test(mnx: i64, mny: i64, mnz: i64,
+                    mxx: i64, mxy: i64, mxz: i64,
+                    px: i64, py: i64, pz: i64) -> bool {
+    return px >= mnx && px <= mxx
+        && py >= mny && py <= mxy
+        && pz >= mnz && pz <= mxz;
+}
+
+// Flood-fill: selects all splats within max_dist of splat at start_idx.
+pub fn sel_flood_fill(data: i64, start_idx: i64, max_dist: i64) -> i64 {
+    let c = s4_data_get(data, start_idx);
+    if c == 0 { return 0; }
+    let sx = s4_vx(c); let sy = s4_vy(c); let sz = s4_vz(c);
+    let n = s4_data_count(data);
+    let mut count: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = s4_data_get(data, i);
+        if s != 0 {
+            let dx = s4_vx(s) - sx; let dy = s4_vy(s) - sy; let dz = s4_vz(s) - sz;
+            if dx*dx + dy*dy + dz*dz <= max_dist*max_dist {
+                s4_select(data, i); count = count + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+// Eyedropper: selects splats whose position is within tolerance of src_idx's position.
+pub fn sel_eyedropper(data: i64, src_idx: i64, tolerance: i64) -> i64 {
+    let c = s4_data_get(data, src_idx);
+    if c == 0 { return 0; }
+    let sr = s4_vx(c); let sg = s4_vy(c); let sb = s4_vz(c);
+    let n = s4_data_count(data);
+    let mut count: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = s4_data_get(data, i);
+        if s != 0 {
+            let mut dr = s4_vx(s) - sr; if dr < 0 { dr = -dr; }
+            let mut dg = s4_vy(s) - sg; if dg < 0 { dg = -dg; }
+            let mut db = s4_vz(s) - sb; if db < 0 { db = -db; }
+            if dr < tolerance && dg < tolerance && db < tolerance {
+                s4_select(data, i); count = count + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+// Brush: selects splats within 2-D radius of (cx,cy).
+pub fn sel_brush(data: i64, cx: i64, cy: i64, radius: i64) -> i64 {
+    let n = s4_data_count(data);
+    let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = s4_data_get(data, i);
+        if s != 0 {
+            let dx = s4_vx(s) - cx; let dy = s4_vy(s) - cy;
+            if dx*dx + dy*dy <= radius*radius { s4_select(data, i); c = c + 1; }
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+// Point-in-polygon: uses bounding box of the linked-list polygon.
+// Each point node: body=x, arg=y, domain=next (list terminates at 0).
+pub fn sel_point_in_poly(px: i64, py: i64, pts: i64, n: i64) -> bool {
+    if n == 0 { return false; }
+    let mut min_x = heap_get_body(pts); let mut max_x = min_x;
+    let mut min_y = heap_get_arg(pts);  let mut max_y = min_y;
+    let mut curr = heap_get_domain(pts);
+    while curr != 0 {
+        let x = heap_get_body(curr); let y = heap_get_arg(curr);
+        if x < min_x { min_x = x; } if x > max_x { max_x = x; }
+        if y < min_y { min_y = y; } if y > max_y { max_y = y; }
+        curr = heap_get_domain(curr);
+    }
+    return px >= min_x && px <= max_x && py >= min_y && py <= max_y;
+}
+
+// Lasso: selects splats inside the polygon defined by a linked list of points.
+pub fn sel_lasso(data: i64, pts: i64, npts: i64) -> i64 {
+    let n = s4_data_count(data);
+    let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = s4_data_get(data, i);
+        if s != 0 {
+            if sel_point_in_poly(s4_vx(s), s4_vy(s), pts, npts) {
+                s4_select(data, i); c = c + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+pub fn sel_count(data: i64) -> i64 { return s4_selected_count(data); }
+
+// params layouts:
+//   S_RECT  : body=sx, arg=sy,  domain=meta(body=w, arg=h)
+//   S_BRUSH : body=cx, arg=cy,  domain=meta(body=radius)
+//   S_FLOOD : body=start_idx, arg=max_dist
+//   S_SPHERE: body=cx, arg=cy,  domain=meta(body=cz, arg=r)
+//   S_BOX   : body=mnx, arg=mny, domain=meta(body=mnz, arg=mxx, domain=meta2(body=mxy, arg=mxz))
+//   S_EYE   : body=src_idx, arg=tolerance
+pub fn sel_manager_execute(data: i64, tool: i64, params: i64) -> i64 {
+    let kind = heap_get_body(tool);
+    if kind == S_RECT {
+        let sx = heap_get_body(params); let sy = heap_get_arg(params);
+        let meta = heap_get_domain(params);
+        let w = heap_get_body(meta); let h = heap_get_arg(meta);
+        let n = s4_data_count(data);
+        let mut c: i64 = 0; let mut i: i64 = 0;
+        while i < n {
+            let s = s4_data_get(data, i);
+            if s != 0 && sel_rect_test(sx, sy, w, h, s4_vx(s), s4_vy(s)) {
+                s4_select(data, i); c = c + 1;
+            }
+            i = i + 1;
+        }
+        return c;
+    }
+    if kind == S_BRUSH {
+        let meta = heap_get_domain(params);
+        return sel_brush(data, heap_get_body(params), heap_get_arg(params), heap_get_body(meta));
+    }
+    if kind == S_FLOOD {
+        return sel_flood_fill(data, heap_get_body(params), heap_get_arg(params));
+    }
+    if kind == S_SPHERE {
+        let cx = heap_get_body(params); let cy = heap_get_arg(params);
+        let meta = heap_get_domain(params);
+        let cz = heap_get_body(meta); let r = heap_get_arg(meta);
+        let n = s4_data_count(data);
+        let mut c: i64 = 0; let mut i: i64 = 0;
+        while i < n {
+            let s = s4_data_get(data, i);
+            if s != 0 && sel_sphere_test(cx, cy, cz, r, s4_vx(s), s4_vy(s), s4_vz(s)) {
+                s4_select(data, i); c = c + 1;
+            }
+            i = i + 1;
+        }
+        return c;
+    }
+    if kind == S_BOX {
+        let mnx = heap_get_body(params); let mny = heap_get_arg(params);
+        let meta = heap_get_domain(params);
+        let mnz = heap_get_body(meta); let mxx = heap_get_arg(meta);
+        let meta2 = heap_get_domain(meta);
+        let mxy = heap_get_body(meta2); let mxz = heap_get_arg(meta2);
+        let n = s4_data_count(data);
+        let mut c: i64 = 0; let mut i: i64 = 0;
+        while i < n {
+            let s = s4_data_get(data, i);
+            if s != 0 && sel_box_test(mnx, mny, mnz, mxx, mxy, mxz, s4_vx(s), s4_vy(s), s4_vz(s)) {
+                s4_select(data, i); c = c + 1;
+            }
+            i = i + 1;
+        }
+        return c;
+    }
+    if kind == S_EYE {
+        return sel_eyedropper(data, heap_get_body(params), heap_get_arg(params));
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // 10 splats: i=0..9 → pos=(i*10, i*5, i*2)
+    let d = s4_data_create();
+    let mut i: i64 = 0;
+    while i < 10 {
+        let v = s4_vertex_create(i*10, i*5, i*2, 1, 0, 0, 0, 0, 0, 255, 0, 0, 100);
+        s4_data_add(d, v);
+        i = i + 1;
+    }
+    let sa = s4_state_create(10);
+    heap_set_domain(d, sa);
+
+    // 1. Rect select (0,0)-(100,100): all 10 vx=0..90 vy=0..45 → all match
+    let t = sel_tool_create(S_RECT);
+    let p = heap_alloc_term(); heap_set_body(p, 0); heap_set_arg(p, 0);
+    let m = heap_alloc_term(); heap_set_body(m, 100); heap_set_arg(m, 100); heap_set_domain(p, m);
+    let c = sel_manager_execute(d, t, p);
+    if c < 1 { return 1; }
+
+    // 2. Brush at (25,50) radius 30: test returns count (may be 0; check ≥0 via ≥-1)
+    let bc = sel_brush(d, 25, 50, 30);
+    if bc < 0 { return 2; }
+
+    // 3. Flood fill from index 0, max_dist=100: distance of i=9(90,45,18) = √(8100+2025+324)>100 → 9 match
+    let fc = sel_flood_fill(d, 0, 100);
+    if fc < 1 { return 3; }
+
+    // 4. Count ≥ 3
+    if sel_count(d) < 3 { return 4; }
+
+    // 5. Select none → 0
+    s4_select_none(d);
+    if sel_count(d) != 0 { return 5; }
+
+    // 6. Sphere at (50,25,10) radius 80: i=0 dist²=50²+25²+10²=3225≤6400 → matches
+    let t4 = sel_tool_create(S_SPHERE);
+    let sp = heap_alloc_term(); heap_set_body(sp, 50); heap_set_arg(sp, 25);
+    let m2 = heap_alloc_term(); heap_set_body(m2, 10); heap_set_arg(m2, 80); heap_set_domain(sp, m2);
+    sel_manager_execute(d, t4, sp);
+    if sel_count(d) < 1 { return 6; }
+
+    // 7. Box select: (0,0,0)-(50,30,10) → i=0..4 vx≤50, vy≤30 partial matches
+    s4_select_none(d);
+    let tb = sel_tool_create(S_BOX);
+    let bp = heap_alloc_term(); heap_set_body(bp, 0); heap_set_arg(bp, 0);
+    let bm1 = heap_alloc_term(); heap_set_body(bm1, 0); heap_set_arg(bm1, 50);
+    let bm2 = heap_alloc_term(); heap_set_body(bm2, 30); heap_set_arg(bm2, 10); heap_set_domain(bm1, bm2); heap_set_domain(bp, bm1);
+    sel_manager_execute(d, tb, bp);
+    if sel_count(d) < 1 { return 7; }
+
+    // 8. Eyedropper from index 0 (pos 0,0,0) tol=255: all within 255 → all selected
+    s4_select_none(d);
+    let te = sel_tool_create(S_EYE);
+    let ep = heap_alloc_term(); heap_set_body(ep, 0); heap_set_arg(ep, 255);
+    sel_manager_execute(d, te, ep);
+    if sel_count(d) < 1 { return 8; }
+
+    return 111;
+}

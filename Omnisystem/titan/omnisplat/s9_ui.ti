@@ -1,0 +1,176 @@
+// titan/omnisplat/s9_ui.ti — Toolbar, Panels, Menu Bar, Shortcut Manager
+// Self-contained. Wrapper-node APPEND for menu list. PREPEND for toolbar.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_TOOLBAR: i64 = 9600;
+const T_PANEL:   i64 = 9601;
+const T_MENU:    i64 = 9602;
+const T_CMD:     i64 = 9603;
+const T_WRP:     i64 = 9604;
+
+const P_EXPLORER: i64 = 0;
+const P_PROPS:    i64 = 1;
+const P_TIMELINE: i64 = 2;
+const P_VIEWPORT: i64 = 3;
+
+const C_NEW:    i64 = 0;
+const C_OPEN:   i64 = 1;
+const C_SAVE:   i64 = 2;
+const C_UNDO:   i64 = 3;
+const C_REDO:   i64 = 4;
+const C_EXPORT: i64 = 5;
+
+// ===== Toolbar =====
+// toolbar: tag=T_TOOLBAR, body=count, arg=list_head
+// item: body=tool_id, domain=next_item   (PREPEND — order not required)
+
+pub fn s9_toolbar() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TOOLBAR); heap_set_body(t, 0); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+
+pub fn s9_tb_add(t: i64, tool_id: i64) {
+    let n = heap_alloc_term();
+    heap_set_body(n, tool_id); heap_set_domain(n, heap_get_arg(t));
+    heap_set_arg(t, n);
+    heap_set_body(t, heap_get_body(t) + 1);
+}
+
+pub fn s9_tb_count(t: i64) -> i64 { return heap_get_body(t); }
+
+// ===== Panel =====
+// panel: tag=T_PANEL, body=kind, arg=0
+
+pub fn s9_panel(kind: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T_PANEL); heap_set_body(p, kind); heap_set_arg(p, 0); heap_set_domain(p, 0);
+    return p;
+}
+
+pub fn s9_panel_kind(p: i64) -> i64 { return heap_get_body(p); }
+
+// ===== Menu =====
+// menu:    tag=T_MENU, body=count, arg=list_head(wrappers)
+// wrapper: tag=T_WRP,  body=cmd_node, domain=next_wrapper
+// cmd_node: tag=T_CMD, body=cmd, arg=label, domain=meta
+// meta: body=key
+
+pub fn s9_menu() -> i64 {
+    let m = heap_alloc_term();
+    heap_set_tag(m, T_MENU); heap_set_body(m, 0); heap_set_arg(m, 0); heap_set_domain(m, 0);
+    return m;
+}
+
+pub fn s9_menu_add(m: i64, cmd: i64, label: i64, key: i64) {
+    let meta = heap_alloc_term(); heap_set_body(meta, key);
+    let n = heap_alloc_term();
+    heap_set_tag(n, T_CMD); heap_set_body(n, cmd); heap_set_arg(n, label); heap_set_domain(n, meta);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP); heap_set_body(w, n); heap_set_domain(w, 0);
+    let c = heap_get_body(m);
+    if c == 0 { heap_set_arg(m, w); }
+    else {
+        let mut t = heap_get_arg(m);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(m, c + 1);
+}
+
+pub fn s9_menu_count(m: i64) -> i64 { return heap_get_body(m); }
+
+pub fn s9_menu_get(m: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(m); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+
+pub fn s9_cmd_key(cmd_node: i64) -> i64   { return heap_get_body(heap_get_domain(cmd_node)); }
+pub fn s9_cmd_label(cmd_node: i64) -> i64 { return heap_get_arg(cmd_node); }
+pub fn s9_cmd_id(cmd_node: i64) -> i64    { return heap_get_body(cmd_node); }
+
+// ===== Shortcut manager =====
+// Returns 1 if cmd is in valid range [0,5] and key > 0, else 0.
+
+pub fn s9_shortcut(cmd: i64, key: i64) -> i64 {
+    if cmd < 0  { return 0; }
+    if cmd > 5  { return 0; }
+    if key <= 0 { return 0; }
+    return 1;
+}
+
+// ===== Layout =====
+pub fn s9_layout(splits: i64) -> i64 {
+    let l = heap_alloc_term();
+    heap_set_body(l, splits); heap_set_arg(l, 0); heap_set_domain(l, 0);
+    return l;
+}
+
+// ===== Command name (integer token for test comparison) =====
+// C_NEW=0→1, C_OPEN=1→2, C_SAVE=2→3, C_UNDO=3→4, C_REDO=4→5, C_EXPORT=5→6
+
+pub fn s9_cmd_name(cmd: i64) -> i64 {
+    if cmd == C_NEW    { return 1; }
+    if cmd == C_OPEN   { return 2; }
+    if cmd == C_SAVE   { return 3; }
+    if cmd == C_UNDO   { return 4; }
+    if cmd == C_REDO   { return 5; }
+    if cmd == C_EXPORT { return 6; }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Toolbar: 4 tools
+    let tb = s9_toolbar();
+    s9_tb_add(tb, 0); s9_tb_add(tb, 1); s9_tb_add(tb, 2); s9_tb_add(tb, 3);
+    if s9_tb_count(tb) != 4 { return 1; }
+
+    // Panel kinds
+    let pe = s9_panel(P_EXPLORER);
+    if s9_panel_kind(pe) != P_EXPLORER { return 2; }
+    let pv = s9_panel(P_VIEWPORT);
+    if s9_panel_kind(pv) != P_VIEWPORT { return 3; }
+
+    // Menu: 3 items
+    let m = s9_menu();
+    s9_menu_add(m, C_NEW,  1, 78);
+    s9_menu_add(m, C_OPEN, 2, 79);
+    s9_menu_add(m, C_SAVE, 3, 83);
+    if s9_menu_count(m) != 3 { return 4; }
+
+    // Verify cmd_node fields via s9_menu_get
+    let cn0 = s9_menu_get(m, 0);
+    if s9_cmd_id(cn0) != C_NEW    { return 5; }
+    if s9_cmd_label(cn0) != 1     { return 6; }
+    if s9_cmd_key(cn0) != 78      { return 7; }
+
+    // Shortcut validation
+    if s9_shortcut(C_NEW, 78) == 0 { return 8; }
+    if s9_shortcut(-1, 78) != 0    { return 9; }
+    if s9_shortcut(6, 78) != 0     { return 10; }
+    if s9_shortcut(C_SAVE, 0) != 0 { return 11; }
+
+    // cmd_name
+    if s9_cmd_name(C_SAVE) != 3    { return 12; }
+    if s9_cmd_name(C_EXPORT) != 6  { return 13; }
+    if s9_cmd_name(99) != 0        { return 14; }
+
+    // Layout node
+    let lay = s9_layout(4);
+    if heap_get_body(lay) != 4     { return 15; }
+
+    return 111;
+}

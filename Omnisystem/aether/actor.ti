@@ -1,0 +1,284 @@
+// aether/actor.ti — Location-transparent actor runtime
+// Actors are identified by a URI-style id (node * 1000000 + local_id).
+// Messages are queued in mailboxes; the scheduler drains them cooperatively.
+// Supervision trees: each actor has a parent supervisor that restarts it on failure.
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+const TAG_ACTOR:   i64 = 61000;
+const TAG_MAILBOX: i64 = 61001;
+const TAG_MSG:     i64 = 61002;
+const TAG_SYSTEM:  i64 = 61003;
+const TAG_SUP:     i64 = 61004;  // supervisor
+const TAG_NODE:    i64 = 61005;
+
+// ── Actor states ─────────────────────────────────────────────────────────
+const AS_RUNNING:  i64 = 0;
+const AS_PAUSED:   i64 = 1;
+const AS_STOPPED:  i64 = 2;
+const AS_FAILED:   i64 = 3;
+const AS_RESTARTING: i64 = 4;
+
+// ── Restart strategies ───────────────────────────────────────────────────
+const STRAT_ONE_FOR_ONE:  i64 = 0;  // restart only failed child
+const STRAT_ONE_FOR_ALL:  i64 = 1;  // restart all children
+const STRAT_REST_FOR_ONE: i64 = 2;  // restart failed + all after it
+
+// ── Message: body=from_id, arg=payload, domain=next_msg ──────────────────
+pub fn msg_new(from:i64, payload:i64) -> i64 {
+    let m=heap_alloc_term(); heap_set_tag(m,TAG_MSG);
+    heap_set_body(m,from); heap_set_arg(m,payload); heap_set_domain(m,0); return m;
+}
+pub fn msg_from(m:i64) -> i64 { return heap_get_body(m); }
+pub fn msg_payload(m:i64) -> i64 { return heap_get_arg(m); }
+
+// ── Mailbox: body=head_msg, arg=tail_msg, domain=count ───────────────────
+pub fn mailbox_new() -> i64 {
+    let mb=heap_alloc_term(); heap_set_tag(mb,TAG_MAILBOX);
+    heap_set_body(mb,0); heap_set_arg(mb,0); heap_set_domain(mb,0); return mb;
+}
+
+pub fn mailbox_send(mb:i64, msg:i64) {
+    if heap_get_body(mb) == 0 {
+        heap_set_body(mb,msg); heap_set_arg(mb,msg);
+    } else {
+        heap_set_domain(heap_get_arg(mb), msg);
+        heap_set_arg(mb,msg);
+    }
+    heap_set_domain(mb, heap_get_domain(mb)+1);
+    return;
+}
+
+pub fn mailbox_recv(mb:i64) -> i64 {
+    if heap_get_body(mb) == 0 { return 0; }
+    let msg = heap_get_body(mb);
+    heap_set_body(mb, heap_get_domain(msg));
+    if heap_get_domain(mb) == 1 { heap_set_arg(mb,0); }
+    heap_set_domain(mb, heap_get_domain(mb)-1);
+    return msg;
+}
+
+pub fn mailbox_size(mb:i64) -> i64 { return heap_get_domain(mb); }
+pub fn mailbox_empty(mb:i64) -> i64 { if heap_get_domain(mb)==0 { return 1; } return 0; }
+
+// ── Actor: body=id, arg=mailbox, domain=state*100+restart_count ──────────
+pub fn actor_new(id:i64) -> i64 {
+    let a=heap_alloc_term(); heap_set_tag(a,TAG_ACTOR);
+    heap_set_body(a,id); heap_set_arg(a,mailbox_new()); heap_set_domain(a,AS_RUNNING*100+0); return a;
+}
+
+pub fn actor_id(a:i64) -> i64 { return heap_get_body(a); }
+pub fn actor_mailbox(a:i64) -> i64 { return heap_get_arg(a); }
+pub fn actor_state(a:i64) -> i64 { return heap_get_domain(a) / 100; }
+pub fn actor_restarts(a:i64) -> i64 { return heap_get_domain(a) - actor_state(a)*100; }
+
+pub fn actor_set_state(a:i64, st:i64) {
+    heap_set_domain(a, st*100 + actor_restarts(a)); return;
+}
+pub fn actor_inc_restart(a:i64) {
+    heap_set_domain(a, actor_state(a)*100 + actor_restarts(a)+1); return;
+}
+
+pub fn actor_send(a:i64, from:i64, payload:i64) {
+    if actor_state(a) != AS_RUNNING { return; }
+    mailbox_send(actor_mailbox(a), msg_new(from, payload));
+    return;
+}
+
+pub fn actor_recv(a:i64) -> i64 { return mailbox_recv(actor_mailbox(a)); }
+pub fn actor_queue_len(a:i64) -> i64 { return mailbox_size(actor_mailbox(a)); }
+
+pub fn actor_stop(a:i64) { actor_set_state(a, AS_STOPPED); return; }
+pub fn actor_fail(a:i64) { actor_set_state(a, AS_FAILED); return; }
+pub fn actor_restart(a:i64) {
+    actor_set_state(a, AS_RUNNING);
+    actor_inc_restart(a);
+    return;
+}
+
+// ── Supervisor ───────────────────────────────────────────────────────────
+// supervisor: body=strategy, arg=child_list_head, domain=max_restarts
+pub fn sup_new(strategy:i64, max_restarts:i64) -> i64 {
+    let s=heap_alloc_term(); heap_set_tag(s,TAG_SUP);
+    heap_set_body(s,strategy); heap_set_arg(s,0); heap_set_domain(s,max_restarts); return s;
+}
+
+pub fn sup_strategy(s:i64) -> i64 { return heap_get_body(s); }
+pub fn sup_max_restarts(s:i64) -> i64 { return heap_get_domain(s); }
+
+pub fn sup_add_child(s:i64, a:i64) {
+    let node=heap_alloc_term(); heap_set_tag(node,TAG_NODE);
+    heap_set_body(node,a); heap_set_arg(node, heap_get_arg(s));
+    heap_set_arg(s,node); return;
+}
+
+pub fn sup_child_count(s:i64) -> i64 {
+    let n=0; let cur=heap_get_arg(s);
+    while cur != 0 { n=n+1; cur=heap_get_arg(cur); }
+    return n;
+}
+
+// Handle child failure according to strategy
+pub fn sup_handle_failure(s:i64, failed_actor:i64) -> i64 {
+    let restarts = actor_restarts(failed_actor);
+    if restarts >= sup_max_restarts(s) { return -1; }  // give up
+
+    let strat = sup_strategy(s);
+
+    if strat == STRAT_ONE_FOR_ONE {
+        actor_restart(failed_actor);
+        return 1;
+    }
+
+    if strat == STRAT_ONE_FOR_ALL {
+        // Restart all children
+        let cur = heap_get_arg(s);
+        while cur != 0 {
+            let child = heap_get_body(cur);
+            if actor_state(child) != AS_STOPPED { actor_restart(child); }
+            cur = heap_get_arg(cur);
+        }
+        return sup_child_count(s);
+    }
+
+    if strat == STRAT_REST_FOR_ONE {
+        // Restart failed actor and all children added after it
+        // (simplified: restart failed + all that appear before it in list = "after" in add order)
+        let restarted = 0; let seen_failed = 0;
+        let cur = heap_get_arg(s);
+        while cur != 0 {
+            let child = heap_get_body(cur);
+            if actor_id(child) == actor_id(failed_actor) { seen_failed = 1; }
+            if seen_failed == 1 && actor_state(child) != AS_STOPPED {
+                actor_restart(child); restarted = restarted + 1;
+            }
+            cur = heap_get_arg(cur);
+        }
+        return restarted;
+    }
+
+    return 0;
+}
+
+// ── Actor system ─────────────────────────────────────────────────────────
+// body=actor_list_head, arg=supervisor, domain=next_id*1000+count
+let g_sys_list:   i64 = 0;
+let g_sys_count:  i64 = 0;
+let g_sys_next_id: i64 = 1;
+
+pub fn system_new() -> i64 {
+    g_sys_list = 0; g_sys_count = 0; g_sys_next_id = 1; return 1;
+}
+
+pub fn system_spawn() -> i64 {
+    let id = g_sys_next_id; g_sys_next_id = g_sys_next_id + 1;
+    let a = actor_new(id);
+    let node=heap_alloc_term(); heap_set_tag(node,TAG_NODE);
+    heap_set_body(node,a); heap_set_arg(node,g_sys_list);
+    g_sys_list = node; g_sys_count = g_sys_count + 1;
+    return a;
+}
+
+pub fn system_find(id:i64) -> i64 {
+    let cur = g_sys_list;
+    while cur != 0 {
+        let a = heap_get_body(cur);
+        if actor_id(a) == id { return a; }
+        cur = heap_get_arg(cur);
+    }
+    return -1;
+}
+
+pub fn system_actor_count() -> i64 { return g_sys_count; }
+
+pub fn system_shutdown() {
+    let cur = g_sys_list;
+    while cur != 0 { actor_stop(heap_get_body(cur)); cur = heap_get_arg(cur); }
+    return;
+}
+
+// ── Work stealing: find the actor with the longest mailbox ───────────────
+pub fn system_busiest_actor() -> i64 {
+    let best = -1; let best_len = -1;
+    let cur = g_sys_list;
+    while cur != 0 {
+        let a = heap_get_body(cur);
+        let l = actor_queue_len(a);
+        if l > best_len { best = a; best_len = l; }
+        cur = heap_get_arg(cur);
+    }
+    return best;
+}
+
+pub fn main() -> i64 {
+    system_new();
+
+    // Test 1: spawn and send
+    let a1 = system_spawn();
+    let a2 = system_spawn();
+    actor_send(a1, actor_id(a2), 42);
+    if actor_queue_len(a1) != 1 { return 1; }
+
+    // Test 2: receive
+    let m = actor_recv(a1);
+    if msg_payload(m) != 42 { return 2; }
+    if actor_queue_len(a1) != 0 { return 3; }
+
+    // Test 3: actor stop
+    actor_stop(a2);
+    actor_send(a2, 0, 99);  // send to stopped actor — ignored
+    if actor_queue_len(a2) != 0 { return 4; }
+
+    // Test 4: system actor count
+    if system_actor_count() != 2 { return 5; }
+
+    // Test 5: find actor
+    let found = system_find(actor_id(a1));
+    if found < 0 { return 6; }
+    if actor_id(found) != actor_id(a1) { return 7; }
+
+    // Test 6: supervisor one-for-one
+    system_new();
+    let sup = sup_new(STRAT_ONE_FOR_ONE, 5);
+    let child1 = system_spawn();
+    let child2 = system_spawn();
+    sup_add_child(sup, child1);
+    sup_add_child(sup, child2);
+    if sup_child_count(sup) != 2 { return 8; }
+
+    actor_fail(child1);
+    let result = sup_handle_failure(sup, child1);
+    if result != 1 { return 9; }
+    if actor_state(child1) != AS_RUNNING { return 10; }
+    if actor_restarts(child1) != 1 { return 11; }
+    if actor_state(child2) != AS_RUNNING { return 12; }  // unaffected
+
+    // Test 7: supervisor one-for-all
+    system_new();
+    let sup2 = sup_new(STRAT_ONE_FOR_ALL, 5);
+    let ca = system_spawn(); let cb = system_spawn(); let cc = system_spawn();
+    sup_add_child(sup2, ca); sup_add_child(sup2, cb); sup_add_child(sup2, cc);
+    actor_fail(ca);
+    sup_handle_failure(sup2, ca);
+    if actor_state(ca) != AS_RUNNING { return 13; }
+    if actor_state(cb) != AS_RUNNING { return 14; }
+    if actor_state(cc) != AS_RUNNING { return 15; }
+
+    // Test 8: work stealing
+    system_new();
+    let w1 = system_spawn(); let w2 = system_spawn();
+    actor_send(w1, 0, 1); actor_send(w1, 0, 2); actor_send(w1, 0, 3);
+    actor_send(w2, 0, 1);
+    let busiest = system_busiest_actor();
+    if actor_id(busiest) != actor_id(w1) { return 16; }
+
+    // Test 9: shutdown
+    system_shutdown();
+    let cur = g_sys_list;
+    while cur != 0 {
+        if actor_state(heap_get_body(cur)) != AS_STOPPED { return 17; }
+        cur = heap_get_arg(cur);
+    }
+
+    return 111;
+}

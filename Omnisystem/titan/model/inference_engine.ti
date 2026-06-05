@@ -1,0 +1,164 @@
+// titan/model/inference_engine.ti — Neural Inference Engine
+// Provides vec (with vec_set), matmul, softmax, argmax. All native Titan.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// ===== Vec (wrappers: body=value, arg=index, domain=next_wrapper) =====
+const TAG_VEC: i64 = 5500;
+
+pub fn vec_new() -> i64 {
+    let h = heap_alloc_term();
+    heap_set_tag(h, TAG_VEC);
+    heap_set_body(h, 0);
+    heap_set_arg(h, 0);
+    heap_set_domain(h, 0);
+    return h;
+}
+
+pub fn vec_push(v: i64, val: i64) {
+    let idx = heap_get_arg(v);
+    let w = heap_alloc_term();
+    heap_set_body(w, val);
+    heap_set_arg(w, idx);
+    heap_set_domain(w, heap_get_domain(v));
+    heap_set_domain(v, w);
+    heap_set_arg(v, idx + 1);
+}
+
+pub fn vec_len(v: i64) -> i64 { return heap_get_arg(v); }
+
+pub fn vec_get(v: i64, idx: i64) -> i64 {
+    let mut curr = heap_get_domain(v);
+    while curr != 0 {
+        if heap_get_arg(curr) == idx { return heap_get_body(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+pub fn vec_set(v: i64, idx: i64, val: i64) {
+    let mut curr = heap_get_domain(v);
+    while curr != 0 {
+        if heap_get_arg(curr) == idx { heap_set_body(curr, val); return; }
+        curr = heap_get_domain(curr);
+    }
+}
+
+// ===== Matmul: C[r,c] = sum_k A[r,k] * B[k,c] =====
+// a_data and b_data are vecs; indices row-major.
+pub fn matmul(a_data: i64, a_rows: i64, a_cols: i64,
+              b_data: i64, b_rows: i64, b_cols: i64) -> i64 {
+    let c = vec_new();
+    let mut r: i64 = 0;
+    while r < a_rows {
+        let mut col: i64 = 0;
+        while col < b_cols {
+            let mut sum: i64 = 0;
+            let mut k: i64 = 0;
+            while k < a_cols {
+                let a_val = vec_get(a_data, r * a_cols + k);
+                let b_val = vec_get(b_data, k * b_cols + col);
+                sum = sum + a_val * b_val;
+                k = k + 1;
+            }
+            vec_push(c, sum);
+            col = col + 1;
+        }
+        r = r + 1;
+    }
+    return c;
+}
+
+// ===== Softmax: exp approximated as 100 + (x - max), then normalize =====
+pub fn softmax(vec_id: i64) -> i64 {
+    let n = vec_len(vec_id);
+    if n == 0 { return vec_id; }
+
+    let mut max_val: i64 = vec_get(vec_id, 0);
+    let mut i: i64 = 1;
+    while i < n {
+        let v = vec_get(vec_id, i);
+        if v > max_val { max_val = v; }
+        i = i + 1;
+    }
+
+    let out = vec_new();
+    let mut sum: i64 = 0;
+    i = 0;
+    while i < n {
+        let exp_val = 100 + (vec_get(vec_id, i) - max_val);
+        vec_push(out, exp_val);
+        sum = sum + exp_val;
+        i = i + 1;
+    }
+
+    if sum == 0 { return out; }
+    i = 0;
+    while i < n {
+        let old = vec_get(out, i);
+        vec_set(out, i, (old * 1000) / sum);
+        i = i + 1;
+    }
+    return out;
+}
+
+// ===== Argmax =====
+pub fn argmax(vec_id: i64) -> i64 {
+    let n = vec_len(vec_id);
+    if n == 0 { return 0; }
+    let mut best_idx: i64 = 0;
+    let mut best_val: i64 = vec_get(vec_id, 0);
+    let mut i: i64 = 1;
+    while i < n {
+        let v = vec_get(vec_id, i);
+        if v > best_val { best_val = v; best_idx = i; }
+        i = i + 1;
+    }
+    return best_idx;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // matmul: [1,2] (1x2) * [3,4] (2x1) = [11]
+    let a = vec_new();
+    vec_push(a, 1); vec_push(a, 2);
+    let b = vec_new();
+    vec_push(b, 3); vec_push(b, 4);
+    let c = matmul(a, 1, 2, b, 2, 1);
+    if vec_get(c, 0) != 11 { return 1; }
+
+    // matmul: identity 2x2 * [[5,6],[7,8]] = [[5,6],[7,8]]
+    let id = vec_new();
+    vec_push(id, 1); vec_push(id, 0);
+    vec_push(id, 0); vec_push(id, 1);
+    let m = vec_new();
+    vec_push(m, 5); vec_push(m, 6);
+    vec_push(m, 7); vec_push(m, 8);
+    let r = matmul(id, 2, 2, m, 2, 2);
+    if vec_get(r, 0) != 5 { return 2; }
+    if vec_get(r, 3) != 8 { return 3; }
+
+    // softmax: [1,2,3] → argmax should be 2
+    let s = vec_new();
+    vec_push(s, 1); vec_push(s, 2); vec_push(s, 3);
+    let s_out = softmax(s);
+    if argmax(s_out) != 2 { return 4; }
+
+    // vec_set
+    let v = vec_new();
+    vec_push(v, 10); vec_push(v, 20); vec_push(v, 30);
+    vec_set(v, 1, 99);
+    if vec_get(v, 1) != 99 { return 5; }
+
+    return 111;
+}

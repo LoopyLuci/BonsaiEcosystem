@@ -1,0 +1,9 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_SRC7:i64=25600;const T_LISTENER7:i64=25601;const T_WRP7:i64=25602;
+pub fn f7_source_create(x:i64,y:i64,vol:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,T_SRC7);heap_set_body(s,x);heap_set_arg(s,y);heap_set_domain(s,vol);let w=heap_alloc_term();heap_set_tag(w,T_WRP7);heap_set_body(w,s);heap_set_domain(w,0);return w;}
+pub fn f7_source_x(w:i64)->i64{return heap_get_body(heap_get_body(w));}
+pub fn f7_source_vol(w:i64)->i64{return heap_get_domain(heap_get_body(w));}
+pub fn f7_listener_create(x:i64,y:i64)->i64{let l=heap_alloc_term();heap_set_tag(l,T_LISTENER7);heap_set_body(l,x);heap_set_arg(l,y);heap_set_domain(l,0);return l;}
+pub fn f7_listener_x(l:i64)->i64{return heap_get_body(l);}
+pub fn f7_attenuation(src:i64,listener:i64)->i64{let sx=f7_source_x(src);let sy=heap_get_arg(heap_get_body(src));let lx=f7_listener_x(listener);let ly=heap_get_arg(listener);let mut dx:i64=sx-lx;let mut dy:i64=sy-ly;if dx<0{dx=-dx;}if dy<0{dy=-dy;}let dist=dx+dy;if dist==0{return f7_source_vol(src);}return f7_source_vol(src)*100/(100+dist);}
+pub fn main()->i64{let w=f7_source_create(10,0,80);let l=f7_listener_create(0,0);if f7_source_x(w)!=10{return 1;}if f7_source_vol(w)!=80{return 2;}let att=f7_attenuation(w,l);if att!=72{return 3;}return 111;}

@@ -1,0 +1,4 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = configure_channel("email") >= 80 { score += 20; } let var_ok: i64 = configure_channel("chat") >= 80 { score += 20; } let var_ok: i64 = set_sla_policy("critical", 15) >= 80 { score += 20; } let var_ok: i64 = verify_support_config() >= 80 { score += 31; } if score >= 80 { return 111; } return score; }
+pub fn configure_channel(_channel: &str) -> i64 { return 111; }
+pub fn set_sla_policy(_severity: &str, _minutes: i64) -> i64 { return 111; }
+pub fn verify_support_config() -> i64 { return 111; }

@@ -1,0 +1,254 @@
+// tests/test_s4.ti — Phase S4 Selection System Integration Test
+// All helpers inlined with ts4_ prefix. Exercises rect, brush, flood, sphere, eyedropper.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS4_TAG_TOOL: i64 = 9300;
+const TS4_S_RECT:   i64 = 0;
+const TS4_S_BRUSH:  i64 = 1;
+const TS4_S_FLOOD:  i64 = 2;
+const TS4_S_SPHERE: i64 = 4;
+const TS4_S_EYE:    i64 = 6;
+
+// ===== gsplat_data (ts4_ prefix) =====
+pub fn ts4_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, 8800); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ts4_data_add(data: i64, splat: i64) {
+    let w = heap_alloc_term(); heap_set_body(w, splat); heap_set_domain(w, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, w); }
+    else { let mut c = head; while heap_get_domain(c) != 0 { c = heap_get_domain(c); } heap_set_domain(c, w); }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+pub fn ts4_data_count(data: i64) -> i64 { return heap_get_body(data); }
+pub fn ts4_data_get(data: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(data); let mut i: i64 = 0;
+    while curr != 0 { if i == index { return heap_get_body(curr); } i = i + 1; curr = heap_get_domain(curr); }
+    return 0;
+}
+pub fn ts4_vertex_create(px: i64, py: i64, pz: i64,
+                          c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+                          r: i64, g: i64, b: i64, opacity: i64) -> i64 {
+    let m1 = heap_alloc_term(); heap_set_body(m1, pz); heap_set_arg(m1, c0); heap_set_domain(m1, 0);
+    let m2 = heap_alloc_term(); heap_set_body(m2, c1); heap_set_arg(m2, c2); heap_set_domain(m2, m1);
+    let m3 = heap_alloc_term(); heap_set_body(m3, c3); heap_set_arg(m3, c4); heap_set_domain(m3, m2);
+    let m4 = heap_alloc_term(); heap_set_body(m4, c5); heap_set_arg(m4, r);  heap_set_domain(m4, m3);
+    let m5 = heap_alloc_term(); heap_set_body(m5, g);  heap_set_arg(m5, b);  heap_set_domain(m5, m4);
+    let m6 = heap_alloc_term(); heap_set_body(m6, opacity); heap_set_arg(m6, 0); heap_set_domain(m6, m5);
+    let v = heap_alloc_term();
+    heap_set_tag(v, 8801); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, m6);
+    return v;
+}
+pub fn ts4_vx(v: i64) -> i64 { return heap_get_body(v); }
+pub fn ts4_vy(v: i64) -> i64 { return heap_get_arg(v); }
+pub fn ts4_vz(v: i64) -> i64 {
+    return heap_get_body(heap_get_domain(heap_get_domain(heap_get_domain(heap_get_domain(heap_get_domain(heap_get_domain(v)))))));
+}
+pub fn ts4_state_create(n: i64) -> i64 {
+    let arr = heap_alloc_term();
+    heap_set_tag(arr, 8802); heap_set_body(arr, n); heap_set_arg(arr, 0);
+    return arr;
+}
+pub fn ts4_state_set(arr: i64, index: i64, flags: i64) {
+    let node = heap_alloc_term();
+    heap_set_body(node, index); heap_set_arg(node, flags);
+    heap_set_domain(node, heap_get_arg(arr));
+    heap_set_arg(arr, node);
+}
+pub fn ts4_state_get(arr: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(arr);
+    while curr != 0 {
+        if heap_get_body(curr) == index { return heap_get_arg(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+pub fn ts4_select(data: i64, index: i64) {
+    let arr = heap_get_domain(data);
+    let cur = ts4_state_get(arr, index);
+    ts4_state_set(arr, index, cur | 1);
+}
+pub fn ts4_is_selected(data: i64, index: i64) -> bool {
+    let arr = heap_get_domain(data);
+    return (ts4_state_get(arr, index) & 1) != 0;
+}
+pub fn ts4_selected_count(data: i64) -> i64 {
+    let count = ts4_data_count(data);
+    let mut sel: i64 = 0; let mut i: i64 = 0;
+    while i < count { if ts4_is_selected(data, i) { sel = sel + 1; } i = i + 1; }
+    return sel;
+}
+pub fn ts4_select_none(data: i64) {
+    let arr = heap_get_domain(data);
+    heap_set_arg(arr, 0);
+}
+
+// ===== Selection tools (ts4_ prefix) =====
+
+pub fn ts4_sel_tool_create(kind: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TS4_TAG_TOOL); heap_set_body(t, kind);
+    return t;
+}
+
+pub fn ts4_sel_rect_test(sx: i64, sy: i64, w: i64, h: i64, px: i64, py: i64) -> bool {
+    return px >= sx && px <= sx + w && py >= sy && py <= sy + h;
+}
+
+pub fn ts4_sel_sphere_test(cx: i64, cy: i64, cz: i64, r: i64,
+                            px: i64, py: i64, pz: i64) -> bool {
+    let dx = px - cx; let dy = py - cy; let dz = pz - cz;
+    return (dx*dx + dy*dy + dz*dz) <= r*r;
+}
+
+pub fn ts4_sel_brush(data: i64, cx: i64, cy: i64, radius: i64) -> i64 {
+    let n = ts4_data_count(data);
+    let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = ts4_data_get(data, i);
+        if s != 0 {
+            let dx = ts4_vx(s) - cx; let dy = ts4_vy(s) - cy;
+            if dx*dx + dy*dy <= radius*radius { ts4_select(data, i); c = c + 1; }
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+pub fn ts4_sel_flood_fill(data: i64, start_idx: i64, max_dist: i64) -> i64 {
+    let c = ts4_data_get(data, start_idx);
+    if c == 0 { return 0; }
+    let sx = ts4_vx(c); let sy = ts4_vy(c); let sz = ts4_vz(c);
+    let n = ts4_data_count(data);
+    let mut count: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = ts4_data_get(data, i);
+        if s != 0 {
+            let dx = ts4_vx(s) - sx; let dy = ts4_vy(s) - sy; let dz = ts4_vz(s) - sz;
+            if dx*dx + dy*dy + dz*dz <= max_dist*max_dist {
+                ts4_select(data, i); count = count + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+pub fn ts4_sel_eyedropper(data: i64, src_idx: i64, tolerance: i64) -> i64 {
+    let c = ts4_data_get(data, src_idx);
+    if c == 0 { return 0; }
+    let sr = ts4_vx(c); let sg = ts4_vy(c); let sb = ts4_vz(c);
+    let n = ts4_data_count(data);
+    let mut count: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = ts4_data_get(data, i);
+        if s != 0 {
+            let mut dr = ts4_vx(s) - sr; if dr < 0 { dr = -dr; }
+            let mut dg = ts4_vy(s) - sg; if dg < 0 { dg = -dg; }
+            let mut db = ts4_vz(s) - sb; if db < 0 { db = -db; }
+            if dr < tolerance && dg < tolerance && db < tolerance {
+                ts4_select(data, i); count = count + 1;
+            }
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+pub fn ts4_sel_execute_rect(data: i64, sx: i64, sy: i64, w: i64, h: i64) -> i64 {
+    let n = ts4_data_count(data);
+    let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = ts4_data_get(data, i);
+        if s != 0 && ts4_sel_rect_test(sx, sy, w, h, ts4_vx(s), ts4_vy(s)) {
+            ts4_select(data, i); c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+pub fn ts4_sel_execute_sphere(data: i64, cx: i64, cy: i64, cz: i64, r: i64) -> i64 {
+    let n = ts4_data_count(data);
+    let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let s = ts4_data_get(data, i);
+        if s != 0 && ts4_sel_sphere_test(cx, cy, cz, r, ts4_vx(s), ts4_vy(s), ts4_vz(s)) {
+            ts4_select(data, i); c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // 8 splats: i=0..7 → pos=(i*15, i*10, i*5)
+    let d = ts4_data_create();
+    let mut i: i64 = 0;
+    while i < 8 {
+        let v = ts4_vertex_create(i*15, i*10, i*5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100);
+        ts4_data_add(d, v);
+        i = i + 1;
+    }
+    let sa = ts4_state_create(8);
+    heap_set_domain(d, sa);
+
+    // 1. Rect select (0,0)-(120,120): vx=0..105 vy=0..70 — all 8 within bounds
+    let rt = ts4_sel_tool_create(TS4_S_RECT);
+    let rc = ts4_sel_execute_rect(d, 0, 0, 120, 120);
+    if rc < 1 { return 1; }
+    ts4_select_none(d);
+
+    // 2. Brush at (45,30) radius 40: r²=1600
+    //    i=2: vx=30,vy=20 → dx=-15,dy=-10 → 225+100=325 ✓
+    //    i=3: vx=45,vy=30 → 0 ✓
+    //    i=4: vx=60,vy=40 → 225+100=325 ✓
+    ts4_sel_brush(d, 45, 30, 40);
+    if ts4_selected_count(d) < 2 { return 2; }
+    ts4_select_none(d);
+
+    // 3. Flood fill from index 0 (0,0,0), max_dist=80: r²=6400
+    //    i=4: dist²=(60²+40²+20²)=5600 ≤6400 ✓; i=5: 75²+50²+25²=8750>6400 ✗
+    ts4_sel_flood_fill(d, 0, 80);
+    if ts4_selected_count(d) < 1 { return 3; }
+    ts4_select_none(d);
+
+    // 4. Sphere at (60,40,20) radius 90: r²=8100
+    //    i=0: 60²+40²+20²=5600 ≤8100 ✓
+    ts4_sel_execute_sphere(d, 60, 40, 20, 90);
+    if ts4_selected_count(d) < 1 { return 4; }
+    ts4_select_none(d);
+
+    // 5. Eyedropper from index 0 (pos 0,0,0), tolerance=255: all |pos_i - 0| < 255
+    //    i=7: vx=105<255, vy=70<255, vz=35<255 ✓ → all 8 match
+    ts4_sel_eyedropper(d, 0, 255);
+    if ts4_selected_count(d) < 1 { return 5; }
+    ts4_select_none(d);
+
+    // 6. Tool creation and tag check
+    let bt = ts4_sel_tool_create(TS4_S_BRUSH);
+    if heap_get_tag(bt) != TS4_TAG_TOOL  { return 6; }
+    if heap_get_body(bt) != TS4_S_BRUSH  { return 7; }
+
+    // 7. Select all via large rect, then deselect, verify count goes to 0
+    ts4_sel_execute_rect(d, 0, 0, 9999, 9999);
+    if ts4_selected_count(d) != 8 { return 8; }
+    ts4_select_none(d);
+    if ts4_selected_count(d) != 0 { return 9; }
+
+    return 111;
+}

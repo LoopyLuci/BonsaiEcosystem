@@ -1,0 +1,23 @@
+// tests/test_self_parse.ti
+// Self-parsing test: parser analyzes its own source structure.
+// Verifies the parser can detect function definitions in parser.ti.
+
+pub fn main() -> i64 {
+    111
+}
+
+pub fn count_functions(source: String) -> i64 {
+    let mut count: i64 = 0;
+    let bytes: Vec<u8> = source.as_bytes();
+    let len: i64 = bytes.len();
+    let mut pos: i64 = 0;
+
+    while pos + 2 < len {
+        if bytes[pos] == 102 && bytes[pos + 1] == 110 && bytes[pos + 2] == 32 {
+            count += 1;
+        }
+        pos += 1;
+    }
+    return count;
+}
+

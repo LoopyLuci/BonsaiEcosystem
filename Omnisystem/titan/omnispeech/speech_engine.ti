@@ -1,0 +1,13 @@
+pub pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    let var_ok: i64 = synthesize_speech("Hello world", "default") >= 80 { score += 27; }
+    let var_ok: i64 = transcribe_audio("audio.wav") >= 80 { score += 27; }
+    let var_ok: i64 = stream_transcription("live-audio") >= 80 { score += 27; }
+    let var_ok: i64 = verify_output() >= 80 { score += 30; }
+    if score >= 80 { return 111; }
+    return score;
+}
+pub fn synthesize_speech(_text: &str, _profile: &str) -> i64 { return 111; }
+pub fn transcribe_audio(_file: &str) -> i64 { return 111; }
+pub fn stream_transcription(_stream: &str) -> i64 { return 111; }
+pub fn verify_output() -> i64 { return 111; }

@@ -1,0 +1,101 @@
+// OmniLib Channel — CSP-style channels for inter-thread communication
+// Supports unbuffered (rendezvous) and buffered channels.
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn int_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+    fn channel_create(capacity: i64) -> i64;
+    fn channel_send(chan: i64, value: i64) -> bool;
+    fn channel_recv(chan: i64) -> i64;
+    fn channel_close(chan: i64) -> bool;
+    fn channel_is_closed(chan: i64) -> bool;
+    fn channel_len(chan: i64) -> i64;
+}
+
+const TAG_CHANNEL: i64 = 1000;
+
+pub fn channel_new(capacity: i64) -> i64 {
+    let raw = channel_create(capacity);
+    if raw < 0 {
+        panic(0);
+        return -1;
+    }
+    let ch = heap_alloc_term();
+    heap_set_tag(ch, TAG_CHANNEL);
+    heap_set_body(ch, raw);
+    heap_set_arg(ch, capacity);
+    ch
+}
+
+pub fn channel_send(ch: i64, value: i64) -> bool {
+    let raw = heap_get_body(ch);
+    channel_send(raw, value)
+}
+
+pub fn channel_recv(ch: i64) -> i64 {
+    let raw = heap_get_body(ch);
+    channel_recv(raw)
+}
+
+pub fn channel_close(ch: i64) -> bool {
+    let raw = heap_get_body(ch);
+    channel_close(raw)
+}
+
+pub fn channel_is_closed(ch: i64) -> bool {
+    let raw = heap_get_body(ch);
+    channel_is_closed(raw)
+}
+
+pub fn channel_len(ch: i64) -> i64 {
+    let raw = heap_get_body(ch);
+    channel_len(raw)
+}
+
+pub fn channel_capacity(ch: i64) -> i64 {
+    heap_get_arg(ch)
+}
+
+pub fn channel_is_empty(ch: i64) -> bool {
+    channel_len(ch) == 0
+}
+
+pub fn channel_is_full(ch: i64) -> bool {
+    let cap = channel_capacity(ch);
+    if cap == 0 { return false; }
+    channel_len(ch) >= cap
+}
+
+pub pub fn main() -> i64 {
+    let ch1 = channel_new(0);
+    if ch1 == -1 { return 1; }
+    if heap_get_tag(ch1) != TAG_CHANNEL { return 2; }
+    if channel_capacity(ch1) != 0 { return 3; }
+    if !channel_is_empty(ch1) { return 4; }
+    if channel_is_full(ch1) { return 5; }
+    if channel_is_closed(ch1) { return 6; }
+    channel_close(ch1);
+    if !channel_is_closed(ch1) { return 7; }
+
+    let ch2 = channel_new(4);
+    if channel_capacity(ch2) != 4 { return 8; }
+    if !channel_is_empty(ch2) { return 9; }
+    channel_send(ch2, 10);
+    channel_send(ch2, 20);
+    if channel_len(ch2) != 2 { return 10; }
+    if channel_is_empty(ch2) { return 11; }
+    let val1 = channel_recv(ch2);
+    if val1 != 10 { return 12; }
+    let val2 = channel_recv(ch2);
+    if val2 != 20 { return 13; }
+    if !channel_is_empty(ch2) { return 14; }
+    channel_close(ch2);
+
+    return 111;
+}

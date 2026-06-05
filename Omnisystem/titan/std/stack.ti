@@ -1,0 +1,80 @@
+// OmniLib Stack -- LIFO stack with heap-backed linked nodes
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_STACK: i64 = 7010;
+const TAG_SNODE: i64 = 7011;
+
+// Stack layout: body=top, domain=size
+pub fn stack_new() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_STACK);
+    heap_set_body(s, 0);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn stack_is_empty(s: i64) -> i64 {
+    if heap_get_domain(s) == 0 { return 1; }
+    return 0;
+}
+
+pub fn stack_size(s: i64) -> i64 {
+    return heap_get_domain(s);
+}
+
+pub fn stack_push(s: i64, value: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_SNODE);
+    heap_set_body(n, value);
+    heap_set_arg(n, heap_get_body(s));
+
+    heap_set_body(s, n);
+    heap_set_domain(s, heap_get_domain(s) + 1);
+    return s;
+}
+
+pub fn stack_peek(s: i64) -> i64 {
+    if heap_get_domain(s) == 0 { return 0; }
+    return heap_get_body(heap_get_body(s));
+}
+
+pub fn stack_pop(s: i64) -> i64 {
+    if heap_get_domain(s) == 0 { return 0; }
+
+    let top = heap_get_body(s);
+    let val = heap_get_body(top);
+    heap_set_body(s, heap_get_arg(top));
+    heap_set_domain(s, heap_get_domain(s) - 1);
+    return val;
+}
+
+pub fn main() -> i64 {
+    let s = stack_new();
+    if stack_is_empty(s) != 1 { return 1; }
+
+    stack_push(s, 1);
+    stack_push(s, 2);
+    stack_push(s, 3);
+
+    if stack_size(s) != 3 { return 2; }
+    if stack_peek(s) != 3 { return 3; }
+
+    if stack_pop(s) != 3 { return 4; }
+    if stack_pop(s) != 2 { return 5; }
+    if stack_pop(s) != 1 { return 6; }
+    if stack_pop(s) != 0 { return 7; }
+
+    if stack_is_empty(s) != 1 { return 8; }
+
+    return 111;
+}

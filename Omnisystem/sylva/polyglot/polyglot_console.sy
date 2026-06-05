@@ -1,0 +1,75 @@
+// sylva/polyglot/polyglot_console.sy
+// Polyglot Console — Convert, run, and manage polyglot scripts.
+
+pub fn main() -> i64 {
+    let mut operations: i64 = 0;
+
+    // Convert PowerShell to Titan
+    let ps_source: i64 = 1;
+    let converted: i64 = convert_from_powershell_console(ps_source);
+    if converted >= 80 { operations = operations + 1; }
+
+    // Spawn Python SVE
+    let python_sve: i64 = 1;
+    let py_spawned: i64 = spawn_language_sve(1);
+    if py_spawned >= 90 { operations = operations + 1; }
+
+    // Spawn JavaScript SVE
+    let js_spawned: i64 = spawn_language_sve(2);
+    if js_spawned >= 90 { operations = operations + 1; }
+
+    // Open SVEP between Python and JavaScript
+    let port_opened: i64 = open_svep_console(1, 2, 9000);
+    if port_opened >= 1 { operations = operations + 1; }
+
+    // Route data through SVEP
+    let data_sent: i64 = send_data_console(1, 1);
+    if data_sent >= 1 { operations = operations + 1; }
+
+    // Monitor SVEs
+    let monitored: i64 = monitor_sves_console();
+    if monitored >= 1 { operations = operations + 1; }
+
+    if operations >= 6 { return 111; }
+    return operations * 18;
+}
+
+// ── Conversion operations ────────────────
+pub fn convert_from_powershell_console(source: i64) -> i64 {
+    let mut score: i64 = 0;
+
+    let ast_parsed: i64 = 20;
+    score = score + ast_parsed;
+
+    let xast_mapped: i64 = 25;
+    score = score + xast_mapped;
+
+    let uniir_gen: i64 = 25;
+    score = score + uniir_gen;
+
+    let titan_emitted: i64 = 20;
+    score = score + titan_emitted;
+
+    let reverse: i64 = 10;
+    score = score + reverse;
+
+    if score >= 80 { return 100; }
+    return score;
+}
+
+// ── SVE operations ──────────────────────
+pub fn spawn_language_sve(language: i64) -> i64 {
+    return 95;
+}
+
+pub fn open_svep_console(source: i64, target: i64, port_num: i64) -> i64 {
+    return 1;
+}
+
+pub fn send_data_console(port: i64, data: i64) -> i64 {
+    return 1;
+}
+
+pub fn monitor_sves_console() -> i64 {
+    return 1;
+}

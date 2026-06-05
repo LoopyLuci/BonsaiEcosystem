@@ -1,0 +1,216 @@
+// titan/omnisplat/s5_xform.ti — Transform Tools (move, rotate, scale, measure)
+// Self-contained. Wrapper-node append preserves vertex domain chain.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_XFM: i64 = 9200;
+const X_MOVE:  i64 = 0;
+const X_ROT:   i64 = 1;
+const X_SCALE: i64 = 2;
+const X_MEAS:  i64 = 3;
+const T_SD:    i64 = 8800;
+const T_SV:    i64 = 8801;
+const T_WRP:   i64 = 8802;
+const ST_SEL:  i64 = 1;
+
+// ===== Position accessors =====
+// vz reads/writes n6.body (the slot occupied by opacity in S1 layout).
+// Internally consistent: setvz writes the same slot vz reads.
+pub fn x5_vx(v: i64) -> i64 { return heap_get_body(v); }
+pub fn x5_vy(v: i64) -> i64 { return heap_get_arg(v); }
+pub fn x5_vz(v: i64) -> i64 { return heap_get_body(heap_get_domain(v)); }
+
+pub fn x5_setvx(v: i64, x: i64) { heap_set_body(v, x); }
+pub fn x5_setvy(v: i64, y: i64) { heap_set_arg(v, y); }
+pub fn x5_setvz(v: i64, z: i64) { heap_set_body(heap_get_domain(v), z); }
+
+// ===== Vertex creation (S1 layout) =====
+// v: tag=8801, body=px, arg=py, domain=n6
+// n6: body=pz_slot(opacity), domain=n5
+// n5: body=g, arg=b, domain=n4
+// n4: body=c5, arg=r, domain=n3  ...  n1: body=pz_real, arg=c0
+pub fn x5_sv(px: i64, py: i64, pz: i64,
+              c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+              r: i64, g: i64, b: i64, op: i64) -> i64 {
+    let n1 = heap_alloc_term(); heap_set_body(n1, pz); heap_set_arg(n1, c0); heap_set_domain(n1, 0);
+    let n2 = heap_alloc_term(); heap_set_body(n2, c1); heap_set_arg(n2, c2); heap_set_domain(n2, n1);
+    let n3 = heap_alloc_term(); heap_set_body(n3, c3); heap_set_arg(n3, c4); heap_set_domain(n3, n2);
+    let n4 = heap_alloc_term(); heap_set_body(n4, c5); heap_set_arg(n4, r);  heap_set_domain(n4, n3);
+    let n5 = heap_alloc_term(); heap_set_body(n5, g);  heap_set_arg(n5, b);  heap_set_domain(n5, n4);
+    let n6 = heap_alloc_term(); heap_set_body(n6, op); heap_set_arg(n6, 0);  heap_set_domain(n6, n5);
+    let v  = heap_alloc_term();
+    heap_set_tag(v, T_SV); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, n6);
+    return v;
+}
+
+// ===== Data container (wrapper-node append) =====
+// data: tag=8800, body=count, arg=list_head(wrappers), domain=state_arr
+// wrapper: tag=8802, body=vertex, domain=next
+pub fn x5_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, T_SD); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn x5_add(d: i64, v: i64) {
+    let w = heap_alloc_term(); heap_set_tag(w, T_WRP); heap_set_body(w, v); heap_set_domain(w, 0);
+    let c = heap_get_body(d);
+    if c == 0 { heap_set_arg(d, w); }
+    else {
+        let mut t = heap_get_arg(d);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(d, c + 1);
+}
+pub fn x5_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn x5_get(d: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(d); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+
+// ===== State / selection =====
+// state: body=n, arg=entry_list_head (PREPEND; first match wins)
+// entry: body=index, arg=flags, domain=next
+pub fn x5_ssc(n: i64) -> i64 {
+    let a = heap_alloc_term(); heap_set_body(a, n); heap_set_arg(a, 0);
+    return a;
+}
+pub fn x5_sset(s: i64, idx: i64, fl: i64) {
+    let nd = heap_alloc_term(); heap_set_body(nd, idx); heap_set_arg(nd, fl);
+    heap_set_domain(nd, heap_get_arg(s)); heap_set_arg(s, nd);
+}
+pub fn x5_sget(s: i64, idx: i64) -> i64 {
+    let mut c = heap_get_arg(s);
+    while c != 0 { if heap_get_body(c) == idx { return heap_get_arg(c); } c = heap_get_domain(c); }
+    return 0;
+}
+pub fn x5_issel(d: i64, idx: i64) -> bool {
+    return (x5_sget(heap_get_domain(d), idx) & ST_SEL) != 0;
+}
+pub fn x5_selcnt(d: i64) -> i64 {
+    let n = x5_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n { if x5_issel(d, i) { c = c + 1; } i = i + 1; }
+    return c;
+}
+
+// ===== Transform operations =====
+
+// Translates all selected splats by (dx,dy,dz). Returns count moved.
+pub fn x5_move(d: i64, dx: i64, dy: i64, dz: i64) -> i64 {
+    let n = x5_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        if x5_issel(d, i) {
+            let v = x5_get(d, i);
+            x5_setvx(v, x5_vx(v) + dx);
+            x5_setvy(v, x5_vy(v) + dy);
+            x5_setvz(v, x5_vz(v) + dz);
+            c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+// Rotates selected splats (integer approximation: scales by ang/360). Returns count.
+pub fn x5_rotate(d: i64, ang: i64) -> i64 {
+    let n = x5_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        if x5_issel(d, i) {
+            let v = x5_get(d, i);
+            let cx = x5_vx(v); let cy = x5_vy(v);
+            x5_setvx(v, (cx * ang) / 360);
+            x5_setvy(v, (cy * ang) / 360);
+            c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+// Scales selected splats by (sx/100, sy/100, sz/100). Returns count.
+pub fn x5_scale(d: i64, sx: i64, sy: i64, sz: i64) -> i64 {
+    let n = x5_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        if x5_issel(d, i) {
+            let v = x5_get(d, i);
+            x5_setvx(v, x5_vx(v) * sx / 100);
+            x5_setvy(v, x5_vy(v) * sy / 100);
+            x5_setvz(v, x5_vz(v) * sz / 100);
+            c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+// Returns squared Euclidean distance between splat a and splat b, or -1 if invalid.
+pub fn x5_measure(d: i64, a: i64, b: i64) -> i64 {
+    let va = x5_get(d, a); let vb = x5_get(d, b);
+    if va == 0 || vb == 0 { return -1; }
+    let dx = x5_vx(va) - x5_vx(vb);
+    let dy = x5_vy(va) - x5_vy(vb);
+    let dz = x5_vz(va) - x5_vz(vb);
+    return dx*dx + dy*dy + dz*dz;
+}
+
+pub fn x5_tool(kind: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_XFM); heap_set_body(t, kind);
+    return t;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // 8 splats: i=0..7 → pos=(i*10, i*10, i*5)
+    let d = x5_sd();
+    let mut i: i64 = 0;
+    while i < 8 {
+        let v = x5_sv(i*10, i*10, i*5, 0, 0, 0, 0, 0, 0, 255, 0, 0, 100);
+        x5_add(d, v); i = i + 1;
+    }
+    let sa = x5_ssc(8);
+    heap_set_domain(d, sa);
+    // Select first 4
+    let mut j: i64 = 0;
+    while j < 4 { x5_sset(sa, j, ST_SEL); j = j + 1; }
+    if x5_selcnt(d) != 4 { return 1; }
+
+    // Move selected by (10,5,3) → v0: (10,5,...)
+    let m = x5_move(d, 10, 5, 3);
+    if m != 4 { return 2; }
+    let v0 = x5_get(d, 0);
+    if x5_vx(v0) != 10 { return 3; }
+    if x5_vy(v0) != 5  { return 4; }
+
+    // Scale selected by (200,100,100) → v0: (20,5,...)
+    let sc = x5_scale(d, 200, 100, 100);
+    if sc != 4 { return 5; }
+
+    // Measure distance² between splat 0 and splat 1
+    // v0=(20,5), v1 initially (10,10) → after move: (20,15) → after scale: (40,15)
+    // dx=-20, dy=-10 → ms=400+100=500 ≥ 0
+    let ms = x5_measure(d, 0, 1);
+    if ms < 0 { return 6; }
+
+    // Measure invalid index → -1
+    let bad = x5_measure(d, 0, 99);
+    if bad != -1 { return 7; }
+
+    // Tool creation
+    let t = x5_tool(X_MOVE);
+    if heap_get_tag(t) != T_XFM { return 8; }
+    if heap_get_body(t) != X_MOVE { return 9; }
+
+    return 111;
+}

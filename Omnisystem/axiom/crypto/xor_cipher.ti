@@ -1,0 +1,69 @@
+// axiom/crypto/xor_cipher.ti
+// XOR stream cipher: encrypt(decrypt(m, k), k) == m
+
+fn xor_cipher(plaintext: i64, key: i64) -> i64 {
+    return bit_xor(plaintext, key);
+}
+
+fn verify_xor_roundtrip(msg: i64, key: i64) -> i64 {
+    let encrypted = xor_cipher(msg, key);
+    let decrypted = xor_cipher(encrypted, key);
+    if decrypted == msg {
+        return 1;
+    }
+    return 0;
+}
+
+fn verify_cases() -> i64 {
+    let r0 = verify_xor_roundtrip(0, 0);
+    let r1 = verify_xor_roundtrip(255, 170);
+    let r2 = verify_xor_roundtrip(12345, 67890);
+    let r3 = verify_xor_roundtrip(-1, 1);
+    let r4 = verify_xor_roundtrip(1000000, 999999);
+    if r0 == 0 {
+        return 0;
+    }
+    if r1 == 0 {
+        return 0;
+    }
+    if r2 == 0 {
+        return 0;
+    }
+    if r3 == 0 {
+        return 0;
+    }
+    if r4 == 0 {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_hex_literals() -> i64 {
+    let a = 0xFF;
+    let b = 0x0F;
+    let masked = bit_and(a, b);
+    if masked != 15 {
+        return 0;
+    }
+    let shifted = bit_shl(0x01, 7);
+    if shifted != 128 {
+        return 0;
+    }
+    let xored = bit_xor(0xAA, 0x55);
+    if xored != 255 {
+        return 0;
+    }
+    return 1;
+}
+
+fn main() -> i64 {
+    let ok1 = verify_cases();
+    if ok1 == 0 {
+        return 0;
+    }
+    let ok2 = verify_hex_literals();
+    if ok2 == 0 {
+        return 0;
+    }
+    return 111;
+}

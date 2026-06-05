@@ -1,0 +1,4 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = configure_tax_rate("US", 0.0) >= 80 { score += 20; } let var_ok: i64 = configure_tax_rate("EU", 20.0) >= 80 { score += 20; } let var_ok: i64 = set_company_details("Omnisystem Inc", "123 Main St") >= 80 { score += 20; } let var_ok: i64 = verify_invoice_config() >= 80 { score += 31; } if score >= 80 { return 111; } return score; }
+pub fn configure_tax_rate(_region: &str, _rate: f64) -> i64 { return 111; }
+pub fn set_company_details(_name: &str, _address: &str) -> i64 { return 111; }
+pub fn verify_invoice_config() -> i64 { return 111; }

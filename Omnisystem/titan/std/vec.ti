@@ -1,0 +1,135 @@
+// OmniLib Vec -- heap-backed growable sequence
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_VEC: i64 = 7400;
+const TAG_VEC_NODE: i64 = 7401;
+
+// Vec layout: body=head, arg=tail, domain=len
+// Node layout: body=value, arg=next
+pub fn vec_new() -> i64 {
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_VEC);
+    heap_set_body(v, 0);
+    heap_set_arg(v, 0);
+    heap_set_domain(v, 0);
+    return v;
+}
+
+pub fn vec_len(v: i64) -> i64 {
+    return heap_get_domain(v);
+}
+
+pub fn vec_capacity(v: i64) -> i64 {
+    let l = vec_len(v);
+    if l < 16 { return 16; }
+    return l * 2;
+}
+
+pub fn vec_push(v: i64, value: i64) {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_VEC_NODE);
+    heap_set_body(n, value);
+    heap_set_arg(n, 0);
+
+    if vec_len(v) == 0 {
+        heap_set_body(v, n);
+        heap_set_arg(v, n);
+    } else {
+        let tail = heap_get_arg(v);
+        heap_set_arg(tail, n);
+        heap_set_arg(v, n);
+    }
+    heap_set_domain(v, vec_len(v) + 1);
+    return;
+}
+
+pub fn vec_pop(v: i64) -> i64 {
+    let len = vec_len(v);
+    if len == 0 { return 0; }
+
+    let head = heap_get_body(v);
+    if len == 1 {
+        let val = heap_get_body(head);
+        heap_set_body(v, 0);
+        heap_set_arg(v, 0);
+        heap_set_domain(v, 0);
+        return val;
+    }
+
+    let mut prev = head;
+    let mut cur = heap_get_arg(head);
+    while heap_get_arg(cur) != 0 {
+        prev = cur;
+        cur = heap_get_arg(cur);
+    }
+
+    let val = heap_get_body(cur);
+    heap_set_arg(prev, 0);
+    heap_set_arg(v, prev);
+    heap_set_domain(v, len - 1);
+    return val;
+}
+
+pub fn vec_get(v: i64, index: i64) -> i64 {
+    if index < 0 || index >= vec_len(v) { return 0; }
+    let mut i: i64 = 0;
+    let mut cur = heap_get_body(v);
+    while cur != 0 {
+        if i == index {
+            return heap_get_body(cur);
+        }
+        i = i + 1;
+        cur = heap_get_arg(cur);
+    }
+    return 0;
+}
+
+pub fn vec_set(v: i64, index: i64, value: i64) {
+    if index < 0 || index >= vec_len(v) { return; }
+    let mut i: i64 = 0;
+    let mut cur = heap_get_body(v);
+    while cur != 0 {
+        if i == index {
+            heap_set_body(cur, value);
+            return;
+        }
+        i = i + 1;
+        cur = heap_get_arg(cur);
+    }
+    return;
+}
+
+pub fn main() -> i64 {
+    let v = vec_new();
+    if vec_len(v) != 0 { return 1; }
+    if vec_capacity(v) != 16 { return 2; }
+
+    vec_push(v, 10);
+    vec_push(v, 20);
+    vec_push(v, 30);
+
+    if vec_len(v) != 3 { return 3; }
+    if vec_get(v, 0) != 10 { return 4; }
+    if vec_get(v, 1) != 20 { return 5; }
+    if vec_get(v, 2) != 30 { return 6; }
+
+    vec_set(v, 1, 99);
+    if vec_get(v, 1) != 99 { return 7; }
+
+    if vec_pop(v) != 30 { return 8; }
+    if vec_len(v) != 2 { return 9; }
+    if vec_pop(v) != 99 { return 10; }
+    if vec_pop(v) != 10 { return 11; }
+    if vec_pop(v) != 0 { return 12; }
+
+    return 111;
+}

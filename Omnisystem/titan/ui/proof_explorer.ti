@@ -1,0 +1,143 @@
+// titan/ui/proof_explorer.ti — Proof Explorer lens for the Inspector panel
+// Renders the Axiom proof tree: theorems, their goals, and verification status.
+// pe_verified_count and pe_unproven_count drive the Inspector's proof progress bar.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_THM:  i64 = 61000;   // theorem node
+const TAG_GOAL: i64 = 61001;   // proof goal node
+const TAG_WRP:  i64 = 61002;   // list wrapper for theorem linked list
+
+// Theorem cell: body=id, arg=label_id, domain=status (0=unproven, 1=verified)
+pub fn pe_thm_create(id: i64, label: i64, status: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_THM);
+    heap_set_body(t, id);
+    heap_set_arg(t, label);
+    heap_set_domain(t, status);
+    return t;
+}
+
+pub fn pe_thm_id(t: i64) -> i64     { return heap_get_body(t); }
+pub fn pe_thm_label(t: i64) -> i64  { return heap_get_arg(t); }
+pub fn pe_thm_status(t: i64) -> i64 { return heap_get_domain(t); }
+
+pub fn pe_thm_discharge(t: i64) {
+    heap_set_domain(t, 1);
+}
+
+// Goal cell: body=id, arg=desc_id, domain=discharged (0/1)
+pub fn pe_goal_create(id: i64, desc: i64, discharged: i64) -> i64 {
+    let g = heap_alloc_term();
+    heap_set_tag(g, TAG_GOAL);
+    heap_set_body(g, id);
+    heap_set_arg(g, desc);
+    heap_set_domain(g, discharged);
+    return g;
+}
+
+pub fn pe_goal_id(g: i64) -> i64         { return heap_get_body(g); }
+pub fn pe_goal_discharged(g: i64) -> i64 { return heap_get_domain(g); }
+
+// Proof tree root cell:
+//   body = theorem_count
+//   arg  = theorem wrapper list head (TAG_WRP → body=thm, domain=next)
+//   domain = goal list head (goals are linked via domain directly)
+pub fn pe_tree_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_body(r, 0);
+    heap_set_arg(r, 0);
+    heap_set_domain(r, 0);
+    return r;
+}
+
+pub fn pe_tree_add_thm(r: i64, t: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WRP);
+    heap_set_body(w, t);
+    heap_set_domain(w, 0);
+    let h = heap_get_arg(r);
+    if h == 0 {
+        heap_set_arg(r, w);
+    } else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn pe_tree_add_goal(r: i64, g: i64) {
+    let h = heap_get_domain(r);
+    if h == 0 {
+        heap_set_domain(r, g);
+    } else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, g);
+    }
+}
+
+pub fn pe_tree_count(r: i64) -> i64 { return heap_get_body(r); }
+
+pub fn pe_verified_count(r: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(r);
+    let mut n: i64 = 0;
+    while cur != 0 {
+        let t = heap_get_body(cur);
+        if pe_thm_status(t) == 1 { n = n + 1; }
+        cur = heap_get_domain(cur);
+    }
+    return n;
+}
+
+pub fn pe_unproven_count(r: i64) -> i64 {
+    return pe_tree_count(r) - pe_verified_count(r);
+}
+
+// Progress in percent [0,100] — useful for the Inspector progress bar
+pub fn pe_progress_pct(r: i64) -> i64 {
+    let total = pe_tree_count(r);
+    if total == 0 { return 100; }
+    return pe_verified_count(r) * 100 / total;
+}
+
+pub fn main() -> i64 {
+    let r = pe_tree_create();
+
+    // Test 1: Add 3 theorems (2 verified, 1 unproven), counts correct
+    let t1 = pe_thm_create(1, 10, 1);
+    let t2 = pe_thm_create(2, 20, 1);
+    let t3 = pe_thm_create(3, 30, 0);
+    pe_tree_add_thm(r, t1);
+    pe_tree_add_thm(r, t2);
+    pe_tree_add_thm(r, t3);
+    if pe_tree_count(r)    != 3 { return 1; }
+    if pe_verified_count(r) != 2 { return 2; }
+    if pe_unproven_count(r) != 1 { return 3; }
+
+    // Test 2: Discharge the remaining theorem, all verified
+    pe_thm_discharge(t3);
+    if pe_verified_count(r) != 3 { return 4; }
+    if pe_progress_pct(r)   != 100 { return 5; }
+
+    // Test 3: Goals are stored and retrievable
+    let g1 = pe_goal_create(1, 100, 0);
+    let g2 = pe_goal_create(2, 200, 1);
+    pe_tree_add_goal(r, g1);
+    pe_tree_add_goal(r, g2);
+    if pe_goal_discharged(g1) != 0 { return 6; }
+    if pe_goal_discharged(g2) != 1 { return 7; }
+
+    return 111;
+}

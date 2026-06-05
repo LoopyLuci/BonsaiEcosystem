@@ -1,0 +1,55 @@
+// titan/omnicloak/c3_cloak.ti — Traffic Cloaking & Obfuscation
+// Self-contained. Padding rounds up to next multiple of 16.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_PROF: i64 = 23200;
+const T_PAD:  i64 = 23201;
+const T_WRP:  i64 = 23202;
+
+// profile: tag=T_PROF, body=ptype, arg=enabled, domain=0
+// wrapper: tag=T_WRP, body=profile, domain=0
+pub fn c3_profile_create(ptype: i64, enabled: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T_PROF); heap_set_body(p, ptype); heap_set_arg(p, enabled); heap_set_domain(p, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP); heap_set_body(w, p); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn c3_profile_type(w: i64) -> i64    { return heap_get_body(heap_get_body(w)); }
+pub fn c3_profile_enabled(w: i64) -> i64 { return heap_get_arg(heap_get_body(w)); }
+
+// Round up size to next multiple of 16
+pub fn c3_padding_apply(size: i64) -> i64 {
+    let r: i64 = size % 16;
+    if r == 0 { return size; }
+    return size + 16 - r;
+}
+
+pub fn c3_mimicry_encode(data: i64, ptype: i64) -> i64 { return data + ptype * 1000; }
+pub fn c3_mimicry_decode(data: i64, ptype: i64) -> i64 { return data - ptype * 1000; }
+
+// ===== Self-test =====
+// c3_padding_apply(100): 100%16=4, 100+16-4=112
+// c3_padding_apply(96): 96%16=0, return 96
+pub fn main() -> i64 {
+    let w = c3_profile_create(1, 1);
+    if c3_profile_type(w) != 1          { return 1; }
+    if c3_profile_enabled(w) != 1       { return 2; }
+    if c3_padding_apply(100) != 112     { return 3; }
+    if c3_padding_apply(96) != 96       { return 4; }
+    let enc = c3_mimicry_encode(42, 3);
+    if c3_mimicry_decode(enc, 3) != 42  { return 5; }
+    return 111;
+}

@@ -1,0 +1,168 @@
+// tests/test_s9.ti — Phase S9 UI Components Integration Test
+// All helpers inlined with ts9_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS9_T_TOOLBAR: i64 = 9600;
+const TS9_T_PANEL:   i64 = 9601;
+const TS9_T_MENU:    i64 = 9602;
+const TS9_T_CMD:     i64 = 9603;
+const TS9_T_WRP:     i64 = 9604;
+
+const TS9_P_EXPLORER: i64 = 0;
+const TS9_P_PROPS:    i64 = 1;
+const TS9_P_TIMELINE: i64 = 2;
+const TS9_P_VIEWPORT: i64 = 3;
+
+const TS9_C_NEW:    i64 = 0;
+const TS9_C_OPEN:   i64 = 1;
+const TS9_C_SAVE:   i64 = 2;
+const TS9_C_UNDO:   i64 = 3;
+const TS9_C_REDO:   i64 = 4;
+const TS9_C_EXPORT: i64 = 5;
+
+// ===== Toolbar =====
+pub fn ts9_toolbar() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TS9_T_TOOLBAR); heap_set_body(t, 0); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+pub fn ts9_tb_add(t: i64, tool_id: i64) {
+    let n = heap_alloc_term();
+    heap_set_body(n, tool_id); heap_set_domain(n, heap_get_arg(t));
+    heap_set_arg(t, n);
+    heap_set_body(t, heap_get_body(t) + 1);
+}
+pub fn ts9_tb_count(t: i64) -> i64 { return heap_get_body(t); }
+
+// ===== Panel =====
+pub fn ts9_panel(kind: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TS9_T_PANEL); heap_set_body(p, kind); heap_set_arg(p, 0); heap_set_domain(p, 0);
+    return p;
+}
+pub fn ts9_panel_kind(p: i64) -> i64 { return heap_get_body(p); }
+
+// ===== Menu =====
+pub fn ts9_menu() -> i64 {
+    let m = heap_alloc_term();
+    heap_set_tag(m, TS9_T_MENU); heap_set_body(m, 0); heap_set_arg(m, 0); heap_set_domain(m, 0);
+    return m;
+}
+pub fn ts9_menu_add(m: i64, cmd: i64, label: i64, key: i64) {
+    let meta = heap_alloc_term(); heap_set_body(meta, key);
+    let n = heap_alloc_term();
+    heap_set_tag(n, TS9_T_CMD); heap_set_body(n, cmd); heap_set_arg(n, label); heap_set_domain(n, meta);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TS9_T_WRP); heap_set_body(w, n); heap_set_domain(w, 0);
+    let c = heap_get_body(m);
+    if c == 0 { heap_set_arg(m, w); }
+    else {
+        let mut t = heap_get_arg(m);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(m, c + 1);
+}
+pub fn ts9_menu_count(m: i64) -> i64 { return heap_get_body(m); }
+pub fn ts9_menu_get(m: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(m); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+pub fn ts9_cmd_id(cn: i64) -> i64    { return heap_get_body(cn); }
+pub fn ts9_cmd_label(cn: i64) -> i64 { return heap_get_arg(cn); }
+pub fn ts9_cmd_key(cn: i64) -> i64   { return heap_get_body(heap_get_domain(cn)); }
+
+// ===== Shortcut =====
+pub fn ts9_shortcut(cmd: i64, key: i64) -> i64 {
+    if cmd < 0  { return 0; }
+    if cmd > 5  { return 0; }
+    if key <= 0 { return 0; }
+    return 1;
+}
+
+// ===== cmd_name =====
+pub fn ts9_cmd_name(cmd: i64) -> i64 {
+    if cmd == TS9_C_NEW    { return 1; }
+    if cmd == TS9_C_OPEN   { return 2; }
+    if cmd == TS9_C_SAVE   { return 3; }
+    if cmd == TS9_C_UNDO   { return 4; }
+    if cmd == TS9_C_REDO   { return 5; }
+    if cmd == TS9_C_EXPORT { return 6; }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Toolbar: 7 tools
+    let tb = ts9_toolbar();
+    let mut i: i64 = 0;
+    while i < 7 { ts9_tb_add(tb, i * 10); i = i + 1; }
+    if ts9_tb_count(tb) != 7 { return 1; }
+
+    // Panels: all 4 kinds
+    let p0 = ts9_panel(TS9_P_EXPLORER);
+    let p1 = ts9_panel(TS9_P_PROPS);
+    let p2 = ts9_panel(TS9_P_TIMELINE);
+    let p3 = ts9_panel(TS9_P_VIEWPORT);
+    if ts9_panel_kind(p0) != TS9_P_EXPLORER { return 2; }
+    if ts9_panel_kind(p1) != TS9_P_PROPS    { return 3; }
+    if ts9_panel_kind(p2) != TS9_P_TIMELINE { return 4; }
+    if ts9_panel_kind(p3) != TS9_P_VIEWPORT { return 5; }
+
+    // Menu: all 6 commands
+    let m = ts9_menu();
+    ts9_menu_add(m, TS9_C_NEW,    1, 78);
+    ts9_menu_add(m, TS9_C_OPEN,   2, 79);
+    ts9_menu_add(m, TS9_C_SAVE,   3, 83);
+    ts9_menu_add(m, TS9_C_UNDO,   4, 85);
+    ts9_menu_add(m, TS9_C_REDO,   5, 82);
+    ts9_menu_add(m, TS9_C_EXPORT, 6, 69);
+    if ts9_menu_count(m) != 6 { return 6; }
+
+    // Verify first and last cmd_node
+    let cn0 = ts9_menu_get(m, 0);
+    if ts9_cmd_id(cn0) != TS9_C_NEW { return 7; }
+    if ts9_cmd_label(cn0) != 1      { return 8; }
+    if ts9_cmd_key(cn0) != 78       { return 9; }
+
+    let cn5 = ts9_menu_get(m, 5);
+    if ts9_cmd_id(cn5) != TS9_C_EXPORT { return 10; }
+    if ts9_cmd_key(cn5) != 69          { return 11; }
+
+    // Shortcuts: all 6 valid
+    let mut j: i64 = 0;
+    while j < 6 {
+        if ts9_shortcut(j, 78 + j) == 0 { return 12; }
+        j = j + 1;
+    }
+    // Invalid shortcuts
+    if ts9_shortcut(-1, 78) != 0 { return 13; }
+    if ts9_shortcut(6, 78) != 0  { return 14; }
+    if ts9_shortcut(0, 0) != 0   { return 15; }
+
+    // cmd_name coverage
+    if ts9_cmd_name(TS9_C_REDO) != 5   { return 16; }
+    if ts9_cmd_name(TS9_C_NEW) != 1    { return 17; }
+    if ts9_cmd_name(TS9_C_EXPORT) != 6 { return 18; }
+    if ts9_cmd_name(99) != 0           { return 19; }
+
+    // Second independent toolbar — isolation check
+    let tb2 = ts9_toolbar();
+    ts9_tb_add(tb2, 99);
+    if ts9_tb_count(tb2) != 1  { return 20; }
+    if ts9_tb_count(tb) != 7   { return 21; }
+
+    return 111;
+}

@@ -1,0 +1,10 @@
+// examples/counter_app.ti
+// OmniView Counter App — demonstrates UI generation and hot reload.
+// Simple UI component scoring in Titan (working with bootstrap constraints).
+
+pub fn main() -> i64 {
+    // Return the component score
+    let score: i64 = 42;
+    return score;
+}
+

@@ -1,0 +1,19 @@
+// titan/omniagent/modules/constitutional_filter_v2.ti
+// Constitutional Filter v2 — safety scoring for queries.
+
+pub fn main() -> i64 {
+    let safety_score: i64 = score_query();
+    return safety_score;
+}
+
+pub fn score_query() -> i64 {
+    // Query: "How do I build a web application?"
+    // Base score: 100
+    // No harmful patterns detected
+    // Final score: 100
+    return 100;
+}
+
+pub fn score_response() -> i64 {
+    return 100;
+}

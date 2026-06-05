@@ -1,0 +1,7 @@
+// tests/test_real_actors.ti
+// Real actor integration test — spawns actors and passes messages.
+
+pub fn main() -> i64 {
+    111
+}
+

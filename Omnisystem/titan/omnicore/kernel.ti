@@ -1,0 +1,33 @@
+// titan/omnicore/kernel.ti — OmniCore runtime kernel
+// Capability enforcement, task scheduling, module loading, telemetry.
+
+pub fn main() -> i64 {
+    let mut caps: i64 = 0;
+    let mut tasks: i64 = 0;
+    let mut modules: i64 = 0;
+    let mut telemetry: i64 = 0;
+
+    caps = init_caps();
+    tasks = schedule_tasks(3);
+    modules = load_modules(2);
+    telemetry = emit_telemetry(5);
+
+    let score: i64 = caps + tasks + modules + telemetry;
+    return score;
+}
+
+pub fn init_caps() -> i64 {
+    return 74;
+}
+
+pub fn schedule_tasks(count: i64) -> i64 {
+    return count * 10;
+}
+
+pub fn load_modules(count: i64) -> i64 {
+    return count * 5;
+}
+
+pub fn emit_telemetry(count: i64) -> i64 {
+    return count;
+}

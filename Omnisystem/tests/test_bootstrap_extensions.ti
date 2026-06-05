@@ -1,0 +1,24 @@
+// Test bitwise operators and advanced features
+pub fn main() -> i64 {
+    // Test XOR (if supported)
+    let xor_result = 5 ^ 3;  // 5=0101, 3=0011, XOR=0110=6
+    if xor_result != 6 { return 1; }
+    
+    // Test OR (if supported)
+    let or_result = 5 | 3;   // 5=0101, 3=0011, OR=0111=7
+    if or_result != 7 { return 2; }
+    
+    // Test AND (if supported)
+    let and_result = 5 & 3;  // 5=0101, 3=0011, AND=0001=1
+    if and_result != 1 { return 3; }
+    
+    // Test left shift (if supported)
+    let shl_result = 1 << 3; // 1 << 3 = 8
+    if shl_result != 8 { return 4; }
+    
+    // Test right shift (if supported)
+    let shr_result = 16 >> 2; // 16 >> 2 = 4
+    if shr_result != 4 { return 5; }
+    
+    return 111;
+}

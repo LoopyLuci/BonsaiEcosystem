@@ -1,0 +1,23 @@
+// Phase 28: Array Indexing and Byte-level Operations
+// Verifies that Titan can now perform byte-level array indexing
+// This enables real lexer implementation with stateful byte scanning
+
+fn main() -> i64 {
+    let result1: i64 = test_string_indexing();
+    
+    if result1 == 102 {
+        return 111;  // Check passes
+    }
+    
+    return 0;
+}
+
+// Test 1: Index directly into string and get ASCII value
+fn test_string_indexing() -> i64 {
+    let source: String = "fn main";
+    
+    // Access first character: 'f' = 102
+    let first_byte: i64 = source[0];
+    
+    return first_byte;
+}

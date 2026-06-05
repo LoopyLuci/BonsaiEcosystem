@@ -1,0 +1,6 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_IM3:i64=27200;const tT_VD3:i64=27201;
+pub fn tl3_image_create(w:i64,h:i64)->i64{let img=heap_alloc_term();heap_set_tag(img,tT_IM3);heap_set_body(img,w);heap_set_arg(img,h);heap_set_domain(img,0);return img;}
+pub fn tl3_video_create(frames:i64,fps:i64)->i64{let v=heap_alloc_term();heap_set_tag(v,tT_VD3);heap_set_body(v,frames);heap_set_arg(v,fps);heap_set_domain(v,0);return v;}
+pub fn tl3_video_frames(v:i64)->i64{return heap_get_body(v);}
+pub fn main()->i64{let v=tl3_video_create(100,60);if tl3_video_frames(v)!=100{return 1;}return 111;}

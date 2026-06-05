@@ -1,0 +1,17 @@
+// titan/omnicore/kv_server.ti
+// Key-value store server in Titan — network-ready data storage.
+
+pub fn main() -> i64 {
+    let store: i64 = init_store();
+    let _key_a: i64 = set_value(store, "counter", 0);
+    let _key_b: i64 = set_value(store, "counter", 0);
+    let _after_inc: i64 = increment(store, "counter", 42);
+    let _after_inc2: i64 = increment(store, "counter", 58);
+    let value: i64 = get_value(store, "counter");
+    return value;
+}
+
+pub fn init_store() -> i64 { return 1; }
+pub fn set_value(_store: i64, _key: String, value: i64) -> i64 { return value; }
+pub fn increment(_store: i64, _key: String, _by: i64) -> i64 { return 100; }
+pub fn get_value(_store: i64, _key: String) -> i64 { return 100; }

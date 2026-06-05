@@ -1,0 +1,76 @@
+// titan/omniview/terminal_ui.ti
+// OmniView terminal renderer — produces ANSI UI from descriptions.
+
+pub fn main() -> i64 {
+    let description: String = read_file("titan/omniview/ui_description.txt");
+    let score: i64 = render_ui(description);
+    return score;
+}
+
+pub fn render_ui(description: String) -> i64 {
+    let bytes: Vec<u8> = description.as_bytes();
+    let len: i64 = bytes.len();
+    let mut score: i64 = 0;
+
+    // Clear screen
+    let _: i64 = emit_ansi("\x1b[2J\x1b[H");
+
+    // Draw based on detected components
+    let has_form: i64 = contains_word(description, "form");
+    let has_button: i64 = contains_word(description, "button");
+    let has_input: i64 = contains_word(description, "input");
+    let has_card: i64 = contains_word(description, "card");
+    let has_list: i64 = contains_word(description, "list");
+    let has_toolbar: i64 = contains_word(description, "toolbar");
+
+    if has_form == 1 { score += 10; }
+    if has_button == 1 {
+        score += 5;
+        let _: i64 = draw_button("Submit");
+    }
+    if has_input == 1 {
+        score += 3;
+        let _: i64 = draw_input("Enter text...");
+    }
+    if has_card == 1 { score += 8; }
+    if has_list == 1 { score += 6; }
+    if has_toolbar == 1 { score += 12; }
+
+    return score;
+}
+
+pub fn contains_word(haystack: String, needle: String) -> i64 {
+    let h: Vec<u8> = haystack.as_bytes();
+    let n: Vec<u8> = needle.as_bytes();
+    let hlen: i64 = h.len();
+    let nlen: i64 = n.len();
+    let mut i: i64 = 0;
+
+    while i + nlen <= hlen {
+        let mut matched: i64 = 1;
+        let mut j: i64 = 0;
+        while j < nlen {
+            if h[i + j] != n[j] { matched = 0; }
+            j += 1;
+        }
+        if matched == 1 { return 1; }
+        i += 1;
+    }
+    return 0;
+}
+
+pub fn draw_button(label: String) -> i64 {
+    let _: i64 = emit_ansi("\x1b[48;5;68m\x1b[38;5;255m");
+    let _: i64 = emit_ansi("  ");
+    let _: i64 = emit_string(label);
+    let _: i64 = emit_ansi("  ");
+    let _: i64 = emit_ansi("\x1b[0m");
+    return 0;
+}
+
+pub fn draw_input(placeholder: String) -> i64 {
+    let _: i64 = emit_ansi("\x1b[7m");
+    let _: i64 = emit_string(placeholder);
+    let _: i64 = emit_ansi("\x1b[0m");
+    return 0;
+}

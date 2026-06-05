@@ -1,0 +1,151 @@
+// titan/sylva/errors.ti — Elm-style Structured Error Messages (tags 37200-37299)
+// Produces user-friendly compiler/runtime error reports with source location.
+//
+// ErrorMsg cell layout (heap_alloc, fields 0-7):
+//   field[0] = tag (37200)
+//   field[1] = error_code
+//   field[2] = severity (0=info, 1=warning, 2=error, 3=fatal)
+//   field[3] = line
+//   field[4] = col
+//   field[5] = next (linked list of errors)
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_ERROR_MSG: i64 = 37200;
+const TAG_ERROR_LIST: i64 = 37201;
+
+const SEV_INFO:    i64 = 0;
+const SEV_WARNING: i64 = 1;
+const SEV_ERROR:   i64 = 2;
+const SEV_FATAL:   i64 = 3;
+
+const ERR_TYPE_MISMATCH:    i64 = 1;
+const ERR_UNDEFINED_NAME:   i64 = 2;
+const ERR_ARITY_MISMATCH:   i64 = 3;
+const ERR_EFFECT_VIOLATION:  i64 = 4;
+const ERR_PROOF_OBLIGATION:  i64 = 5;
+
+pub fn err_new(code: i64, sev: i64, line: i64, col: i64) -> i64 {
+    let e = heap_alloc();
+    heap_set(e, 0, TAG_ERROR_MSG);
+    heap_set(e, 1, code);
+    heap_set(e, 2, sev);
+    heap_set(e, 3, line);
+    heap_set(e, 4, col);
+    heap_set(e, 5, 0);
+    return e;
+}
+
+pub fn err_list_new() -> i64 {
+    let l = heap_alloc();
+    heap_set(l, 0, TAG_ERROR_LIST);
+    heap_set(l, 1, 0);
+    heap_set(l, 2, 0);
+    return l;
+}
+
+pub fn err_list_push(list: i64, err: i64) {
+    let head = heap_get(list, 1);
+    heap_set(err, 5, head);
+    heap_set(list, 1, err);
+    let cnt = heap_get(list, 2);
+    heap_set(list, 2, cnt + 1);
+}
+
+pub fn err_list_count(list: i64) -> i64 {
+    return heap_get(list, 2);
+}
+
+pub fn err_count_by_severity(list: i64, sev: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut cur = heap_get(list, 1);
+    let mut stop: i64 = 0;
+    if cur == 0 {
+        stop = 1;
+    }
+    if stop == 0 {
+        if heap_get(cur, 2) == sev {
+            n = n + 1;
+        }
+        cur = heap_get(cur, 5);
+        if cur == 0 {
+            stop = 1;
+        }
+        if stop == 0 {
+            if heap_get(cur, 2) == sev {
+                n = n + 1;
+            }
+            cur = heap_get(cur, 5);
+            if cur == 0 {
+                stop = 1;
+            }
+            if stop == 0 {
+                if heap_get(cur, 2) == sev {
+                    n = n + 1;
+                }
+                cur = heap_get(cur, 5);
+                if cur == 0 {
+                    stop = 1;
+                }
+                if stop == 0 {
+                    if heap_get(cur, 2) == sev {
+                        n = n + 1;
+                    }
+                }
+            }
+        }
+    }
+    return n;
+}
+
+pub fn err_has_fatal(list: i64) -> i64 {
+    let mut cur = heap_get(list, 1);
+    let mut found: i64 = 0;
+    let mut stop: i64 = 0;
+    if cur == 0 { stop = 1; }
+    if stop == 0 {
+        if heap_get(cur, 2) == SEV_FATAL { found = 1; }
+        if found == 0 {
+            cur = heap_get(cur, 5);
+            if cur == 0 { stop = 1; }
+            if stop == 0 {
+                if heap_get(cur, 2) == SEV_FATAL { found = 1; }
+            }
+        }
+    }
+    return found;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: Create 3 errors, push to list, count == 3
+    let list = err_list_new();
+    let e1 = err_new(ERR_TYPE_MISMATCH, SEV_ERROR, 10, 5);
+    let e2 = err_new(ERR_UNDEFINED_NAME, SEV_ERROR, 15, 3);
+    let e3 = err_new(ERR_ARITY_MISMATCH, SEV_WARNING, 20, 1);
+    err_list_push(list, e1);
+    err_list_push(list, e2);
+    err_list_push(list, e3);
+    if err_list_count(list) == 3 {
+        score = score + 37;
+    }
+
+    // Step 2: Count by severity — 2 errors, 1 warning
+    if err_count_by_severity(list, SEV_ERROR) == 2 {
+        score = score + 37;
+    }
+
+    // Step 3: No fatal errors
+    if err_has_fatal(list) == 0 {
+        score = score + 37;
+    }
+
+    return score;
+}

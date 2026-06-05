@@ -1,0 +1,91 @@
+// test_omniNet.ti — Phase 3 networking integration tests
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn heap_set_domain(a:i64,b:i64);
+    fn heap_get_domain(a:i64)->i64;
+    fn socket_create(type:i64)->i64;
+    fn socket_close(sock:i64);
+    fn net_listen(port:i64)->i64;
+}
+
+const T_NET_TEST:i64=30500;
+const TCP:i64=0;
+const UDP:i64=1;
+
+pub fn test_tcp_create()->i64{
+    let s:i64=socket_create(TCP);
+    if s==0{return 0;}
+    socket_close(s);
+    return 1;
+}
+
+pub fn test_udp_create()->i64{
+    let s:i64=socket_create(UDP);
+    if s==0{return 0;}
+    socket_close(s);
+    return 1;
+}
+
+pub fn test_two_sockets()->i64{
+    let s1:i64=socket_create(TCP);
+    let s2:i64=socket_create(TCP);
+    if s1==0{return 0;}
+    if s2==0{socket_close(s1);return 0;}
+    if s1==s2{socket_close(s1);socket_close(s2);return 0;}
+    socket_close(s1);
+    socket_close(s2);
+    return 1;
+}
+
+pub fn test_listen()->i64{
+    let srv:i64=net_listen(19900);
+    if srv==0{return 0;}
+    socket_close(srv);
+    return 1;
+}
+
+pub fn test_heap_socket()->i64{
+    let term:i64=heap_alloc_term();
+    let fd:i64=socket_create(TCP);
+    heap_set_tag(term,T_NET_TEST);
+    heap_set_body(term,fd);
+    heap_set_arg(term,TCP);
+    let got_fd:i64=heap_get_body(term);
+    let got_type:i64=heap_get_arg(term);
+    if got_fd==fd{
+        if got_type==TCP{
+            socket_close(fd);
+            return 1;
+        }
+    }
+    socket_close(fd);
+    return 0;
+}
+
+pub fn test_listen_port_range()->i64{
+    let s1:i64=net_listen(19910);
+    let s2:i64=net_listen(19911);
+    if s1==0{return 0;}
+    if s2==0{socket_close(s1);return 0;}
+    socket_close(s1);
+    socket_close(s2);
+    return 1;
+}
+
+pub fn main()->i64{
+    let mut score:i64=0;
+    if test_tcp_create()==1{score=score+1;}
+    if test_udp_create()==1{score=score+1;}
+    if test_two_sockets()==1{score=score+1;}
+    if test_listen()==1{score=score+1;}
+    if test_heap_socket()==1{score=score+1;}
+    if test_listen_port_range()==1{score=score+1;}
+    if score==6{return 111;}
+    return score;
+}

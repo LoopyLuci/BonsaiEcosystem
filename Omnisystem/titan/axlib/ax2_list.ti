@@ -1,0 +1,14 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_CONS2:i64=28100;const T_NIL2:i64=28101;
+pub fn ax2_nil()->i64{let n=heap_alloc_term();heap_set_tag(n,T_NIL2);heap_set_body(n,0);return n;}
+pub fn ax2_cons(head:i64,tail:i64)->i64{let c=heap_alloc_term();heap_set_tag(c,T_CONS2);heap_set_body(c,head);heap_set_arg(c,tail);return c;}
+pub fn ax2_is_nil(l:i64)->i64{if heap_get_tag(l)==T_NIL2{return 1;}return 0;}
+pub fn ax2_head(l:i64)->i64{return heap_get_body(l);}
+pub fn ax2_tail(l:i64)->i64{return heap_get_arg(l);}
+pub fn ax2_len(l:i64)->i64{if ax2_is_nil(l)==1{return 0;}return 1+ax2_len(ax2_tail(l));}
+pub fn ax2_nth(l:i64,i:i64)->i64{if i==0{return ax2_head(l);}return ax2_nth(ax2_tail(l),i-1);}
+pub fn ax2_append(a:i64,b:i64)->i64{if ax2_is_nil(a)==1{return b;}return ax2_cons(ax2_head(a),ax2_append(ax2_tail(a),b));}
+pub fn ax2_rev_help(l:i64,acc:i64)->i64{if ax2_is_nil(l)==1{return acc;}return ax2_rev_help(ax2_tail(l),ax2_cons(ax2_head(l),acc));}
+pub fn ax2_reverse(l:i64)->i64{return ax2_rev_help(l,ax2_nil());}
+pub fn ax2_map(l:i64,delta:i64)->i64{if ax2_is_nil(l)==1{return ax2_nil();}return ax2_cons(ax2_head(l)+delta,ax2_map(ax2_tail(l),delta));}
+pub fn main()->i64{let z=ax2_nil();let l=ax2_cons(1,ax2_cons(2,ax2_cons(3,z)));if ax2_len(l)!=3{return 1;}if ax2_nth(l,0)!=1{return 2;}if ax2_nth(l,1)!=2{return 3;}if ax2_nth(l,2)!=3{return 4;}let l2=ax2_cons(4,ax2_cons(5,ax2_nil()));let l3=ax2_append(l,l2);if ax2_len(l3)!=5{return 5;}if ax2_nth(l3,2)!=3{return 6;}if ax2_nth(l3,3)!=4{return 7;}let rev=ax2_reverse(l);if ax2_head(rev)!=3{return 8;}let mapped=ax2_map(l,10);if ax2_nth(mapped,0)!=11{return 9;}if ax2_nth(mapped,1)!=12{return 10;}return 111;}

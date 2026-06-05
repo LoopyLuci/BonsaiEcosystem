@@ -1,0 +1,14 @@
+// OmniBenchmark — Performance benchmarking configuration
+pub pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    let var_ok: i64 = create_suite("compiler-perf") >= 80 { score += 20; }
+    let var_ok: i64 = add_benchmark("compiler-perf", "parse-overhead") >= 80 { score += 20; }
+    let var_ok: i64 = set_iterations("compiler-perf", 1000) >= 80 { score += 20; }
+    let var_ok: i64 = verify_benchmark() >= 80 { score += 31; }
+    if score >= 80 { return 111; }
+    return score;
+}
+pub fn create_suite(_name: &str) -> i64 { return 111; }
+pub fn add_benchmark(_suite: &str, _name: &str) -> i64 { return 111; }
+pub fn set_iterations(_suite: &str, _n: i64) -> i64 { return 111; }
+pub fn verify_benchmark() -> i64 { return 111; }

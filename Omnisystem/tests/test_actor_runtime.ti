@@ -1,0 +1,33 @@
+// tests/test_actor_runtime.ti
+// Real Aether actor runtime test — spawn, send, receive, supervise.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: Spawn an actor
+    let spawn_result: i64 = spawn_actor("worker-1", 0);
+    if spawn_result == 1 { score = score + 1; }
+
+    // Test 2: Send a message to the actor
+    let send_result: i64 = send_actor_msg("worker-1", "process_data");
+    if send_result == 1 { score = score + 1; }
+
+    // Test 3: Send second message
+    let send_result2: i64 = send_actor_msg("worker-1", "update_config");
+    if send_result2 == 1 { score = score + 1; }
+
+    // Test 4: Receive a message
+    let msg: String = receive_actor_msg("worker-1");
+    if msg == "update_config" { score = score + 1; }
+
+    // Test 5: Receive second message (FIFO order)
+    let msg2: String = receive_actor_msg("worker-1");
+    if msg2 == "process_data" { score = score + 1; }
+
+    // Test 6: Spawn second actor with supervision relationship
+    let spawn2: i64 = spawn_actor("worker-2", 100);
+    if spawn2 == 1 { score = score + 1; }
+
+    if score == 6 { return 111; }
+    return score * 10;
+}

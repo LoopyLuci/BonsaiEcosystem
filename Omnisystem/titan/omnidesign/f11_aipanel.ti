@@ -1,0 +1,10 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_REQ11:i64=26000;const T_RES11:i64=26001;const T_WRP11:i64=26002;
+pub fn f11_request_create(prompt:i64,context:i64)->i64{let r=heap_alloc_term();heap_set_tag(r,T_REQ11);heap_set_body(r,prompt);heap_set_arg(r,context);heap_set_domain(r,0);return r;}
+pub fn f11_request_prompt(r:i64)->i64{return heap_get_body(r);}
+pub fn f11_response_create(text:i64,confidence:i64)->i64{let r=heap_alloc_term();heap_set_tag(r,T_RES11);heap_set_body(r,text);heap_set_arg(r,confidence);heap_set_domain(r,0);return r;}
+pub fn f11_response_confidence(r:i64)->i64{return heap_get_arg(r);}
+pub fn f11_approve(r:i64)->i64{return f11_response_confidence(r);}
+pub fn f11_reject(r:i64)->i64{return 0;}
+pub fn f11_diff_preview(original:i64,modified:i64)->i64{return modified-original;}
+pub fn main()->i64{let req=f11_request_create(100,200);if f11_request_prompt(req)!=100{return 1;}let res=f11_response_create(300,85);if f11_response_confidence(res)!=85{return 2;}if f11_approve(res)!=85{return 3;}if f11_reject(res)!=0{return 4;}if f11_diff_preview(50,80)!=30{return 5;}return 111;}

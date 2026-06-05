@@ -1,0 +1,109 @@
+// titan/studio/studio_config.ti — IDE Configuration & Project Model
+// Layout engine with left/center/right zones and workspace/project model.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_PROJECT:   i64 = 8700;
+const TAG_WORKSPACE: i64 = 8701;
+const TAG_LAYOUT:    i64 = 8702;
+
+// Panel type constants
+const PANEL_EXPLORER:  i64 = 0;
+const PANEL_EDITOR:    i64 = 1;
+const PANEL_TERMINAL:  i64 = 2;
+const PANEL_DEBUGGER:  i64 = 3;
+const PANEL_AGENT:     i64 = 4;
+const PANEL_RAG:       i64 = 5;
+const PANEL_PIPELINE:  i64 = 6;
+
+// layout: tag=TAG_LAYOUT, body=left_head, arg=center_head, domain=right_head
+// Each zone is a linked list of panel nodes (body=panel_type, domain=next).
+
+pub fn layout_create() -> i64 {
+    let l = heap_alloc_term();
+    heap_set_tag(l, TAG_LAYOUT);
+    heap_set_body(l, 0);
+    heap_set_arg(l, 0);
+    heap_set_domain(l, 0);
+    return l;
+}
+
+pub fn layout_add_panel(layout: i64, zone: i64, panel_type: i64) {
+    let panel = heap_alloc_term();
+    heap_set_body(panel, panel_type);
+    heap_set_arg(panel, zone);
+    if zone == 0 {
+        heap_set_domain(panel, heap_get_body(layout));
+        heap_set_body(layout, panel);
+    } else if zone == 1 {
+        heap_set_domain(panel, heap_get_arg(layout));
+        heap_set_arg(layout, panel);
+    } else {
+        heap_set_domain(panel, heap_get_domain(layout));
+        heap_set_domain(layout, panel);
+    }
+}
+
+pub fn layout_panel_count(layout: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = heap_get_body(layout);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    curr = heap_get_arg(layout);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    curr = heap_get_domain(layout);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    return count;
+}
+
+// workspace: tag=TAG_WORKSPACE, body=name_id, arg=project_list_head, domain=0
+pub fn workspace_create(name_id: i64) -> i64 {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WORKSPACE);
+    heap_set_body(w, name_id);
+    heap_set_arg(w, 0);
+    heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn workspace_add_project(workspace: i64, project: i64) {
+    heap_set_domain(project, heap_get_arg(workspace));
+    heap_set_arg(workspace, project);
+}
+
+pub fn workspace_project_count(w: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = heap_get_arg(w);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    return count;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let layout = layout_create();
+    if heap_get_tag(layout) != TAG_LAYOUT { return 1; }
+    layout_add_panel(layout, 0, PANEL_EXPLORER);
+    layout_add_panel(layout, 1, PANEL_EDITOR);
+    layout_add_panel(layout, 2, PANEL_TERMINAL);
+    layout_add_panel(layout, 2, PANEL_DEBUGGER);
+    layout_add_panel(layout, 2, PANEL_AGENT);
+    if layout_panel_count(layout) != 5 { return 2; }
+
+    let ws = workspace_create(heap_alloc_term());
+    if heap_get_tag(ws) != TAG_WORKSPACE       { return 3; }
+    if workspace_project_count(ws) != 0        { return 4; }
+    workspace_add_project(ws, heap_alloc_term());
+    workspace_add_project(ws, heap_alloc_term());
+    if workspace_project_count(ws) != 2        { return 5; }
+
+    return 111;
+}

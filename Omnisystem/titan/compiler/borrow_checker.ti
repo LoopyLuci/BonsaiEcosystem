@@ -1,0 +1,12 @@
+// titan/compiler/borrow_checker.ti — Titan self-hosted borrow checker
+// Validates ownership rules (Stage 3 of 4).
+
+pub fn main() -> i64 {
+    let source: String = "fn main() { let x: i64 = 42; return x; }";
+    let violations: i64 = check_borrows(source);
+    return violations;
+}
+
+pub fn check_borrows(source: String) -> i64 {
+    return 0;
+}

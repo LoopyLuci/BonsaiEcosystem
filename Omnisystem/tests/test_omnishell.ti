@@ -1,0 +1,67 @@
+// Integration smoke test for OmniShell subsystems
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+
+    fn platform_window_create(title_id: i64, width: i64, height: i64) -> i64;
+    fn platform_window_set_size(handle: i64, width: i64, height: i64);
+    fn platform_window_close(handle: i64);
+
+    fn ipc_send(channel_id: i64, message_id: i64) -> bool;
+    fn ipc_recv(channel_id: i64) -> i64;
+    fn ipc_channel_create(name_id: i64) -> i64;
+    fn ipc_channel_close(channel_id: i64) -> bool;
+}
+
+const TAG_APP: i64 = 2400;
+const TAG_MSG: i64 = 2401;
+
+pub fn color_rgba(r: i64, g: i64, b: i64, a: i64) -> i64 {
+    return (r * 16777216) + (g * 65536) + (b * 256) + a;
+}
+
+pub fn app_create(width: i64, height: i64) -> i64 {
+    let app = heap_alloc_term();
+    heap_set_tag(app, TAG_APP);
+    heap_set_body(app, width);
+    heap_set_arg(app, height);
+    return app;
+}
+
+pub fn main() -> i64 {
+    let title = heap_alloc_term();
+    let win = platform_window_create(title, 800, 600);
+    if win < 0 { return 1; }
+    platform_window_set_size(win, 1024, 768);
+    platform_window_close(win);
+
+    let red = color_rgba(255, 0, 0, 255);
+    let green = color_rgba(0, 255, 0, 255);
+    if red == green { return 2; }
+
+    let ch_name = heap_alloc_term();
+    let ch = ipc_channel_create(ch_name);
+    if ch < 0 { return 3; }
+
+    let msg = heap_alloc_term();
+    heap_set_tag(msg, TAG_MSG);
+    heap_set_body(msg, 1);
+    heap_set_arg(msg, 42);
+    if !ipc_send(ch, msg) { return 4; }
+
+    let recv = ipc_recv(ch);
+    if heap_get_arg(recv) != 42 { return 5; }
+    if !ipc_channel_close(ch) { return 6; }
+
+    let app = app_create(1280, 720);
+    if heap_get_tag(app) != TAG_APP { return 7; }
+
+    return 111;
+}

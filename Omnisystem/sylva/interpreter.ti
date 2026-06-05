@@ -1,0 +1,344 @@
+// sylva/interpreter.ti — Sylva bytecode interpreter
+// Sylva compiles to Omni-IR; this interpreter executes Omni-IR for Sylva values.
+// Sylva values are dynamically typed: Null, Bool, Int, Float (scaled), Str, List, Map.
+// The interpreter is stack-based and fully deterministic.
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+// ── Value tags ───────────────────────────────────────────────────────────
+const SV_NULL:  i64 = 62000;  // body=0
+const SV_BOOL:  i64 = 62001;  // body=0(false)/1(true)
+const SV_INT:   i64 = 62002;  // body=integer value
+const SV_FLOAT: i64 = 62003;  // body=value*1000 (3 decimal fixed-point)
+const SV_STR:   i64 = 62004;  // body=hash, arg=length
+const SV_LIST:  i64 = 62005;  // body=head_node, arg=length
+const SV_MAP:   i64 = 62006;  // body=entry_head, arg=size
+
+const SV_NODE:  i64 = 62010;  // generic list/map node
+
+// ── Value constructors ───────────────────────────────────────────────────
+pub fn sv_null() -> i64 { let v=heap_alloc_term(); heap_set_tag(v,SV_NULL); heap_set_body(v,0); heap_set_arg(v,0); heap_set_domain(v,0); return v; }
+pub fn sv_bool(b:i64) -> i64 { let v=heap_alloc_term(); heap_set_tag(v,SV_BOOL); heap_set_body(v,b); return v; }
+pub fn sv_int(n:i64) -> i64 { let v=heap_alloc_term(); heap_set_tag(v,SV_INT); heap_set_body(v,n); return v; }
+pub fn sv_float(n_x1000:i64) -> i64 { let v=heap_alloc_term(); heap_set_tag(v,SV_FLOAT); heap_set_body(v,n_x1000); return v; }
+pub fn sv_str(hash:i64, len:i64) -> i64 { let v=heap_alloc_term(); heap_set_tag(v,SV_STR); heap_set_body(v,hash); heap_set_arg(v,len); return v; }
+pub fn sv_list_new() -> i64 { let v=heap_alloc_term(); heap_set_tag(v,SV_LIST); heap_set_body(v,0); heap_set_arg(v,0); heap_set_domain(v,0); return v; }
+pub fn sv_map_new() -> i64 { let v=heap_alloc_term(); heap_set_tag(v,SV_MAP); heap_set_body(v,0); heap_set_arg(v,0); heap_set_domain(v,0); return v; }
+
+// ── Value accessors ──────────────────────────────────────────────────────
+pub fn sv_tag(v:i64) -> i64 { return heap_get_tag(v); }
+pub fn sv_is_null(v:i64) -> i64 { if heap_get_tag(v)==SV_NULL { return 1; } return 0; }
+pub fn sv_is_truthy(v:i64) -> i64 {
+    let t = heap_get_tag(v);
+    if t==SV_NULL { return 0; }
+    if t==SV_BOOL { if heap_get_body(v)==0 { return 0; } return 1; }
+    if t==SV_INT  { if heap_get_body(v)==0 { return 0; } return 1; }
+    return 1;  // non-empty list, map, str are truthy
+}
+pub fn sv_as_int(v:i64) -> i64 {
+    if heap_get_tag(v)==SV_INT   { return heap_get_body(v); }
+    if heap_get_tag(v)==SV_FLOAT { return heap_get_body(v) / 1000; }
+    if heap_get_tag(v)==SV_BOOL  { return heap_get_body(v); }
+    return 0;
+}
+pub fn sv_as_bool(v:i64) -> i64 { return sv_is_truthy(v); }
+pub fn sv_type_name(v:i64) -> i64 {
+    let t = heap_get_tag(v);
+    if t==SV_NULL  { return 0; }
+    if t==SV_BOOL  { return 1; }
+    if t==SV_INT   { return 2; }
+    if t==SV_FLOAT { return 3; }
+    if t==SV_STR   { return 4; }
+    if t==SV_LIST  { return 5; }
+    if t==SV_MAP   { return 6; }
+    return -1;
+}
+
+// ── List operations ──────────────────────────────────────────────────────
+pub fn sv_list_push(lst:i64, val:i64) {
+    let n=heap_alloc_term(); heap_set_tag(n,SV_NODE);
+    heap_set_body(n,val); heap_set_arg(n,0);
+    let tail = heap_get_domain(lst);
+    if tail==0 { heap_set_body(lst,n); heap_set_domain(lst,n); }
+    else { heap_set_arg(tail,n); heap_set_domain(lst,n); }
+    heap_set_arg(lst, heap_get_arg(lst)+1);
+    return;
+}
+
+pub fn sv_list_get(lst:i64, idx:i64) -> i64 {
+    let cur=heap_get_body(lst); let i=0;
+    while cur!=0 { if i==idx { return heap_get_body(cur); } cur=heap_get_arg(cur); i=i+1; }
+    return -1;
+}
+
+pub fn sv_list_len(lst:i64) -> i64 { return heap_get_arg(lst); }
+
+// ── Map operations ───────────────────────────────────────────────────────
+// Map entry: body=key_hash, arg=value, domain=next
+pub fn sv_map_set(m:i64, key_hash:i64, val:i64) {
+    let cur=heap_get_body(m);
+    while cur!=0 {
+        if heap_get_body(cur)==key_hash { heap_set_arg(cur,val); return; }
+        cur=heap_get_domain(cur);
+    }
+    let e=heap_alloc_term(); heap_set_tag(e,SV_NODE);
+    heap_set_body(e,key_hash); heap_set_arg(e,val);
+    heap_set_domain(e, heap_get_body(m));
+    heap_set_body(m,e); heap_set_arg(m, heap_get_arg(m)+1);
+    return;
+}
+
+pub fn sv_map_get(m:i64, key_hash:i64) -> i64 {
+    let cur=heap_get_body(m);
+    while cur!=0 {
+        if heap_get_body(cur)==key_hash { return heap_get_arg(cur); }
+        cur=heap_get_domain(cur);
+    }
+    return sv_null();
+}
+
+pub fn sv_map_size(m:i64) -> i64 { return heap_get_arg(m); }
+
+// ── Opcodes ─────────────────────────────────────────────────────────────
+const OP_PUSH_NULL:  i64 = 0;
+const OP_PUSH_BOOL:  i64 = 1;
+const OP_PUSH_INT:   i64 = 2;
+const OP_PUSH_FLOAT: i64 = 3;
+const OP_POP:        i64 = 4;
+const OP_DUP:        i64 = 5;
+const OP_ADD:        i64 = 10;
+const OP_SUB:        i64 = 11;
+const OP_MUL:        i64 = 12;
+const OP_DIV:        i64 = 13;
+const OP_EQ:         i64 = 20;
+const OP_NEQ:        i64 = 21;
+const OP_LT:         i64 = 22;
+const OP_GT:         i64 = 23;
+const OP_AND:        i64 = 24;
+const OP_OR:         i64 = 25;
+const OP_NOT:        i64 = 26;
+const OP_LOAD:       i64 = 30;
+const OP_STORE:      i64 = 31;
+const OP_JUMP:       i64 = 40;
+const OP_JUMP_IF:    i64 = 41;
+const OP_CALL:       i64 = 50;
+const OP_RET:        i64 = 51;
+const OP_LIST_NEW:   i64 = 60;
+const OP_LIST_PUSH:  i64 = 61;
+const OP_LIST_GET:   i64 = 62;
+const OP_MAP_NEW:    i64 = 70;
+const OP_MAP_SET:    i64 = 71;
+const OP_MAP_GET:    i64 = 72;
+const OP_HALT:       i64 = 99;
+
+// ── Instruction node: body=opcode, arg=operand, domain=next ──────────────
+const TAG_INSTR: i64 = 62020;
+
+pub fn instr(op:i64, operand:i64) -> i64 {
+    let i=heap_alloc_term(); heap_set_tag(i,TAG_INSTR);
+    heap_set_body(i,op); heap_set_arg(i,operand); heap_set_domain(i,0); return i;
+}
+
+pub fn prog_append(tail_ptr:i64, ins:i64) -> i64 {
+    if tail_ptr != 0 { heap_set_domain(tail_ptr, ins); }
+    return ins;
+}
+
+// ── VM state ─────────────────────────────────────────────────────────────
+// Stack: fixed 256-slot array simulated as linked list
+const TAG_FRAME: i64 = 62030;
+const VM_STACK_MAX: i64 = 256;
+
+let g_stack:   i64 = 0;   // head of stack list (most recent = top)
+let g_sp:      i64 = 0;   // stack depth
+let g_locals:  i64 = 0;   // locals array head
+
+pub fn vm_reset() { g_stack = 0; g_sp = 0; g_locals = 0; return; }
+
+pub fn vm_push(v:i64) {
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_FRAME);
+    heap_set_body(n,v); heap_set_arg(n,g_stack);
+    g_stack=n; g_sp=g_sp+1;
+    return;
+}
+
+pub fn vm_pop() -> i64 {
+    if g_sp==0 { return sv_null(); }
+    let top=g_stack; let v=heap_get_body(top);
+    g_stack=heap_get_arg(top); g_sp=g_sp-1;
+    return v;
+}
+
+pub fn vm_peek() -> i64 {
+    if g_sp==0 { return sv_null(); }
+    return heap_get_body(g_stack);
+}
+
+// Locals: array of 64 slots
+pub fn vm_store_local(slot:i64, val:i64) {
+    if g_locals==0 {
+        g_locals=heap_alloc_term(); heap_set_tag(g_locals,TAG_FRAME);
+        heap_set_body(g_locals,0); heap_set_arg(g_locals,0); heap_set_domain(g_locals,0);
+    }
+    // Simple: store slot/value pairs in a linked list
+    let n=heap_alloc_term(); heap_set_tag(n,TAG_FRAME);
+    heap_set_body(n,slot); heap_set_arg(n,val); heap_set_domain(n,g_locals);
+    g_locals=n;
+    return;
+}
+
+pub fn vm_load_local(slot:i64) -> i64 {
+    let cur=g_locals;
+    while cur!=0 {
+        if heap_get_body(cur)==slot { return heap_get_arg(cur); }
+        cur=heap_get_domain(cur);
+    }
+    return sv_null();
+}
+
+// ── Interpreter loop ─────────────────────────────────────────────────────
+// Returns top-of-stack when HALT is reached, or sv_null on empty program.
+pub fn sv_exec(program_head:i64) -> i64 {
+    vm_reset();
+    let pc = program_head;
+
+    while pc != 0 {
+        let op      = heap_get_body(pc);
+        let operand = heap_get_arg(pc);
+
+        if op == OP_HALT { return vm_peek(); }
+
+        if op == OP_PUSH_NULL  { vm_push(sv_null()); }
+        if op == OP_PUSH_BOOL  { vm_push(sv_bool(operand)); }
+        if op == OP_PUSH_INT   { vm_push(sv_int(operand)); }
+        if op == OP_PUSH_FLOAT { vm_push(sv_float(operand)); }
+        if op == OP_POP        { vm_pop(); }
+        if op == OP_DUP        { let top=vm_peek(); vm_push(top); }
+
+        if op == OP_ADD {
+            let b=vm_pop(); let a=vm_pop();
+            if sv_tag(a)==SV_INT && sv_tag(b)==SV_INT {
+                vm_push(sv_int(sv_as_int(a)+sv_as_int(b)));
+            } else {
+                vm_push(sv_float(sv_as_int(a)*1000/1000 + sv_as_int(b)*1000/1000));
+            }
+        }
+        if op == OP_SUB {
+            let b=vm_pop(); let a=vm_pop();
+            vm_push(sv_int(sv_as_int(a)-sv_as_int(b)));
+        }
+        if op == OP_MUL {
+            let b=vm_pop(); let a=vm_pop();
+            vm_push(sv_int(sv_as_int(a)*sv_as_int(b)));
+        }
+        if op == OP_DIV {
+            let b=vm_pop(); let a=vm_pop();
+            if sv_as_int(b)==0 { vm_push(sv_null()); }
+            else { vm_push(sv_int(sv_as_int(a)/sv_as_int(b))); }
+        }
+
+        if op == OP_EQ  { let b=vm_pop(); let a=vm_pop(); if sv_as_int(a)==sv_as_int(b) { vm_push(sv_bool(1)); } else { vm_push(sv_bool(0)); } }
+        if op == OP_NEQ { let b=vm_pop(); let a=vm_pop(); if sv_as_int(a)!=sv_as_int(b) { vm_push(sv_bool(1)); } else { vm_push(sv_bool(0)); } }
+        if op == OP_LT  { let b=vm_pop(); let a=vm_pop(); if sv_as_int(a)<sv_as_int(b)  { vm_push(sv_bool(1)); } else { vm_push(sv_bool(0)); } }
+        if op == OP_GT  { let b=vm_pop(); let a=vm_pop(); if sv_as_int(a)>sv_as_int(b)  { vm_push(sv_bool(1)); } else { vm_push(sv_bool(0)); } }
+
+        if op == OP_AND { let b=vm_pop(); let a=vm_pop(); vm_push(sv_bool(sv_as_bool(a)&sv_as_bool(b))); }
+        if op == OP_OR  { let b=vm_pop(); let a=vm_pop(); vm_push(sv_bool(sv_as_bool(a)|sv_as_bool(b))); }
+        if op == OP_NOT { let a=vm_pop(); if sv_is_truthy(a)==0 { vm_push(sv_bool(1)); } else { vm_push(sv_bool(0)); } }
+
+        if op == OP_STORE { let v=vm_pop(); vm_store_local(operand, v); }
+        if op == OP_LOAD  { vm_push(vm_load_local(operand)); }
+
+        if op == OP_JUMP    { pc=operand; }  // operand = target instruction ptr
+        if op == OP_JUMP_IF { let cond=vm_pop(); if sv_is_truthy(cond)==1 { pc=operand; } else { pc=heap_get_domain(pc); } }
+
+        if op == OP_LIST_NEW  { vm_push(sv_list_new()); }
+        if op == OP_LIST_PUSH { let v=vm_pop(); let lst=vm_peek(); sv_list_push(lst,v); }
+        if op == OP_LIST_GET  { let idx=vm_pop(); let lst=vm_pop(); vm_push(sv_list_get(lst, sv_as_int(idx))); }
+
+        if op == OP_MAP_NEW { vm_push(sv_map_new()); }
+        if op == OP_MAP_SET { let v=vm_pop(); let k=vm_pop(); let m=vm_peek(); sv_map_set(m, sv_as_int(k), v); }
+        if op == OP_MAP_GET { let k=vm_pop(); let m=vm_pop(); vm_push(sv_map_get(m, sv_as_int(k))); }
+
+        if op != OP_JUMP && op != OP_JUMP_IF { pc=heap_get_domain(pc); }
+    }
+
+    return vm_peek();
+}
+
+// ── Program builder helpers ──────────────────────────────────────────────
+pub fn build_start() -> i64 { return instr(OP_PUSH_NULL, 0); }  // placeholder, overwritten
+
+pub fn main() -> i64 {
+    // Test 1: push int, halt
+    let p1 = instr(OP_PUSH_INT, 42);
+    heap_set_domain(p1, instr(OP_HALT, 0));
+    let r1 = sv_exec(p1);
+    if sv_as_int(r1) != 42 { return 1; }
+
+    // Test 2: arithmetic: (3 + 4) * 2 = 14
+    let p2 = instr(OP_PUSH_INT, 3); let cur = p2;
+    cur = prog_append(cur, instr(OP_PUSH_INT, 4));
+    cur = prog_append(cur, instr(OP_ADD, 0));
+    cur = prog_append(cur, instr(OP_PUSH_INT, 2));
+    cur = prog_append(cur, instr(OP_MUL, 0));
+    cur = prog_append(cur, instr(OP_HALT, 0));
+    let r2 = sv_exec(p2);
+    if sv_as_int(r2) != 14 { return 2; }
+
+    // Test 3: boolean: true AND false = false
+    let p3 = instr(OP_PUSH_BOOL, 1); cur = p3;
+    cur = prog_append(cur, instr(OP_PUSH_BOOL, 0));
+    cur = prog_append(cur, instr(OP_AND, 0));
+    cur = prog_append(cur, instr(OP_HALT, 0));
+    let r3 = sv_exec(p3);
+    if sv_as_bool(r3) != 0 { return 3; }
+
+    // Test 4: store/load local
+    let p4 = instr(OP_PUSH_INT, 99); cur = p4;
+    cur = prog_append(cur, instr(OP_STORE, 0));  // local[0] = 99
+    cur = prog_append(cur, instr(OP_LOAD, 0));   // push local[0]
+    cur = prog_append(cur, instr(OP_HALT, 0));
+    let r4 = sv_exec(p4);
+    if sv_as_int(r4) != 99 { return 4; }
+
+    // Test 5: null value
+    let p5 = instr(OP_PUSH_NULL, 0);
+    heap_set_domain(p5, instr(OP_HALT, 0));
+    let r5 = sv_exec(p5);
+    if sv_is_null(r5) != 1 { return 5; }
+
+    // Test 6: list operations
+    let p6 = instr(OP_LIST_NEW, 0); cur = p6;
+    cur = prog_append(cur, instr(OP_PUSH_INT, 10));
+    cur = prog_append(cur, instr(OP_LIST_PUSH, 0));
+    cur = prog_append(cur, instr(OP_PUSH_INT, 20));
+    cur = prog_append(cur, instr(OP_LIST_PUSH, 0));
+    cur = prog_append(cur, instr(OP_HALT, 0));
+    let r6 = sv_exec(p6);
+    if sv_list_len(r6) != 2 { return 6; }
+    if sv_as_int(sv_list_get(r6, 0)) != 10 { return 7; }
+
+    // Test 7: type system
+    if sv_type_name(sv_int(0))   != 2 { return 8; }
+    if sv_type_name(sv_bool(1))  != 1 { return 9; }
+    if sv_type_name(sv_null())   != 0 { return 10; }
+    if sv_type_name(sv_list_new()) != 5 { return 11; }
+
+    // Test 8: map operations
+    let m = sv_map_new();
+    sv_map_set(m, 100, sv_int(777));
+    let mv = sv_map_get(m, 100);
+    if sv_as_int(mv) != 777 { return 12; }
+    if sv_map_size(m) != 1 { return 13; }
+
+    // Test 9: division by zero → null
+    let p9 = instr(OP_PUSH_INT, 10); cur = p9;
+    cur = prog_append(cur, instr(OP_PUSH_INT, 0));
+    cur = prog_append(cur, instr(OP_DIV, 0));
+    cur = prog_append(cur, instr(OP_HALT, 0));
+    let r9 = sv_exec(p9);
+    if sv_is_null(r9) != 1 { return 14; }
+
+    return 111;
+}

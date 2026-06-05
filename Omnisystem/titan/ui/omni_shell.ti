@@ -1,0 +1,98 @@
+// titan/ui/omni_shell.ti — OmniShell: unified command shell for the Omnisystem UI
+// Hosts the Inspector, Topology Map, Proof Explorer, and Axiom Console as dockable panels.
+// Routes keyboard shortcuts to the active panel and dispatches commands to the Supervisor.
+import "titan/ui/inspector.ti"
+import "titan/ui/topology/aether_map.ti"
+import "titan/ui/proof_explorer.ti"
+import "titan/ui/axiom_console.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_SHELL:      i64 = 67000;
+const PANEL_TOPOLOGY: i64 = 0;
+const PANEL_INSPECTOR: i64 = 1;
+const PANEL_PROOF:    i64 = 2;
+const PANEL_CONSOLE:  i64 = 3;
+
+// Shell cell:
+//   body = active_panel (0-3)
+//   arg  = inspector handle
+//   domain = proof_tree handle
+pub fn shell_create() -> i64 {
+    let sh = heap_alloc_term();
+    heap_set_tag(sh, TAG_SHELL);
+    heap_set_body(sh, PANEL_TOPOLOGY);
+    let insp = insp_create();
+    heap_set_arg(sh, insp);
+    let tree = pe_tree_create();
+    heap_set_domain(sh, tree);
+    return sh;
+}
+
+pub fn shell_active_panel(sh: i64) -> i64  { return heap_get_body(sh); }
+pub fn shell_inspector(sh: i64) -> i64     { return heap_get_arg(sh); }
+pub fn shell_proof_tree(sh: i64) -> i64    { return heap_get_domain(sh); }
+
+pub fn shell_focus_panel(sh: i64, panel: i64) {
+    heap_set_body(sh, panel);
+}
+
+// Dispatch a write-back from the Inspector panel; propagates EVT_CONFIG_CHANGE
+pub fn shell_writeback(sh: i64, sys_id: i64, prop_key: i64, new_val: i64) -> i64 {
+    let insp = shell_inspector(sh);
+    return insp_handle_writeback(sys_id, prop_key, new_val);
+}
+
+// Update proof progress — adds a verified theorem to the shell's proof tree
+pub fn shell_record_proof(sh: i64, thm_id: i64, label: i64) {
+    let tree = shell_proof_tree(sh);
+    let t = pe_thm_create(thm_id, label, 1);
+    pe_tree_add_thm(tree, t);
+}
+
+pub fn shell_proof_progress(sh: i64) -> i64 {
+    return pe_progress_pct(shell_proof_tree(sh));
+}
+
+// Advance one simulation tick: decay pulses, animate topology, update inspector lens
+pub fn shell_tick(sh: i64, g: i64, pe: i64, ac: i64, tick: i64) {
+    am_decay_pulses();
+    let active = am_simulate_message(tick, 10);
+    am_edge_pulse(active, active, tick);
+}
+
+pub fn main() -> i64 {
+    let sh = shell_create();
+
+    // Test 1: Shell starts on topology panel
+    if shell_active_panel(sh) != PANEL_TOPOLOGY { return 1; }
+
+    // Test 2: Focus inspector, write-back valid change
+    shell_focus_panel(sh, PANEL_INSPECTOR);
+    if shell_active_panel(sh) != PANEL_INSPECTOR { return 2; }
+    let evt = shell_writeback(sh, 2, 0, 100);
+    if evt == 0 { return 3; }
+    if evt_type(evt) != EVT_CONFIG_CHANGE { return 4; }
+
+    // Test 3: Record two proofs, progress = 100%
+    shell_record_proof(sh, 1, 10);
+    shell_record_proof(sh, 2, 20);
+    if pe_verified_count(shell_proof_tree(sh)) != 2 { return 5; }
+    if shell_proof_progress(sh) != 100 { return 6; }
+
+    // Test 4: Topology builds correctly from shell context
+    let g = am_build_topology();
+    if tg_graph_node_count(g) != 9 { return 7; }
+
+    return 111;
+}

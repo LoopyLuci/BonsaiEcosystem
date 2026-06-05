@@ -1,0 +1,43 @@
+// tests/test_palette.ti — Integration test for Command Palette
+import "titan/ui/command_palette.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+pub fn main() -> i64 {
+    let p = cp_palette_create();
+
+    // Test 1: register two commands manually, count = 2
+    cp_register(p, CMD_OPEN_SUBSYS, 0, 5);
+    cp_register(p, CMD_CONFIG_SET,  0, 3);
+    if cp_count(p) != 2 { return 1; }
+
+    // Test 2: search for OPEN_SUBSYS finds 1 result
+    let res = cp_search(p, CMD_OPEN_SUBSYS);
+    if res == 0 { return 2; }
+
+    // Test 3: execute OPEN_SUBSYS → non-zero
+    let c = heap_get_body(res);
+    if cp_execute(c) == 0 { return 3; }
+
+    // Test 4: seed defaults → total becomes 2 + 11 = 13
+    cp_seed_defaults(p);
+    if cp_count(p) != 13 { return 4; }
+
+    // Test 5: CONFIG_SET on valid target fires EVT_CONFIG_CHANGE
+    let cmd_cfg = cp_cmd_create(CMD_CONFIG_SET, 0, 2);
+    let evt = cp_execute(cmd_cfg);
+    if evt == 0 { return 5; }
+    if evt_type(evt) != EVT_CONFIG_CHANGE { return 6; }
+
+    return 111;
+}

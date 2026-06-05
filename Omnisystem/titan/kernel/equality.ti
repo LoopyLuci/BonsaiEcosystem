@@ -1,0 +1,93 @@
+// titan/kernel/equality.ti — Definitional equality via WHNF
+// Self-contained: includes all term constructors, eq_term, shift, subst, whnf.
+
+pub fn var_ref(idx: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 0); heap_set(id, 1, idx); return id;
+}
+pub fn lam(body: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 1); heap_set(id, 1, body); return id;
+}
+pub fn app(func: i64, arg: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 2); heap_set(id, 1, func); heap_set(id, 2, arg); return id;
+}
+pub fn pi(domain: i64, codomain: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 3); heap_set(id, 1, domain); heap_set(id, 2, codomain); return id;
+}
+pub fn sort(level: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 4); heap_set(id, 1, level); return id;
+}
+pub fn const_term(name: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 5); heap_set(id, 1, name); return id;
+}
+pub fn make_id() -> i64 { return lam(var_ref(0)); }
+
+pub fn eq_term(a: i64, b: i64) -> i64 {
+    let ta = heap_get(a, 0); let tb = heap_get(b, 0);
+    if ta != tb { return 0; }
+    if ta == 0 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 1 { return eq_term(heap_get(a, 1), heap_get(b, 1)); }
+    if ta == 2 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 3 { if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; } return eq_term(heap_get(a, 2), heap_get(b, 2)); }
+    if ta == 4 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 5 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    return 0;
+}
+
+pub fn shift(t: i64, cutoff: i64, amount: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx >= cutoff { return var_ref(idx + amount); } return var_ref(idx); }
+    if tag == 1 { return lam(shift(heap_get(t, 1), cutoff + 1, amount)); }
+    if tag == 2 { return app(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff, amount)); }
+    if tag == 3 { return pi(shift(heap_get(t, 1), cutoff, amount), shift(heap_get(t, 2), cutoff + 1, amount)); }
+    return t;
+}
+pub fn lift(t: i64, cutoff: i64) -> i64 { return shift(t, cutoff, 1); }
+
+pub fn subst(s: i64, index: i64, t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 { let idx = heap_get(t, 1); if idx == index { return s; } if idx > index { return var_ref(idx - 1); } return var_ref(idx); }
+    if tag == 1 { let s2 = lift(s, 0); return lam(subst(s2, index + 1, heap_get(t, 1))); }
+    if tag == 2 { return app(subst(s, index, heap_get(t, 1)), subst(s, index, heap_get(t, 2))); }
+    if tag == 3 { let s2 = lift(s, 0); return pi(subst(s, index, heap_get(t, 1)), subst(s2, index + 1, heap_get(t, 2))); }
+    return t;
+}
+
+pub fn whnf(t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 2 {
+        let func = whnf(heap_get(t, 1));
+        if heap_get(func, 0) == 1 {
+            let reduced = subst(heap_get(t, 2), 0, heap_get(func, 1));
+            return whnf(reduced);
+        }
+        return app(func, heap_get(t, 2));
+    }
+    return t;
+}
+
+// Definitional equality: normalise both sides, then compare structurally
+// Returns 1 = equal, 0 = not equal
+pub fn conv(a: i64, b: i64) -> i64 {
+    return eq_term(whnf(a), whnf(b));
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: (λ x. x) 1  definitionally equals  1
+    let a = app(make_id(), const_term(1));
+    let b = const_term(1);
+    if conv(a, b) == 1 { score = score + 37; }
+
+    // Test 2: sort(0) definitionally equals itself
+    let s0a = sort(0);
+    let s0b = sort(0);
+    if conv(s0a, s0b) == 1 { score = score + 37; }
+
+    // Test 3: sort(0) is NOT definitionally equal to sort(1)
+    let s1 = sort(1);
+    if conv(s0a, s1) == 0 { score = score + 37; }
+
+    if score >= 111 { return 111; }
+    return score;
+}

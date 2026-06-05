@@ -1,0 +1,99 @@
+// OmniLib Set -- unique integer set with heap-backed linked list
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_SET: i64 = 7020;
+const TAG_SET_NODE: i64 = 7021;
+
+// Set layout: body=head, domain=size
+pub fn set_new() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SET);
+    heap_set_body(s, 0);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn set_size(s: i64) -> i64 {
+    return heap_get_domain(s);
+}
+
+pub fn set_hash(k: i64) -> i64 {
+    if k < 0 { return -k; }
+    return k;
+}
+
+pub fn set_contains(s: i64, key: i64) -> i64 {
+    let mut cur = heap_get_body(s);
+    while cur != 0 {
+        if heap_get_body(cur) == key { return 1; }
+        cur = heap_get_arg(cur);
+    }
+    return 0;
+}
+
+pub fn set_insert(s: i64, key: i64) -> i64 {
+    if set_contains(s, key) == 1 { return 0; }
+
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_SET_NODE);
+    heap_set_body(n, key);
+    heap_set_arg(n, heap_get_body(s));
+
+    heap_set_body(s, n);
+    heap_set_domain(s, heap_get_domain(s) + 1);
+    return 1;
+}
+
+pub fn set_remove(s: i64, key: i64) -> i64 {
+    let mut prev: i64 = 0;
+    let mut cur = heap_get_body(s);
+
+    while cur != 0 {
+        if heap_get_body(cur) == key {
+            let nxt = heap_get_arg(cur);
+            if prev == 0 {
+                heap_set_body(s, nxt);
+            } else {
+                heap_set_arg(prev, nxt);
+            }
+            heap_set_domain(s, heap_get_domain(s) - 1);
+            return 1;
+        }
+        prev = cur;
+        cur = heap_get_arg(cur);
+    }
+
+    return 0;
+}
+
+pub fn main() -> i64 {
+    let s = set_new();
+    if set_size(s) != 0 { return 1; }
+
+    if set_insert(s, 42) != 1 { return 2; }
+    if set_insert(s, 42) != 0 { return 3; }
+    if set_insert(s, 99) != 1 { return 4; }
+
+    if set_contains(s, 42) != 1 { return 5; }
+    if set_contains(s, 99) != 1 { return 6; }
+    if set_contains(s, 100) != 0 { return 7; }
+    if set_size(s) != 2 { return 8; }
+
+    if set_remove(s, 42) != 1 { return 9; }
+    if set_contains(s, 42) != 0 { return 10; }
+    if set_size(s) != 1 { return 11; }
+
+    if set_hash(-5) != 5 { return 12; }
+
+    return 111;
+}

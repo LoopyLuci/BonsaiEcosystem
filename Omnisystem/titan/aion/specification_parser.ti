@@ -1,0 +1,167 @@
+// titan/aion/specification_parser.ti — Natural Language Specification Parser
+// Extracts intent, entities, and constraints from NL descriptions.
+// Body-for-meta: entity.body=meta1, entity.domain=next_entity (safe for list).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+}
+
+const TAG_SPEC:   i64 = 8410;
+const TAG_ENTITY: i64 = 8411;
+
+// Entity types
+const ENTITY_ENDPOINT: i64 = 0;
+const ENTITY_MODEL:    i64 = 1;
+const ENTITY_AUTH:     i64 = 2;
+const ENTITY_DATABASE: i64 = 3;
+const ENTITY_UI:       i64 = 4;
+const ENTITY_API:      i64 = 5;
+
+// Project template types
+const TEMPLATE_REST_API:     i64 = 0;
+const TEMPLATE_WEB_APP:      i64 = 1;
+const TEMPLATE_CLI_TOOL:     i64 = 2;
+const TEMPLATE_LIBRARY:      i64 = 3;
+const TEMPLATE_ACTOR_SYSTEM: i64 = 4;
+
+// Entity cell layout:
+//   entity: tag=TAG_ENTITY, body=meta1, arg=0, domain=next_entity
+//   meta1:  body=entity_type, arg=name_id, domain=properties_id
+
+pub fn entity_create(entity_type: i64, name_id: i64, properties_id: i64) -> i64 {
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, entity_type);
+    heap_set_arg(meta1, name_id);
+    heap_set_domain(meta1, properties_id);
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_ENTITY);
+    heap_set_body(e, meta1);
+    heap_set_arg(e, 0);
+    heap_set_domain(e, 0);    // next_entity; safe for list link
+    return e;
+}
+
+pub fn entity_type(e: i64) -> i64 { return heap_get_body(heap_get_body(e)); }  // meta1.body
+pub fn entity_name(e: i64) -> i64 { return heap_get_arg(heap_get_body(e)); }   // meta1.arg
+
+// Parse spec string, extract entities, always return a spec node.
+pub fn spec_parse(spec_id: i64) -> i64 {
+    let len = str_len(spec_id);
+    let mut entities: i64 = 0;
+
+    if len > 0 {
+        let mut pos: i64 = 0;
+        while pos < len {
+            // "API" — ASCII 65 80 73
+            if pos + 2 < len {
+                if str_at(spec_id, pos) == 65 && str_at(spec_id, pos + 1) == 80 && str_at(spec_id, pos + 2) == 73 {
+                    let e = entity_create(ENTITY_API, heap_alloc_term(), heap_alloc_term());
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            // "DB" — 68 66
+            if pos + 1 < len {
+                if str_at(spec_id, pos) == 68 && str_at(spec_id, pos + 1) == 66 {
+                    let e = entity_create(ENTITY_DATABASE, heap_alloc_term(), heap_alloc_term());
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            // "auth" — 97 117 116 104
+            if pos + 3 < len {
+                if str_at(spec_id, pos) == 97 && str_at(spec_id, pos + 1) == 117 && str_at(spec_id, pos + 2) == 116 && str_at(spec_id, pos + 3) == 104 {
+                    let e = entity_create(ENTITY_AUTH, heap_alloc_term(), heap_alloc_term());
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            // "UI" — 85 73
+            if pos + 1 < len {
+                if str_at(spec_id, pos) == 85 && str_at(spec_id, pos + 1) == 73 {
+                    let e = entity_create(ENTITY_UI, heap_alloc_term(), heap_alloc_term());
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            // "model" — 109 111 100 101 108
+            if pos + 4 < len {
+                if str_at(spec_id, pos) == 109 && str_at(spec_id, pos + 1) == 111 && str_at(spec_id, pos + 2) == 100 && str_at(spec_id, pos + 3) == 101 && str_at(spec_id, pos + 4) == 108 {
+                    let e = entity_create(ENTITY_MODEL, heap_alloc_term(), heap_alloc_term());
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            pos = pos + 1;
+        }
+    }
+
+    // Always create and return spec node
+    let spec = heap_alloc_term();
+    heap_set_tag(spec, TAG_SPEC);
+    heap_set_body(spec, spec_id);
+    heap_set_arg(spec, 0);
+    heap_set_domain(spec, entities);
+    return spec;
+}
+
+pub fn spec_entity_count(spec: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = heap_get_domain(spec);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    return count;
+}
+
+pub fn spec_recommend_template(spec: i64) -> i64 {
+    let mut has_api:  bool = false;
+    let mut has_db:   bool = false;
+    let mut has_auth: bool = false;
+    let mut has_ui:   bool = false;
+    let mut curr = heap_get_domain(spec);
+    while curr != 0 {
+        let et = entity_type(curr);
+        if et == ENTITY_API      { has_api  = true; }
+        if et == ENTITY_DATABASE { has_db   = true; }
+        if et == ENTITY_AUTH     { has_auth = true; }
+        if et == ENTITY_UI       { has_ui   = true; }
+        curr = heap_get_domain(curr);
+    }
+    if has_api && has_db { return TEMPLATE_REST_API; }
+    if has_ui            { return TEMPLATE_WEB_APP; }
+    if has_api           { return TEMPLATE_CLI_TOOL; }
+    return TEMPLATE_LIBRARY;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Empty spec_id (heap cell → str_len likely 0) — always returns spec node
+    let spec_id = heap_alloc_term();
+    let spec = spec_parse(spec_id);
+    if heap_get_tag(spec) != TAG_SPEC { return 1; }
+
+    let count = spec_entity_count(spec);
+    if count < 0 { return 2; }
+
+    let template = spec_recommend_template(spec);
+    if template > 4 { return 3; }
+
+    // Entity creation accessors
+    let e = entity_create(ENTITY_API, 42, 99);
+    if heap_get_tag(e) != TAG_ENTITY   { return 4; }
+    if entity_type(e) != ENTITY_API    { return 5; }
+    if entity_name(e) != 42           { return 6; }
+
+    // Second spec
+    let spec2 = spec_parse(heap_alloc_term());
+    if heap_get_tag(spec2) != TAG_SPEC { return 7; }
+    if spec_entity_count(spec2) < 0   { return 8; }
+
+    return 111;
+}

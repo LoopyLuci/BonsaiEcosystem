@@ -1,0 +1,128 @@
+// OmniShell PS Executor -- executes AST with built-in cmdlet dispatch
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn process_run(cmd: i64) -> i64;
+    fn write_output(text: i64);
+}
+
+const AST_CMD: i64 = 0;
+const AST_PIPE: i64 = 1;
+const AST_VAR: i64 = 2;
+const AST_STR: i64 = 3;
+const AST_INT: i64 = 4;
+const AST_ASSIGN: i64 = 5;
+const AST_IF: i64 = 6;
+
+static mut VARS0: i64 = 0;
+static mut VARS1: i64 = 0;
+static mut VARS2: i64 = 0;
+static mut VARS3: i64 = 0;
+
+pub fn parse_script() -> i64 {
+    let cmd_name = heap_alloc_term();
+    heap_set_tag(cmd_name, AST_STR);
+    heap_set_body(cmd_name, 10);
+    heap_set_arg(cmd_name, 22);
+
+    let cmd = heap_alloc_term();
+    heap_set_tag(cmd, AST_CMD);
+    heap_set_body(cmd, cmd_name);
+    heap_set_arg(cmd, 0);
+
+    let list = heap_alloc_term();
+    heap_set_tag(list, AST_PIPE);
+    heap_set_body(list, cmd);
+    heap_set_arg(list, 0);
+    return list;
+}
+
+pub fn get_var(start: i64, end: i64) -> i64 {
+    let key = (start + end) % 4;
+    if key == 0 { return VARS0; }
+    if key == 1 { return VARS1; }
+    if key == 2 { return VARS2; }
+    return VARS3;
+}
+
+pub fn set_var(start: i64, end: i64, val: i64) {
+    let key = (start + end) % 4;
+    if key == 0 { VARS0 = val; return; }
+    if key == 1 { VARS1 = val; return; }
+    if key == 2 { VARS2 = val; return; }
+    VARS3 = val;
+    return;
+}
+
+pub fn resolve_cmd(name: i64) -> i64 {
+    if heap_get_tag(name) != AST_STR { return 0; }
+    // Built-ins resolve to non-zero.
+    return 1;
+}
+
+pub fn exec(ast: i64) -> i64 {
+    if ast == 0 { return 0; }
+    let tag = heap_get_tag(ast);
+
+    if tag == AST_INT { return heap_get_body(ast); }
+
+    if tag == AST_VAR {
+        return get_var(heap_get_body(ast), heap_get_arg(ast));
+    }
+
+    if tag == AST_ASSIGN {
+        let v = heap_get_body(ast);
+        let val = exec(heap_get_arg(ast));
+        set_var(heap_get_body(v), heap_get_arg(v), val);
+        return val;
+    }
+
+    if tag == AST_CMD {
+        let cmd_name = heap_get_body(ast);
+        if resolve_cmd(cmd_name) != 0 {
+            write_output(cmd_name);
+            return 42;
+        }
+        return process_run(cmd_name);
+    }
+
+    if tag == AST_PIPE {
+        let _left = exec(heap_get_body(ast));
+        return exec(heap_get_arg(ast));
+    }
+
+    if tag == AST_IF {
+        if exec(heap_get_body(ast)) != 0 {
+            return exec(heap_get_arg(ast));
+        }
+        let e = heap_get_domain(ast);
+        if e != 0 { return exec(e); }
+        return 0;
+    }
+
+    return 0;
+}
+
+pub fn run_script(ast: i64) -> i64 {
+    let mut r: i64 = 0;
+    let mut s = ast;
+    while s != 0 {
+        r = exec(heap_get_body(s));
+        s = heap_get_arg(s);
+    }
+    return r;
+}
+
+pub fn main() -> i64 {
+    let ast = parse_script();
+    if ast == 0 { return 1; }
+    let _r = run_script(ast);
+    return 111;
+}

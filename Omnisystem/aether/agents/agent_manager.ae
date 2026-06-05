@@ -1,0 +1,127 @@
+// aether/agents/agent_manager.ae — Agent Lifecycle Actor
+// Spawns, monitors, and coordinates AI agent actors using an idle-agent pool.
+
+extern "rust" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_AGENT:      i64 = 6100;
+const TAG_AGENT_POOL: i64 = 6101;
+
+// Agent kind codes
+const AGENT_PLANNER:  i64 = 0;
+const AGENT_CODER:    i64 = 1;
+const AGENT_TESTER:   i64 = 2;
+const AGENT_VERIFIER: i64 = 3;
+
+// Agent state codes
+const AGENT_IDLE:  i64 = 0;
+const AGENT_BUSY:  i64 = 1;
+const AGENT_ERROR: i64 = 2;
+
+// Agent cell: tag=TAG_AGENT, body=agent_type, arg=status, domain=meta
+// meta: body=agent_name, arg=current_task, domain=result_artifact
+pub fn agent_create(agent_type: i64, agent_name: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, agent_name);
+    heap_set_arg(meta, 0);
+    heap_set_domain(meta, 0);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_AGENT);
+    heap_set_body(a, agent_type);
+    heap_set_arg(a, AGENT_IDLE);
+    heap_set_domain(a, meta);
+    return a;
+}
+
+pub fn agent_is_idle(agent: i64) -> bool { return heap_get_arg(agent) == AGENT_IDLE; }
+pub fn agent_type(agent: i64) -> i64     { return heap_get_body(agent); }
+
+pub fn agent_assign_task(agent: i64, task: i64) -> bool {
+    if heap_get_arg(agent) != AGENT_IDLE { return false; }
+    heap_set_arg(agent, AGENT_BUSY);
+    let meta = heap_get_domain(agent);
+    heap_set_arg(meta, task);
+    return true;
+}
+
+pub fn agent_complete_task(agent: i64, result: i64) {
+    heap_set_arg(agent, AGENT_IDLE);
+    let meta = heap_get_domain(agent);
+    heap_set_domain(meta, result);
+}
+
+// Agent pool uses wrapper nodes so agent.domain stays free for its meta.
+// pool_wrapper: body=agent, domain=next_wrapper
+static mut AGENT_POOL: i64 = 0;
+static mut POOL_COUNT: i64 = 0;
+
+pub fn pool_add_agent(agent_type: i64, name: i64) -> i64 {
+    let agent   = agent_create(agent_type, name);
+    let wrapper = heap_alloc_term();
+    heap_set_body(wrapper, agent);
+    heap_set_domain(wrapper, AGENT_POOL);
+    AGENT_POOL = wrapper;
+    POOL_COUNT = POOL_COUNT + 1;
+    return agent;
+}
+
+pub fn pool_count() -> i64 { return POOL_COUNT; }
+
+pub fn pool_idle_count() -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = AGENT_POOL;
+    while curr != 0 {
+        let agent = heap_get_body(curr);
+        if agent_is_idle(agent) { count = count + 1; }
+        curr = heap_get_domain(curr);
+    }
+    return count;
+}
+
+pub fn pool_find_idle_agent(required_type: i64) -> i64 {
+    let mut curr = AGENT_POOL;
+    while curr != 0 {
+        let agent = heap_get_body(curr);
+        if agent_is_idle(agent) && agent_type(agent) == required_type {
+            return agent;
+        }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    AGENT_POOL = 0;
+    POOL_COUNT = 0;
+
+    pool_add_agent(AGENT_PLANNER,  100);
+    pool_add_agent(AGENT_CODER,    200);
+    pool_add_agent(AGENT_TESTER,   300);
+
+    if pool_count()     != 3 { return 1; }
+    if pool_idle_count() != 3 { return 2; }
+
+    let agent = pool_find_idle_agent(AGENT_CODER);
+    if agent == 0                    { return 3; }
+    if !agent_assign_task(agent, 42) { return 4; }
+    if pool_idle_count() != 2        { return 5; }
+
+    agent_complete_task(agent, 100);
+    if pool_idle_count() != 3 { return 6; }
+
+    // Re-assign same agent now that it is idle
+    if !agent_assign_task(agent, 99) { return 7; }
+    if pool_idle_count() != 2        { return 8; }
+
+    return 111;
+}

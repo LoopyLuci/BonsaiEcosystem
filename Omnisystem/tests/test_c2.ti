@@ -1,0 +1,93 @@
+// tests/test_c2.ti — Phase C2 Decentralised P2P Network Integration Test
+// All helpers inlined with tc2_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TC2_T_BKT:  i64 = 23100;
+const TC2_T_PEER: i64 = 23101;
+const TC2_T_DHT:  i64 = 23102;
+const TC2_T_WRP:  i64 = 23103;
+
+pub fn tc2_peer_create(peer_id: i64, addr: i64, rep: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TC2_T_PEER); heap_set_body(p, peer_id); heap_set_arg(p, addr); heap_set_domain(p, rep);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TC2_T_WRP); heap_set_body(w, p); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tc2_peer_rep(w: i64) -> i64 { return heap_get_domain(heap_get_body(w)); }
+
+pub fn tc2_bucket_create() -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TC2_T_BKT); heap_set_body(b, 0); heap_set_arg(b, 0);
+    return b;
+}
+
+pub fn tc2_bucket_add(b: i64, w: i64) {
+    let h = heap_get_arg(b);
+    if h == 0 { heap_set_arg(b, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(b, heap_get_body(b) + 1);
+}
+
+pub fn tc2_dht_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TC2_T_DHT); heap_set_body(d, 0); heap_set_arg(d, 0);
+    return d;
+}
+
+pub fn tc2_dht_add_bucket(d: i64, b: i64) {
+    let h = heap_get_arg(d);
+    if h == 0 { heap_set_arg(d, b); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, b);
+    }
+    heap_set_body(d, heap_get_body(d) + 1);
+}
+
+pub fn tc2_xor_dist(a: i64, b: i64) -> i64 { return (a ^ b) & 0x7FFFFFFF; }
+
+pub fn tc2_reputation_check(w: i64, threshold: i64) -> i64 {
+    if tc2_peer_rep(w) >= threshold { return 1; }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let d = tc2_dht_create();
+    let b = tc2_bucket_create();
+    tc2_bucket_add(b, tc2_peer_create(1, 10, 90));
+    tc2_bucket_add(b, tc2_peer_create(2, 20, 30));
+    tc2_dht_add_bucket(d, b);
+    if heap_get_body(d) != 1          { return 1; }
+
+    // XOR distance tests
+    if tc2_xor_dist(3, 7) != 4        { return 2; }
+    if tc2_xor_dist(0, 0) != 0        { return 3; }
+
+    // Reputation checks
+    let w1 = tc2_peer_create(10, 1, 90);
+    let w2 = tc2_peer_create(20, 2, 30);
+    if tc2_reputation_check(w1, 60) != 1 { return 4; }
+    if tc2_reputation_check(w2, 60) != 0 { return 5; }
+    if tc2_reputation_check(w2, 30) != 1 { return 6; }
+
+    return 111;
+}

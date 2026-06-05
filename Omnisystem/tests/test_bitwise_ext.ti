@@ -1,0 +1,17 @@
+// Test bitwise operator extensions
+extern "titan" {
+    fn bit_xor(a: i64, b: i64) -> i64;
+    fn bit_or(a: i64, b: i64) -> i64;
+    fn bit_and(a: i64, b: i64) -> i64;
+    fn bit_shl(a: i64, b: i64) -> i64;
+    fn bit_shr(a: i64, b: i64) -> i64;
+}
+
+pub fn main() -> i64 {
+    if bit_xor(5, 3) != 6 { return 1; }
+    if bit_or(5, 3) != 7 { return 2; }
+    if bit_and(5, 3) != 1 { return 3; }
+    if bit_shl(1, 4) != 16 { return 4; }
+    if bit_shr(16, 2) != 4 { return 5; }
+    return 111;
+}

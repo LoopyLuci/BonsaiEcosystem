@@ -1,0 +1,80 @@
+// titan/ulcf/configs/r.ti
+// R language configuration for the Universal Grammar Adapter.
+
+pub fn r_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("integer".to_string(), "i64".to_string());
+    type_map.insert("numeric".to_string(), "f64".to_string());
+    type_map.insert("double".to_string(), "f64".to_string());
+    type_map.insert("logical".to_string(), "bool".to_string());
+    type_map.insert("character".to_string(), "String".to_string());
+    type_map.insert("vector".to_string(), "Vec<Any>".to_string());
+    type_map.insert("list".to_string(), "Vec<Any>".to_string());
+    type_map.insert("matrix".to_string(), "Matrix<f64>".to_string());
+    type_map.insert("data.frame".to_string(), "DataFrame".to_string());
+    type_map.insert("factor".to_string(), "Vec<String>".to_string());
+    type_map.insert("NULL".to_string(), "Option<Any>".to_string());
+    type_map.insert("function".to_string(), "Fn".to_string());
+    type_map.insert("environment".to_string(), "Map".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+    operator_map.insert("<-".to_string(), "add".to_string());
+    operator_map.insert("->".to_string(), "add".to_string());
+    operator_map.insert("%in%".to_string(), "add".to_string());
+    operator_map.insert("%>%".to_string(), "add".to_string());
+
+    LanguageConfig {
+        name: "r".to_string(),
+        extensions: vec![".r".to_string(), ".R".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression".to_string(),
+            "assignment".to_string(),
+            "if_statement".to_string(),
+            "while_statement".to_string(),
+            "for_statement".to_string(),
+            "repeat_statement".to_string(),
+            "function_definition".to_string(),
+            "return_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "call_expression".to_string(),
+            "identifier".to_string(),
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "null_literal".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "NULL".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec![
+            "brace_list".to_string(),
+            "expression_list".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}

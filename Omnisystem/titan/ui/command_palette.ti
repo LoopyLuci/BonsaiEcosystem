@@ -1,0 +1,151 @@
+// titan/ui/command_palette.ti — Universal Command Palette
+// Discoverable entry point for every Omnisystem capability.
+// TAG range 68000–68002 (clear of renderer 64000, graph 63000, inspector 65100, events 66000, shell 67000).
+import "titan/ui/inspector.ti"
+import "titan/omnicore/events.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_CMD: i64 = 68000;
+const TAG_PAL: i64 = 68001;
+const TAG_WRP: i64 = 68002;
+
+const CMD_OPEN_SUBSYS: i64 = 0;
+const CMD_RUN_PROOF:   i64 = 1;
+const CMD_CONFIG_SET:  i64 = 2;
+const CMD_SEARCH:      i64 = 3;
+
+// Command cell: body=kind, arg=label, domain=target
+pub fn cp_cmd_create(kind: i64, label: i64, target: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_CMD);
+    heap_set_body(c, kind);
+    heap_set_arg(c, label);
+    heap_set_domain(c, target);
+    return c;
+}
+
+pub fn cp_cmd_kind(c: i64) -> i64   { return heap_get_body(c); }
+pub fn cp_cmd_target(c: i64) -> i64 { return heap_get_domain(c); }
+
+// Palette cell: body=count, arg=head (linked list of TAG_WRP wrappers)
+pub fn cp_palette_create() -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TAG_PAL);
+    heap_set_body(p, 0);
+    heap_set_arg(p, 0);
+    heap_set_domain(p, 0);
+    return p;
+}
+
+pub fn cp_register(p: i64, kind: i64, label: i64, target: i64) {
+    let c = cp_cmd_create(kind, label, target);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WRP);
+    heap_set_body(w, c);
+    heap_set_domain(w, 0);
+    let h = heap_get_arg(p);
+    if h == 0 {
+        heap_set_arg(p, w);
+    } else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 {
+            cur = heap_get_domain(cur);
+        }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(p, heap_get_body(p) + 1);
+}
+
+pub fn cp_count(p: i64) -> i64 { return heap_get_body(p); }
+
+// Returns a linked list (via domain) of wrapper nodes whose command kind matches query
+pub fn cp_search(p: i64, query: i64) -> i64 {
+    let mut results: i64 = 0;
+    let mut cur: i64 = heap_get_arg(p);
+    while cur != 0 {
+        let c = heap_get_body(cur);
+        if cp_cmd_kind(c) == query {
+            if cp_cmd_target(c) >= 0 {
+                let r = heap_alloc_term();
+                heap_set_body(r, c);
+                heap_set_domain(r, results);
+                results = r;
+            }
+        }
+        cur = heap_get_domain(cur);
+    }
+    return results;
+}
+
+// Execute: OPEN_SUBSYS → target id; CONFIG_SET → validated write-back event
+pub fn cp_execute(c: i64) -> i64 {
+    let kind = cp_cmd_kind(c);
+    if kind == CMD_OPEN_SUBSYS {
+        return cp_cmd_target(c) + 1;   // non-zero = success; +1 so target=0 still succeeds
+    }
+    if kind == CMD_CONFIG_SET {
+        return insp_handle_writeback(cp_cmd_target(c), 1, 0);
+    }
+    return 0;
+}
+
+// Seed: 9 OPEN_SUBSYS (subsystems 0–8) + 1 CONFIG_SET + 1 RUN_PROOF = 11 defaults
+pub fn cp_seed_defaults(p: i64) {
+    cp_register(p, CMD_OPEN_SUBSYS, 0, 0);
+    cp_register(p, CMD_OPEN_SUBSYS, 1, 1);
+    cp_register(p, CMD_OPEN_SUBSYS, 2, 2);
+    cp_register(p, CMD_OPEN_SUBSYS, 3, 3);
+    cp_register(p, CMD_OPEN_SUBSYS, 4, 4);
+    cp_register(p, CMD_OPEN_SUBSYS, 5, 5);
+    cp_register(p, CMD_OPEN_SUBSYS, 6, 6);
+    cp_register(p, CMD_OPEN_SUBSYS, 7, 7);
+    cp_register(p, CMD_OPEN_SUBSYS, 8, 8);
+    cp_register(p, CMD_CONFIG_SET,  9, 3);
+    cp_register(p, CMD_RUN_PROOF,  10, 8);
+}
+
+pub fn main() -> i64 {
+    let p = cp_palette_create();
+    cp_seed_defaults(p);
+
+    // Test 1: 11 commands registered
+    if cp_count(p) != 11 { return 1; }
+
+    // Test 2: search returns all 9 OPEN_SUBSYS commands
+    let results = cp_search(p, CMD_OPEN_SUBSYS);
+    if results == 0 { return 2; }
+    let mut cnt: i64 = 0;
+    let mut r = results;
+    while r != 0 {
+        cnt = cnt + 1;
+        r = heap_get_domain(r);
+    }
+    if cnt != 9 { return 3; }
+
+    // Test 3: execute OPEN_SUBSYS returns non-zero
+    let cmd0 = cp_cmd_create(CMD_OPEN_SUBSYS, 0, 5);
+    if cp_execute(cmd0) == 0 { return 4; }
+
+    // Test 4: execute CONFIG_SET on valid sys_id returns valid event
+    let cmd_cfg = cp_cmd_create(CMD_CONFIG_SET, 0, 3);
+    let evt = cp_execute(cmd_cfg);
+    if evt == 0 { return 5; }
+    if evt_type(evt) != EVT_CONFIG_CHANGE { return 6; }
+
+    // Test 5: execute CONFIG_SET on invalid sys_id (0) returns 0
+    let cmd_bad = cp_cmd_create(CMD_CONFIG_SET, 0, 0);
+    if cp_execute(cmd_bad) != 0 { return 7; }
+
+    return 111;
+}

@@ -1,0 +1,156 @@
+// test_integration.ti — Phase 7: cross-subsystem integration tests
+// Exercises window + net + thread + audio together in a single module
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn heap_set_domain(a:i64,b:i64);
+    fn heap_get_domain(a:i64)->i64;
+    fn window_create(w:i64,h:i64,x:i64,y:i64)->i64;
+    fn window_show(wid:i64);
+    fn window_poll_event(wid:i64)->i64;
+    fn window_destroy(wid:i64);
+    fn surface_create(wid:i64,w:i64,h:i64)->i64;
+    fn surface_clear(sid:i64,color:i64);
+    fn surface_draw_rect(sid:i64,x:i64,y:i64,w:i64,h:i64,color:i64);
+    fn surface_present(sid:i64);
+    fn socket_create(type:i64)->i64;
+    fn socket_close(sock:i64);
+    fn net_listen(port:i64)->i64;
+    fn mutex_create()->i64;
+    fn mutex_lock(mid:i64);
+    fn mutex_unlock(mid:i64);
+    fn audio_init()->i64;
+    fn audio_play(freq:i64,duration:i64);
+}
+
+const T_INTEG:i64=34000;
+
+// Test 1: all subsystems initialise without error
+pub fn test_all_init()->i64{
+    let sock:i64=socket_create(0);
+    if sock==0{return 0;}
+    let mid:i64=mutex_create();
+    if mid==0{socket_close(sock);return 0;}
+    let aud:i64=audio_init();
+    if aud==0{socket_close(sock);return 0;}
+    let wid:i64=window_create(320,240,20,20);
+    if wid==0{socket_close(sock);return 0;}
+    window_destroy(wid);
+    socket_close(sock);
+    return 1;
+}
+
+// Test 2: heap records can interleave across subsystems
+pub fn test_heap_interleave()->i64{
+    let rec:i64=heap_alloc_term();
+    let sock:i64=socket_create(0);
+    let wid:i64=window_create(200,150,10,10);
+    let mid:i64=mutex_create();
+    heap_set_tag(rec,T_INTEG);
+    heap_set_body(rec,sock);
+    heap_set_arg(rec,wid);
+    heap_set_domain(rec,mid);
+    let gsock:i64=heap_get_body(rec);
+    let gwid:i64=heap_get_arg(rec);
+    let gmid:i64=heap_get_domain(rec);
+    if gsock==sock{
+        if gwid==wid{
+            if gmid==mid{
+                if wid>0{window_destroy(wid);}
+                socket_close(sock);
+                return 1;
+            }
+        }
+    }
+    if wid>0{window_destroy(wid);}
+    socket_close(sock);
+    return 0;
+}
+
+// Test 3: mutex guards window render cycle
+pub fn test_mutex_guards_render()->i64{
+    let mid:i64=mutex_create();
+    if mid==0{return 0;}
+    let wid:i64=window_create(400,300,40,40);
+    if wid==0{return 0;}
+    let sid:i64=surface_create(wid,400,300);
+    if sid==0{window_destroy(wid);return 0;}
+    mutex_lock(mid);
+    surface_clear(sid,1052688);
+    surface_draw_rect(sid,10,10,200,100,52224);
+    surface_present(sid);
+    mutex_unlock(mid);
+    window_poll_event(wid);
+    window_destroy(wid);
+    return 1;
+}
+
+// Test 4: net + audio together
+pub fn test_net_audio()->i64{
+    let s1:i64=socket_create(0);
+    let s2:i64=net_listen(19860);
+    let ok:i64=audio_init();
+    if s1==0{return 0;}
+    if s2==0{socket_close(s1);return 0;}
+    if ok==0{socket_close(s1);socket_close(s2);return 0;}
+    audio_play(440,30);
+    socket_close(s1);
+    socket_close(s2);
+    return 1;
+}
+
+// Test 5: sequential window lifecycle x3
+pub fn test_window_lifecycle()->i64{
+    let mut i:i64=0;
+    let mut ok:i64=1;
+    while i<3{
+        let wid:i64=window_create(300,200,50,50);
+        if wid==0{ok=0;}
+        if wid>0{
+            window_show(wid);
+            window_poll_event(wid);
+            window_destroy(wid);
+        }
+        i=i+1;
+    }
+    return ok;
+}
+
+// Test 6: heap isolation — two subsystem records don't collide
+pub fn test_heap_isolation()->i64{
+    let rec1:i64=heap_alloc_term();
+    let rec2:i64=heap_alloc_term();
+    heap_set_tag(rec1,34001);
+    heap_set_tag(rec2,34002);
+    heap_set_body(rec1,100);
+    heap_set_body(rec2,200);
+    let t1:i64=heap_get_tag(rec1);
+    let t2:i64=heap_get_tag(rec2);
+    let b1:i64=heap_get_body(rec1);
+    let b2:i64=heap_get_body(rec2);
+    if t1==34001{
+        if t2==34002{
+            if b1==100{
+                if b2==200{return 1;}
+            }
+        }
+    }
+    return 0;
+}
+
+pub fn main()->i64{
+    let mut score:i64=0;
+    if test_all_init()==1{score=score+1;}
+    if test_heap_interleave()==1{score=score+1;}
+    if test_mutex_guards_render()==1{score=score+1;}
+    if test_net_audio()==1{score=score+1;}
+    if test_window_lifecycle()==1{score=score+1;}
+    if test_heap_isolation()==1{score=score+1;}
+    if score==6{return 111;}
+    return score;
+}

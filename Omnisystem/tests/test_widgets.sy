@@ -1,0 +1,16 @@
+// Direct test of widget counting
+pub fn main() -> i64 {
+    let w: i64 = count_widgets("Window");
+    let b: i64 = count_widgets("Button");
+    let t: i64 = count_widgets("Text");
+    let sum1: i64 = w + b;
+    let total: i64 = sum1 + t;
+    return total;
+}
+
+pub fn count_widgets(widget_type: String) -> i64 {
+    if widget_type == "Window" { return 1; }
+    if widget_type == "Button" { return 2; }
+    if widget_type == "Text" { return 3; }
+    return 0;
+}

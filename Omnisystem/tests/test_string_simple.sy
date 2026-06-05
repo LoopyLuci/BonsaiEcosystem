@@ -1,0 +1,16 @@
+// Test simpler string calls
+pub fn main() -> i64 {
+    let a: i64 = test_one();
+    let b: i64 = test_two();
+    return a + b;
+}
+
+pub fn test_one() -> i64 {
+    if "A" == "A" { return 1; }
+    return 0;
+}
+
+pub fn test_two() -> i64 {
+    if "B" == "B" { return 2; }
+    return 0;
+}

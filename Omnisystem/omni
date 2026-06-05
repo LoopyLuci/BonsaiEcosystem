@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# omni - Omnisystem Universal Compiler Bootstrap
+# One-time setup on brand-new machine:
+#   cargo build --release --manifest-path titan-bootstrap/Cargo.toml
+# Then all compilation happens through this script.
+
+set -e
+
+BOOTSTRAP_BIN="titan-bootstrap/target/release/titan-bootstrap"
+
+if [ ! -f "$BOOTSTRAP_BIN" ]; then
+    echo "Error: Rust seed not built. Run bootstrap first:"
+    echo "  cargo build --release --manifest-path titan-bootstrap/Cargo.toml"
+    exit 1
+fi
+
+# Default to --run (execute)
+ARGS="${@:---run}"
+
+# If no file specified, show usage
+if [ $# -eq 0 ]; then
+    echo "Omnisystem Bootstrap Compiler (via Rust seed)"
+    echo "Usage: omni <source.ti|.ae|.sy|.ax> [--run|--check]"
+    echo ""
+    echo "Examples:"
+    echo "  omni titan/compiler/compiler.ti --run"
+    echo "  omni tests/test_file_self_compile.ti --run"
+    exit 0
+fi
+
+exec "$BOOTSTRAP_BIN" "$@"

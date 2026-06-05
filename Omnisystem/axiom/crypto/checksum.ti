@@ -1,0 +1,69 @@
+// axiom/crypto/checksum.ti
+// Simple additive and Fletcher-16-style checksum over i64 sequences
+
+fn adler_step(s1: i64, s2: i64, byte: i64, mod_val: i64) -> i64 {
+    let new_s1 = (s1 + byte) % mod_val;
+    let new_s2 = (s2 + new_s1) % mod_val;
+    return bit_or(bit_shl(new_s2, 16), new_s1);
+}
+
+fn adler_s1(state: i64) -> i64 {
+    return bit_and(state, 65535);
+}
+
+fn adler_s2(state: i64) -> i64 {
+    return bit_and(bit_shr(state, 16), 65535);
+}
+
+fn checksum_bytes(b0: i64, b1: i64, b2: i64, b3: i64) -> i64 {
+    let mod_val = 65521;
+    let init = bit_or(bit_shl(0, 16), 1);
+    let st1 = adler_step(adler_s1(init), adler_s2(init), b0, mod_val);
+    let st2 = adler_step(adler_s1(st1), adler_s2(st1), b1, mod_val);
+    let st3 = adler_step(adler_s1(st2), adler_s2(st2), b2, mod_val);
+    let st4 = adler_step(adler_s1(st3), adler_s2(st3), b3, mod_val);
+    return st4;
+}
+
+fn verify_checksum_deterministic() -> i64 {
+    let c1 = checksum_bytes(1, 2, 3, 4);
+    let c2 = checksum_bytes(1, 2, 3, 4);
+    if c1 != c2 {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_checksum_sensitive() -> i64 {
+    let c1 = checksum_bytes(1, 2, 3, 4);
+    let c2 = checksum_bytes(4, 3, 2, 1);
+    if c1 == c2 {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_zero_block() -> i64 {
+    let c = checksum_bytes(0, 0, 0, 0);
+    let s1 = adler_s1(c);
+    if s1 != 1 {
+        return 0;
+    }
+    return 1;
+}
+
+fn main() -> i64 {
+    let ok1 = verify_checksum_deterministic();
+    if ok1 == 0 {
+        return 0;
+    }
+    let ok2 = verify_checksum_sensitive();
+    if ok2 == 0 {
+        return 0;
+    }
+    let ok3 = verify_zero_block();
+    if ok3 == 0 {
+        return 0;
+    }
+    return 111;
+}

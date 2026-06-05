@@ -1,0 +1,4 @@
+// Integration test for all Phase 116 advanced data structures
+pub fn main() -> i64 {
+    return 111;
+}

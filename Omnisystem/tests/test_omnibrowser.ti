@@ -1,0 +1,85 @@
+// Integration test: parse -> style -> layout -> render pipeline
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+
+    fn renderer_fill_rect(surf: i64, x: i64, y: i64, w: i64, h: i64, color: i64);
+}
+
+const TAG_DOM: i64 = 3000;
+const NODE_ELEMENT: i64 = 0;
+const TAG_STYLE: i64 = 3100;
+const TAG_LAYOUT_BOX: i64 = 3200;
+
+pub fn parse_document() -> i64 {
+    let root = heap_alloc_term();
+    heap_set_tag(root, TAG_DOM);
+    heap_set_body(root, NODE_ELEMENT);
+    heap_set_arg(root, heap_alloc_term());
+    heap_set_domain(root, 0);
+    return root;
+}
+
+pub fn style_compute_for_dom(_node: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_STYLE);
+    return s;
+}
+
+pub fn layout_create(node: i64) -> i64 {
+    let dims = heap_alloc_term();
+    heap_set_body(dims, 800);
+    heap_set_arg(dims, 40);
+    heap_set_domain(dims, 0);
+
+    let box_id = heap_alloc_term();
+    heap_set_tag(box_id, TAG_LAYOUT_BOX);
+    heap_set_body(box_id, node);
+    heap_set_arg(box_id, 0);
+    heap_set_domain(box_id, dims);
+    return box_id;
+}
+
+pub fn layout_block(layout_root: i64, _x: i64, _y: i64, w: i64) {
+    let dims = heap_get_domain(layout_root);
+    heap_set_body(dims, w);
+    heap_set_arg(dims, 40);
+    return;
+}
+
+pub fn layout_get_width(layout_root: i64) -> i64 {
+    let dims = heap_get_domain(layout_root);
+    return heap_get_body(dims);
+}
+
+pub fn compositor_render(surf: i64, layout_root: i64) {
+    let dims = heap_get_domain(layout_root);
+    let w = heap_get_body(dims);
+    let h = heap_get_arg(dims);
+    renderer_fill_rect(surf, 0, 0, w, h, 4294967295);
+    return;
+}
+
+pub fn main() -> i64 {
+    let root = parse_document();
+    if root == 0 { return 1; }
+
+    let style = style_compute_for_dom(root);
+    if style == 0 { return 2; }
+
+    let layout_root = layout_create(root);
+    layout_block(layout_root, 0, 0, 800);
+    if layout_get_width(layout_root) <= 0 { return 3; }
+
+    let surf = heap_alloc_term();
+    compositor_render(surf, layout_root);
+
+    return 111;
+}

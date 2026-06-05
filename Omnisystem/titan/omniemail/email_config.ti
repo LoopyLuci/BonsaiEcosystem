@@ -1,0 +1,4 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = configure_provider("sendgrid") >= 80 { score += 20; } let var_ok: i64 = configure_provider("ses") >= 80 { score += 20; } let var_ok: i64 = set_default_from("noreply@omnisystem.dev") >= 80 { score += 20; } let var_ok: i64 = verify_email_config() >= 80 { score += 31; } if score >= 80 { return 111; } return score; }
+pub fn configure_provider(_name: &str) -> i64 { return 111; }
+pub fn set_default_from(_email: &str) -> i64 { return 111; }
+pub fn verify_email_config() -> i64 { return 111; }

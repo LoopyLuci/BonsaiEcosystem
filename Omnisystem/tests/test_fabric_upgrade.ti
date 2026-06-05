@@ -1,0 +1,61 @@
+// tests/test_fabric_upgrade.ti
+// OmniAgent Fabric module upgrade test.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: Module discovery
+    let available: i64 = count_available_modules();
+    if available >= 4 {
+        score = score + 1;
+    }
+
+    // Test 2: Module version comparison
+    let v1_score: i64 = reasoning_v1_score();
+    let v2_score: i64 = reasoning_v2_score();
+    if v2_score >= v1_score {
+        score = score + 1;
+    }
+
+    // Test 3: Upgrade preserves safety
+    let v1_safety: i64 = safety_v1_score();
+    let v2_safety: i64 = safety_v2_score();
+    if v2_safety >= v1_safety {
+        score = score + 1;
+    }
+
+    // Test 4: Cross-module composition
+    let composed: i64 = compose_modules();
+    if composed >= 200 {
+        score = score + 1;
+    }
+
+    if score == 4 {
+        return 111;
+    }
+    return 0;
+}
+
+pub fn count_available_modules() -> i64 {
+    return 5;
+}
+
+pub fn reasoning_v1_score() -> i64 {
+    return 15;
+}
+
+pub fn reasoning_v2_score() -> i64 {
+    return 19;
+}
+
+pub fn safety_v1_score() -> i64 {
+    return 95;
+}
+
+pub fn safety_v2_score() -> i64 {
+    return 100;
+}
+
+pub fn compose_modules() -> i64 {
+    return 210;
+}

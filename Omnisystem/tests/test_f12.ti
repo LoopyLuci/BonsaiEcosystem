@@ -1,0 +1,7 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_PN12:i64=26100;const tT_SV12:i64=26101;const tT_WR12:i64=26102;
+pub fn tf12_panel_create(ptype:i64,label:i64)->i64{let p=heap_alloc_term();heap_set_tag(p,tT_PN12);heap_set_body(p,ptype);heap_set_arg(p,label);heap_set_domain(p,0);let w=heap_alloc_term();heap_set_tag(w,tT_WR12);heap_set_body(w,p);heap_set_domain(w,0);return w;}
+pub fn tf12_service_create(name:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,tT_SV12);heap_set_body(s,name);heap_set_arg(s,0);heap_set_domain(s,0);return s;}
+pub fn tf12_service_start(s:i64){heap_set_arg(s,1);}
+pub fn tf12_service_running(s:i64)->i64{return heap_get_arg(s);}
+pub fn main()->i64{let s=tf12_service_create(5);tf12_service_start(s);if tf12_service_running(s)!=1{return 1;}return 111;}

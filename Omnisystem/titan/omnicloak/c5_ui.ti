@@ -1,0 +1,83 @@
+// titan/omnicloak/c5_ui.ti — Browser UI & Chrome
+// Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_TAB:   i64 = 23400;
+const T_ABAR:  i64 = 23401;
+const T_PANEL: i64 = 23402;
+const T_WRP:   i64 = 23403;
+
+// tab: tag=T_TAB, body=url, arg=title, domain=active
+// wrapper: tag=T_WRP, body=tab, domain=next_wrapper
+pub fn c5_tab_create(url: i64, title: i64, active: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TAB); heap_set_body(t, url); heap_set_arg(t, title); heap_set_domain(t, active);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP); heap_set_body(w, t); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn c5_tab_url(w: i64) -> i64    { return heap_get_body(heap_get_body(w)); }
+pub fn c5_tab_active(w: i64) -> i64 { return heap_get_domain(heap_get_body(w)); }
+
+// address bar: tag=T_ABAR, body=tab_count, arg=list_head(wrappers)
+pub fn c5_abar_create() -> i64 {
+    let a = heap_alloc_term();
+    heap_set_tag(a, T_ABAR); heap_set_body(a, 0); heap_set_arg(a, 0);
+    return a;
+}
+
+pub fn c5_abar_add_tab(a: i64, w: i64) {
+    let h = heap_get_arg(a);
+    if h == 0 { heap_set_arg(a, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(a, heap_get_body(a) + 1);
+}
+
+pub fn c5_abar_tab_count(a: i64) -> i64 { return heap_get_body(a); }
+
+// settings panel: tag=T_PANEL, body=count, arg=0
+pub fn c5_settings_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_PANEL); heap_set_body(s, 0); heap_set_arg(s, 0);
+    return s;
+}
+
+pub fn c5_settings_set(s: i64, key: i64, val: i64) {
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+
+pub fn c5_settings_count(s: i64) -> i64 { return heap_get_body(s); }
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let a = c5_abar_create();
+    let w1 = c5_tab_create(1, 100, 1);
+    let w2 = c5_tab_create(2, 200, 0);
+    c5_abar_add_tab(a, w1);
+    c5_abar_add_tab(a, w2);
+    if c5_abar_tab_count(a) != 2   { return 1; }
+    if c5_tab_url(w1) != 1         { return 2; }
+    if c5_tab_active(w2) != 0      { return 3; }
+
+    let s = c5_settings_create();
+    c5_settings_set(s, 10, 50);
+    c5_settings_set(s, 20, 60);
+    if c5_settings_count(s) != 2   { return 4; }
+    return 111;
+}

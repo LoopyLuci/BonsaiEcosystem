@@ -1,0 +1,171 @@
+// OmniLib MessagePack — compact binary serialization format
+// Pure Titan implementation for data format handling
+
+pub fn mp_encode_nil() -> i64 {
+    return 192;
+}
+
+pub fn mp_encode_false() -> i64 {
+    return 194;
+}
+
+pub fn mp_encode_true() -> i64 {
+    return 195;
+}
+
+pub fn mp_encode_fixint(val: i64) -> i64 {
+    if val >= 0 && val <= 127 {
+        return val;
+    }
+    if val >= -32 && val < 0 {
+        return val;
+    }
+    return 0;
+}
+
+pub fn mp_encode_int(val: i64) -> i64 {
+    if val >= -32 && val <= 127 {
+        return mp_encode_fixint(val);
+    }
+    if val >= -128 && val < -32 {
+        return 208;
+    }
+    if val >= 128 && val <= 255 {
+        return 208;
+    }
+    return 211;
+}
+
+pub fn mp_is_fixint(byte: i64) -> bool {
+    if byte >= 0 && byte <= 127 { return true; }
+    if byte >= -32 && byte < 0 { return true; }
+    return false;
+}
+
+pub fn mp_is_nil(byte: i64) -> bool {
+    return byte == 192;
+}
+
+pub fn mp_is_true(byte: i64) -> bool {
+    return byte == 195;
+}
+
+pub fn mp_is_false(byte: i64) -> bool {
+    return byte == 194;
+}
+
+pub fn mp_is_int8(byte: i64) -> bool {
+    return byte == 208;
+}
+
+pub fn mp_is_int16(byte: i64) -> bool {
+    return byte == 209;
+}
+
+pub fn mp_is_int32(byte: i64) -> bool {
+    return byte == 210;
+}
+
+pub fn mp_is_int64(byte: i64) -> bool {
+    return byte == 211;
+}
+
+pub fn mp_encode_array_marker(len: i64) -> i64 {
+    if len < 16 {
+        return 144 + len;
+    }
+    return 220;
+}
+
+pub fn mp_encode_map_marker(len: i64) -> i64 {
+    if len < 16 {
+        return 128 + len;
+    }
+    return 222;
+}
+
+pub fn mp_decode_bool(byte: i64) -> i64 {
+    if byte == 195 { return 1; }
+    if byte == 194 { return 0; }
+    return -1;
+}
+
+pub fn mp_decode_int(marker: i64, payload: i64) -> i64 {
+    if mp_is_fixint(marker) { return marker; }
+    if marker == 208 { return payload; }
+    if marker == 209 { return payload; }
+    if marker == 210 { return payload; }
+    if marker == 211 { return payload; }
+    return 0;
+}
+
+pub fn mp_roundtrip_bool(val: bool) -> bool {
+    let enc = if val { mp_encode_true() } else { mp_encode_false() };
+    let dec = mp_decode_bool(enc);
+    if val { return dec == 1; }
+    return dec == 0;
+}
+
+pub fn mp_roundtrip_int(v: i64) -> bool {
+    let marker = mp_encode_int(v);
+    let decoded = mp_decode_int(marker, v);
+    return decoded == v;
+}
+
+pub fn main() -> i64 {
+    // Test nil encoding
+    let nil_marker = mp_encode_nil();
+    if nil_marker != 192 { return 1; }
+    if !mp_is_nil(nil_marker) { return 2; }
+
+    // Test boolean encoding
+    let true_marker = mp_encode_true();
+    let false_marker = mp_encode_false();
+    if true_marker != 195 { return 3; }
+    if false_marker != 194 { return 4; }
+    if !mp_is_true(true_marker) { return 5; }
+    if !mp_is_false(false_marker) { return 6; }
+
+    // Test fixint encoding
+    let small_int = mp_encode_fixint(42);
+    if small_int != 42 { return 7; }
+    if !mp_is_fixint(small_int) { return 8; }
+
+    // Test negative fixint
+    let neg_int = mp_encode_fixint(-10);
+    if neg_int != -10 { return 9; }
+    if !mp_is_fixint(neg_int) { return 10; }
+
+    // Test int encoding selector
+    let int_type_small = mp_encode_int(100);
+    if int_type_small != 100 { return 11; }
+
+    let int_type_large = mp_encode_int(1000);
+    if int_type_large != 211 { return 12; }
+
+    // Test array marker
+    let arr_marker_small = mp_encode_array_marker(3);
+    if arr_marker_small != 147 { return 13; }
+
+    let arr_marker_large = mp_encode_array_marker(20);
+    if arr_marker_large != 220 { return 14; }
+
+    // Test map marker
+    let map_marker_small = mp_encode_map_marker(2);
+    if map_marker_small != 130 { return 15; }
+
+    let map_marker_large = mp_encode_map_marker(20);
+    if map_marker_large != 222 { return 16; }
+
+    // Decode and roundtrip checks
+    if mp_decode_bool(195) != 1 { return 17; }
+    if mp_decode_bool(194) != 0 { return 18; }
+    if !mp_roundtrip_bool(true) { return 19; }
+    if !mp_roundtrip_bool(false) { return 20; }
+
+    if !mp_roundtrip_int(42) { return 21; }
+    if !mp_roundtrip_int(-10) { return 22; }
+    if !mp_roundtrip_int(1000) { return 23; }
+
+    return 111;
+}

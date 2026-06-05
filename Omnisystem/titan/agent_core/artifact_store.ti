@@ -1,0 +1,140 @@
+// titan/agent_core/artifact_store.ti — Structured Artifact Management
+// Stores agent-produced artifacts with review workflow.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+}
+
+const TAG_ARTIFACT: i64 = 6200;
+
+// Artifact kinds
+const ART_PLAN:          i64 = 0;
+const ART_CODE_DIFF:     i64 = 1;
+const ART_TEST_RESULT:   i64 = 2;
+const ART_VERIFY_REPORT: i64 = 3;
+
+// Review status codes
+const REVIEW_PENDING:  i64 = 0;
+const REVIEW_APPROVED: i64 = 1;
+const REVIEW_REJECTED: i64 = 2;
+const REVIEW_REVISION: i64 = 3;
+
+// Artifact cell layout — body holds the meta chain so domain stays free for
+// the store linked list without clobbering review/content metadata:
+//
+//   artifact: tag=TAG_ARTIFACT, body=meta1, arg=task_id, domain=next_artifact
+//   meta1:    body=art_type, arg=agent_id, domain=meta2
+//   meta2:    body=content_id, arg=0, domain=review_status
+
+pub fn artifact_create(art_type: i64, task_id: i64, agent_id: i64,
+                       content_id: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, content_id);
+    heap_set_arg(meta2, 0);
+    heap_set_domain(meta2, REVIEW_PENDING);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, art_type);
+    heap_set_arg(meta1, agent_id);
+    heap_set_domain(meta1, meta2);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_ARTIFACT);
+    heap_set_body(a, meta1);
+    heap_set_arg(a, task_id);
+    heap_set_domain(a, 0);      // next_artifact = end (safe to overwrite in store)
+    return a;
+}
+
+pub fn artifact_type(a: i64) -> i64 {
+    return heap_get_body(heap_get_body(a));    // meta1.body
+}
+pub fn artifact_task(a: i64) -> i64 { return heap_get_arg(a); }
+pub fn artifact_agent(a: i64) -> i64 {
+    return heap_get_arg(heap_get_body(a));     // meta1.arg
+}
+pub fn artifact_content(a: i64) -> i64 {
+    let meta2 = heap_get_domain(heap_get_body(a));
+    return heap_get_body(meta2);               // meta2.body
+}
+pub fn artifact_review_status(a: i64) -> i64 {
+    let meta2 = heap_get_domain(heap_get_body(a));
+    return heap_get_domain(meta2);             // meta2.domain
+}
+pub fn artifact_set_review(a: i64, status: i64) {
+    let meta2 = heap_get_domain(heap_get_body(a));
+    heap_set_domain(meta2, status);
+}
+
+// ===== Artifact store (linked list via artifact.domain) =====
+static mut ARTIFACT_LIST:  i64 = 0;
+static mut ARTIFACT_COUNT: i64 = 0;
+
+pub fn store_insert(artifact: i64) {
+    heap_set_domain(artifact, ARTIFACT_LIST);
+    ARTIFACT_LIST  = artifact;
+    ARTIFACT_COUNT = ARTIFACT_COUNT + 1;
+}
+
+pub fn store_count() -> i64 { return ARTIFACT_COUNT; }
+
+pub fn store_get_by_task(task_id: i64) -> i64 {
+    let mut curr = ARTIFACT_LIST;
+    while curr != 0 {
+        if artifact_task(curr) == task_id { return curr; }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+pub fn store_pending_review_count() -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = ARTIFACT_LIST;
+    while curr != 0 {
+        if artifact_review_status(curr) == REVIEW_PENDING { count = count + 1; }
+        curr = heap_get_domain(curr);
+    }
+    return count;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    ARTIFACT_LIST  = 0;
+    ARTIFACT_COUNT = 0;
+
+    let a = artifact_create(ART_PLAN, 1, 100, heap_alloc_term());
+    if heap_get_tag(a) != TAG_ARTIFACT   { return 1; }
+    if artifact_type(a) != ART_PLAN      { return 2; }
+    if artifact_task(a) != 1             { return 3; }
+    if artifact_review_status(a) != REVIEW_PENDING { return 4; }
+
+    store_insert(a);
+    if store_count() != 1 { return 5; }
+
+    artifact_set_review(a, REVIEW_APPROVED);
+    if artifact_review_status(a) != REVIEW_APPROVED { return 6; }
+
+    let found = store_get_by_task(1);
+    if found == 0                    { return 7; }
+    if artifact_type(found) != ART_PLAN { return 8; }
+
+    // Second artifact with a different task
+    let b = artifact_create(ART_CODE_DIFF, 2, 200, heap_alloc_term());
+    store_insert(b);
+    if store_count() != 2 { return 9; }
+
+    // One is approved, one is pending
+    if store_pending_review_count() != 1 { return 10; }
+
+    // Non-existent task returns 0
+    if store_get_by_task(99) != 0 { return 11; }
+
+    return 111;
+}

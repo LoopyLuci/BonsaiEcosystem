@@ -1,0 +1,90 @@
+// axiom/control/break_continue.ti
+// Verifies break and continue in while, for, and loop statements
+
+fn first_multiple(base: i64, lo: i64, hi: i64) -> i64 {
+    let result = -1;
+    for i in lo..hi {
+        if (i % base) == 0 {
+            result = i;
+            break;
+        }
+    }
+    return result;
+}
+
+fn sum_odds_below(n: i64) -> i64 {
+    let acc = 0;
+    for i in 0..n {
+        if (i % 2) == 0 {
+            continue;
+        }
+        acc += i;
+    }
+    return acc;
+}
+
+fn find_with_while(target: i64) -> i64 {
+    let i = 0;
+    while i < 1000 {
+        if i * i == target {
+            return i;
+        }
+        if i * i > target {
+            break;
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+fn loop_until(limit: i64) -> i64 {
+    let i = 0;
+    loop {
+        i += 1;
+        if i >= limit {
+            break;
+        }
+    }
+    return i;
+}
+
+fn verify_first_multiple() -> i64 {
+    if first_multiple(7, 1, 100) != 7 { return 0; }
+    if first_multiple(11, 5, 50) != 11 { return 0; }
+    if first_multiple(100, 1, 50) != -1 { return 0; }
+    return 1;
+}
+
+fn verify_sum_odds() -> i64 {
+    let s = sum_odds_below(10);
+    if s != 25 { return 0; }
+    let s2 = sum_odds_below(1);
+    if s2 != 0 { return 0; }
+    return 1;
+}
+
+fn verify_find_with_while() -> i64 {
+    if find_with_while(9) != 3 { return 0; }
+    if find_with_while(16) != 4 { return 0; }
+    if find_with_while(100) != 10 { return 0; }
+    return 1;
+}
+
+fn verify_loop_until() -> i64 {
+    if loop_until(5) != 5 { return 0; }
+    if loop_until(1) != 1 { return 0; }
+    if loop_until(100) != 100 { return 0; }
+    return 1;
+}
+
+fn main() -> i64 {
+    let ok1 = verify_first_multiple();
+    if ok1 == 0 { return 0; }
+    let ok2 = verify_sum_odds();
+    if ok2 == 0 { return 0; }
+    let ok3 = verify_find_with_while();
+    if ok3 == 0 { return 0; }
+    let ok4 = verify_loop_until();
+    if ok4 == 0 { return 0; }
+    return 111;
+}

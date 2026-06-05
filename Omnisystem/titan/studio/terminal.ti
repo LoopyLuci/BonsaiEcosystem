@@ -1,0 +1,195 @@
+// titan/studio/terminal.ti
+// Omni Studio Terminal Core — Raw terminal rendering and input.
+// Capability-checked: only code with the TtyWrite capability can draw.
+
+effect TtyWrite { fd: i64 }
+effect TtyRead { fd: i64 }
+
+// ── Terminal dimensions ────────────────────────────────────
+pub struct TerminalSize {
+    pub rows: i64,
+    pub cols: i64,
+}
+
+// ── Screen buffer (double-buffered) ────────────────────────
+pub struct ScreenBuffer {
+    pub cells: Vec<Cell>,
+    pub rows: i64,
+    pub cols: i64,
+    pub cursor_row: i64,
+    pub cursor_col: i64,
+}
+
+pub struct Cell {
+    pub ch: u8,
+    pub fg: u8,
+    pub bg: u8,
+    pub bold: bool,
+    pub underline: bool,
+}
+
+// ── Colour palette ─────────────────────────────────────────
+pub const COLOR_BLACK: u8 = 0;
+pub const COLOR_RED: u8 = 1;
+pub const COLOR_GREEN: u8 = 2;
+pub const COLOR_YELLOW: u8 = 3;
+pub const COLOR_BLUE: u8 = 4;
+pub const COLOR_MAGENTA: u8 = 5;
+pub const COLOR_CYAN: u8 = 6;
+pub const COLOR_WHITE: u8 = 7;
+
+impl ScreenBuffer {
+    pub fn new(rows: i64, cols: i64) -> ScreenBuffer {
+        let mut cells = Vec::with_capacity((rows * cols) as usize);
+        let mut i: i64 = 0;
+        while i < rows * cols {
+            cells.push(Cell {
+                ch: ' ' as u8,
+                fg: COLOR_WHITE,
+                bg: COLOR_BLACK,
+                bold: false,
+                underline: false,
+            });
+            i = i + 1;
+        }
+        ScreenBuffer {
+            cells,
+            rows,
+            cols,
+            cursor_row: 0,
+            cursor_col: 0,
+        }
+    }
+
+    pub fn clear(&mut self) {
+        let mut i: i64 = 0;
+        while i < self.rows * self.cols {
+            self.cells[i as usize] = Cell {
+                ch: ' ' as u8,
+                fg: COLOR_WHITE,
+                bg: COLOR_BLACK,
+                bold: false,
+                underline: false,
+            };
+            i = i + 1;
+        }
+        self.cursor_row = 0;
+        self.cursor_col = 0;
+    }
+
+    pub fn put_char(&mut self, ch: u8, fg: u8, bg: u8) {
+        if self.cursor_row >= self.rows || self.cursor_col >= self.cols {
+            return;
+        }
+        let idx = (self.cursor_row * self.cols + self.cursor_col) as usize;
+        self.cells[idx] = Cell {
+            ch,
+            fg,
+            bg,
+            bold: false,
+            underline: false,
+        };
+        self.cursor_col = self.cursor_col + 1;
+        if self.cursor_col >= self.cols {
+            self.cursor_col = 0;
+            self.cursor_row = self.cursor_row + 1;
+        }
+    }
+
+    pub fn write_string(&mut self, s: &str, fg: u8, bg: u8) {
+        let bytes = s.as_bytes();
+        for byte in bytes {
+            if *byte == '\n' as u8 {
+                self.cursor_col = 0;
+                self.cursor_row = self.cursor_row + 1;
+            } else {
+                self.put_char(*byte, fg, bg);
+            }
+        }
+    }
+
+    pub fn draw_box(&mut self, row: i64, col: i64, h: i64, w: i64, fg: u8, bg: u8) {
+        // Top border
+        self.cursor_row = row;
+        self.cursor_col = col;
+        self.put_char('+' as u8, fg, bg);
+        let mut i: i64 = 1;
+        while i < w - 1 {
+            self.put_char('-' as u8, fg, bg);
+            i = i + 1;
+        }
+        self.put_char('+' as u8, fg, bg);
+
+        // Side borders
+        let mut r: i64 = 1;
+        while r < h - 1 {
+            self.cursor_row = row + r;
+            self.cursor_col = col;
+            self.put_char('|' as u8, fg, bg);
+            self.cursor_col = col + w - 1;
+            self.put_char('|' as u8, fg, bg);
+            r = r + 1;
+        }
+
+        // Bottom border
+        self.cursor_row = row + h - 1;
+        self.cursor_col = col;
+        self.put_char('+' as u8, fg, bg);
+        i = 1;
+        while i < w - 1 {
+            self.put_char('-' as u8, fg, bg);
+            i = i + 1;
+        }
+        self.put_char('+' as u8, fg, bg);
+    }
+
+    pub fn flush(&self) {
+        // Emit ANSI escape sequences
+        let mut out = String::from("\x1b[2J\x1b[H");
+        let mut r: i64 = 0;
+        while r < self.rows {
+            let mut c: i64 = 0;
+            while c < self.cols {
+                let idx = (r * self.cols + c) as usize;
+                let cell = &self.cells[idx];
+                out = out + "\x1b[0m";
+                out = out + format!("\x1b[{};{}H", r + 1, c + 1).as_str();
+                if cell.bold {
+                    out = out + "\x1b[1m";
+                }
+                out = out + format!("\x1b[38;5;{}m\x1b[48;5;{}m", cell.fg, cell.bg)
+                    .as_str();
+                out = out + format!("{}", cell.ch as char).as_str();
+                c = c + 1;
+            }
+            r = r + 1;
+        }
+        out = out + "\x1b[0m";
+        println!("{}", out);
+    }
+}
+
+pub enum KeyEvent {
+    Char(u8),
+    Enter,
+    Tab,
+    Backspace,
+    Escape,
+    Up,
+    Down,
+    Left,
+    Right,
+    CtrlC,
+}
+
+pub fn read_key() -> Option<KeyEvent> {
+    None // Platform-specific implementation
+}
+
+pub fn get_terminal_size() -> TerminalSize {
+    // Platform-specific: read from termios or Windows console
+    TerminalSize {
+        rows: 24,
+        cols: 80,
+    }
+}

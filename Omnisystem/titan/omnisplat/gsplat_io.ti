@@ -1,0 +1,162 @@
+// titan/omnisplat/gsplat_io.ti — PLY File Parser
+// Parses PLY header and validates structure. file_id is treated as the raw content
+// string (str_len/str_at on the id). Heap cells have str_len=0 → graceful defaults.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+}
+
+const TAG_PLY_HEADER: i64 = 8810;
+
+// header: tag=TAG_PLY_HEADER, body=vertex_count, arg=property_count, domain=0
+
+pub fn ply_header_create() -> i64 {
+    let h = heap_alloc_term();
+    heap_set_tag(h, TAG_PLY_HEADER);
+    heap_set_body(h, 0);
+    heap_set_arg(h, 0);
+    heap_set_domain(h, 0);
+    return h;
+}
+
+pub fn ply_vertex_count(header: i64) -> i64 { return heap_get_body(header); }
+
+// Validate a PLY file: first 3 chars must be 'p','l','y' (112,108,121)
+pub fn ply_validate(file_id: i64) -> bool {
+    let len = str_len(file_id);
+    if len < 3 { return false; }
+    return str_at(file_id, 0) == 112
+        && str_at(file_id, 1) == 108
+        && str_at(file_id, 2) == 121;
+}
+
+// Parse "element vertex N" — returns vertex count (0 if not found)
+pub fn ply_extract_vertex_count(file_id: i64) -> i64 {
+    let len = str_len(file_id);
+    if len < 16 { return 0; }
+    // Search for 'e','l','e','m','e','n','t',' ','v','e','r','t','e','x',' '
+    // ASCII: 101,108,101,109,101,110,116,32,118,101,114,116,101,120,32
+    let mut pos: i64 = 0;
+    while pos + 15 < len {
+        if str_at(file_id, pos)      == 101
+        && str_at(file_id, pos + 1)  == 108
+        && str_at(file_id, pos + 2)  == 101
+        && str_at(file_id, pos + 3)  == 109
+        && str_at(file_id, pos + 4)  == 101
+        && str_at(file_id, pos + 5)  == 110
+        && str_at(file_id, pos + 6)  == 116
+        && str_at(file_id, pos + 7)  == 32
+        && str_at(file_id, pos + 8)  == 118
+        && str_at(file_id, pos + 9)  == 101
+        && str_at(file_id, pos + 10) == 114
+        && str_at(file_id, pos + 11) == 116
+        && str_at(file_id, pos + 12) == 101
+        && str_at(file_id, pos + 13) == 120
+        && str_at(file_id, pos + 14) == 32 {
+            pos = pos + 15;
+            let mut vertex_count: i64 = 0;
+            while pos < len {
+                let ch = str_at(file_id, pos);
+                if ch >= 48 && ch <= 57 {
+                    vertex_count = vertex_count * 10 + (ch - 48);
+                    pos = pos + 1;
+                } else { break; }
+            }
+            return vertex_count;
+        }
+        pos = pos + 1;
+    }
+    return 0;
+}
+
+// Parse PLY header — always returns a valid header node
+pub fn ply_parse_header(file_id: i64) -> i64 {
+    let header = ply_header_create();
+    let vc = ply_extract_vertex_count(file_id);
+    heap_set_body(header, vc);
+    heap_set_arg(header, ply_property_count(file_id));
+    return header;
+}
+
+// Return byte offset after "end_header\n" (101,110,100,95,104,101,97,100,101,114,10)
+pub fn ply_data_offset(file_id: i64) -> i64 {
+    let len = str_len(file_id);
+    if len < 11 { return -1; }
+    let mut pos: i64 = 0;
+    while pos + 10 < len {
+        if str_at(file_id, pos)      == 101
+        && str_at(file_id, pos + 1)  == 110
+        && str_at(file_id, pos + 2)  == 100
+        && str_at(file_id, pos + 3)  == 95
+        && str_at(file_id, pos + 4)  == 104
+        && str_at(file_id, pos + 5)  == 101
+        && str_at(file_id, pos + 6)  == 97
+        && str_at(file_id, pos + 7)  == 100
+        && str_at(file_id, pos + 8)  == 101
+        && str_at(file_id, pos + 9)  == 114
+        && str_at(file_id, pos + 10) == 10 {
+            return pos + 11;
+        }
+        pos = pos + 1;
+    }
+    return -1;
+}
+
+// Count "property " occurrences (112,114,111,112,101,114,116,121,32)
+pub fn ply_property_count(file_id: i64) -> i64 {
+    let len = str_len(file_id);
+    if len < 9 { return 0; }
+    let mut count: i64 = 0;
+    let mut pos: i64 = 0;
+    while pos + 8 < len {
+        if str_at(file_id, pos)     == 112
+        && str_at(file_id, pos + 1) == 114
+        && str_at(file_id, pos + 2) == 111
+        && str_at(file_id, pos + 3) == 112
+        && str_at(file_id, pos + 4) == 101
+        && str_at(file_id, pos + 5) == 114
+        && str_at(file_id, pos + 6) == 116
+        && str_at(file_id, pos + 7) == 121
+        && str_at(file_id, pos + 8) == 32 {
+            count = count + 1;
+        }
+        pos = pos + 1;
+    }
+    return count;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Test with a heap cell as file_id (str_len=0 → graceful defaults)
+    let file_id = heap_alloc_term();
+
+    let header = ply_parse_header(file_id);
+    if heap_get_tag(header) != TAG_PLY_HEADER { return 1; }
+    let vc = ply_vertex_count(header);
+    if vc < 0                               { return 2; }
+
+    // Non-existent file content → no PLY magic → validate=false
+    if ply_validate(file_id)               { return 3; }
+
+    // Empty content → 0 properties
+    if ply_property_count(file_id) != 0    { return 4; }
+
+    // Empty content → no end_header → offset = -1
+    if ply_data_offset(file_id) != -1      { return 5; }
+
+    // Header vertex count = 0 for empty content
+    if ply_vertex_count(header) != 0       { return 6; }
+
+    return 111;
+}

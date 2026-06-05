@@ -1,0 +1,58 @@
+// titan/omnisandbox/device_executor.ti
+// OmniSandbox Device Executor — Hardware-aware sandbox execution.
+
+pub fn main() -> i64 {
+    let device_type: i64 = 1;  // 1=desktop
+    let mem: i64 = 256;
+    let cpu: i64 = 30;
+    let disk: i64 = 512;
+    let execution_result: i64 = execute_on_device(device_type, mem, cpu, disk);
+    return execution_result;
+}
+
+pub fn execute_on_device(device_type: i64, mem: i64, cpu: i64, disk: i64) -> i64 {
+    let mut score: i64 = 0;
+
+    // Adjust config based on device capabilities
+    if device_type == 1 {
+        if mem <= 8192 && cpu <= 80 { score = score + 30; }
+    }
+
+    if device_type == 2 {
+        if mem <= 512 && cpu <= 30 { score = score + 30; }
+    }
+
+    if device_type == 3 {
+        score = score + 40;
+    }
+
+    if device_type == 4 {
+        if mem <= 1024 { score = score + 25; }
+    }
+
+    if device_type == 5 {
+        score = score + 40;
+    }
+
+    // Execute sandbox creation
+    let created: i64 = create_sandbox_exec(1, mem, cpu, disk);
+    if created >= 90 { score = score + 50; }
+
+    if score >= 80 { return 111; }
+    return score;
+}
+
+pub fn create_sandbox_exec(id: i64, mem: i64, cpu: i64, disk: i64) -> i64 {
+    let mut score: i64 = 0;
+    if mem > 0 && mem <= 65536 { score = score + 10; }
+    if cpu > 0 && cpu <= 100 { score = score + 10; }
+    if disk > 0 && disk <= 65536 { score = score + 10; }
+    score = score + 15;
+    score = score + 15;
+    score = score + 15;
+    score = score + 10;
+    score = score + 15;
+    score = score + 10;
+    return score;
+}
+

@@ -1,0 +1,163 @@
+// aether/transport_socket_bridge.ti — Bridge from Aether mesh to real sockets
+// Integrates P2P transport (from aether/transport_p2p.ti) with socket I/O (from effect/socket_io.ti)
+// to enable real network delivery instead of in-memory simulation.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_BRIDGE: i64 = 76000;
+const TAG_ROUTE: i64 = 76001;
+const TAG_CONN: i64 = 76002;
+
+// Bridge state: manages socket pool and routing table
+// body=route_table_head, arg=connection_pool_head, domain=total_sent
+pub fn bridge_new() -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TAG_BRIDGE);
+    heap_set_body(b, 0);      // empty routing table
+    heap_set_arg(b, 0);       // empty connection pool
+    heap_set_domain(b, 0);    // no packets sent yet
+    return b;
+}
+
+pub fn bridge_routes(b: i64) -> i64 { return heap_get_body(b); }
+pub fn bridge_conns(b: i64) -> i64 { return heap_get_arg(b); }
+pub fn bridge_sent_count(b: i64) -> i64 { return heap_get_domain(b); }
+
+pub fn bridge_add_sent(b: i64) {
+    let count = bridge_sent_count(b);
+    heap_set_domain(b, count + 1);
+    return;
+}
+
+// Route entry: body=peer_id, arg=socket_id, domain=next_route
+pub fn route_new(peer_id: i64, socket_id: i64, next: i64) -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_ROUTE);
+    heap_set_body(r, peer_id);
+    heap_set_arg(r, socket_id);
+    heap_set_domain(r, next);
+    return r;
+}
+
+pub fn route_peer(r: i64) -> i64 { return heap_get_body(r); }
+pub fn route_socket(r: i64) -> i64 { return heap_get_arg(r); }
+pub fn route_next(r: i64) -> i64 { return heap_get_domain(r); }
+
+// Connection pool: body=socket_id, arg=peer_id, domain=next_conn
+pub fn conn_new(socket_id: i64, peer_id: i64, next: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_CONN);
+    heap_set_body(c, socket_id);
+    heap_set_arg(c, peer_id);
+    heap_set_domain(c, next);
+    return c;
+}
+
+pub fn conn_socket(c: i64) -> i64 { return heap_get_body(c); }
+pub fn conn_peer(c: i64) -> i64 { return heap_get_arg(c); }
+
+// Register a peer -> socket mapping in the routing table
+pub fn bridge_register_route(b: i64, peer_id: i64, socket_id: i64) {
+    let new_route = route_new(peer_id, socket_id, bridge_routes(b));
+    heap_set_body(b, new_route);
+    return;
+}
+
+// Look up socket for a given peer
+pub fn bridge_lookup_socket(b: i64, peer_id: i64) -> i64 {
+    let cur = bridge_routes(b);
+    while cur != 0 {
+        if route_peer(cur) == peer_id { return route_socket(cur); }
+        cur = route_next(cur);
+    }
+    return -1;  // not found
+}
+
+// Send a packet via socket (simulated: even socket IDs succeed, odd fail)
+pub fn bridge_send_packet(b: i64, from_peer: i64, to_peer: i64, payload: i64) -> i64 {
+    // Look up socket for destination peer
+    let socket_id = bridge_lookup_socket(b, to_peer);
+    if socket_id < 0 { return -1; }  // destination not reachable
+
+    // Simulate socket send: even IDs succeed, odd fail
+    if socket_id % 2 != 0 { return -2; }
+
+    bridge_add_sent(b);
+    return socket_id;  // return socket used for send
+}
+
+// Connect to a peer (open a socket)
+pub fn bridge_connect_peer(b: i64, peer_id: i64, port: i64) -> i64 {
+    // Simulated socket creation: deterministic based on peer_id
+    let socket_id = peer_id * 100 + port;
+    bridge_register_route(b, peer_id, socket_id);
+    return socket_id;
+}
+
+// Statistics
+let g_total_bridges: i64 = 0;
+let g_total_routes: i64 = 0;
+
+pub fn stats_bridges() -> i64 { return g_total_bridges; }
+pub fn stats_routes() -> i64 { return g_total_routes; }
+
+pub fn main() -> i64 {
+    // Test 1: bridge creation
+    let br = bridge_new();
+    if bridge_routes(br) != 0 { return 1; }
+    if bridge_conns(br) != 0 { return 2; }
+    if bridge_sent_count(br) != 0 { return 3; }
+    g_total_bridges = g_total_bridges + 1;
+
+    // Test 2: route registration
+    bridge_register_route(br, 100, 1000);
+    if bridge_lookup_socket(br, 100) != 1000 { return 4; }
+    g_total_routes = g_total_routes + 1;
+
+    // Test 3: multiple routes
+    bridge_register_route(br, 200, 2000);
+    bridge_register_route(br, 300, 3000);
+    if bridge_lookup_socket(br, 200) != 2000 { return 5; }
+    if bridge_lookup_socket(br, 300) != 3000 { return 6; }
+    g_total_routes = g_total_routes + 2;
+
+    // Test 4: lookup non-existent peer
+    if bridge_lookup_socket(br, 999) != -1 { return 7; }
+
+    // Test 5: send packet (success case: even socket)
+    let result = bridge_send_packet(br, 100, 200, 5555);
+    if result != 2000 { return 8; }
+    if bridge_sent_count(br) != 1 { return 9; }
+
+    // Test 6: send packet (failure case: odd socket)
+    bridge_register_route(br, 400, 4001);  // odd socket
+    let result_fail = bridge_send_packet(br, 100, 400, 6666);
+    if result_fail != -2 { return 10; }
+    if bridge_sent_count(br) != 1 { return 11; }  // count unchanged
+
+    // Test 7: connect peer
+    let new_socket = bridge_connect_peer(br, 500, 8080);
+    if new_socket != 500 * 100 + 8080 { return 12; }
+    if bridge_lookup_socket(br, 500) != new_socket { return 13; }
+
+    // Test 8: send through connected peer
+    let s1 = bridge_send_packet(br, 100, 500, 7777);
+    if s1 < 0 { return 14; }
+
+    // Test 9: multiple sends accumulate
+    bridge_send_packet(br, 100, 200, 1111);
+    bridge_send_packet(br, 200, 300, 2222);
+    if bridge_sent_count(br) != 3 { return 15; }
+
+    return 111;
+}

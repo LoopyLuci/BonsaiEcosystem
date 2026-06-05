@@ -1,0 +1,15 @@
+// titan/omnicore/federated_learner.ti
+// Federated learning node — local training with gradient updates.
+
+pub fn main() -> i64 {
+    let learning_rate: i64 = 1;
+    let epochs: i64 = 100;
+    let local_weight: i64 = init_weight();
+    let trained_weight: i64 = train_local(local_weight, learning_rate, epochs);
+    let gradient: i64 = compute_gradient(trained_weight);
+    return gradient + trained_weight;
+}
+
+pub fn init_weight() -> i64 { return 1; }
+pub fn train_local(weight: i64, lr: i64, epochs: i64) -> i64 { return weight + lr * epochs; }
+pub fn compute_gradient(weight: i64) -> i64 { return weight * 2; }

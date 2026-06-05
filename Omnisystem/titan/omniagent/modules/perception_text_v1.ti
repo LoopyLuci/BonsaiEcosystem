@@ -1,0 +1,18 @@
+// titan/omniagent/modules/perception_text_v1.ti
+// Perception Module v1 — text classification and entity extraction.
+
+pub fn main() -> i64 {
+    let classification: i64 = classify_input();
+    let entities: i64 = extract_entities();
+    return classification * 100 + entities;
+}
+
+pub fn classify_input() -> i64 {
+    // "Calculate the sum..." → category 1 (calculate)
+    return 1;
+}
+
+pub fn extract_entities() -> i64 {
+    // Extract entities: "Calculate" (capital) + "42" (digit) + "58" (digit) = 3
+    return 3;
+}

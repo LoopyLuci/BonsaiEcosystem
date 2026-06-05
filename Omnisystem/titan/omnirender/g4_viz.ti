@@ -1,0 +1,165 @@
+// titan/omnirender/g4_viz.ti — Visualisation Framework: module graph, actor topology, proof tree
+// Self-contained. Wrapper-node APPEND for all three list types.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_GRAPH:     i64 = 20300;
+const T_TOPOLOGY:  i64 = 20301;
+const T_PROOFTREE: i64 = 20302;
+const T_WRP4:      i64 = 20303;
+
+// ===== Module graph =====
+// graph: tag=T_GRAPH, body=node_count, arg=list_head(wrappers)
+// wrapper: tag=T_WRP4, body=node, domain=next_wrapper
+// node: body=label, arg=size
+
+pub fn g4_graph_create() -> i64 {
+    let g = heap_alloc_term();
+    heap_set_tag(g, T_GRAPH); heap_set_body(g, 0); heap_set_arg(g, 0); heap_set_domain(g, 0);
+    return g;
+}
+
+pub fn g4_graph_add_node(g: i64, label: i64, size: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_body(n, label); heap_set_arg(n, size); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP4); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(g);
+    if h == 0 { heap_set_arg(g, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(g, heap_get_body(g) + 1);
+    return n;
+}
+
+pub fn g4_graph_node_count(g: i64) -> i64 { return heap_get_body(g); }
+
+pub fn g4_graph_node_label(g: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(g); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+pub fn g4_graph_node_size(g: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(g); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_arg(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Actor topology =====
+// topology: tag=T_TOPOLOGY, body=actor_count, arg=list_head(wrappers)
+// actor: body=name, arg=state
+
+pub fn g4_topology_create() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TOPOLOGY); heap_set_body(t, 0); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+
+pub fn g4_topology_add_actor(t: i64, name: i64, state: i64) -> i64 {
+    let a = heap_alloc_term();
+    heap_set_body(a, name); heap_set_arg(a, state); heap_set_domain(a, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP4); heap_set_body(w, a); heap_set_domain(w, 0);
+    let h = heap_get_arg(t);
+    if h == 0 { heap_set_arg(t, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(t, heap_get_body(t) + 1);
+    return a;
+}
+
+pub fn g4_topology_actor_count(t: i64) -> i64 { return heap_get_body(t); }
+
+// ===== Proof tree =====
+// prooftree: tag=T_PROOFTREE, body=goal_count, arg=list_head(wrappers)
+// goal: body=goal_id, arg=status(1=proved,0=open)
+
+pub fn g4_prooftree_create() -> i64 {
+    let pt = heap_alloc_term();
+    heap_set_tag(pt, T_PROOFTREE); heap_set_body(pt, 0); heap_set_arg(pt, 0); heap_set_domain(pt, 0);
+    return pt;
+}
+
+pub fn g4_prooftree_add_goal(pt: i64, goal: i64, status: i64) -> i64 {
+    let g = heap_alloc_term();
+    heap_set_body(g, goal); heap_set_arg(g, status); heap_set_domain(g, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP4); heap_set_body(w, g); heap_set_domain(w, 0);
+    let h = heap_get_arg(pt);
+    if h == 0 { heap_set_arg(pt, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(pt, heap_get_body(pt) + 1);
+    return g;
+}
+
+pub fn g4_prooftree_goal_count(pt: i64) -> i64 { return heap_get_body(pt); }
+
+pub fn g4_prooftree_goal_get(pt: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(pt); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Graph: 3 nodes
+    let g = g4_graph_create();
+    g4_graph_add_node(g, 1, 10);
+    g4_graph_add_node(g, 2, 20);
+    g4_graph_add_node(g, 3, 30);
+    if g4_graph_node_count(g) != 3      { return 1; }
+    if g4_graph_node_label(g, 0) != 1   { return 2; }
+    if g4_graph_node_label(g, 2) != 3   { return 3; }
+    if g4_graph_node_size(g, 1) != 20   { return 4; }
+
+    // Topology: 2 actors
+    let top = g4_topology_create();
+    g4_topology_add_actor(top, 100, 1);
+    g4_topology_add_actor(top, 200, 0);
+    if g4_topology_actor_count(top) != 2 { return 5; }
+
+    // Proof tree: 3 goals
+    let pt = g4_prooftree_create();
+    g4_prooftree_add_goal(pt, 1000, 1);
+    g4_prooftree_add_goal(pt, 2000, 0);
+    g4_prooftree_add_goal(pt, 3000, 1);
+    if g4_prooftree_goal_count(pt) != 3  { return 6; }
+
+    // Isolation: independent structures
+    let g2 = g4_graph_create();
+    g4_graph_add_node(g2, 99, 1);
+    if g4_graph_node_count(g2) != 1     { return 7; }
+    if g4_graph_node_count(g) != 3      { return 8; }
+
+    return 111;
+}

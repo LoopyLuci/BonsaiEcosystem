@@ -1,0 +1,87 @@
+// titan/ulcf/configs/php.ti
+// PHP language configuration for the Universal Grammar Adapter.
+
+pub fn php_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("int".to_string(), "i64".to_string());
+    type_map.insert("float".to_string(), "f64".to_string());
+    type_map.insert("bool".to_string(), "bool".to_string());
+    type_map.insert("string".to_string(), "String".to_string());
+    type_map.insert("array".to_string(), "Vec<Any>".to_string());
+    type_map.insert("null".to_string(), "Option<Any>".to_string());
+    type_map.insert("mixed".to_string(), "Any".to_string());
+    type_map.insert("void".to_string(), "void".to_string());
+    type_map.insert("object".to_string(), "Any".to_string());
+    type_map.insert("callable".to_string(), "Fn".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("%".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("===".to_string(), "eq".to_string());
+    operator_map.insert("!=".to_string(), "neq".to_string());
+    operator_map.insert("!==".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+    operator_map.insert("??".to_string(), "or".to_string());
+    operator_map.insert("and".to_string(), "and".to_string());
+    operator_map.insert("or".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "php".to_string(),
+        extensions: vec![".php".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "assignment_expression".to_string(),
+            "if_statement".to_string(),
+            "switch_statement".to_string(),
+            "while_statement".to_string(),
+            "do_statement".to_string(),
+            "for_statement".to_string(),
+            "foreach_statement".to_string(),
+            "return_statement".to_string(),
+            "break_statement".to_string(),
+            "continue_statement".to_string(),
+            "try_statement".to_string(),
+            "throw_statement".to_string(),
+            "echo_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "function_call_expression".to_string(),
+            "variable_name".to_string(),
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "null_literal".to_string(),
+            "array_creation_expression".to_string(),
+            "anonymous_function_expression".to_string(),
+            "arrow_function_expression".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "null".to_string(),
+        ],
+        comment_nodes: vec![
+            "comment".to_string(),
+            "multiline_comment".to_string(),
+        ],
+        block_nodes: vec!["compound_statement".to_string()],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}

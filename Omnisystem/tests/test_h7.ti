@@ -1,0 +1,8 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_EX:i64=24600;const tT_HS:i64=24601;const tT_WR:i64=24602;
+pub fn th7_exp_create(task:i64,result:i64,feedback:i64)->i64{let e=heap_alloc_term();heap_set_tag(e,tT_EX);heap_set_body(e,task);heap_set_arg(e,result);heap_set_domain(e,feedback);let w=heap_alloc_term();heap_set_tag(w,tT_WR);heap_set_body(w,e);heap_set_domain(w,0);return w;}
+pub fn th7_exp_result(w:i64)->i64{return heap_get_arg(heap_get_body(w));}
+pub fn th7_history_create()->i64{let h=heap_alloc_term();heap_set_tag(h,tT_HS);heap_set_body(h,0);heap_set_arg(h,0);return h;}
+pub fn th7_history_add(h:i64,w:i64){let mut cur:i64=heap_get_arg(h);if cur==0{heap_set_arg(h,w);}else{while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(h,heap_get_body(h)+1);}
+pub fn th7_improvement_score(h:i64)->i64{let n=heap_get_body(h);if n<2{return 0;}let mut sum:i64=0;let mut cur:i64=heap_get_arg(h);while cur!=0{let next=heap_get_domain(cur);if next!=0{let r1=th7_exp_result(cur);let r2=th7_exp_result(next);sum=sum+r2-r1;}cur=heap_get_domain(cur);}return sum;}
+pub fn main()->i64{let h=th7_history_create();th7_history_add(h,th7_exp_create(5,50,3));th7_history_add(h,th7_exp_create(6,60,4));if heap_get_body(h)!=2{return 1;}if th7_improvement_score(h)!=10{return 2;}return 111;}

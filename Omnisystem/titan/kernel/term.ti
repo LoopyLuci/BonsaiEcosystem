@@ -1,0 +1,118 @@
+// titan/kernel/term.ti — De Bruijn term representation
+//
+// Term cell layout (8 i64 fields per cell, indexed 0-7):
+//   Var    (tag 0): [tag, var_index]
+//   Lam    (tag 1): [tag, body_id]
+//   App    (tag 2): [tag, func_id, arg_id]
+//   Pi     (tag 3): [tag, domain_id, codomain_id]
+//   Sort   (tag 4): [tag, universe_level]
+//   Const  (tag 5): [tag, name_int]
+//
+// heap_alloc / heap_get / heap_set are runtime built-ins (no declaration needed).
+
+pub fn var_ref(idx: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 0);
+    heap_set(id, 1, idx);
+    return id;
+}
+
+pub fn lam(body: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 1);
+    heap_set(id, 1, body);
+    return id;
+}
+
+pub fn app(func: i64, arg: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 2);
+    heap_set(id, 1, func);
+    heap_set(id, 2, arg);
+    return id;
+}
+
+pub fn pi(domain: i64, codomain: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 3);
+    heap_set(id, 1, domain);
+    heap_set(id, 2, codomain);
+    return id;
+}
+
+pub fn sort(level: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 4);
+    heap_set(id, 1, level);
+    return id;
+}
+
+pub fn const_term(name: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 5);
+    heap_set(id, 1, name);
+    return id;
+}
+
+// λ x. x  (identity function)
+pub fn make_id() -> i64 {
+    return lam(var_ref(0));
+}
+
+// Structural equality (alpha-equivalence via De Bruijn)
+// Returns 1 = equal, 0 = not equal
+pub fn eq_term(a: i64, b: i64) -> i64 {
+    let ta = heap_get(a, 0);
+    let tb = heap_get(b, 0);
+    if ta != tb { return 0; }
+    if ta == 0 {
+        if heap_get(a, 1) == heap_get(b, 1) { return 1; }
+        return 0;
+    }
+    if ta == 1 {
+        return eq_term(heap_get(a, 1), heap_get(b, 1));
+    }
+    if ta == 2 {
+        if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; }
+        return eq_term(heap_get(a, 2), heap_get(b, 2));
+    }
+    if ta == 3 {
+        if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; }
+        return eq_term(heap_get(a, 2), heap_get(b, 2));
+    }
+    if ta == 4 {
+        if heap_get(a, 1) == heap_get(b, 1) { return 1; }
+        return 0;
+    }
+    if ta == 5 {
+        if heap_get(a, 1) == heap_get(b, 1) { return 1; }
+        return 0;
+    }
+    return 0;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: var equality and inequality
+    let v0a = var_ref(0);
+    let v0b = var_ref(0);
+    let v1  = var_ref(1);
+    if eq_term(v0a, v0b) == 1 { score = score + 25; }
+    if eq_term(v0a, v1)  == 0 { score = score + 25; }
+
+    // Test 2: identity function structurally equals itself
+    let id1 = make_id();
+    let id2 = make_id();
+    if eq_term(id1, id2) == 1 { score = score + 25; }
+
+    // Test 3: sort equality and inequality
+    let s0a = sort(0);
+    let s0b = sort(0);
+    let s1  = sort(1);
+    if eq_term(s0a, s0b) == 1 { score = score + 13; }
+    if eq_term(s0a, s1)  == 0 { score = score + 12; }
+
+    if score >= 99 { return 111; }
+    return score;
+}

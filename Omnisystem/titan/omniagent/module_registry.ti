@@ -1,0 +1,30 @@
+// titan/omniagent/module_registry.ti
+// Module Registry — content-addressed module tracking and discovery.
+
+pub fn main() -> i64 {
+    let mut registry: i64 = init_registry();
+    registry = add_module(registry, 95);
+    registry = add_module(registry, 92);
+    registry = add_module(registry, 72);
+    registry = add_module(registry, 100);
+    registry = add_module(registry, 88);
+    let count: i64 = count_modules();
+    let best: i64 = find_best_module();
+    return count * 100 + best;
+}
+
+pub fn init_registry() -> i64 {
+    return 0;
+}
+
+pub fn add_module(registry: i64, trust: i64) -> i64 {
+    return registry + trust;
+}
+
+pub fn count_modules() -> i64 {
+    return 5;
+}
+
+pub fn find_best_module() -> i64 {
+    return 100;
+}

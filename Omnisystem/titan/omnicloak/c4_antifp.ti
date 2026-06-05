@@ -1,0 +1,62 @@
+// titan/omnicloak/c4_antifp.ti — Anti-Fingerprinting & Privacy
+// Self-contained. No || operator — split into separate ifs.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_CANV:    i64 = 23300;
+const T_COOKIE:  i64 = 23301;
+const T_TRACKER: i64 = 23302;
+
+// canvas_noise: add deterministic jitter — value + (value%7) - 3
+pub fn c4_canvas_noise(value: i64) -> i64 { return value + (value % 7) - 3; }
+
+// webgl_normalize: round down to nearest 100
+pub fn c4_webgl_normalize(vendor_id: i64) -> i64 { return (vendor_id / 100) * 100; }
+
+// cookie isolation: encode (domain, key) as domain*1000+key
+pub fn c4_cookie_isolate(domain: i64, key: i64) -> i64 { return domain * 1000 + key; }
+pub fn c4_cookie_clear() -> i64 { return 0; }
+
+// tracker block: scan singly-linked list (body=url, domain=next)
+pub fn c4_tracker_block(url: i64, blocklist: i64) -> i64 {
+    let mut cur: i64 = blocklist;
+    while cur != 0 {
+        if heap_get_body(cur) == url { return 1; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+// c4_canvas_noise(100) = 100 + (100%7) - 3 = 100 + 2 - 3 = 99; in [94,100]
+pub fn main() -> i64 {
+    let noise = c4_canvas_noise(100);
+    if noise < 94  { return 1; }
+    if noise > 100 { return 1; }
+
+    let norm = c4_webgl_normalize(1234);
+    if norm != 1200                    { return 2; }
+
+    let ck = c4_cookie_isolate(5, 42);
+    if ck != 5042                      { return 3; }
+    if c4_cookie_clear() != 0          { return 4; }
+
+    let bl = heap_alloc_term();
+    heap_set_body(bl, 99);
+    let bl2 = heap_alloc_term();
+    heap_set_body(bl2, 88);
+    heap_set_domain(bl2, bl);
+    if c4_tracker_block(88, bl2) != 1  { return 5; }
+    if c4_tracker_block(77, bl2) != 0  { return 6; }
+    return 111;
+}

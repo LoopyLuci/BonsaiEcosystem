@@ -1,0 +1,147 @@
+// titan/kernel/normalize.ti — Weak Head Normal Form (WHNF) reduction
+// Self-contained: includes all term constructors, eq_term, shift, subst.
+//
+// beta:  (λ body) arg  -->  subst(arg, 0, body)
+
+pub fn var_ref(idx: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 0);
+    heap_set(id, 1, idx);
+    return id;
+}
+pub fn lam(body: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 1);
+    heap_set(id, 1, body);
+    return id;
+}
+pub fn app(func: i64, arg: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 2);
+    heap_set(id, 1, func);
+    heap_set(id, 2, arg);
+    return id;
+}
+pub fn pi(domain: i64, codomain: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 3);
+    heap_set(id, 1, domain);
+    heap_set(id, 2, codomain);
+    return id;
+}
+pub fn sort(level: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 4);
+    heap_set(id, 1, level);
+    return id;
+}
+pub fn const_term(name: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 5);
+    heap_set(id, 1, name);
+    return id;
+}
+pub fn make_id() -> i64 { return lam(var_ref(0)); }
+
+pub fn eq_term(a: i64, b: i64) -> i64 {
+    let ta = heap_get(a, 0);
+    let tb = heap_get(b, 0);
+    if ta != tb { return 0; }
+    if ta == 0 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 1 { return eq_term(heap_get(a, 1), heap_get(b, 1)); }
+    if ta == 2 {
+        if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; }
+        return eq_term(heap_get(a, 2), heap_get(b, 2));
+    }
+    if ta == 3 {
+        if eq_term(heap_get(a, 1), heap_get(b, 1)) == 0 { return 0; }
+        return eq_term(heap_get(a, 2), heap_get(b, 2));
+    }
+    if ta == 4 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    if ta == 5 { if heap_get(a, 1) == heap_get(b, 1) { return 1; } return 0; }
+    return 0;
+}
+
+// Shift all free variables >= cutoff by amount
+pub fn shift(t: i64, cutoff: i64, amount: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 {
+        let idx = heap_get(t, 1);
+        if idx >= cutoff { return var_ref(idx + amount); }
+        return var_ref(idx);
+    }
+    if tag == 1 { return lam(shift(heap_get(t, 1), cutoff + 1, amount)); }
+    if tag == 2 {
+        return app(shift(heap_get(t, 1), cutoff, amount),
+                   shift(heap_get(t, 2), cutoff, amount));
+    }
+    if tag == 3 {
+        return pi(shift(heap_get(t, 1), cutoff, amount),
+                  shift(heap_get(t, 2), cutoff + 1, amount));
+    }
+    return t;
+}
+
+pub fn lift(t: i64, cutoff: i64) -> i64 { return shift(t, cutoff, 1); }
+
+// Capture-avoiding substitution: replace Var(index) with s in t
+pub fn subst(s: i64, index: i64, t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 0 {
+        let idx = heap_get(t, 1);
+        if idx == index { return s; }
+        if idx > index  { return var_ref(idx - 1); }
+        return var_ref(idx);
+    }
+    if tag == 1 {
+        let s2 = lift(s, 0);
+        return lam(subst(s2, index + 1, heap_get(t, 1)));
+    }
+    if tag == 2 {
+        return app(subst(s, index, heap_get(t, 1)),
+                   subst(s, index, heap_get(t, 2)));
+    }
+    if tag == 3 {
+        let s2 = lift(s, 0);
+        return pi(subst(s,  index,     heap_get(t, 1)),
+                  subst(s2, index + 1, heap_get(t, 2)));
+    }
+    return t;
+}
+
+// Weak Head Normal Form
+pub fn whnf(t: i64) -> i64 {
+    let tag = heap_get(t, 0);
+    if tag == 2 {
+        let func = whnf(heap_get(t, 1));
+        if heap_get(func, 0) == 1 {
+            let reduced = subst(heap_get(t, 2), 0, heap_get(func, 1));
+            return whnf(reduced);
+        }
+        return app(func, heap_get(t, 2));
+    }
+    return t;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: whnf of a non-redex is the term itself
+    let c = const_term(7);
+    let nf = whnf(c);
+    if eq_term(nf, const_term(7)) == 1 { score = score + 37; }
+
+    // Test 2: beta — (λ x. x) 42  -->  42
+    let a = app(make_id(), const_term(42));
+    let nf2 = whnf(a);
+    if eq_term(nf2, const_term(42)) == 1 { score = score + 37; }
+
+    // Test 3: double application — (λ x. x) ((λ x. x) 99)  -->  99
+    let inner = app(make_id(), const_term(99));
+    let outer = app(make_id(), inner);
+    let nf3   = whnf(outer);
+    if eq_term(nf3, const_term(99)) == 1 { score = score + 37; }
+
+    if score >= 111 { return 111; }
+    return score;
+}

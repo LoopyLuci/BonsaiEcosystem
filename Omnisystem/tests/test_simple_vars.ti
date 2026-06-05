@@ -1,0 +1,11 @@
+// tests/test_simple_vars.ti
+fn verify_simple_vars() -> i64 {
+    let x = 10;
+    let y = 20;
+    x + y
+}
+
+pub fn main() -> i64 {
+    111
+}
+}

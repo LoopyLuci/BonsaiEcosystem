@@ -1,0 +1,133 @@
+// tests/test_g4.ti — Phase G4 Visualisation Framework Integration Test
+// All helpers inlined with tg4_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TG4_T_GR4: i64 = 20300;
+const TG4_T_TP4: i64 = 20301;
+const TG4_T_PT4: i64 = 20302;
+const TG4_T_WR4: i64 = 20303;
+
+// ===== Graph =====
+pub fn tg4_graph_create() -> i64 {
+    let g = heap_alloc_term();
+    heap_set_tag(g, TG4_T_GR4); heap_set_body(g, 0); heap_set_arg(g, 0); heap_set_domain(g, 0);
+    return g;
+}
+pub fn tg4_graph_add_node(g: i64, label: i64, size: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_body(n, label); heap_set_arg(n, size); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TG4_T_WR4); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(g);
+    if h == 0 { heap_set_arg(g, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(g, heap_get_body(g) + 1);
+    return n;
+}
+pub fn tg4_graph_node_count(g: i64) -> i64 { return heap_get_body(g); }
+pub fn tg4_graph_node_label(g: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(g); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Topology =====
+pub fn tg4_topology_create() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TG4_T_TP4); heap_set_body(t, 0); heap_set_arg(t, 0); heap_set_domain(t, 0);
+    return t;
+}
+pub fn tg4_topology_add_actor(t: i64, name: i64, state: i64) -> i64 {
+    let a = heap_alloc_term();
+    heap_set_body(a, name); heap_set_arg(a, state); heap_set_domain(a, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TG4_T_WR4); heap_set_body(w, a); heap_set_domain(w, 0);
+    let h = heap_get_arg(t);
+    if h == 0 { heap_set_arg(t, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(t, heap_get_body(t) + 1);
+    return a;
+}
+pub fn tg4_topology_actor_count(t: i64) -> i64 { return heap_get_body(t); }
+
+// ===== Proof tree =====
+pub fn tg4_prooftree_create() -> i64 {
+    let pt = heap_alloc_term();
+    heap_set_tag(pt, TG4_T_PT4); heap_set_body(pt, 0); heap_set_arg(pt, 0); heap_set_domain(pt, 0);
+    return pt;
+}
+pub fn tg4_prooftree_add_goal(pt: i64, goal: i64, status: i64) -> i64 {
+    let g = heap_alloc_term();
+    heap_set_body(g, goal); heap_set_arg(g, status); heap_set_domain(g, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TG4_T_WR4); heap_set_body(w, g); heap_set_domain(w, 0);
+    let h = heap_get_arg(pt);
+    if h == 0 { heap_set_arg(pt, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(pt, heap_get_body(pt) + 1);
+    return g;
+}
+pub fn tg4_prooftree_goal_count(pt: i64) -> i64 { return heap_get_body(pt); }
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Graph: 2 nodes, verify labels
+    let g = tg4_graph_create();
+    tg4_graph_add_node(g, 10, 100);
+    tg4_graph_add_node(g, 20, 200);
+    if tg4_graph_node_count(g) != 2      { return 1; }
+    if tg4_graph_node_label(g, 0) != 10  { return 2; }
+    if tg4_graph_node_label(g, 1) != 20  { return 3; }
+
+    // Topology: 3 actors
+    let top = tg4_topology_create();
+    tg4_topology_add_actor(top, 500, 1);
+    tg4_topology_add_actor(top, 600, 0);
+    tg4_topology_add_actor(top, 700, 1);
+    if tg4_topology_actor_count(top) != 3 { return 4; }
+
+    // Proof tree: 2 goals
+    let pt = tg4_prooftree_create();
+    tg4_prooftree_add_goal(pt, 50, 1);
+    tg4_prooftree_add_goal(pt, 60, 0);
+    if tg4_prooftree_goal_count(pt) != 2  { return 5; }
+
+    // Loop: add 5 nodes to a second graph
+    let g2 = tg4_graph_create();
+    let mut i: i64 = 0;
+    while i < 5 { tg4_graph_add_node(g2, i * 7, i); i = i + 1; }
+    if tg4_graph_node_count(g2) != 5     { return 6; }
+    if tg4_graph_node_label(g2, 0) != 0  { return 7; }
+    if tg4_graph_node_label(g2, 4) != 28 { return 8; }
+
+    // Isolation: original graph unchanged
+    if tg4_graph_node_count(g) != 2      { return 9; }
+
+    return 111;
+}

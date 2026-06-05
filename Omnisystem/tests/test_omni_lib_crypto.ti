@@ -1,0 +1,84 @@
+// Integration Test for Phase 121 — OmniLib Cryptography and Security
+
+extern "titan" {
+    fn sha256_k(t: i64) -> i64;
+    fn sha256_ch(x: i64, y: i64, z: i64) -> i64;
+    fn sha256_maj(x: i64, y: i64, z: i64) -> i64;
+    fn sha256_rotr(x: i64, n: i64) -> i64;
+    fn sha256_sigma0(x: i64) -> i64;
+    fn sha256_sigma1(x: i64) -> i64;
+    fn sha256_sigma_small0(x: i64) -> i64;
+    fn sha256_sigma_small1(x: i64) -> i64;
+    fn sha256_hash(data: i64, len: i64) -> i64;
+    fn sha256_digest_eq(a: i64, b: i64) -> bool;
+    fn hmac_sha256(key: i64, key_len: i64, message: i64, msg_len: i64) -> i64;
+    fn hmac_verify(key: i64, key_len: i64, message: i64, msg_len: i64, tag: i64) -> bool;
+    fn random_seed(entropy: i64);
+    fn random_i64() -> i64;
+    fn random_range(max: i64) -> i64;
+    fn random_bool() -> bool;
+    fn random_bytes(buf: i64, count: i64);
+    fn base64_encode_byte(b: i64) -> i64;
+    fn base64_decode_char(c: i64) -> i64;
+    fn base64_encoded_len(raw_len: i64) -> i64;
+    fn base64_is_valid_padding(encoded_len: i64) -> bool;
+}
+
+pub fn main() -> i64 {
+    // Test SHA-256 round constants
+    if sha256_k(0) != 1116352408 { return 1; }
+    if sha256_k(63) != 3328369153 { return 2; }
+    
+    // Test SHA-256 functions
+    let ch = sha256_ch(4294967295, 4294967295, 0);
+    if ch != 4294967295 { return 3; }
+    
+    let maj = sha256_maj(4294967295, 4294967295, 0);
+    if maj != 4294967295 { return 4; }
+    
+    let rotr = sha256_rotr(2147483648, 1);
+    if rotr < 0 { return 5; }
+    
+    let s0 = sha256_sigma0(12345);
+    if s0 < 0 { return 6; }
+    
+    let s1 = sha256_sigma1(54321);
+    if s1 < 0 { return 7; }
+    
+    let ss0 = sha256_sigma_small0(99999);
+    if ss0 < 0 { return 8; }
+    
+    let ss1 = sha256_sigma_small1(77777);
+    if ss1 < 0 { return 9; }
+    
+    // Test SHA-256 hashing and digest comparison
+    let d1 = sha256_hash(0, 0);
+    let d2 = sha256_hash(0, 0);
+    if !sha256_digest_eq(d1, d2) { return 10; }
+    
+    // Test HMAC
+    let hmac_tag = hmac_sha256(12345, 16, 54321, 8);
+    if !hmac_verify(12345, 16, 54321, 8, hmac_tag) { return 11; }
+    
+    // Test CSPRNG
+    random_seed(12345);
+    let r1 = random_i64();
+    let r2 = random_i64();
+    if r1 == r2 { return 12; }
+    
+    let range_val = random_range(50);
+    if range_val < 0 || range_val >= 50 { return 13; }
+    
+    let bool_val = random_bool();
+    
+    random_bytes(0, 10);
+    
+    // Test Base64
+    if base64_encode_byte(0) != 65 { return 14; }
+    if base64_decode_char(65) != 0 { return 15; }
+    if base64_encoded_len(3) != 4 { return 16; }
+    if !base64_is_valid_padding(4) { return 17; }
+    if base64_is_valid_padding(5) { return 18; }
+    
+    return 111;
+}

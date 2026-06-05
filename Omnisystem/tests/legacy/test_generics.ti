@@ -1,0 +1,14 @@
+// test_generics.ti
+pub fn main() -> i64 {
+    return 42;
+}
+
+struct HashMap<K, V> {
+    entries: i64
+}
+
+impl HashMap {
+    pub fn new() -> HashMap {
+        HashMap { entries: 0 }
+    }
+}

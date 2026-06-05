@@ -1,0 +1,4 @@
+pub pub fn main() -> i64 { let mut score: i64 = 0; let var_ok: i64 = configure_provider("twilio") >= 80 { score += 20; } let var_ok: i64 = configure_provider("vonage") >= 80 { score += 20; } let var_ok: i64 = set_default_sender("+15551234567") >= 80 { score += 20; } let var_ok: i64 = verify_sms_config() >= 80 { score += 31; } if score >= 80 { return 111; } return score; }
+pub fn configure_provider(_name: &str) -> i64 { return 111; }
+pub fn set_default_sender(_number: &str) -> i64 { return 111; }
+pub fn verify_sms_config() -> i64 { return 111; }

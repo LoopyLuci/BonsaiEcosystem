@@ -1,0 +1,5 @@
+// Test string equality
+pub fn main() -> i64 {
+    if "Window" == "Window" { return 1; }
+    return 0;
+}

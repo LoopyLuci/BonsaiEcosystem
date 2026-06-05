@@ -1,0 +1,125 @@
+// titan/sylva/verify.ti — Gradual Verification Framework (tags 37100-37199)
+// Tracks verification state and proof obligations for Sylva functions.
+//
+// SylvaFn cell layout (heap_alloc, fields 0-7):
+//   field[0] = tag (37100)
+//   field[1] = fn_id
+//   field[2] = status (0=UNVERIFIED, 1=PARTIAL, 2=VERIFIED)
+//   field[3] = obligation_count
+//   field[4] = head_obligation_id (linked list)
+//
+// Obligation cell layout:
+//   field[0] = tag (37101)
+//   field[1] = fn_ref
+//   field[2] = obligation_type
+//   field[3] = next_obligation_id (linked list)
+//   field[4] = discharged (0=active, 1=discharged)
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_SYLVA_FN:  i64 = 37100;
+const TAG_OBLIGATION: i64 = 37101;
+
+const SV_UNVERIFIED: i64 = 0;
+const SV_PARTIAL:    i64 = 1;
+const SV_VERIFIED:   i64 = 2;
+
+const OBL_PRECOND:     i64 = 1;
+const OBL_POSTCOND:    i64 = 2;
+const OBL_TERMINATION: i64 = 3;
+const OBL_EFFECT:      i64 = 4;
+
+pub fn sv_fn_new(fn_id: i64) -> i64 {
+    let fn_cell = heap_alloc();
+    heap_set(fn_cell, 0, TAG_SYLVA_FN);
+    heap_set(fn_cell, 1, fn_id);
+    heap_set(fn_cell, 2, SV_UNVERIFIED);
+    heap_set(fn_cell, 3, 0);
+    heap_set(fn_cell, 4, 0);
+    return fn_cell;
+}
+
+pub fn sv_fn_status(fn_cell: i64) -> i64 {
+    return heap_get(fn_cell, 2);
+}
+
+pub fn sv_fn_add_obligation(fn_cell: i64, obl_type: i64) -> i64 {
+    let obl = heap_alloc();
+    heap_set(obl, 0, TAG_OBLIGATION);
+    heap_set(obl, 1, fn_cell);
+    heap_set(obl, 2, obl_type);
+    heap_set(obl, 3, heap_get(fn_cell, 4));
+    heap_set(obl, 4, 0);
+    heap_set(fn_cell, 4, obl);
+    let cnt = heap_get(fn_cell, 3);
+    heap_set(fn_cell, 3, cnt + 1);
+    if heap_get(fn_cell, 2) == SV_UNVERIFIED {
+        heap_set(fn_cell, 2, SV_PARTIAL);
+    }
+    return obl;
+}
+
+pub fn sv_fn_discharge(fn_cell: i64, obl_id: i64) {
+    // Mark obligation as discharged and decrement count
+    if heap_get(obl_id, 4) == 0 {
+        heap_set(obl_id, 4, 1);
+        let cnt = heap_get(fn_cell, 3);
+        if cnt > 0 {
+            heap_set(fn_cell, 3, cnt - 1);
+        }
+    }
+}
+
+pub fn sv_fn_check_verified(fn_cell: i64) -> i64 {
+    if heap_get(fn_cell, 3) == 0 {
+        heap_set(fn_cell, 2, SV_VERIFIED);
+        return 1;
+    }
+    return 0;
+}
+
+pub fn sv_fn_promote(fn_cell: i64) {
+    if heap_get(fn_cell, 3) == 0 {
+        heap_set(fn_cell, 2, SV_VERIFIED);
+    }
+}
+
+pub fn sv_obligation_count(fn_cell: i64) -> i64 {
+    return heap_get(fn_cell, 3);
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: Create SylvaFn, status should be UNVERIFIED, check_verified == 0
+    let f = sv_fn_new(1001);
+    if sv_fn_status(f) == SV_UNVERIFIED {
+        if sv_fn_check_verified(f) == 0 {
+            score = score + 37;
+        }
+    }
+
+    // Step 2: Add 3 obligations, discharge 2, count should be 1
+    let obl1 = sv_fn_add_obligation(f, OBL_PRECOND);
+    let obl2 = sv_fn_add_obligation(f, OBL_POSTCOND);
+    let obl3 = sv_fn_add_obligation(f, OBL_TERMINATION);
+    sv_fn_discharge(f, obl1);
+    sv_fn_discharge(f, obl2);
+    if sv_obligation_count(f) == 1 {
+        score = score + 37;
+    }
+
+    // Step 3: Discharge last obligation, check_verified should return 1
+    sv_fn_discharge(f, obl3);
+    if sv_fn_check_verified(f) == 1 {
+        score = score + 37;
+    }
+
+    return score;
+}

@@ -1,0 +1,94 @@
+// OmniStyle Engine -- computes style maps for DOM nodes
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const STYLE_WIDTH: i64 = 0;
+const STYLE_HEIGHT: i64 = 1;
+const STYLE_PADDING_LEFT: i64 = 2;
+const STYLE_PADDING_RIGHT: i64 = 3;
+const STYLE_PADDING_TOP: i64 = 4;
+const STYLE_PADDING_BOTTOM: i64 = 5;
+const STYLE_MARGIN_LEFT: i64 = 6;
+const STYLE_MARGIN_RIGHT: i64 = 7;
+const STYLE_MARGIN_TOP: i64 = 8;
+const STYLE_MARGIN_BOTTOM: i64 = 9;
+const STYLE_FONT_SIZE: i64 = 10;
+const STYLE_COLOR: i64 = 11;
+const STYLE_BACKGROUND: i64 = 12;
+const STYLE_DISPLAY: i64 = 13;
+const STYLE_FLEX_DIRECTION: i64 = 14;
+
+const TAG_STYLE: i64 = 3100;
+const TAG_STYLE_PROP: i64 = 3101;
+
+pub fn style_new() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_STYLE);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn style_set(s: i64, prop: i64, value: i64) {
+    let mut p = heap_get_domain(s);
+    while p != 0 {
+        if heap_get_body(p) == prop {
+            heap_set_arg(p, value);
+            return;
+        }
+        p = heap_get_domain(p);
+    }
+
+    let node = heap_alloc_term();
+    heap_set_tag(node, TAG_STYLE_PROP);
+    heap_set_body(node, prop);
+    heap_set_arg(node, value);
+    heap_set_domain(node, heap_get_domain(s));
+    heap_set_domain(s, node);
+    return;
+}
+
+pub fn style_get(s: i64, prop: i64) -> i64 {
+    let mut p = heap_get_domain(s);
+    while p != 0 {
+        if heap_get_body(p) == prop { return heap_get_arg(p); }
+        p = heap_get_domain(p);
+    }
+    return -1;
+}
+
+pub fn style_default_for_node(_node: i64) -> i64 {
+    let s = style_new();
+    style_set(s, STYLE_DISPLAY, 0);
+    style_set(s, STYLE_FONT_SIZE, 16);
+    style_set(s, STYLE_COLOR, 255);
+    style_set(s, STYLE_BACKGROUND, 4294967295);
+    style_set(s, STYLE_WIDTH, -1);
+    style_set(s, STYLE_HEIGHT, -1);
+    return s;
+}
+
+pub fn style_compute_for_dom(node: i64) -> i64 {
+    let s = style_default_for_node(node);
+    return s;
+}
+
+pub fn main() -> i64 {
+    let s = style_new();
+    style_set(s, STYLE_FONT_SIZE, 24);
+    if style_get(s, STYLE_FONT_SIZE) != 24 { return 1; }
+    if style_get(s, STYLE_COLOR) != -1 { return 2; }
+
+    let dom = heap_alloc_term();
+    let computed = style_compute_for_dom(dom);
+    if style_get(computed, STYLE_FONT_SIZE) != 16 { return 3; }
+    return 111;
+}

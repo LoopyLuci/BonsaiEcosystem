@@ -1,0 +1,137 @@
+// OmniShell Application -- native desktop shell lifecycle
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+
+    fn platform_window_create(title_id: i64, width: i64, height: i64) -> i64;
+    fn platform_window_show(handle: i64);
+    fn platform_window_close(handle: i64);
+    fn platform_window_poll_events() -> i64;
+    fn platform_window_should_close(handle: i64) -> bool;
+
+    fn platform_event_type(event: i64) -> i64;
+    fn platform_event_width(event: i64) -> i64;
+    fn platform_event_height(event: i64) -> i64;
+
+    fn renderer_init(window_handle: i64) -> i64;
+    fn renderer_begin_frame(surface: i64);
+    fn renderer_end_frame(surface: i64);
+    fn renderer_clear(surface: i64, color: i64);
+
+    fn ipc_send(channel_id: i64, message_id: i64) -> bool;
+    fn ipc_recv(channel_id: i64) -> i64;
+    fn ipc_channel_create(name_id: i64) -> i64;
+    fn ipc_channel_close(channel_id: i64) -> bool;
+    fn ipc_has_message(channel_id: i64) -> bool;
+}
+
+const TAG_APP: i64 = 2400;
+const TAG_MSG: i64 = 2401;
+
+const EVENT_KEY_DOWN: i64 = 1;
+const EVENT_MOUSE_DOWN: i64 = 3;
+const EVENT_RESIZE: i64 = 6;
+
+static mut APP_WINDOW: i64 = 0;
+static mut APP_SURFACE: i64 = 0;
+static mut APP_RUNNING: i64 = 0;
+static mut APP_IPC: i64 = 0;
+
+pub fn color_gray(level: i64) -> i64 {
+    return (level * 16777216) + (level * 65536) + (level * 256) + 255;
+}
+
+pub fn app_create(title_id: i64, width: i64, height: i64) -> i64 {
+    let app = heap_alloc_term();
+    heap_set_tag(app, TAG_APP);
+    heap_set_body(app, width);
+    heap_set_arg(app, height);
+    heap_set_domain(app, title_id);
+    return app;
+}
+
+pub fn app_init_runtime(app: i64) -> i64 {
+    let width = heap_get_body(app);
+    let height = heap_get_arg(app);
+    let title = heap_get_domain(app);
+
+    APP_WINDOW = platform_window_create(title, width, height);
+    if APP_WINDOW < 0 { return 1; }
+
+    APP_SURFACE = renderer_init(APP_WINDOW);
+    if APP_SURFACE < 0 { return 2; }
+
+    let name = heap_alloc_term();
+    heap_set_body(name, 1);
+    APP_IPC = ipc_channel_create(name);
+    if APP_IPC < 0 { return 3; }
+
+    platform_window_show(APP_WINDOW);
+    return 0;
+}
+
+pub fn app_run(app: i64) -> i64 {
+    let init = app_init_runtime(app);
+    if init != 0 { return init; }
+
+    APP_RUNNING = 1;
+    let mut guard: i64 = 0;
+    while APP_RUNNING == 1 {
+        if platform_window_should_close(APP_WINDOW) {
+            APP_RUNNING = 0;
+            break;
+        }
+
+        let event = platform_window_poll_events();
+        if event != 0 {
+            let evt_type = platform_event_type(event);
+            if evt_type == EVENT_RESIZE {
+                let _new_w = platform_event_width(event);
+                let _new_h = platform_event_height(event);
+            } else if evt_type == EVENT_KEY_DOWN {
+                let _k = 1;
+            } else if evt_type == EVENT_MOUSE_DOWN {
+                let _m = 1;
+            }
+        }
+
+        renderer_begin_frame(APP_SURFACE);
+        renderer_clear(APP_SURFACE, color_gray(30));
+        renderer_end_frame(APP_SURFACE);
+
+        if ipc_has_message(APP_IPC) {
+            let msg = ipc_recv(APP_IPC);
+            let _ty = heap_get_body(msg);
+        }
+
+        guard = guard + 1;
+        if guard > 1 {
+            APP_RUNNING = 0;
+        }
+    }
+
+    platform_window_close(APP_WINDOW);
+    ipc_channel_close(APP_IPC);
+    return 0;
+}
+
+pub fn app_quit() {
+    APP_RUNNING = 0;
+    return;
+}
+
+pub fn main() -> i64 {
+    let app = app_create(heap_alloc_term(), 1280, 720);
+    if heap_get_tag(app) != TAG_APP { return 1; }
+    if heap_get_body(app) != 1280 { return 2; }
+    if heap_get_arg(app) != 720 { return 3; }
+
+    return 111;
+}

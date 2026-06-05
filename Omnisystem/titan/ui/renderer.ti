@@ -1,0 +1,100 @@
+// titan/ui/renderer.ti — Immediate-mode renderer primitives
+// Colors, points, and rects are value nodes on the heap.
+// ui_anim_pulse returns a [0,100] sawtooth/triangle value driven by a tick counter.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_COLOR: i64 = 64000;
+const TAG_POINT: i64 = 64001;
+const TAG_RECT:  i64 = 64002;
+
+pub fn ui_color(r: i64, g: i64, b: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_COLOR);
+    heap_set_body(c, r);
+    heap_set_arg(c, g);
+    heap_set_domain(c, b);
+    return c;
+}
+
+pub fn ui_color_r(c: i64) -> i64 { return heap_get_body(c); }
+pub fn ui_color_g(c: i64) -> i64 { return heap_get_arg(c); }
+pub fn ui_color_b(c: i64) -> i64 { return heap_get_domain(c); }
+
+pub fn ui_point(x: i64, y: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TAG_POINT);
+    heap_set_body(p, x);
+    heap_set_arg(p, y);
+    return p;
+}
+
+pub fn ui_point_x(p: i64) -> i64 { return heap_get_body(p); }
+pub fn ui_point_y(p: i64) -> i64 { return heap_get_arg(p); }
+
+// ui_rect: x,y,w,h stored in two cells; fill = color handle
+pub fn ui_rect(x: i64, y: i64, w: i64, h: i64, fill: i64) -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_RECT);
+    heap_set_body(r, x);
+    heap_set_arg(r, y);
+    let m = heap_alloc_term();
+    heap_set_body(m, w);
+    heap_set_arg(m, h);
+    heap_set_domain(m, fill);
+    heap_set_domain(r, m);
+    return r;
+}
+
+pub fn ui_rect_x(r: i64) -> i64    { return heap_get_body(r); }
+pub fn ui_rect_y(r: i64) -> i64    { return heap_get_arg(r); }
+pub fn ui_rect_w(r: i64) -> i64    { return heap_get_body(heap_get_domain(r)); }
+pub fn ui_rect_h(r: i64) -> i64    { return heap_get_arg(heap_get_domain(r)); }
+pub fn ui_rect_fill(r: i64) -> i64 { return heap_get_domain(heap_get_domain(r)); }
+
+// Triangle wave in [0,100] driven by tick/speed
+pub fn ui_anim_pulse(tick: i64, speed: i64) -> i64 {
+    let mut v: i64 = 0;
+    if speed > 0 { v = tick / speed; }
+    let phase: i64 = v % 200;
+    if phase < 100 { return phase; }
+    return 200 - phase;
+}
+
+pub fn main() -> i64 {
+    // Test 1: color channels round-trip
+    let c = ui_color(100, 200, 50);
+    if ui_color_r(c) != 100 { return 1; }
+    if ui_color_g(c) != 200 { return 2; }
+    if ui_color_b(c) != 50  { return 3; }
+
+    // Test 2: point round-trip
+    let p = ui_point(30, 40);
+    if ui_point_x(p) != 30 { return 4; }
+    if ui_point_y(p) != 40 { return 5; }
+
+    // Test 3: pulse stays in [0,100]
+    let pulse0 = ui_anim_pulse(0, 10);
+    if pulse0 != 0 { return 6; }
+    let pulse50 = ui_anim_pulse(500, 10);    // tick/speed=50, phase=50 → 50
+    if pulse50 != 50 { return 7; }
+    let pulse150 = ui_anim_pulse(1500, 10);  // v=150, phase=150 → 200-150=50
+    if pulse150 != 50 { return 8; }
+
+    // Test 4: rect stores all five fields
+    let r = ui_rect(10, 20, 100, 80, c);
+    if ui_rect_x(r) != 10  { return 9; }
+    if ui_rect_w(r) != 100 { return 10; }
+
+    return 111;
+}

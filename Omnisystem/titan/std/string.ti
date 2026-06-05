@@ -1,0 +1,155 @@
+// OmniLib String -- heap-backed linked codepoint string
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_STR: i64 = 7200;
+const TAG_STR_NODE: i64 = 7201;
+
+// String layout: body=head, arg=tail, domain=len
+// Node layout: body=codepoint, arg=next
+pub fn string_new() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_STR);
+    heap_set_body(s, 0);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn string_len(s: i64) -> i64 {
+    return heap_get_domain(s);
+}
+
+pub fn string_push_char(s: i64, cp: i64) {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_STR_NODE);
+    heap_set_body(n, cp);
+    heap_set_arg(n, 0);
+
+    if string_len(s) == 0 {
+        heap_set_body(s, n);
+        heap_set_arg(s, n);
+    } else {
+        let tail = heap_get_arg(s);
+        heap_set_arg(tail, n);
+        heap_set_arg(s, n);
+    }
+    heap_set_domain(s, string_len(s) + 1);
+    return;
+}
+
+pub fn string_char_at(s: i64, idx: i64) -> i64 {
+    if idx < 0 || idx >= string_len(s) { return -1; }
+    let mut i: i64 = 0;
+    let mut cur = heap_get_body(s);
+    while cur != 0 {
+        if i == idx { return heap_get_body(cur); }
+        i = i + 1;
+        cur = heap_get_arg(cur);
+    }
+    return -1;
+}
+
+pub fn string_concat(a: i64, b: i64) -> i64 {
+    let out = string_new();
+
+    let mut i: i64 = 0;
+    while i < string_len(a) {
+        string_push_char(out, string_char_at(a, i));
+        i = i + 1;
+    }
+
+    i = 0;
+    while i < string_len(b) {
+        string_push_char(out, string_char_at(b, i));
+        i = i + 1;
+    }
+
+    return out;
+}
+
+pub fn string_equals(a: i64, b: i64) -> bool {
+    if string_len(a) != string_len(b) { return false; }
+    let mut i: i64 = 0;
+    while i < string_len(a) {
+        if string_char_at(a, i) != string_char_at(b, i) { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+pub fn string_find(haystack: i64, needle: i64) -> i64 {
+    let h_len = string_len(haystack);
+    let n_len = string_len(needle);
+    if n_len == 0 { return 0; }
+    if n_len > h_len { return -1; }
+
+    let mut start: i64 = 0;
+    while start <= h_len - n_len {
+        let mut j: i64 = 0;
+        let mut ok: i64 = 1;
+        while j < n_len {
+            if string_char_at(haystack, start + j) != string_char_at(needle, j) {
+                ok = 0;
+                j = n_len;
+            } else {
+                j = j + 1;
+            }
+        }
+        if ok == 1 { return start; }
+        start = start + 1;
+    }
+
+    return -1;
+}
+
+pub fn string_split_count(s: i64, delim: i64) -> i64 {
+    if string_len(s) == 0 { return 0; }
+    let mut count: i64 = 1;
+    let mut i: i64 = 0;
+    while i < string_len(s) {
+        if string_char_at(s, i) == delim { count = count + 1; }
+        i = i + 1;
+    }
+    return count;
+}
+
+pub fn main() -> i64 {
+    let a = string_new();
+    let b = string_new();
+    string_push_char(a, 65);
+    string_push_char(a, 44);
+    string_push_char(a, 66);
+    string_push_char(b, 67);
+
+    if string_len(a) != 3 { return 1; }
+    if string_char_at(a, 0) != 65 { return 2; }
+    if string_char_at(a, 1) != 44 { return 3; }
+
+    let c = string_concat(a, b);
+    if string_len(c) != 4 { return 4; }
+    if string_char_at(c, 3) != 67 { return 5; }
+
+    let d = string_new();
+    string_push_char(d, 65);
+    string_push_char(d, 44);
+    string_push_char(d, 66);
+    if !string_equals(a, d) { return 6; }
+
+    let needle = string_new();
+    string_push_char(needle, 44);
+    string_push_char(needle, 66);
+    if string_find(a, needle) != 1 { return 7; }
+
+    if string_split_count(a, 44) != 2 { return 8; }
+
+    return 111;
+}

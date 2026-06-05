@@ -1,0 +1,175 @@
+// titan/aether/omnicrodt.ti — CRDTs: GCounter, GSet, LWWRegister (tags 38100-38199)
+// Conflict-free replicated data types for distributed Aether state.
+//
+// GCounter cell layout:
+//   field[0] = tag (38100)
+//   field[1] = replica_id
+//   field[2] = count (this replica's increment)
+//   field[3] = merged_count (merged max)
+//
+// GSet cell layout:
+//   field[0] = tag (38101)
+//   field[1] = size
+//   field[2..7] = stored values (up to 6 elements)
+//
+// LWWRegister cell layout:
+//   field[0] = tag (38102)
+//   field[1] = value
+//   field[2] = timestamp
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+const TAG_GCOUNTER:    i64 = 38100;
+const TAG_GSET:        i64 = 38101;
+const TAG_LWW_REG:     i64 = 38102;
+
+// GCounter
+pub fn gctr_new(replica_id: i64) -> i64 {
+    let c = heap_alloc();
+    heap_set(c, 0, TAG_GCOUNTER);
+    heap_set(c, 1, replica_id);
+    heap_set(c, 2, 0);
+    heap_set(c, 3, 0);
+    return c;
+}
+
+pub fn gctr_increment(ctr: i64) {
+    let v = heap_get(ctr, 2);
+    heap_set(ctr, 2, v + 1);
+    let m = heap_get(ctr, 3);
+    if v + 1 > m {
+        heap_set(ctr, 3, v + 1);
+    }
+}
+
+pub fn gctr_value(ctr: i64) -> i64 {
+    return heap_get(ctr, 3);
+}
+
+pub fn gctr_merge(dst: i64, src: i64) {
+    let d = heap_get(dst, 3);
+    let s = heap_get(src, 3);
+    if s > d {
+        heap_set(dst, 3, s);
+    }
+}
+
+// GSet (up to 6 elements stored in fields 2-7)
+pub fn gset_new() -> i64 {
+    let s = heap_alloc();
+    heap_set(s, 0, TAG_GSET);
+    heap_set(s, 1, 0);
+    return s;
+}
+
+pub fn gset_add(s: i64, val: i64) -> i64 {
+    let sz = heap_get(s, 1);
+    if sz >= 6 {
+        return 0;
+    }
+    let slot = sz + 2;
+    heap_set(s, slot, val);
+    heap_set(s, 1, sz + 1);
+    return 1;
+}
+
+pub fn gset_contains(s: i64, val: i64) -> i64 {
+    let sz = heap_get(s, 1);
+    let mut i: i64 = 0;
+    let mut found: i64 = 0;
+    if i < sz {
+        if heap_get(s, i + 2) == val { found = 1; }
+        i = i + 1;
+    }
+    if found == 0 {
+        if i < sz {
+            if heap_get(s, i + 2) == val { found = 1; }
+            i = i + 1;
+        }
+    }
+    if found == 0 {
+        if i < sz {
+            if heap_get(s, i + 2) == val { found = 1; }
+            i = i + 1;
+        }
+    }
+    if found == 0 {
+        if i < sz {
+            if heap_get(s, i + 2) == val { found = 1; }
+        }
+    }
+    return found;
+}
+
+pub fn gset_size(s: i64) -> i64 {
+    return heap_get(s, 1);
+}
+
+// LWWRegister
+pub fn lww_new(val: i64, ts: i64) -> i64 {
+    let r = heap_alloc();
+    heap_set(r, 0, TAG_LWW_REG);
+    heap_set(r, 1, val);
+    heap_set(r, 2, ts);
+    return r;
+}
+
+pub fn lww_write(r: i64, val: i64, ts: i64) {
+    if ts > heap_get(r, 2) {
+        heap_set(r, 1, val);
+        heap_set(r, 2, ts);
+    }
+}
+
+pub fn lww_read(r: i64) -> i64 {
+    return heap_get(r, 1);
+}
+
+pub fn lww_merge(dst: i64, src: i64) {
+    let dst_ts = heap_get(dst, 2);
+    let src_ts = heap_get(src, 2);
+    if src_ts > dst_ts {
+        heap_set(dst, 1, heap_get(src, 1));
+        heap_set(dst, 2, src_ts);
+    }
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Step 1: GCounter — increment 3 times, value == 3
+    let ctr = gctr_new(1);
+    gctr_increment(ctr);
+    gctr_increment(ctr);
+    gctr_increment(ctr);
+    if gctr_value(ctr) == 3 {
+        score = score + 37;
+    }
+
+    // Step 2: GSet — add 3 elements, contains check
+    let gset = gset_new();
+    gset_add(gset, 10);
+    gset_add(gset, 20);
+    gset_add(gset, 30);
+    if gset_size(gset) == 3 {
+        if gset_contains(gset, 20) == 1 {
+            score = score + 37;
+        }
+    }
+
+    // Step 3: LWWRegister — write wins by timestamp
+    let reg = lww_new(100, 1);
+    lww_write(reg, 200, 5);
+    lww_write(reg, 150, 3);
+    if lww_read(reg) == 200 {
+        score = score + 37;
+    }
+
+    return score;
+}

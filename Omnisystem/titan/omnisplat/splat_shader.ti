@@ -1,0 +1,131 @@
+// titan/omnisplat/splat_shader.ti — Core Splat Rendering Shader
+// 3D covariance projection, alpha computation, depth sorting. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_ELLIPSE:     i64 = 9000;
+const TAG_SORTED_LIST: i64 = 9001;
+
+// Project 3D covariance diagonal to 2D ellipse parameters.
+// ellipse: tag=TAG_ELLIPSE, body=major(=c00), arg=minor(=c11), domain=meta
+// meta: body=angle(=45), arg=c22, domain=0
+pub fn shader_project_covariance(c00: i64, c01: i64, c02: i64,
+                                  c10: i64, c11: i64, c12: i64,
+                                  c20: i64, c21: i64, c22: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, 45);
+    heap_set_arg(meta, c22);
+    heap_set_domain(meta, 0);
+    let ellipse = heap_alloc_term();
+    heap_set_tag(ellipse, TAG_ELLIPSE);
+    heap_set_body(ellipse, c00);
+    heap_set_arg(ellipse, c11);
+    heap_set_domain(ellipse, meta);
+    return ellipse;
+}
+
+pub fn ellipse_major(e: i64) -> i64 { return heap_get_body(e); }
+pub fn ellipse_minor(e: i64) -> i64 { return heap_get_arg(e); }
+
+// Alpha = opacity * 1000 / (projected_area + distance + 1)
+pub fn shader_compute_alpha(opacity: i64, projected_area: i64, distance: i64) -> i64 {
+    let denom = projected_area + distance + 1;
+    if denom <= 0 { return 0; }
+    return (opacity * 1000) / denom;
+}
+
+// Depth sort: z_values is a linked list (body=z, domain=next), count elements.
+// Iterates in list order assigning index 0..count-1.
+// Returns sorted list (descending Z = back-to-front): tag=TAG_SORTED_LIST,
+// body=count, arg=list_head (node: body=splat_index, arg=z_value, domain=next).
+pub fn shader_depth_sort(data: i64, z_values: i64, count: i64) -> i64 {
+    let result = heap_alloc_term();
+    heap_set_tag(result, TAG_SORTED_LIST);
+    heap_set_body(result, 0);
+    heap_set_arg(result, 0);
+
+    let mut node_ptr = z_values;
+    let mut i: i64 = 0;
+    while i < count && node_ptr != 0 {
+        let zi = heap_get_body(node_ptr);
+        let node = heap_alloc_term();
+        heap_set_body(node, i);
+        heap_set_arg(node, zi);
+        heap_set_domain(node, 0);
+
+        let head = heap_get_arg(result);
+        if head == 0 || heap_get_arg(head) <= zi {
+            heap_set_domain(node, head);
+            heap_set_arg(result, node);
+        } else {
+            let mut curr = head;
+            while heap_get_domain(curr) != 0 && heap_get_arg(heap_get_domain(curr)) > zi {
+                curr = heap_get_domain(curr);
+            }
+            heap_set_domain(node, heap_get_domain(curr));
+            heap_set_domain(curr, node);
+        }
+        heap_set_body(result, heap_get_body(result) + 1);
+        node_ptr = heap_get_domain(node_ptr);
+        i = i + 1;
+    }
+    return result;
+}
+
+// Returns true if sorted list is in descending Z order.
+pub fn shader_validate_sort_order(sorted: i64) -> bool {
+    let mut curr = heap_get_arg(sorted);
+    while curr != 0 {
+        let next = heap_get_domain(curr);
+        if next != 0 {
+            if heap_get_arg(curr) < heap_get_arg(next) { return false; }
+        }
+        curr = next;
+    }
+    return true;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Test covariance projection
+    let ellipse = shader_project_covariance(5,0,0, 0,3,0, 0,0,1);
+    if heap_get_tag(ellipse) != TAG_ELLIPSE { return 1; }
+    if ellipse_major(ellipse) != 5          { return 2; }
+    if ellipse_minor(ellipse) != 3          { return 3; }
+
+    // Test alpha
+    let alpha = shader_compute_alpha(255, 10, 5);
+    if alpha <= 0    { return 4; }
+    if alpha > 25500 { return 5; }
+
+    // Test depth sort with 4 z-values in a linked list (head→tail order):
+    // index 0→z=75, index 1→z=50, index 2→z=200, index 3→z=100
+    // Expected sorted desc: [idx2,z=200], [idx3,z=100], [idx0,z=75], [idx1,z=50]
+    let z3 = heap_alloc_term(); heap_set_body(z3, 100); heap_set_domain(z3, 0);
+    let z2 = heap_alloc_term(); heap_set_body(z2, 200); heap_set_domain(z2, z3);
+    let z1 = heap_alloc_term(); heap_set_body(z1, 50);  heap_set_domain(z1, z2);
+    let z0 = heap_alloc_term(); heap_set_body(z0, 75);  heap_set_domain(z0, z1);
+
+    let sorted = shader_depth_sort(heap_alloc_term(), z0, 4);
+    if heap_get_body(sorted) != 4        { return 6; }
+    if !shader_validate_sort_order(sorted) { return 7; }
+
+    let first = heap_get_arg(sorted);
+    if heap_get_body(first) != 2         { return 8; } // index 2 has z=200
+
+    // Verify second element
+    let second = heap_get_domain(first);
+    if heap_get_body(second) != 3        { return 9; } // index 3 has z=100
+
+    return 111;
+}

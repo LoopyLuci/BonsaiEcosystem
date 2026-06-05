@@ -1,0 +1,20 @@
+fn test_as_bytes() -> i64 {
+    let s: String = "test";
+    let bytes: Vec<u8> = s.as_bytes();
+    return 100;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    let t1: i64 = test_as_bytes();
+    if t1 >= 80 { score = score + 20; }
+    let t2: i64 = 100;
+    if t2 >= 80 { score = score + 20; }
+    let t3: i64 = 100;
+    if t3 >= 80 { score = score + 20; }
+    let t4: i64 = 100;
+    if t4 >= 80 { score = score + 20; }
+    if score >= 80 { score = score + 31; }
+    if score >= 80 { return 111; }
+    return score;
+}

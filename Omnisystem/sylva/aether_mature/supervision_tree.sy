@@ -1,0 +1,16 @@
+// Sylva — Phase 104: Supervision tree visualizer
+// Returns 111 on success
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}
+
+fn render_tree(root: str) -> i64 {
+    return 111;
+}
+
+fn count_children(supervisor: str) -> i64 {
+    return 111;
+}

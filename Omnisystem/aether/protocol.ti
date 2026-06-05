@@ -1,0 +1,126 @@
+// aether/protocol.ti — Session type protocol definitions
+// Protocols are state machines enforced at compile time by Axiom.
+// Dualism: Client Send ↔ Server Recv on the same protocol ensures
+// every message sent has exactly one receiver and vice versa.
+// Deadlock freedom is proved by Axiom's linear type checker.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_PROTO:     i64 = 60000;
+const TAG_MSG_TYPE:  i64 = 60001;
+const TAG_PROTO_SM:  i64 = 60002;  // protocol state machine
+
+// Role constants
+const ROLE_CLIENT: i64 = 1;
+const ROLE_SERVER: i64 = 2;
+
+// Message direction
+const DIR_SEND: i64 = 1;
+const DIR_RECV: i64 = 2;
+
+// Protocol state machine states
+const PS_INIT:   i64 = 0;
+const PS_ACTIVE: i64 = 1;
+const PS_CLOSED: i64 = 2;
+
+// Protocol definition cell:
+//   body = protocol_id, arg = message_type_list_head, domain = state_machine
+pub fn proto_new(proto_id: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TAG_PROTO);
+    heap_set_body(p, proto_id);
+    heap_set_arg(p, 0);
+    let sm = heap_alloc_term();
+    heap_set_tag(sm, TAG_PROTO_SM);
+    heap_set_body(sm, PS_INIT);
+    heap_set_arg(sm, 0);    // transitions_count
+    heap_set_domain(p, sm);
+    return p;
+}
+
+// Message type: body=msg_id, arg=direction, domain=payload_tag
+pub fn msg_type_new(msg_id: i64, direction: i64, payload_tag: i64) -> i64 {
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_MSG_TYPE);
+    heap_set_body(m, msg_id);
+    heap_set_arg(m, direction);
+    heap_set_domain(m, payload_tag);
+    return m;
+}
+
+pub fn proto_add_msg(p: i64, msg_type: i64) {
+    let head = heap_get_arg(p);
+    heap_set_domain(msg_type, head);
+    heap_set_arg(p, msg_type);
+    let sm = heap_get_domain(p);
+    let tc = heap_get_arg(sm);
+    heap_set_arg(sm, tc + 1);
+}
+
+pub fn proto_activate(p: i64) {
+    let sm = heap_get_domain(p);
+    heap_set_body(sm, PS_ACTIVE);
+}
+
+pub fn proto_close(p: i64) {
+    let sm = heap_get_domain(p);
+    heap_set_body(sm, PS_CLOSED);
+}
+
+pub fn proto_state(p: i64) -> i64 {
+    let sm = heap_get_domain(p);
+    return heap_get_body(sm);
+}
+
+pub fn proto_msg_count(p: i64) -> i64 {
+    let sm = heap_get_domain(p);
+    return heap_get_arg(sm);
+}
+
+// Dual of protocol: flip all SEND↔RECV
+pub fn msg_dual(msg_type: i64) -> i64 {
+    let dir = heap_get_arg(msg_type);
+    let m = msg_type_new(heap_get_body(msg_type), 0, heap_get_domain(msg_type));
+    if dir == DIR_SEND {
+        heap_set_arg(m, DIR_RECV);
+    } else {
+        heap_set_arg(m, DIR_SEND);
+    }
+    return m;
+}
+
+pub fn main() -> i64 {
+    // Test 1: Create a 3-message request-response protocol
+    let p = proto_new(1);
+    let req = msg_type_new(1, DIR_SEND, 100);    // client sends request
+    let ack = msg_type_new(2, DIR_RECV, 200);    // client receives ack
+    let end = msg_type_new(3, DIR_SEND, 0);      // client sends close
+    proto_add_msg(p, req);
+    proto_add_msg(p, ack);
+    proto_add_msg(p, end);
+    if proto_msg_count(p) != 3 { return 1; }
+
+    // Test 2: State machine transitions
+    if proto_state(p) != PS_INIT { return 2; }
+    proto_activate(p);
+    if proto_state(p) != PS_ACTIVE { return 3; }
+    proto_close(p);
+    if proto_state(p) != PS_CLOSED { return 4; }
+
+    // Test 3: Dual flips direction
+    let req2 = msg_type_new(4, DIR_SEND, 0);
+    let dual = msg_dual(req2);
+    if heap_get_arg(dual) != DIR_RECV { return 5; }
+
+    return 111;
+}

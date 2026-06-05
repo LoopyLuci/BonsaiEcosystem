@@ -1,0 +1,131 @@
+// titan/studio/command_palette.ti — Command Palette & Action Dispatcher
+// Unified command registry with prefix search.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+const TAG_COMMAND: i64 = 8720;
+
+// Standard command IDs
+const CMD_NEW_FILE:        i64 = 0;
+const CMD_OPEN_FILE:       i64 = 1;
+const CMD_SAVE_FILE:       i64 = 2;
+const CMD_BUILD:           i64 = 3;
+const CMD_RUN:             i64 = 4;
+const CMD_DEBUG:           i64 = 5;
+const CMD_TOGGLE_TERMINAL: i64 = 6;
+const CMD_TOGGLE_EXPLORER: i64 = 7;
+const CMD_OPEN_PALETTE:    i64 = 8;
+const CMD_GOTO_DEFINITION: i64 = 9;
+const CMD_FIND_REFERENCES: i64 = 10;
+const CMD_FORMAT_DOCUMENT: i64 = 11;
+const CMD_AGENT_DECOMPOSE: i64 = 12;
+const CMD_AION_RUN:        i64 = 13;
+
+// command: tag=TAG_COMMAND, body=cmd_id_val, arg=label_id, domain=meta
+// meta:    body=keybinding_id, arg=category_id, domain=action_id
+
+pub fn command_create(the_id: i64, label_id: i64, keybinding_id: i64,
+                      category_id: i64, action_id: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, keybinding_id);
+    heap_set_arg(meta, category_id);
+    heap_set_domain(meta, action_id);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_COMMAND);
+    heap_set_body(c, the_id);
+    heap_set_arg(c, label_id);
+    heap_set_domain(c, meta);
+    return c;
+}
+
+pub fn cmd_id_of(c: i64) -> i64       { return heap_get_body(c); }
+pub fn cmd_label_of(c: i64) -> i64    { return heap_get_arg(c); }
+pub fn cmd_keybinding(c: i64) -> i64  { return heap_get_body(heap_get_domain(c)); }
+
+static mut COMMAND_LIST: i64 = 0;
+static mut CMD_COUNT:    i64 = 0;
+
+pub fn cmd_register(the_id: i64, label_id: i64, keybinding_id: i64,
+                    category_id: i64, action_id: i64) {
+    let c = command_create(the_id, label_id, keybinding_id, category_id, action_id);
+    heap_set_domain(c, COMMAND_LIST);
+    COMMAND_LIST = c;
+    CMD_COUNT = CMD_COUNT + 1;
+}
+
+pub fn cmd_find_by_id(target_id: i64) -> i64 {
+    let mut curr = COMMAND_LIST;
+    while curr != 0 {
+        if cmd_id_of(curr) == target_id { return curr; }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// Returns a linked list of result-wrapper nodes (body=command, domain=next)
+// If prefix_id str_len==0 return all; otherwise filter by first char of label.
+pub fn cmd_search(prefix_id: i64) -> i64 {
+    let prefix_len = str_len(prefix_id);
+    let mut results: i64 = 0;
+    let mut curr = COMMAND_LIST;
+    while curr != 0 {
+        let label = cmd_label_of(curr);
+        let match_all = prefix_len == 0;
+        let match_char = prefix_len > 0 && str_len(label) > 0 && str_at(label, 0) == str_at(prefix_id, 0);
+        if match_all || match_char {
+            let r = heap_alloc_term();
+            heap_set_body(r, curr);
+            heap_set_domain(r, results);
+            results = r;
+        }
+        curr = heap_get_domain(curr);
+    }
+    return results;
+}
+
+pub fn cmd_count() -> i64 { return CMD_COUNT; }
+
+pub fn cmd_seed_defaults() {
+    COMMAND_LIST = 0; CMD_COUNT = 0;
+    cmd_register(CMD_NEW_FILE,        heap_alloc_term(), heap_alloc_term(), heap_alloc_term(), 0);
+    cmd_register(CMD_OPEN_FILE,       heap_alloc_term(), heap_alloc_term(), heap_alloc_term(), 0);
+    cmd_register(CMD_BUILD,           heap_alloc_term(), heap_alloc_term(), heap_alloc_term(), 0);
+    cmd_register(CMD_RUN,             heap_alloc_term(), heap_alloc_term(), heap_alloc_term(), 0);
+    cmd_register(CMD_DEBUG,           heap_alloc_term(), heap_alloc_term(), heap_alloc_term(), 0);
+    cmd_register(CMD_AGENT_DECOMPOSE, heap_alloc_term(), heap_alloc_term(), heap_alloc_term(), 0);
+    cmd_register(CMD_AION_RUN,        heap_alloc_term(), heap_alloc_term(), heap_alloc_term(), 0);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    cmd_seed_defaults();
+    if cmd_count() != 7                     { return 1; }
+
+    let c = cmd_find_by_id(CMD_BUILD);
+    if c == 0                               { return 2; }
+    if cmd_id_of(c) != CMD_BUILD            { return 3; }
+
+    let c2 = cmd_find_by_id(CMD_AGENT_DECOMPOSE);
+    if c2 == 0                              { return 4; }
+
+    // Search with empty prefix → all 7 commands
+    let results = cmd_search(heap_alloc_term());
+    let mut count: i64 = 0;
+    let mut curr = results;
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    if count != 7                           { return 5; }
+
+    return 111;
+}

@@ -1,0 +1,80 @@
+// OmniML -> HTML transpiler
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn file_write_all(path: i64, data: i64, len: i64) -> bool;
+}
+
+const NODE_ELEMENT: i64 = 0;
+const NODE_TEXT: i64 = 1;
+
+pub fn parser_init(src: i64) { let _x = src; return; }
+pub fn parse_document() -> i64 {
+    let root = heap_alloc_term();
+    heap_set_tag(root, NODE_ELEMENT);
+    heap_set_body(root, NODE_ELEMENT);
+    heap_set_arg(root, 0);
+    heap_set_domain(root, 0);
+    return root;
+}
+pub fn dom_node_type(node: i64) -> i64 { return heap_get_body(node); }
+pub fn dom_tag(node: i64) -> i64 { return heap_get_arg(node); }
+pub fn dom_first_child(node: i64) -> i64 { return heap_get_domain(node); }
+pub fn dom_next_sibling(node: i64) -> i64 { return heap_get_domain(node); }
+pub fn dom_text_content(node: i64) -> i64 { return heap_get_arg(node); }
+
+pub fn emit_open_tag(_tag: i64) -> i64 {
+    return heap_alloc_term();
+}
+
+pub fn emit_close_tag(_tag: i64) -> i64 {
+    return heap_alloc_term();
+}
+
+pub fn emit_html(node: i64, out: i64) -> i64 {
+    if node == 0 { return out; }
+
+    let nt = dom_node_type(node);
+    if nt == NODE_ELEMENT {
+        let tag = dom_tag(node);
+        out = str_concat(out, emit_open_tag(tag));
+
+        let mut child = dom_first_child(node);
+        while child != 0 {
+            out = emit_html(child, out);
+            child = dom_next_sibling(child);
+        }
+
+        out = str_concat(out, emit_close_tag(tag));
+    } else if nt == NODE_TEXT {
+        out = str_concat(out, dom_text_content(node));
+    }
+
+    return out;
+}
+
+pub fn transpile_omniml(src: i64, out_path: i64) -> bool {
+    parser_init(src);
+    let root = parse_document();
+    if root == 0 { return false; }
+
+    let mut html = heap_alloc_term();
+    html = emit_html(root, html);
+    return file_write_all(out_path, html, str_len(html));
+}
+
+pub fn main() -> i64 {
+    let src = heap_alloc_term();
+    let ok = transpile_omniml(src, heap_alloc_term());
+    if !ok { return 1; }
+    return 111;
+}

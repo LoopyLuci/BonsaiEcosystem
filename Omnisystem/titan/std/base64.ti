@@ -1,0 +1,53 @@
+// OmniLib Base64 — RFC 4648 Base64 encoding and decoding
+
+pub fn base64_encode_byte(b: i64) -> i64 {
+    if b < 26 { return 65 + b; }
+    if b < 52 { return 97 + (b - 26); }
+    if b < 62 { return 48 + (b - 52); }
+    if b == 62 { return 43; }
+    if b == 63 { return 47; }
+    return 61;
+}
+
+pub fn base64_decode_char(c: i64) -> i64 {
+    if c >= 65 && c <= 90 { return c - 65; }
+    if c >= 97 && c <= 122 { return 26 + (c - 97); }
+    if c >= 48 && c <= 57 { return 52 + (c - 48); }
+    if c == 43 { return 62; }
+    if c == 47 { return 63; }
+    if c == 61 { return -1; }
+    return -2;
+}
+
+pub fn base64_encoded_len(raw_len: i64) -> i64 {
+    let triplets = (raw_len + 2) / 3;
+    return triplets * 4;
+}
+
+pub fn base64_is_valid_padding(encoded_len: i64) -> bool {
+    let mod4 = encoded_len % 4;
+    return mod4 == 0;
+}
+
+pub fn main() -> i64 {
+    if base64_encode_byte(0) != 65 { return 1; }
+    if base64_encode_byte(1) != 66 { return 2; }
+    if base64_encode_byte(25) != 90 { return 3; }
+    if base64_encode_byte(26) != 97 { return 4; }
+    
+    if base64_decode_char(65) != 0 { return 5; }
+    if base64_decode_char(66) != 1 { return 6; }
+    if base64_decode_char(90) != 25 { return 7; }
+    if base64_decode_char(97) != 26 { return 8; }
+    
+    if base64_encoded_len(1) != 4 { return 9; }
+    if base64_encoded_len(2) != 4 { return 10; }
+    if base64_encoded_len(3) != 4 { return 11; }
+    if base64_encoded_len(4) != 8 { return 12; }
+    
+    if !base64_is_valid_padding(4) { return 13; }
+    if !base64_is_valid_padding(8) { return 14; }
+    if base64_is_valid_padding(5) { return 15; }
+    
+    return 111;
+}

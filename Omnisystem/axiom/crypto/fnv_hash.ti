@@ -1,0 +1,57 @@
+// axiom/crypto/fnv_hash.ti
+// FNV-1a 64-bit hash implemented in Titan using bitwise ops
+
+fn fnv1a_byte(hash: i64, byte: i64) -> i64 {
+    let xored = bit_xor(hash, byte);
+    let prime = 1099511628211;
+    return xored * prime;
+}
+
+fn fnv1a_str_helper(hash: i64, s: i64, pos: i64, len: i64) -> i64 {
+    if pos >= len {
+        return hash;
+    }
+    let b = str_at(s, pos);
+    let next_hash = fnv1a_byte(hash, b);
+    return fnv1a_str_helper(next_hash, s, pos + 1, len);
+}
+
+fn fnv_hash_int(n: i64) -> i64 {
+    let offset_basis = -3750763034362895579;
+    let b0 = bit_and(n, 255);
+    let b1 = bit_and(bit_shr(n, 8), 255);
+    let b2 = bit_and(bit_shr(n, 16), 255);
+    let b3 = bit_and(bit_shr(n, 24), 255);
+    let h0 = fnv1a_byte(offset_basis, b0);
+    let h1 = fnv1a_byte(h0, b1);
+    let h2 = fnv1a_byte(h1, b2);
+    let h3 = fnv1a_byte(h2, b3);
+    return h3;
+}
+
+fn verify_fnv() -> i64 {
+    let h0 = fnv_hash_int(0);
+    let h1 = fnv_hash_int(1);
+    let h2 = fnv_hash_int(42);
+    let diff01 = h0 - h1;
+    let diff12 = h1 - h2;
+    if diff01 == 0 {
+        return 0;
+    }
+    if diff12 == 0 {
+        return 0;
+    }
+    let same = fnv_hash_int(42);
+    if same != h2 {
+        return 0;
+    }
+    return 1;
+}
+
+fn main() -> i64 {
+    let ok = verify_fnv();
+    if ok == 0 {
+        return 0;
+    }
+    return 111;
+}

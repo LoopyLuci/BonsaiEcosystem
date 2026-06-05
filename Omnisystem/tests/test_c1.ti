@@ -1,0 +1,88 @@
+// tests/test_c1.ti — Phase C1 Secure Circuit Builder Integration Test
+// All helpers inlined with tc1_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TC1_T_C:   i64 = 23000;
+const TC1_T_HOP: i64 = 23001;
+const TC1_T_WRP: i64 = 23003;
+
+pub fn tc1_circuit_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TC1_T_C); heap_set_body(c, 0); heap_set_arg(c, 0);
+    return c;
+}
+
+pub fn tc1_hop_create(node_id: i64, key: i64) -> i64 {
+    let h = heap_alloc_term();
+    heap_set_tag(h, TC1_T_HOP); heap_set_body(h, node_id); heap_set_arg(h, key); heap_set_domain(h, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TC1_T_WRP); heap_set_body(w, h); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tc1_hop_key(w: i64) -> i64 { return heap_get_arg(heap_get_body(w)); }
+
+pub fn tc1_circuit_add_hop(c: i64, w: i64) {
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+pub fn tc1_encrypt_layer(data: i64, key: i64) -> i64 { return data ^ key; }
+
+pub fn tc1_onion_encrypt(c: i64, msg: i64) -> i64 {
+    let mut result: i64 = msg;
+    let mut cur: i64 = heap_get_arg(c);
+    while cur != 0 {
+        let w = cur;
+        let key = tc1_hop_key(w);
+        result = tc1_encrypt_layer(result, key);
+        cur = heap_get_domain(cur);
+    }
+    return result;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let c = tc1_circuit_create();
+    let w1 = tc1_hop_create(5, 3);
+    let w2 = tc1_hop_create(15, 11);
+    tc1_circuit_add_hop(c, w1);
+    tc1_circuit_add_hop(c, w2);
+    if heap_get_body(c) != 2         { return 1; }
+    let enc = tc1_onion_encrypt(c, 100);
+    if enc == 100                     { return 2; }
+
+    // XOR decrypt: apply same keys in same order gives original
+    let c2 = tc1_circuit_create();
+    tc1_circuit_add_hop(c2, tc1_hop_create(1, 7));
+    let e = tc1_onion_encrypt(c2, 42);
+    // 42 ^ 7 = 45; decrypt: 45 ^ 7 = 42
+    let c3 = tc1_circuit_create();
+    tc1_circuit_add_hop(c3, tc1_hop_create(1, 7));
+    let d = tc1_onion_encrypt(c3, e);
+    if d != 42                        { return 3; }
+
+    // Empty circuit → no encryption
+    let c4 = tc1_circuit_create();
+    let plain = tc1_onion_encrypt(c4, 55);
+    if plain != 55                    { return 4; }
+
+    return 111;
+}

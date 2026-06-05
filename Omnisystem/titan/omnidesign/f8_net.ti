@@ -1,0 +1,10 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_CLIENT8:i64=25700;const T_SERVER8:i64=25701;const T_WRP8:i64=25702;
+pub fn f8_client_create(client_id:i64)->i64{let c=heap_alloc_term();heap_set_tag(c,T_CLIENT8);heap_set_body(c,client_id);heap_set_arg(c,0);heap_set_domain(c,0);let w=heap_alloc_term();heap_set_tag(w,T_WRP8);heap_set_body(w,c);heap_set_domain(w,0);return w;}
+pub fn f8_client_id(w:i64)->i64{return heap_get_body(heap_get_body(w));}
+pub fn f8_server_create()->i64{let s=heap_alloc_term();heap_set_tag(s,T_SERVER8);heap_set_body(s,0);heap_set_arg(s,0);return s;}
+pub fn f8_server_connect(s:i64,w:i64){let h=heap_get_arg(s);if h==0{heap_set_arg(s,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(s,heap_get_body(s)+1);}
+pub fn f8_server_client_count(s:i64)->i64{return heap_get_body(s);}
+pub fn f8_replicate_state(state:i64)->i64{return state*2;}
+pub fn f8_lag_compensate(tick:i64,delay:i64)->i64{return tick-delay;}
+pub fn main()->i64{let s=f8_server_create();let w1=f8_client_create(1);let w2=f8_client_create(2);f8_server_connect(s,w1);f8_server_connect(s,w2);if f8_server_client_count(s)!=2{return 1;}if f8_client_id(w2)!=2{return 2;}if f8_replicate_state(42)!=84{return 3;}if f8_lag_compensate(100,15)!=85{return 4;}return 111;}

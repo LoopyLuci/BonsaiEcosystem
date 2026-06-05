@@ -1,0 +1,410 @@
+// titan/xast_to_uniir.ti
+// Universal lowering: XAST → UniIR (typed SSA intermediate representation)
+// Part of self‑hosted Omnisystem bootstrap.
+
+use xast::*;
+use omnicore::uniir::*;
+use std::collections::HashMap;
+
+pub struct XASTCompiler {
+    module: UniIRModule,
+    builder: SSABuilder,
+    locals: HashMap<String, Register>,
+    return_type: Option<String>,
+}
+
+impl XASTCompiler {
+    pub fn new(module_name: String) -> XASTCompiler {
+        XASTCompiler {
+            module: UniIRModule::new(module_name),
+            builder: SSABuilder::new(),
+            locals: HashMap::new(),
+            return_type: None,
+        }
+    }
+
+    pub fn compile(&mut self, xast: &XNode) -> UniIRModule {
+        if xast.kind != XNodeKind::MODULE {
+            panic("Expected MODULE node at root");
+        }
+        
+        // Process all top-level items (functions, structs, enums)
+        for child in &xast.children {
+            match child.kind {
+                XNodeKind::FUNC => self.lower_function(child),
+                XNodeKind::STRUCT_DEF => self.lower_struct_decl(child),
+                XNodeKind::ENUM_DEF => self.lower_enum_decl(child),
+                _ => {}
+            }
+        }
+        
+        self.module.clone()
+    }
+
+    fn lower_function(&mut self, func_node: &XNode) {
+        let func_name = func_node.value.clone();
+        let ret_type_str = func_node.type_annotation.clone();
+        let ret_type = self.infer_type(&ret_type_str);
+        
+        // Extract parameters
+        let mut params = Vec::new();
+        let mut body_start_idx = 0;
+        
+        for (i, child) in func_node.children.iter().enumerate() {
+            if child.kind == XNodeKind::PARAM {
+                let param_type = self.infer_type(&child.type_annotation);
+                params.push((child.value.clone(), param_type));
+                body_start_idx = i + 1;
+            } else {
+                break;
+            }
+        }
+        
+        // Create function definition
+        let mut func_def = UniIRFunction::new(func_name.clone(), params.clone(), ret_type.clone());
+        
+        // Enter function context
+        self.builder.enter_function(&func_def);
+        self.locals.clear();
+        self.return_type = Some(ret_type_str);
+        
+        // Map parameter names to registers
+        for (param_name, param_type) in params {
+            let reg = self.builder.alloc_register(param_type);
+            self.locals.insert(param_name, reg);
+        }
+        
+        // Lower function body
+        for i in body_start_idx..func_node.children.len() {
+            let stmt = &func_node.children[i];
+            self.lower_statement(stmt);
+        }
+        
+        // Exit function
+        self.builder.exit_function();
+        self.module.add_function(func_def);
+    }
+
+    fn lower_struct_decl(&mut self, struct_node: &XNode) {
+        let struct_name = struct_node.value.clone();
+        let mut field_types = Vec::new();
+        
+        for child in &struct_node.children {
+            if child.kind == XNodeKind::PARAM {
+                let field_name = child.value.clone();
+                let field_type = self.infer_type(&child.type_annotation);
+                field_types.push((field_name, field_type));
+            }
+        }
+        
+        let struct_type = UniIRType::Struct(struct_name.clone(), field_types);
+        self.module.register_type(struct_name, struct_type);
+    }
+
+    fn lower_enum_decl(&mut self, enum_node: &XNode) {
+        let enum_name = enum_node.value.clone();
+        let mut variants = Vec::new();
+        
+        for child in &enum_node.children {
+            if child.kind == XNodeKind::IDENT {
+                variants.push(child.value.clone());
+            }
+        }
+        
+        let enum_type = UniIRType::Enum(enum_name.clone(), variants);
+        self.module.register_type(enum_name, enum_type);
+    }
+
+    fn lower_statement(&mut self, stmt: &XNode) {
+        match stmt.kind {
+            XNodeKind::VAR_DECL => {
+                let var_name = stmt.value.clone();
+                let var_type = self.infer_type(&stmt.type_annotation);
+                let reg = self.builder.alloc_register(var_type.clone());
+                
+                // Initialize if provided
+                if !stmt.children.is_empty() {
+                    if let Some(init_reg) = self.lower_expression(&stmt.children[0]) {
+                        self.builder.emit_store(reg.clone(), init_reg);
+                    }
+                }
+                
+                self.locals.insert(var_name, reg);
+            },
+            
+            XNodeKind::ASSIGN => {
+                let var_name = stmt.value.clone();
+                if let Some(rhs_reg) = self.lower_expression(&stmt.children[0]) {
+                    if let Some(lhs_reg) = self.locals.get(&var_name).cloned() {
+                        self.builder.emit_store(lhs_reg, rhs_reg);
+                    }
+                }
+            },
+            
+            XNodeKind::RETURN => {
+                if !stmt.children.is_empty() {
+                    if let Some(ret_reg) = self.lower_expression(&stmt.children[0]) {
+                        self.builder.emit_return(Some(ret_reg));
+                    }
+                } else {
+                    self.builder.emit_return(None);
+                }
+            },
+            
+            XNodeKind::IF => {
+                self.lower_if_statement(stmt);
+            },
+            
+            XNodeKind::WHILE => {
+                self.lower_while_statement(stmt);
+            },
+            
+            XNodeKind::FOR => {
+                self.lower_for_statement(stmt);
+            },
+            
+            XNodeKind::BLOCK => {
+                for child in &stmt.children {
+                    self.lower_statement(child);
+                }
+            },
+            
+            XNodeKind::CALL => {
+                // Call as statement (result discarded)
+                self.lower_expression(stmt);
+            },
+            
+            _ => {
+                // Other statement types ignored for now
+            }
+        }
+    }
+
+    fn lower_if_statement(&mut self, if_node: &XNode) {
+        let cond_reg = if let Some(r) = self.lower_expression(&if_node.children[0]) {
+            r
+        } else {
+            return;
+        };
+        
+        let then_block = &if_node.children[1];
+        let else_block = if if_node.children.len() > 2 {
+            Some(&if_node.children[2])
+        } else {
+            None
+        };
+        
+        // Create basic blocks
+        let then_bb = self.builder.create_basic_block("then");
+        let else_bb = if else_block.is_some() {
+            self.builder.create_basic_block("else")
+        } else {
+            self.builder.create_basic_block("merge")
+        };
+        let merge_bb = self.builder.create_basic_block("merge");
+        
+        // Branch instruction
+        self.builder.emit_branch(cond_reg, then_bb.clone(), else_bb.clone());
+        
+        // Then block
+        self.builder.set_current_block(then_bb);
+        if let XNodeKind::BLOCK = then_block.kind {
+            for stmt in &then_block.children {
+                self.lower_statement(stmt);
+            }
+        } else {
+            self.lower_statement(then_block);
+        }
+        self.builder.emit_jump(merge_bb.clone());
+        
+        // Else block
+        if let Some(else_stmts) = else_block {
+            self.builder.set_current_block(else_bb);
+            if let XNodeKind::BLOCK = else_stmts.kind {
+                for stmt in &else_stmts.children {
+                    self.lower_statement(stmt);
+                }
+            } else {
+                self.lower_statement(else_stmts);
+            }
+            self.builder.emit_jump(merge_bb.clone());
+        }
+        
+        // Merge block
+        self.builder.set_current_block(merge_bb);
+    }
+
+    fn lower_while_statement(&mut self, while_node: &XNode) {
+        let header_bb = self.builder.create_basic_block("loop_header");
+        let body_bb = self.builder.create_basic_block("loop_body");
+        let exit_bb = self.builder.create_basic_block("loop_exit");
+        
+        self.builder.emit_jump(header_bb.clone());
+        
+        // Header
+        self.builder.set_current_block(header_bb);
+        if let Some(cond_reg) = self.lower_expression(&while_node.children[0]) {
+            self.builder.emit_branch(cond_reg, body_bb.clone(), exit_bb.clone());
+        }
+        
+        // Body
+        self.builder.set_current_block(body_bb);
+        if let XNodeKind::BLOCK = while_node.children[1].kind {
+            for stmt in &while_node.children[1].children {
+                self.lower_statement(stmt);
+            }
+        } else {
+            self.lower_statement(&while_node.children[1]);
+        }
+        self.builder.emit_jump(header_bb.clone());
+        
+        // Exit
+        self.builder.set_current_block(exit_bb);
+    }
+
+    fn lower_for_statement(&mut self, for_node: &XNode) {
+        // Initialization
+        self.lower_statement(&for_node.children[0]);
+        
+        let header_bb = self.builder.create_basic_block("loop_header");
+        let body_bb = self.builder.create_basic_block("loop_body");
+        let update_bb = self.builder.create_basic_block("loop_update");
+        let exit_bb = self.builder.create_basic_block("loop_exit");
+        
+        self.builder.emit_jump(header_bb.clone());
+        
+        // Header
+        self.builder.set_current_block(header_bb);
+        if let Some(cond_reg) = self.lower_expression(&for_node.children[1]) {
+            self.builder.emit_branch(cond_reg, body_bb.clone(), exit_bb.clone());
+        }
+        
+        // Body
+        self.builder.set_current_block(body_bb);
+        if let XNodeKind::BLOCK = for_node.children[3].kind {
+            for stmt in &for_node.children[3].children {
+                self.lower_statement(stmt);
+            }
+        } else {
+            self.lower_statement(&for_node.children[3]);
+        }
+        self.builder.emit_jump(update_bb.clone());
+        
+        // Update
+        self.builder.set_current_block(update_bb);
+        self.lower_statement(&for_node.children[2]);
+        self.builder.emit_jump(header_bb);
+        
+        // Exit
+        self.builder.set_current_block(exit_bb);
+    }
+
+    fn lower_expression(&mut self, expr: &XNode) -> Option<Register> {
+        match expr.kind {
+            XNodeKind::LITERAL => {
+                let kind_str = expr.type_annotation.clone();
+                let val_str = expr.value.clone();
+                let reg = self.builder.alloc_register(self.infer_type(&kind_str));
+                self.builder.emit_literal(reg.clone(), val_str);
+                Some(reg)
+            },
+            
+            XNodeKind::IDENT => {
+                self.locals.get(&expr.value).cloned()
+            },
+            
+            XNodeKind::BINARY_OP => {
+                let left_reg = self.lower_expression(&expr.children[0])?;
+                let right_reg = self.lower_expression(&expr.children[1])?;
+                let op_str = expr.value.clone();
+                let op = self.parse_binop(&op_str);
+                
+                let result_reg = self.builder.alloc_register(UniIRType::I64);  // simplified
+                self.builder.emit_binary(result_reg.clone(), op, left_reg, right_reg);
+                Some(result_reg)
+            },
+            
+            XNodeKind::UNARY_OP => {
+                let operand_reg = self.lower_expression(&expr.children[0])?;
+                let op_str = expr.value.clone();
+                let result_reg = self.builder.alloc_register(UniIRType::I64);
+                self.builder.emit_unary(result_reg.clone(), &op_str, operand_reg);
+                Some(result_reg)
+            },
+            
+            XNodeKind::CALL => {
+                let func_name = expr.value.clone();
+                let mut arg_regs = Vec::new();
+                for arg in &expr.children {
+                    if let Some(arg_reg) = self.lower_expression(arg) {
+                        arg_regs.push(arg_reg);
+                    }
+                }
+                let result_reg = self.builder.alloc_register(UniIRType::I64);  // simplified
+                self.builder.emit_call(result_reg.clone(), func_name, arg_regs);
+                Some(result_reg)
+            },
+            
+            XNodeKind::FIELD_ACCESS => {
+                let obj_reg = self.lower_expression(&expr.children[0])?;
+                let field_name = expr.value.clone();
+                let result_reg = self.builder.alloc_register(UniIRType::I64);  // simplified
+                self.builder.emit_field_access(result_reg.clone(), obj_reg, field_name);
+                Some(result_reg)
+            },
+            
+            XNodeKind::INDEX => {
+                let array_reg = self.lower_expression(&expr.children[0])?;
+                let index_reg = self.lower_expression(&expr.children[1])?;
+                let result_reg = self.builder.alloc_register(UniIRType::I64);  // simplified
+                self.builder.emit_index(result_reg.clone(), array_reg, index_reg);
+                Some(result_reg)
+            },
+            
+            _ => None,
+        }
+    }
+
+    fn infer_type(&self, type_str: &str) -> UniIRType {
+        match type_str {
+            "i32" => UniIRType::I32,
+            "i64" => UniIRType::I64,
+            "f32" => UniIRType::F32,
+            "f64" => UniIRType::F64,
+            "bool" => UniIRType::Bool,
+            "void" => UniIRType::Void,
+            "string" | "str" => UniIRType::String,
+            "INT" => UniIRType::I64,
+            "FLOAT" => UniIRType::F64,
+            "STRING" => UniIRType::String,
+            "BOOL" => UniIRType::Bool,
+            "NULL" => UniIRType::Void,
+            _ => UniIRType::I64,  // default fallback
+        }
+    }
+
+    fn parse_binop(&self, op_str: &str) -> BinaryOpKind {
+        match op_str {
+            "+" => BinaryOpKind::Add,
+            "-" => BinaryOpKind::Sub,
+            "*" => BinaryOpKind::Mul,
+            "/" => BinaryOpKind::Div,
+            "%" => BinaryOpKind::Mod,
+            "==" => BinaryOpKind::Eq,
+            "!=" => BinaryOpKind::Neq,
+            "<" => BinaryOpKind::Lt,
+            ">" => BinaryOpKind::Gt,
+            "<=" => BinaryOpKind::Le,
+            ">=" => BinaryOpKind::Ge,
+            "&&" => BinaryOpKind::And,
+            "||" => BinaryOpKind::Or,
+            _ => BinaryOpKind::Add,  // default fallback
+        }
+    }
+}
+
+// Public API
+pub fn compile_xast(module_name: String, xast: &XNode) -> UniIRModule {
+    let mut compiler = XASTCompiler::new(module_name);
+    compiler.compile(xast)
+}

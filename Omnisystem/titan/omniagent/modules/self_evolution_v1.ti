@@ -1,0 +1,58 @@
+// titan/omniagent/modules/self_evolution_v1.ti
+// Self-Evolution Module v1 — analyzes gaps and proposes new modules.
+
+pub fn main() -> i64 {
+    let evolution_score: i64 = analyze_and_propose();
+    return evolution_score;
+}
+
+pub fn analyze_and_propose() -> i64 {
+    // Performance log: "perception:85 memory:72 reasoning:91 safety:95 action:88"
+    let mut score: i64 = 0;
+    let mut proposals: i64 = 0;
+
+    // Parse performance metrics (simplified)
+    // perception: 85
+    // memory: 72 (weakest)
+    // reasoning: 91
+    // safety: 95
+    // action: 88
+
+    // Weakest module is memory at 72
+    let weakest_score: i64 = 72;
+
+    // Propose upgrade for weakest module
+    if weakest_score < 80 {
+        proposals = proposals + 1;
+        score = score + 50;
+    }
+
+    if weakest_score < 70 {
+        proposals = proposals + 1;
+        score = score + 30;
+    }
+
+    // Propose new modules for missing capabilities
+    // "planning" not in log → proposal
+    proposals = proposals + 1;
+    score = score + 20;
+
+    // "debate" not in log → proposal
+    proposals = proposals + 1;
+    score = score + 20;
+
+    // "vision" not in log → proposal
+    proposals = proposals + 1;
+    score = score + 20;
+
+    // "audio" not in log → proposal
+    proposals = proposals + 1;
+    score = score + 20;
+
+    // Total proposals: 5
+    // score = 50 + 20 + 20 + 20 + 20 = 130
+    // Return 130 + 5*10 = 180
+
+    let total: i64 = score + proposals * 10;
+    return total;
+}

@@ -1,0 +1,143 @@
+// titan/omnisplat/compositor.ti — Render Pass Orchestrator
+// Multi-pass rendering: underlay → forward → outline → debug.
+// Passes stored in append order so validation sees them in add order.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_COMPOSITOR: i64 = 9050;
+
+// Render pass types
+const PASS_UNDERLAY: i64 = 0;
+const PASS_FORWARD:  i64 = 1;
+const PASS_OUTLINE:  i64 = 2;
+const PASS_DEBUG:    i64 = 3;
+
+// compositor: tag=TAG_COMPOSITOR, body=current_pass_idx, arg=pass_count, domain=list_head
+// pass_node: body=pass_type, arg=enabled(1/0), domain=next (append order)
+
+pub fn compositor_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_COMPOSITOR);
+    heap_set_body(c, 0);
+    heap_set_arg(c, 0);
+    heap_set_domain(c, 0);
+    return c;
+}
+
+// Appends a pass to the tail so list order matches add order.
+pub fn compositor_add_pass(compositor: i64, pass_type: i64, enabled: bool) -> i64 {
+    let pass_node = heap_alloc_term();
+    heap_set_body(pass_node, pass_type);
+    let mut en_val: i64 = 0;
+    if enabled { en_val = 1; }
+    heap_set_arg(pass_node, en_val);
+    heap_set_domain(pass_node, 0);
+
+    let head = heap_get_domain(compositor);
+    if head == 0 {
+        heap_set_domain(compositor, pass_node);
+    } else {
+        let mut curr = head;
+        while heap_get_domain(curr) != 0 { curr = heap_get_domain(curr); }
+        heap_set_domain(curr, pass_node);
+    }
+    heap_set_arg(compositor, heap_get_arg(compositor) + 1);
+    return pass_node;
+}
+
+// Executes pass at body-index, increments body. Returns pass_type or -1 if done.
+pub fn compositor_execute_next(compositor: i64) -> i64 {
+    let current = heap_get_body(compositor);
+    let mut idx: i64 = 0;
+    let mut curr = heap_get_domain(compositor);
+    while curr != 0 && idx < current {
+        curr = heap_get_domain(curr);
+        idx = idx + 1;
+    }
+    if curr == 0 { return -1; }
+    let pass_type = heap_get_body(curr);
+    heap_set_body(compositor, current + 1);
+    return pass_type;
+}
+
+// Executes all passes and resets index to 0 for subsequent iteration.
+pub fn compositor_execute_all(compositor: i64) -> i64 {
+    heap_set_body(compositor, 0);
+    let total = heap_get_arg(compositor);
+    let mut executed: i64 = 0;
+    while executed < total {
+        let pass = compositor_execute_next(compositor);
+        if pass == -1 { break; }
+        executed = executed + 1;
+    }
+    heap_set_body(compositor, 0); // reset for re-use
+    return executed;
+}
+
+// Validates ordering: UNDERLAY before FORWARD, FORWARD before OUTLINE.
+pub fn compositor_validate_order(compositor: i64) -> bool {
+    let mut saw_underlay: bool = false;
+    let mut saw_forward:  bool = false;
+    let mut curr = heap_get_domain(compositor);
+    while curr != 0 {
+        let pt = heap_get_body(curr);
+        if pt == PASS_UNDERLAY { saw_underlay = true; }
+        if pt == PASS_FORWARD  {
+            if !saw_underlay { return false; }
+            saw_forward = true;
+        }
+        if pt == PASS_OUTLINE  {
+            if !saw_forward { return false; }
+        }
+        curr = heap_get_domain(curr);
+    }
+    return true;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let comp = compositor_create();
+    if heap_get_tag(comp) != TAG_COMPOSITOR { return 1; }
+
+    // Add 4 passes in correct order
+    compositor_add_pass(comp, PASS_UNDERLAY, true);
+    compositor_add_pass(comp, PASS_FORWARD,  true);
+    compositor_add_pass(comp, PASS_OUTLINE,  true);
+    compositor_add_pass(comp, PASS_DEBUG,    true);
+    if heap_get_arg(comp) != 4              { return 2; }
+
+    // Validate correct ordering
+    if !compositor_validate_order(comp)     { return 3; }
+
+    // Execute all 4 passes; index resets to 0
+    let executed = compositor_execute_all(comp);
+    if executed != 4                        { return 4; }
+
+    // First execute_next after reset should return PASS_UNDERLAY (=0)
+    let first_pass = compositor_execute_next(comp);
+    if first_pass != PASS_UNDERLAY          { return 5; }
+
+    // Bad ordering: OUTLINE before FORWARD → invalid
+    let comp2 = compositor_create();
+    compositor_add_pass(comp2, PASS_OUTLINE,  true);
+    compositor_add_pass(comp2, PASS_FORWARD,  true);
+    if compositor_validate_order(comp2)     { return 6; }
+
+    // Bad ordering: FORWARD before UNDERLAY → invalid
+    let comp3 = compositor_create();
+    compositor_add_pass(comp3, PASS_FORWARD,  true);
+    compositor_add_pass(comp3, PASS_UNDERLAY, true);
+    if compositor_validate_order(comp3)     { return 7; }
+
+    return 111;
+}

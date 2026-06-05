@@ -1,0 +1,22 @@
+// test_impl_simple.ti
+// Test impl blocks without generics
+
+struct Stack {
+    items: i64,
+}
+
+impl Stack {
+    pub fn new() -> Stack {
+        Stack { items: 0 }
+    }
+
+    pub fn push(&mut self, value: i64) {
+        self.items = self.items + 1;
+    }
+}
+
+pub fn main() -> i64 {
+    let mut stack = Stack::new();
+    stack.push(10);
+    return 42;
+}

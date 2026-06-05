@@ -1,0 +1,120 @@
+{
+  "version": "P2.4",
+  "python_lowering": "Z:\\Projects\\Omnisystem\\titan\\stage0\\lowering.py",
+  "titan_lowering": "Z:\\Projects\\Omnisystem\\titan\\stage3b\\lowering.ti",
+  "lowering_ti_compiled": {
+    "def_count": 171,
+    "hash": "107e049b206a200e",
+    "defs_sample": [
+      "TY_UNIT",
+      "TY_BOOL",
+      "TY_I64",
+      "TY_I32",
+      "TY_I16",
+      "TY_I8",
+      "TY_F64",
+      "TY_F32",
+      "TY_REF",
+      "TY_PTR",
+      "TY_FUN",
+      "TY_ADT",
+      "TY_VAR",
+      "TY_UNKNOWN",
+      "VAL_REG"
+    ]
+  },
+  "test_programs": {
+    "minimal_function": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 0,
+      "block_counts": {
+        "main": 1
+      },
+      "hash": "55c5ce2d79b13efc2f52075359d6356b61be48c617cb877ab953f9c2050aa942"
+    },
+    "function_with_params": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 0,
+      "block_counts": {
+        "add": 1
+      },
+      "hash": "f6cbda037d4a63a5d92017c31b4d6f5a23a06bd5abc3367666f6aa56c8c01106"
+    },
+    "let_and_operations": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 0,
+      "block_counts": {
+        "compute": 1
+      },
+      "hash": "0b3546a789f9b4b19a10bb9e641d59842c998fec1ab9fca88295bc840e368ab8"
+    },
+    "control_flow": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 0,
+      "block_counts": {
+        "sign": 3
+      },
+      "hash": "f963d571dab7fe5d446dbd3113d4ca533dc7444f7245afc4fc8ed7cc76fab1de"
+    },
+    "loop_construct": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 0,
+      "block_counts": {
+        "countdown": 3
+      },
+      "hash": "f1022cd7d7c54e944a2822cbdc9c1cb4ca59edb9f7ddabf5b3989a5b10ede8ab"
+    },
+    "struct_definition": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 1,
+      "block_counts": {
+        "origin": 1
+      },
+      "hash": "0a91587e656c0bd883084f576104fefde758024c5685bfabafe498cf8015da1d"
+    },
+    "struct_literal": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 1,
+      "block_counts": {
+        "make_vec": 1
+      },
+      "hash": "1b9290ae1b5f7ecd41157f1805743c02208a6644223d2d7c583b5d985201600d"
+    },
+    "complex_expressions": {
+      "ok": true,
+      "fn_count": 1,
+      "adt_count": 0,
+      "block_counts": {
+        "evaluate": 1
+      },
+      "hash": "9bbb9b87f450b6263ee137663cab250376e92ef6ef297bbde63c5deb7049ebf5"
+    },
+    "nested_calls": {
+      "ok": true,
+      "fn_count": 2,
+      "adt_count": 0,
+      "block_counts": {
+        "outer": 1,
+        "inner": 1
+      },
+      "hash": "06d583b9a4db911302985a9bb0c90b2fa0919ef520a5b6044c6abc853487aa20"
+    },
+    "mutual_recursion": {
+      "ok": true,
+      "fn_count": 2,
+      "adt_count": 0,
+      "block_counts": {
+        "is_even": 1,
+        "is_odd": 1
+      },
+      "hash": "6325786ed27fd715915938c6bee506328de3cecbf273055413273f49c3d2b7a5"
+    }
+  }
+}

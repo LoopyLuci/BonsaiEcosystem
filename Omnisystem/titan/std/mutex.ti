@@ -1,0 +1,73 @@
+// OmniLib Mutex — mutual exclusion lock for shared state
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn panic(msg: i64);
+    fn mutex_create() -> i64;
+    fn mutex_lock(mtx: i64) -> bool;
+    fn mutex_try_lock(mtx: i64) -> bool;
+    fn mutex_unlock(mtx: i64) -> bool;
+    fn mutex_is_locked(mtx: i64) -> bool;
+}
+
+const TAG_MUTEX: i64 = 1010;
+
+pub fn mutex_new() -> i64 {
+    let raw = mutex_create();
+    if raw < 0 {
+        panic(0);
+        return -1;
+    }
+    let mtx = heap_alloc_term();
+    heap_set_tag(mtx, TAG_MUTEX);
+    heap_set_body(mtx, raw);
+    mtx
+}
+
+pub fn mutex_lock(mtx: i64) -> bool {
+    let raw = heap_get_body(mtx);
+    mutex_lock(raw)
+}
+
+pub fn mutex_try_lock(mtx: i64) -> bool {
+    let raw = heap_get_body(mtx);
+    mutex_try_lock(raw)
+}
+
+pub fn mutex_unlock(mtx: i64) -> bool {
+    let raw = heap_get_body(mtx);
+    mutex_unlock(raw)
+}
+
+pub fn mutex_is_locked(mtx: i64) -> bool {
+    let raw = heap_get_body(mtx);
+    mutex_is_locked(raw)
+}
+
+pub pub fn main() -> i64 {
+    let mtx = mutex_new();
+    if mtx == -1 { return 1; }
+    if heap_get_tag(mtx) != TAG_MUTEX { return 2; }
+
+    if mutex_is_locked(mtx) { return 3; }
+
+    let locked = mutex_lock(mtx);
+    if !locked { return 4; }
+    if !mutex_is_locked(mtx) { return 5; }
+
+    if mutex_try_lock(mtx) { return 6; }
+
+    let unlocked = mutex_unlock(mtx);
+    if !unlocked { return 7; }
+    if mutex_is_locked(mtx) { return 8; }
+
+    if !mutex_try_lock(mtx) { return 9; }
+    mutex_unlock(mtx);
+
+    return 111;
+}

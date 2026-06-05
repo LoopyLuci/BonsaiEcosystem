@@ -1,0 +1,57 @@
+// titan/gui/screen_capture.ti — Screen Capture (Simulated)
+// Returns heap nodes representing screenshots; no real pixel I/O in bootstrap.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_SCREENSHOT: i64 = 8510;
+
+// screenshot: tag=TAG_SCREENSHOT, body=meta, arg=0, domain=0
+// meta: body=width, arg=height, domain=data_id
+
+pub fn sc_create(width: i64, height: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, width);
+    heap_set_arg(meta, height);
+    heap_set_domain(meta, 0);
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SCREENSHOT);
+    heap_set_body(s, meta);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn sc_width(s: i64) -> i64  { return heap_get_body(heap_get_body(s)); }
+pub fn sc_height(s: i64) -> i64 { return heap_get_arg(heap_get_body(s)); }
+
+pub fn screen_capture_full() -> i64 {
+    return sc_create(1920, 1080);
+}
+
+pub fn screen_capture_region(x: i64, y: i64, w: i64, h: i64) -> i64 {
+    return sc_create(w, h);
+}
+
+pub fn main() -> i64 {
+    let s = screen_capture_full();
+    if heap_get_tag(s) != TAG_SCREENSHOT { return 1; }
+    if sc_width(s) != 1920              { return 2; }
+    if sc_height(s) != 1080             { return 3; }
+
+    let r = screen_capture_region(10, 20, 400, 300);
+    if heap_get_tag(r) != TAG_SCREENSHOT { return 4; }
+    if sc_width(r) != 400               { return 5; }
+    if sc_height(r) != 300              { return 6; }
+
+    return 111;
+}

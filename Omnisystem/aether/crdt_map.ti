@@ -1,0 +1,278 @@
+// aether/crdt_map.ti — Map and Graph CRDTs for Aether actor state
+// CRDTMap: add-wins map. Key removal is token-tagged (same as ORSet).
+// CRDTGraph: directed graph with add-wins vertex and edge sets.
+// Both satisfy: merge is commutative, associative, idempotent.
+
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+
+const TAG_MAP:   i64 = 68200;
+const TAG_ENTRY: i64 = 68201;  // key_hash + value + token + next
+const TAG_GRAPH: i64 = 68202;
+const TAG_VERT:  i64 = 68203;
+const TAG_EDGE:  i64 = 68204;
+const TAG_NODE:  i64 = 68205;
+
+let g_map_token: i64 = 1;
+
+// ── CRDTMap ───────────────────────────────────────────────────────────────
+// Entry layout: body=key_hash, arg=value, domain_hi=token, domain=next_entry
+// We store token in a secondary node linked from the entry's tag field
+// Simplified: store token directly in the entry domain; next in arg of a wrapper
+pub fn crdt_map_new() -> i64 {
+    let m=heap_alloc_term(); heap_set_tag(m,TAG_MAP);
+    heap_set_body(m,0);   // entry_list_head
+    heap_set_arg(m,0);    // entry count
+    heap_set_domain(m,0);
+    return m;
+}
+
+// Entry node: body=key_hash, arg=(value*10000+token), domain=next
+pub fn _map_entry(key:i64, value:i64, tok:i64) -> i64 {
+    let e=heap_alloc_term(); heap_set_tag(e,TAG_ENTRY);
+    heap_set_body(e,key); heap_set_arg(e,value*10000+tok); heap_set_domain(e,0); return e;
+}
+pub fn _entry_key(e:i64) -> i64   { return heap_get_body(e); }
+pub fn _entry_value(e:i64) -> i64 { return heap_get_arg(e) / 10000; }
+pub fn _entry_token(e:i64) -> i64 { return heap_get_arg(e) - _entry_value(e)*10000; }
+
+pub fn crdt_map_set(m:i64, key:i64, value:i64) -> i64 {
+    let tok = g_map_token; g_map_token = g_map_token + 1;
+
+    // Replace existing key's entry if present (update in place)
+    let cur=heap_get_body(m);
+    while cur!=0 {
+        if _entry_key(cur)==key {
+            heap_set_arg(cur, value*10000 + tok);
+            return tok;
+        }
+        cur=heap_get_domain(cur);
+    }
+
+    // New entry
+    let e=_map_entry(key,value,tok);
+    heap_set_domain(e,heap_get_body(m));
+    heap_set_body(m,e);
+    heap_set_arg(m, heap_get_arg(m)+1);
+    return tok;
+}
+
+pub fn crdt_map_get(m:i64, key:i64) -> i64 {
+    let cur=heap_get_body(m);
+    while cur!=0 {
+        if _entry_key(cur)==key { return _entry_value(cur); }
+        cur=heap_get_domain(cur);
+    }
+    return -1;   // not found
+}
+
+pub fn crdt_map_remove(m:i64, key:i64) {
+    // Remove by unlinking the entry
+    let cur=heap_get_body(m); let prev=0;
+    while cur!=0 {
+        if _entry_key(cur)==key {
+            if prev==0 { heap_set_body(m,heap_get_domain(cur)); }
+            else { heap_set_domain(prev,heap_get_domain(cur)); }
+            heap_set_arg(m, heap_get_arg(m)-1);
+            return;
+        }
+        prev=cur; cur=heap_get_domain(cur);
+    }
+    return;
+}
+
+pub fn crdt_map_contains(m:i64, key:i64) -> i64 {
+    if crdt_map_get(m,key) < 0 { return 0; } return 1;
+}
+
+pub fn crdt_map_size(m:i64) -> i64 { return heap_get_arg(m); }
+
+// Merge: add-wins — entries from b not in a are added; for duplicate keys, keep higher token
+pub fn crdt_map_merge(a:i64, b:i64) -> i64 {
+    let cur=heap_get_body(b);
+    while cur!=0 {
+        let key=_entry_key(cur);
+        let bv=_entry_value(cur);
+        let bt=_entry_token(cur);
+
+        let found=heap_get_body(a); let found_entry=0;
+        while found!=0 {
+            if _entry_key(found)==key { found_entry=found; }
+            found=heap_get_domain(found);
+        }
+
+        if found_entry==0 {
+            // Key not in a — add it
+            let ne=_map_entry(key,bv,bt);
+            heap_set_domain(ne,heap_get_body(a));
+            heap_set_body(a,ne);
+            heap_set_arg(a,heap_get_arg(a)+1);
+        } else {
+            // Key in both — keep higher token (later write wins)
+            if bt > _entry_token(found_entry) {
+                heap_set_arg(found_entry, bv*10000+bt);
+            }
+        }
+        cur=heap_get_domain(cur);
+    }
+    return a;
+}
+
+// ── CRDTGraph ─────────────────────────────────────────────────────────────
+// Vertices and edges tracked as token-tagged entries (add-wins, like ORSet).
+// Vertex: body=vertex_id, arg=token, domain=next
+// Edge: body=from*1000000+to, arg=token, domain=next
+
+pub fn crdt_graph_new() -> i64 {
+    let g=heap_alloc_term(); heap_set_tag(g,TAG_GRAPH);
+    heap_set_body(g,0);   // vertex list head
+    heap_set_arg(g,0);    // edge list head
+    heap_set_domain(g,0); // vertex count
+    return g;
+}
+
+let g_graph_token: i64 = 1;
+
+pub fn crdt_graph_add_vertex(g:i64, vid:i64) -> i64 {
+    // Check if already exists
+    let cur=heap_get_body(g);
+    while cur!=0 {
+        if heap_get_body(cur)==vid { return heap_get_arg(cur); }
+        cur=heap_get_domain(cur);
+    }
+    let tok=g_graph_token; g_graph_token=g_graph_token+1;
+    let v=heap_alloc_term(); heap_set_tag(v,TAG_VERT);
+    heap_set_body(v,vid); heap_set_arg(v,tok);
+    heap_set_domain(v,heap_get_body(g));
+    heap_set_body(g,v);
+    heap_set_domain(g, heap_get_domain(g)+1);
+    return tok;
+}
+
+pub fn crdt_graph_add_edge(g:i64, from:i64, to:i64) -> i64 {
+    let key=from*1000000+to;
+    let cur=heap_get_arg(g);
+    while cur!=0 {
+        if heap_get_body(cur)==key { return heap_get_arg(cur); }
+        cur=heap_get_domain(cur);
+    }
+    let tok=g_graph_token; g_graph_token=g_graph_token+1;
+    let e=heap_alloc_term(); heap_set_tag(e,TAG_EDGE);
+    heap_set_body(e,key); heap_set_arg(e,tok);
+    heap_set_domain(e,heap_get_arg(g));
+    heap_set_arg(g,e);
+    return tok;
+}
+
+pub fn crdt_graph_has_vertex(g:i64, vid:i64) -> i64 {
+    let cur=heap_get_body(g);
+    while cur!=0 { if heap_get_body(cur)==vid { return 1; } cur=heap_get_domain(cur); }
+    return 0;
+}
+
+pub fn crdt_graph_has_edge(g:i64, from:i64, to:i64) -> i64 {
+    let key=from*1000000+to; let cur=heap_get_arg(g);
+    while cur!=0 { if heap_get_body(cur)==key { return 1; } cur=heap_get_domain(cur); }
+    return 0;
+}
+
+pub fn crdt_graph_vertex_count(g:i64) -> i64 { return heap_get_domain(g); }
+
+pub fn crdt_graph_edge_count(g:i64) -> i64 {
+    let n=0; let cur=heap_get_arg(g);
+    while cur!=0 { n=n+1; cur=heap_get_domain(cur); }
+    return n;
+}
+
+// Merge two graphs: union of vertices and edges (add-wins)
+pub fn crdt_graph_merge(a:i64, b:i64) -> i64 {
+    // Merge vertices
+    let vb=heap_get_body(b);
+    while vb!=0 { crdt_graph_add_vertex(a, heap_get_body(vb)); vb=heap_get_domain(vb); }
+    // Merge edges
+    let eb=heap_get_arg(b);
+    while eb!=0 {
+        let key=heap_get_body(eb);
+        let from=key/1000000; let to=key-from*1000000;
+        crdt_graph_add_edge(a,from,to);
+        eb=heap_get_domain(eb);
+    }
+    return a;
+}
+
+pub fn main() -> i64 {
+    // ── CRDTMap tests ────────────────────────────────────────────────────
+    let m = crdt_map_new();
+
+    // Test 1: set and get
+    crdt_map_set(m, 10, 100);
+    crdt_map_set(m, 20, 200);
+    if crdt_map_get(m, 10) != 100 { return 1; }
+    if crdt_map_get(m, 20) != 200 { return 2; }
+    if crdt_map_size(m) != 2 { return 3; }
+
+    // Test 2: update existing key
+    crdt_map_set(m, 10, 999);
+    if crdt_map_get(m, 10) != 999 { return 4; }
+    if crdt_map_size(m) != 2 { return 5; }  // no new entry
+
+    // Test 3: remove
+    crdt_map_remove(m, 20);
+    if crdt_map_contains(m, 20) != 0 { return 6; }
+    if crdt_map_size(m) != 1 { return 7; }
+
+    // Test 4: merge — add-wins
+    let ma = crdt_map_new();
+    let mb = crdt_map_new();
+    crdt_map_set(ma, 1, 10);
+    crdt_map_set(mb, 2, 20);
+    crdt_map_set(mb, 1, 999);  // concurrent update to key 1 with higher token
+    crdt_map_merge(ma, mb);
+    if crdt_map_get(ma, 2) != 20  { return 8; }   // added from mb
+    if crdt_map_get(ma, 1) != 999 { return 9; }   // higher token wins
+
+    // Test 5: merge idempotent
+    crdt_map_merge(ma, mb);
+    if crdt_map_get(ma, 2) != 20 { return 10; }
+
+    // ── CRDTGraph tests ──────────────────────────────────────────────────
+    let g = crdt_graph_new();
+
+    // Test 6: add vertices
+    crdt_graph_add_vertex(g, 1);
+    crdt_graph_add_vertex(g, 2);
+    crdt_graph_add_vertex(g, 3);
+    if crdt_graph_vertex_count(g) != 3 { return 11; }
+    if crdt_graph_has_vertex(g, 2) != 1 { return 12; }
+    if crdt_graph_has_vertex(g, 9) != 0 { return 13; }
+
+    // Test 7: add edges
+    crdt_graph_add_edge(g, 1, 2);
+    crdt_graph_add_edge(g, 2, 3);
+    crdt_graph_add_edge(g, 1, 3);
+    if crdt_graph_edge_count(g) != 3 { return 14; }
+    if crdt_graph_has_edge(g, 1, 2) != 1 { return 15; }
+    if crdt_graph_has_edge(g, 3, 1) != 0 { return 16; }  // directed: 3→1 not added
+
+    // Test 8: duplicate vertex/edge ignored
+    crdt_graph_add_vertex(g, 1);
+    if crdt_graph_vertex_count(g) != 3 { return 17; }
+    crdt_graph_add_edge(g, 1, 2);
+    if crdt_graph_edge_count(g) != 3 { return 18; }
+
+    // Test 9: graph merge
+    let ga = crdt_graph_new();
+    let gb = crdt_graph_new();
+    crdt_graph_add_vertex(ga, 10); crdt_graph_add_vertex(ga, 20);
+    crdt_graph_add_vertex(gb, 20); crdt_graph_add_vertex(gb, 30);
+    crdt_graph_add_edge(ga, 10, 20);
+    crdt_graph_add_edge(gb, 20, 30);
+    crdt_graph_merge(ga, gb);
+    if crdt_graph_vertex_count(ga) != 3 { return 19; }  // 10, 20, 30
+    if crdt_graph_has_edge(ga, 20, 30) != 1 { return 20; }
+
+    // Test 10: merge idempotent
+    crdt_graph_merge(ga, gb);
+    if crdt_graph_vertex_count(ga) != 3 { return 21; }
+
+    return 111;
+}

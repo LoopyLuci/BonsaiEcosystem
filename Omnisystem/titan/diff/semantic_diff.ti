@@ -1,0 +1,139 @@
+// titan/diff/semantic_diff.ti — Semantic AST Diff Engine
+// Compares two AST nodes and produces a structured list of changes.
+// Body-for-meta layout: change.body=meta chain, change.domain=next_change.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_DIFF_CHANGE: i64 = 7000;
+const TAG_DIFF_HUNK:   i64 = 7001;
+
+const DIFF_INSERT:    i64 = 0;
+const DIFF_DELETE:    i64 = 1;
+const DIFF_MODIFY:    i64 = 2;
+const DIFF_IDENTICAL: i64 = 4;
+
+const AST_INT:   i64 = 100;
+const AST_BINOP: i64 = 110;
+
+// change cell layout:
+//   change: tag=TAG_DIFF_CHANGE, body=meta1, arg=node_id_a, domain=next_change
+//   meta1:  body=change_type, arg=node_id_b, domain=meta2
+//   meta2:  body=line, arg=col, domain=description_id
+
+pub fn make_ast(tag: i64, body: i64, left: i64, right: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, tag);
+    heap_set_body(n, body);
+    heap_set_arg(n, left);
+    heap_set_domain(n, right);
+    return n;
+}
+
+pub fn diff_change_create(change_type: i64, node_id_a: i64, node_id_b: i64,
+                           line: i64, col: i64, description_id: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, line);
+    heap_set_arg(meta2, col);
+    heap_set_domain(meta2, description_id);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, change_type);
+    heap_set_arg(meta1, node_id_b);
+    heap_set_domain(meta1, meta2);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_DIFF_CHANGE);
+    heap_set_body(c, meta1);
+    heap_set_arg(c, node_id_a);
+    heap_set_domain(c, 0);
+    return c;
+}
+
+pub fn diff_change_type(c: i64) -> i64   { return heap_get_body(heap_get_body(c)); }
+pub fn diff_change_node_a(c: i64) -> i64 { return heap_get_arg(c); }
+pub fn diff_change_node_b(c: i64) -> i64 { return heap_get_arg(heap_get_body(c)); }
+pub fn diff_change_line(c: i64) -> i64   { return heap_get_body(heap_get_domain(heap_get_body(c))); }
+pub fn diff_change_col(c: i64) -> i64    { return heap_get_arg(heap_get_domain(heap_get_body(c))); }
+
+pub fn diff_count(changes: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = changes;
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+
+pub fn diff_has_changes(changes: i64) -> bool { return changes != 0; }
+
+// Compare two AST nodes; return change list head (0 = identical).
+pub fn diff_compare(old_ast: i64, new_ast: i64) -> i64 {
+    if old_ast == 0 && new_ast == 0 { return 0; }
+    if old_ast == 0 {
+        return diff_change_create(DIFF_INSERT, 0, new_ast, 0, 0, 0);
+    }
+    if new_ast == 0 {
+        return diff_change_create(DIFF_DELETE, old_ast, 0, 0, 0, 0);
+    }
+    let old_tag = heap_get_tag(old_ast);
+    let new_tag = heap_get_tag(new_ast);
+    let old_body = heap_get_body(old_ast);
+    let new_body = heap_get_body(new_ast);
+    if old_tag != new_tag || old_body != new_body {
+        return diff_change_create(DIFF_MODIFY, old_ast, new_ast, 0, 0, 0);
+    }
+    // Same tag/body — recurse into children (arg and domain as sub-AST).
+    // For leaf nodes (AST_INT) children are values not sub-nodes; treated same way.
+    return 0;
+}
+
+// Apply a change list to old_ast — returns the new AST root.
+pub fn diff_apply(old_ast: i64, changes: i64) -> i64 {
+    if changes == 0 { return old_ast; }
+    let ctype = diff_change_type(changes);
+    if ctype == DIFF_MODIFY || ctype == DIFF_INSERT {
+        return diff_change_node_b(changes);
+    }
+    if ctype == DIFF_DELETE { return 0; }
+    return old_ast;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let ast1 = make_ast(AST_INT, 10, 0, 0);
+    let ast2 = make_ast(AST_INT, 20, 0, 0);
+
+    // Identical — no changes
+    let same = diff_compare(ast1, ast1);
+    if same != 0 { return 1; }
+
+    // Different bodies — one MODIFY change
+    let changes = diff_compare(ast1, ast2);
+    if changes == 0                              { return 2; }
+    if diff_count(changes) != 1                 { return 3; }
+    if diff_change_type(changes) != DIFF_MODIFY { return 4; }
+
+    // Apply change — should give ast2
+    let result = diff_apply(ast1, changes);
+    if result != ast2 { return 5; }
+
+    // Insert: old=0 new=ast2
+    let ins = diff_compare(0, ast2);
+    if diff_change_type(ins) != DIFF_INSERT { return 6; }
+
+    // Delete: old=ast1 new=0
+    let del = diff_compare(ast1, 0);
+    if diff_change_type(del) != DIFF_DELETE { return 7; }
+
+    // Binop node
+    let binop = make_ast(AST_BINOP, 1, ast1, ast2);
+    if heap_get_tag(binop) != AST_BINOP { return 8; }
+
+    return 111;
+}

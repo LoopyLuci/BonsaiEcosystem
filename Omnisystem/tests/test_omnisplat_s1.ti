@@ -1,0 +1,160 @@
+// tests/test_omnisplat_s1.ti — Phase S1 OmniSplat Integration Test
+// Exercises data creation, state management, I/O validation, and GPU estimation.
+// All subsystems inlined; self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+// ===== Splat data (inlined) =====
+const TAG_SPLAT_DATA:   i64 = 8800;
+const TAG_SPLAT_VERTEX: i64 = 8801;
+const TAG_SPLAT_STATE:  i64 = 8802;
+const STATE_NONE:     i64 = 0;
+const STATE_SELECTED: i64 = 1;
+const STATE_LOCKED:   i64 = 2;
+const STATE_DELETED:  i64 = 4;
+
+pub fn ts1_vertex_create(px: i64, py: i64, pz: i64, opacity: i64) -> i64 {
+    let m1 = heap_alloc_term();
+    heap_set_body(m1, pz); heap_set_arg(m1, 0); heap_set_domain(m1, 0);
+    let m6 = heap_alloc_term();
+    heap_set_body(m6, opacity); heap_set_arg(m6, 0); heap_set_domain(m6, m1);
+    let v = heap_alloc_term();
+    heap_set_tag(v, TAG_SPLAT_VERTEX);
+    heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, m6);
+    return v;
+}
+
+pub fn ts1_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_SPLAT_DATA); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+
+pub fn ts1_data_add(data: i64, splat: i64) {
+    let wrapper = heap_alloc_term();
+    heap_set_body(wrapper, splat); heap_set_domain(wrapper, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, wrapper); }
+    else {
+        let mut curr = head;
+        while heap_get_domain(curr) != 0 { curr = heap_get_domain(curr); }
+        heap_set_domain(curr, wrapper);
+    }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+
+pub fn ts1_data_count(data: i64) -> i64 { return heap_get_body(data); }
+
+pub fn ts1_state_create(n: i64) -> i64 {
+    let arr = heap_alloc_term();
+    heap_set_tag(arr, TAG_SPLAT_STATE); heap_set_body(arr, n); heap_set_arg(arr, 0);
+    return arr;
+}
+
+pub fn ts1_state_set(arr: i64, index: i64, flags: i64) {
+    let node = heap_alloc_term();
+    heap_set_body(node, index); heap_set_arg(node, flags);
+    heap_set_domain(node, heap_get_arg(arr)); heap_set_arg(arr, node);
+}
+
+pub fn ts1_state_get(arr: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(arr);
+    while curr != 0 {
+        if heap_get_body(curr) == index { return heap_get_arg(curr); }
+        curr = heap_get_domain(curr);
+    }
+    return STATE_NONE;
+}
+
+pub fn ts1_select(data: i64, index: i64) {
+    let arr = heap_get_domain(data);
+    let cur = ts1_state_get(arr, index);
+    ts1_state_set(arr, index, cur | STATE_SELECTED);
+}
+
+pub fn ts1_is_selected(data: i64, index: i64) -> bool {
+    let arr = heap_get_domain(data);
+    return (ts1_state_get(arr, index) & STATE_SELECTED) != 0;
+}
+
+pub fn ts1_selected_count(data: i64) -> i64 {
+    let count = ts1_data_count(data);
+    let mut sel: i64 = 0;
+    let mut i: i64 = 0;
+    while i < count { if ts1_is_selected(data, i) { sel = sel + 1; } i = i + 1; }
+    return sel;
+}
+
+// ===== PLY validation (inlined) =====
+pub fn ts1_ply_validate(file_id: i64) -> bool {
+    let len = str_len(file_id);
+    if len < 3 { return false; }
+    return str_at(file_id, 0) == 112 && str_at(file_id, 1) == 108 && str_at(file_id, 2) == 121;
+}
+
+pub fn ts1_ply_data_offset(file_id: i64) -> i64 {
+    let len = str_len(file_id);
+    if len < 11 { return -1; }
+    let mut pos: i64 = 0;
+    while pos + 10 < len {
+        if str_at(file_id, pos)     == 101 && str_at(file_id, pos+1) == 110
+        && str_at(file_id, pos+2)   == 100 && str_at(file_id, pos+3) == 95
+        && str_at(file_id, pos+4)   == 104 && str_at(file_id, pos+5) == 101
+        && str_at(file_id, pos+6)   == 97  && str_at(file_id, pos+7) == 100
+        && str_at(file_id, pos+8)   == 101 && str_at(file_id, pos+9) == 114
+        && str_at(file_id, pos+10)  == 10 { return pos + 11; }
+        pos = pos + 1;
+    }
+    return -1;
+}
+
+// ===== GPU estimation (inlined) =====
+pub fn ts1_gpu_memory_estimate(splat_count: i64) -> i64 { return splat_count * 67; }
+pub fn ts1_gpu_is_feasible(splat_count: i64, max_memory: i64) -> bool {
+    return ts1_gpu_memory_estimate(splat_count) <= max_memory;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // 1. Data creation and manipulation
+    let data = ts1_data_create();
+    let s1 = ts1_vertex_create(10, 20, 30, 100);
+    let s2 = ts1_vertex_create(40, 50, 60, 200);
+    ts1_data_add(data, s1); ts1_data_add(data, s2);
+    if ts1_data_count(data) != 2         { return 1; }
+
+    // 2. Splat vertex fields
+    if heap_get_body(s1) != 10           { return 2; }
+    if heap_get_arg(s1) != 20            { return 3; }
+
+    // 3. State management
+    let state_arr = ts1_state_create(2);
+    heap_set_domain(data, state_arr);
+    ts1_select(data, 0);
+    if !ts1_is_selected(data, 0)         { return 4; }
+    if ts1_selected_count(data) != 1     { return 5; }
+
+    // 4. I/O validation — heap cell has str_len=0 → false
+    let file_id = heap_alloc_term();
+    if ts1_ply_validate(file_id)         { return 6; }
+    if ts1_ply_data_offset(file_id) != -1 { return 7; }
+
+    // 5. GPU memory estimation
+    if ts1_gpu_memory_estimate(500000) <= 0  { return 8; }
+    if ts1_gpu_is_feasible(100000000, 1000000) { return 9; }
+    if !ts1_gpu_is_feasible(1000, 1000000)   { return 10; }
+
+    return 111;
+}

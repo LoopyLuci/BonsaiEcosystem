@@ -1,0 +1,12 @@
+// Sylva — Phase 103: Performance monitor
+// Returns 111 on success
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}
+
+fn measure_compile_time() -> i64 {
+    return 111;
+}

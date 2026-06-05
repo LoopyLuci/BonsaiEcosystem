@@ -1,0 +1,82 @@
+// titan/ulcf/configs/erlang.ti
+// Erlang/OTP language configuration for the Universal Grammar Adapter.
+
+pub fn erlang_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("integer".to_string(), "i64".to_string());
+    type_map.insert("float".to_string(), "f64".to_string());
+    type_map.insert("boolean".to_string(), "bool".to_string());
+    type_map.insert("string".to_string(), "String".to_string());
+    type_map.insert("atom".to_string(), "String".to_string());
+    type_map.insert("list".to_string(), "Vec<Any>".to_string());
+    type_map.insert("tuple".to_string(), "Tuple".to_string());
+    type_map.insert("map".to_string(), "HashMap<Any,Any>".to_string());
+    type_map.insert("function".to_string(), "Fn".to_string());
+    type_map.insert("pid".to_string(), "ActorId".to_string());
+    type_map.insert("reference".to_string(), "Ref".to_string());
+    type_map.insert("port".to_string(), "Port".to_string());
+    type_map.insert("binary".to_string(), "Vec<u8>".to_string());
+    type_map.insert("bitstring".to_string(), "Vec<u8>".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("rem".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("/=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("=<".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("and".to_string(), "and".to_string());
+    operator_map.insert("or".to_string(), "or".to_string());
+    operator_map.insert("++".to_string(), "add".to_string());
+    operator_map.insert("--".to_string(), "sub".to_string());
+
+    LanguageConfig {
+        name: "erlang".to_string(),
+        extensions: vec![".erl".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression".to_string(),
+            "function_declaration".to_string(),
+            "module_declaration".to_string(),
+            "if_expression".to_string(),
+            "case_expression".to_string(),
+            "receive_expression".to_string(),
+            "try_expression".to_string(),
+            "fun_expression".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "function_call".to_string(),
+            "variable".to_string(),
+            "integer_literal".to_string(),
+            "float_literal".to_string(),
+            "string_literal".to_string(),
+            "atom_literal".to_string(),
+            "list_literal".to_string(),
+            "tuple_literal".to_string(),
+            "map_literal".to_string(),
+            "fun_expression".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "float_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "atom_literal".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec![
+            "clause_body".to_string(),
+            "block".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}

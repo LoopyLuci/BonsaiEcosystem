@@ -1,0 +1,43 @@
+// tests/test_topology.ti — Integration test for Aether Topology Map
+// Exercises the full stack: renderer → graph engine → aether_map → simulation
+import "titan/ui/topology/aether_map.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: Full topology build — 9 nodes, 10 edges
+    let g = am_build_topology();
+    if tg_graph_node_count(g) == 9 {
+        if tg_edge_count(g) == 10 {
+            score = score + 37;
+        }
+    }
+
+    // Test 2: Force-directed layout step runs on the full graph
+    tg_force_directed_step(g, 5);
+    // After 5 steps, node count must be unchanged
+    if tg_graph_node_count(g) == 9 {
+        score = score + 37;
+    }
+
+    // Test 3: Message simulation produces distinct active edges for different ticks
+    let e1 = am_simulate_message(0, 10);
+    let e2 = am_simulate_message(5, 10);
+    if e1 != e2 {
+        score = score + 37;
+    }
+
+    return score;
+}

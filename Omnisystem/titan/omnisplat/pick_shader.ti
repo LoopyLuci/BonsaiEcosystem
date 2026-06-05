@@ -1,0 +1,140 @@
+// titan/omnisplat/pick_shader.ti — Ray-Gaussian Intersection Picking
+// Mouse picking via 2D ellipse distance + closest-splat search. Inlines gsplat_data.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_PICK_MASK: i64 = 9040;
+
+// ===== Inlined gsplat_data helpers =====
+const TAG_SPLAT_DATA: i64 = 8800;
+
+pub fn pk_data_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_SPLAT_DATA); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn pk_data_add(data: i64, splat: i64) {
+    let w = heap_alloc_term(); heap_set_body(w, splat); heap_set_domain(w, 0);
+    let head = heap_get_arg(data);
+    if head == 0 { heap_set_arg(data, w); }
+    else { let mut c = head; while heap_get_domain(c) != 0 { c = heap_get_domain(c); } heap_set_domain(c, w); }
+    heap_set_body(data, heap_get_body(data) + 1);
+}
+pub fn pk_data_count(data: i64) -> i64 { return heap_get_body(data); }
+pub fn pk_data_get(data: i64, index: i64) -> i64 {
+    let mut curr = heap_get_arg(data);
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index { return heap_get_body(curr); }
+        i = i + 1; curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+// Vertex stores px in body, py in arg (simplified layout for pick purposes)
+pub fn pk_vertex_create(px: i64, py: i64) -> i64 {
+    let v = heap_alloc_term(); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, 0);
+    return v;
+}
+pub fn pk_vx(s: i64) -> i64 { return heap_get_body(s); }
+pub fn pk_vy(s: i64) -> i64 { return heap_get_arg(s); }
+
+// ===== Pick shader functions =====
+
+// Scaled squared distance from point (mx,my) to ellipse centre (cx,cy).
+// dist = (dx²+dy²) * 1000 / avg_radius²
+pub fn pick_point_to_ellipse_dist(mx: i64, my: i64, cx: i64, cy: i64,
+                                   major: i64, minor: i64, angle: i64) -> i64 {
+    let dx = mx - cx;
+    let dy = my - cy;
+    let avg_radius = (major + minor) / 2;
+    if avg_radius <= 0 { return 999999; }
+    return (dx * dx + dy * dy) * 1000 / (avg_radius * avg_radius);
+}
+
+// Returns index of closest splat to (mx,my), or -1 if empty.
+pub fn pick_find_closest(data: i64, mx: i64, my: i64) -> i64 {
+    let count = pk_data_count(data);
+    if count == 0 { return -1; }
+    let mut best_idx: i64 = 0;
+    let mut best_dist: i64 = 999999999;
+    let mut i: i64 = 0;
+    while i < count {
+        let splat = pk_data_get(data, i);
+        if splat != 0 {
+            let sx = pk_vx(splat);
+            let sy = pk_vy(splat);
+            let dx = mx - sx;
+            let dy = my - sy;
+            let dist = dx * dx + dy * dy;
+            if dist < best_dist { best_dist = dist; best_idx = i; }
+        }
+        i = i + 1;
+    }
+    return best_idx;
+}
+
+// mask: tag=TAG_PICK_MASK, body=x, arg=y, domain=meta(body=w, arg=h)
+pub fn pick_build_mask(x: i64, y: i64, width: i64, height: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, width); heap_set_arg(meta, height); heap_set_domain(meta, 0);
+    let mask = heap_alloc_term();
+    heap_set_tag(mask, TAG_PICK_MASK);
+    heap_set_body(mask, x); heap_set_arg(mask, y); heap_set_domain(mask, meta);
+    return mask;
+}
+
+pub fn pick_mask_contains(mask: i64, px: i64, py: i64) -> bool {
+    let mx = heap_get_body(mask);
+    let my = heap_get_arg(mask);
+    let meta = heap_get_domain(mask);
+    let mw = heap_get_body(meta);
+    let mh = heap_get_arg(meta);
+    return px >= mx && px <= mx + mw && py >= my && py <= my + mh;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Distance: closer point gives smaller value
+    let d1 = pick_point_to_ellipse_dist(100, 100, 90, 90, 20, 10, 0);
+    let d2 = pick_point_to_ellipse_dist(200, 200, 90, 90, 20, 10, 0);
+    if d1 >= d2 { return 1; }
+
+    // Zero radius → max distance
+    let d_zero = pick_point_to_ellipse_dist(50, 50, 0, 0, 0, 0, 0);
+    if d_zero != 999999 { return 2; }
+
+    // Closest splat: s1=(10,10), s2=(100,100)
+    let data = pk_data_create();
+    let s1 = pk_vertex_create(10, 10);
+    let s2 = pk_vertex_create(100, 100);
+    pk_data_add(data, s1); pk_data_add(data, s2);
+
+    let close_s1 = pick_find_closest(data, 15, 15);
+    if close_s1 != 0 { return 3; } // s1 at index 0
+
+    let close_s2 = pick_find_closest(data, 105, 105);
+    if close_s2 != 1 { return 4; } // s2 at index 1
+
+    // Empty data → -1
+    let empty = pk_data_create();
+    if pick_find_closest(empty, 0, 0) != -1 { return 5; }
+
+    // Pick mask
+    let mask = pick_build_mask(50, 50, 100, 100);
+    if heap_get_tag(mask) != TAG_PICK_MASK     { return 6; }
+    if !pick_mask_contains(mask, 75, 75)       { return 7; }
+    if !pick_mask_contains(mask, 50, 50)       { return 8; } // exactly on boundary
+    if pick_mask_contains(mask, 25, 25)        { return 9; }
+
+    return 111;
+}

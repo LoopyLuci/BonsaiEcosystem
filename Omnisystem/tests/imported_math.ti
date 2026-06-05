@@ -1,0 +1,26 @@
+// Titan math module - Basic arithmetic
+// Provides simple math functions callable from Sylva
+
+fn add_nums(a: i64, b: i64) -> i64 {
+    return a + b;
+}
+
+fn multiply_nums(a: i64, b: i64) -> i64 {
+    return a * b;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    let add_result: i64 = add_nums(50, 60);
+    if add_result >= 80 { score = score + 20; }
+    let mul_result: i64 = multiply_nums(10, 11);
+    if mul_result >= 80 { score = score + 20; }
+    let add2: i64 = add_nums(85, 85);
+    if add2 >= 80 { score = score + 20; }
+    let mul2: i64 = multiply_nums(90, 90);
+    if mul2 >= 80 { score = score + 20; }
+    if score >= 80 { score = score + 31; }
+    if score >= 80 { return 111; }
+    return score;
+}
+

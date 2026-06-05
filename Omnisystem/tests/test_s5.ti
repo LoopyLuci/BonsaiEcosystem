@@ -1,0 +1,174 @@
+// tests/test_s5.ti — Phase S5 Transform Tools Integration Test
+// All helpers inlined with ts5_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS5_T_XFM:  i64 = 9200;
+const TS5_X_MOVE: i64 = 0;
+const TS5_ST_SEL: i64 = 1;
+
+// ===== Position accessors =====
+pub fn ts5_vx(v: i64) -> i64 { return heap_get_body(v); }
+pub fn ts5_vy(v: i64) -> i64 { return heap_get_arg(v); }
+pub fn ts5_vz(v: i64) -> i64 { return heap_get_body(heap_get_domain(v)); }
+pub fn ts5_setvx(v: i64, x: i64) { heap_set_body(v, x); }
+pub fn ts5_setvy(v: i64, y: i64) { heap_set_arg(v, y); }
+pub fn ts5_setvz(v: i64, z: i64) { heap_set_body(heap_get_domain(v), z); }
+
+// ===== Vertex creation =====
+pub fn ts5_sv(px: i64, py: i64, pz: i64,
+               c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+               r: i64, g: i64, b: i64, op: i64) -> i64 {
+    let n1 = heap_alloc_term(); heap_set_body(n1, pz); heap_set_arg(n1, c0); heap_set_domain(n1, 0);
+    let n2 = heap_alloc_term(); heap_set_body(n2, c1); heap_set_arg(n2, c2); heap_set_domain(n2, n1);
+    let n3 = heap_alloc_term(); heap_set_body(n3, c3); heap_set_arg(n3, c4); heap_set_domain(n3, n2);
+    let n4 = heap_alloc_term(); heap_set_body(n4, c5); heap_set_arg(n4, r);  heap_set_domain(n4, n3);
+    let n5 = heap_alloc_term(); heap_set_body(n5, g);  heap_set_arg(n5, b);  heap_set_domain(n5, n4);
+    let n6 = heap_alloc_term(); heap_set_body(n6, op); heap_set_arg(n6, 0);  heap_set_domain(n6, n5);
+    let v  = heap_alloc_term();
+    heap_set_tag(v, 8801); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, n6);
+    return v;
+}
+
+// ===== Data container =====
+pub fn ts5_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, 8800); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ts5_add(d: i64, v: i64) {
+    let w = heap_alloc_term(); heap_set_tag(w, 8802); heap_set_body(w, v); heap_set_domain(w, 0);
+    let c = heap_get_body(d);
+    if c == 0 { heap_set_arg(d, w); }
+    else {
+        let mut t = heap_get_arg(d);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(d, c + 1);
+}
+pub fn ts5_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn ts5_get(d: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(d); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+
+// ===== State / selection =====
+pub fn ts5_ssc(n: i64) -> i64 {
+    let a = heap_alloc_term(); heap_set_body(a, n); heap_set_arg(a, 0);
+    return a;
+}
+pub fn ts5_sset(s: i64, idx: i64, fl: i64) {
+    let nd = heap_alloc_term(); heap_set_body(nd, idx); heap_set_arg(nd, fl);
+    heap_set_domain(nd, heap_get_arg(s)); heap_set_arg(s, nd);
+}
+pub fn ts5_sget(s: i64, idx: i64) -> i64 {
+    let mut c = heap_get_arg(s);
+    while c != 0 { if heap_get_body(c) == idx { return heap_get_arg(c); } c = heap_get_domain(c); }
+    return 0;
+}
+pub fn ts5_issel(d: i64, idx: i64) -> bool {
+    return (ts5_sget(heap_get_domain(d), idx) & TS5_ST_SEL) != 0;
+}
+pub fn ts5_selcnt(d: i64) -> i64 {
+    let n = ts5_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n { if ts5_issel(d, i) { c = c + 1; } i = i + 1; }
+    return c;
+}
+
+// ===== Transform operations =====
+pub fn ts5_move(d: i64, dx: i64, dy: i64, dz: i64) -> i64 {
+    let n = ts5_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        if ts5_issel(d, i) {
+            let v = ts5_get(d, i);
+            ts5_setvx(v, ts5_vx(v) + dx);
+            ts5_setvy(v, ts5_vy(v) + dy);
+            ts5_setvz(v, ts5_vz(v) + dz);
+            c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+pub fn ts5_scale(d: i64, sx: i64, sy: i64, sz: i64) -> i64 {
+    let n = ts5_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        if ts5_issel(d, i) {
+            let v = ts5_get(d, i);
+            ts5_setvx(v, ts5_vx(v) * sx / 100);
+            ts5_setvy(v, ts5_vy(v) * sy / 100);
+            ts5_setvz(v, ts5_vz(v) * sz / 100);
+            c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+pub fn ts5_measure(d: i64, a: i64, b: i64) -> i64 {
+    let va = ts5_get(d, a); let vb = ts5_get(d, b);
+    if va == 0 || vb == 0 { return -1; }
+    let dx = ts5_vx(va) - ts5_vx(vb);
+    let dy = ts5_vy(va) - ts5_vy(vb);
+    let dz = ts5_vz(va) - ts5_vz(vb);
+    return dx*dx + dy*dy + dz*dz;
+}
+
+// ===== Integration test =====
+// 6 splats: i=0..5 → pos=(i*20, i*15, i*10)
+pub fn main() -> i64 {
+    let d = ts5_sd();
+    let mut i: i64 = 0;
+    while i < 6 {
+        let v = ts5_sv(i*20, i*15, i*10, 0, 0, 0, 0, 0, 0, 0, i*40, 0, 100);
+        ts5_add(d, v); i = i + 1;
+    }
+    let sa = ts5_ssc(6);
+    heap_set_domain(d, sa);
+    let mut j: i64 = 0;
+    while j < 6 { ts5_sset(sa, j, TS5_ST_SEL); j = j + 1; }
+    if ts5_selcnt(d) != 6 { return 1; }
+
+    // Move all by (50,25,10)
+    // v0: (0→50, 0→25), v1: (20→70, 15→40)
+    let m1 = ts5_move(d, 50, 25, 10);
+    if m1 != 6 { return 2; }
+    let v0 = ts5_get(d, 0);
+    if ts5_vx(v0) != 50 { return 3; }
+
+    // Scale all by 50%: multiply by 50/100
+    // v0: (50→25, 25→12), v1: (70→35, 40→20)
+    let m2 = ts5_scale(d, 50, 50, 50);
+    if m2 != 6 { return 4; }
+    let v1 = ts5_get(d, 1);
+    if ts5_vx(v1) != 35 { return 5; }
+
+    // Measure distance² between splat 0 and splat 4
+    // v0 after transforms: (25, 12, ...)
+    // v4 initially (80,60): after move (130,85): after scale (65,42)
+    // dx=25-65=-40, dy=12-42=-30 → ms=1600+900=2500 > 0
+    let ms = ts5_measure(d, 0, 4);
+    if ms <= 0 { return 6; }
+
+    // Rotate test: tool creation
+    let t = heap_alloc_term(); heap_set_tag(t, TS5_T_XFM); heap_set_body(t, TS5_X_MOVE);
+    if heap_get_tag(t) != TS5_T_XFM { return 7; }
+
+    // Verify splat count unchanged
+    if ts5_cnt(d) != 6 { return 8; }
+
+    return 111;
+}

@@ -1,0 +1,125 @@
+// tests/test_g5.ti — Phase G5 Axiom Graphics Proofs Integration Test
+// All helpers inlined with tg5_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TG5_T_PRF5: i64 = 20400;
+const TG5_T_INV5: i64 = 20401;
+const TG5_T_BUF:  i64 = 20001;
+const TG5_T_CMD:  i64 = 20002;
+const TG5_T_WRP:  i64 = 20003;
+
+// ===== Proof =====
+pub fn tg5_proof_create(name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TG5_T_PRF5); heap_set_body(p, name); heap_set_arg(p, 1); heap_set_domain(p, 0);
+    return p;
+}
+pub fn tg5_proof_valid(p: i64) -> i64    { return heap_get_arg(p); }
+pub fn tg5_proof_set_valid(p: i64, v: i64) { heap_set_arg(p, v); }
+
+// ===== Invariant =====
+pub fn tg5_invariant_create(cond: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, TG5_T_INV5); heap_set_body(inv, cond); heap_set_arg(inv, 1); heap_set_domain(inv, 0);
+    return inv;
+}
+pub fn tg5_invariant_check(inv: i64, actual: i64) -> i64 {
+    if actual == 0 { heap_set_arg(inv, 0); return 0; }
+    return heap_get_arg(inv);
+}
+pub fn tg5_invariant_status(inv: i64) -> i64 { return heap_get_arg(inv); }
+
+// ===== Verification helpers =====
+pub fn tg5_verify_shader(shader: i64, reference: i64) -> i64 {
+    if shader == reference { return 1; }
+    return 0;
+}
+pub fn tg5_verify_buffer(buf: i64, expected_size: i64) -> i64 {
+    if heap_get_body(buf) == expected_size { return 1; }
+    return 0;
+}
+pub fn tg5_verify_cmdbuf(cb: i64, expected_ops: i64) -> i64 {
+    if heap_get_body(cb) == expected_ops { return 1; }
+    return 0;
+}
+
+// ===== Inline buffer/cmdbuf constructors =====
+pub fn tg5_buf_create(size: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TG5_T_BUF); heap_set_body(b, size); heap_set_arg(b, 0); heap_set_domain(b, 0);
+    return b;
+}
+pub fn tg5_cmdbuf_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TG5_T_CMD); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    return c;
+}
+pub fn tg5_cmdbuf_add(c: i64, op: i64, arg: i64) {
+    let n = heap_alloc_term();
+    heap_set_body(n, op); heap_set_arg(n, arg); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TG5_T_WRP); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Proof: valid → invalid
+    let p = tg5_proof_create(10);
+    if tg5_proof_valid(p) != 1  { return 1; }
+    tg5_proof_set_valid(p, 0);
+    if tg5_proof_valid(p) != 0  { return 2; }
+
+    // Invariant: pass, then fail (latched)
+    let inv = tg5_invariant_create(20);
+    if tg5_invariant_check(inv, 1) != 1 { return 3; }
+    if heap_get_arg(inv) != 1           { return 4; }
+    if tg5_invariant_check(inv, 0) != 0 { return 5; }
+    if heap_get_arg(inv) != 0           { return 6; }
+    // Latched: further pass still returns 0
+    if tg5_invariant_check(inv, 1) != 0 { return 7; }
+
+    // Shader verification
+    if tg5_verify_shader(7, 7) != 1    { return 8; }
+    if tg5_verify_shader(7, 9) != 0    { return 9; }
+
+    // Buffer verification
+    let buf = tg5_buf_create(4096);
+    if tg5_verify_buffer(buf, 4096) != 1 { return 10; }
+    if tg5_verify_buffer(buf, 512) != 0  { return 11; }
+
+    // Cmdbuf verification
+    let cb = tg5_cmdbuf_create();
+    tg5_cmdbuf_add(cb, 10, 1);
+    tg5_cmdbuf_add(cb, 20, 2);
+    tg5_cmdbuf_add(cb, 30, 3);
+    if tg5_verify_cmdbuf(cb, 3) != 1   { return 12; }
+    if tg5_verify_cmdbuf(cb, 2) != 0   { return 13; }
+
+    // Multiple independent invariants
+    let ia = tg5_invariant_create(1);
+    let ib = tg5_invariant_create(2);
+    tg5_invariant_check(ib, 0);
+    if tg5_invariant_status(ia) != 1   { return 14; }
+    if tg5_invariant_status(ib) != 0   { return 15; }
+
+    return 111;
+}

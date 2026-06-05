@@ -1,0 +1,818 @@
+// Titan Stage 3B — AST-to-UniIR Lowering
+// Phase 3 P2.4: Self-hosting translation of titan/stage0/lowering.py
+//
+// Translates Titan AST (post-borrow-check) into UniIR SSA form using
+// only Stage-0-parseable syntax: structs and fn declarations, i64 tags.
+//
+// Structure mirrors the Python TitanLowerer + LowerEnv classes:
+//   - LowerEnv    : register allocator + basic block state
+//   - TyNode      : lowered UniIR type representation
+//   - ValNode     : lowered value (register or constant)
+//   - InstrNode   : single SSA instruction
+//   - BlockDef    : basic block summary (id, instr_count, terminator)
+//   - FunSummary  : lowered function metadata
+//   - ModSummary  : lowered module metadata
+
+// ── UniIR Type Kind Tags ──────────────────────────────────────────────────────
+
+fn TY_UNIT() -> i64 { return 0; }
+fn TY_BOOL() -> i64 { return 1; }
+fn TY_I64()  -> i64 { return 2; }
+fn TY_I32()  -> i64 { return 3; }
+fn TY_I16()  -> i64 { return 4; }
+fn TY_I8()   -> i64 { return 5; }
+fn TY_F64()  -> i64 { return 6; }
+fn TY_F32()  -> i64 { return 7; }
+fn TY_REF()  -> i64 { return 8; }
+fn TY_PTR()  -> i64 { return 9; }
+fn TY_FUN()  -> i64 { return 10; }
+fn TY_ADT()  -> i64 { return 11; }
+fn TY_VAR()  -> i64 { return 12; }
+fn TY_UNKNOWN() -> i64 { return 99; }
+
+// ── Value Kind Tags ───────────────────────────────────────────────────────────
+
+fn VAL_REG()   -> i64 { return 20; }
+fn VAL_CONST() -> i64 { return 21; }
+fn VAL_UNDEF() -> i64 { return 22; }
+
+// ── Literal Kind Tags ─────────────────────────────────────────────────────────
+
+fn LIT_UNIT()  -> i64 { return 30; }
+fn LIT_BOOL()  -> i64 { return 31; }
+fn LIT_INT()   -> i64 { return 32; }
+fn LIT_FLOAT() -> i64 { return 33; }
+fn LIT_STR()   -> i64 { return 34; }
+
+// ── Instruction Kind Tags ─────────────────────────────────────────────────────
+
+fn INS_ADD()       -> i64 { return 40; }
+fn INS_SUB()       -> i64 { return 41; }
+fn INS_MUL()       -> i64 { return 42; }
+fn INS_DIV()       -> i64 { return 43; }
+fn INS_AND()       -> i64 { return 44; }
+fn INS_OR()        -> i64 { return 45; }
+fn INS_XOR()       -> i64 { return 46; }
+fn INS_NOT()       -> i64 { return 47; }
+fn INS_SHL()       -> i64 { return 48; }
+fn INS_SHR()       -> i64 { return 49; }
+fn INS_ICMP()      -> i64 { return 50; }
+fn INS_FCMP()      -> i64 { return 51; }
+fn INS_CALL()      -> i64 { return 52; }
+fn INS_LOAD()      -> i64 { return 53; }
+fn INS_STORE()     -> i64 { return 54; }
+fn INS_ALLOCA()    -> i64 { return 55; }
+fn INS_GET_FIELD() -> i64 { return 56; }
+fn INS_MK_ADT()    -> i64 { return 57; }
+fn INS_GET_ADT()   -> i64 { return 58; }
+fn INS_PHI()       -> i64 { return 59; }
+fn INS_HASH()      -> i64 { return 60; }
+fn INS_FENCE()     -> i64 { return 61; }
+fn INS_UNKNOWN()   -> i64 { return 99; }
+
+// ── Terminator Kind Tags ──────────────────────────────────────────────────────
+
+fn TERM_RET()         -> i64 { return 70; }
+fn TERM_BR()          -> i64 { return 71; }
+fn TERM_JMP()         -> i64 { return 72; }
+fn TERM_SWITCH()      -> i64 { return 73; }
+fn TERM_UNREACHABLE() -> i64 { return 74; }
+
+// ── Comparison Op Tags ────────────────────────────────────────────────────────
+
+fn CMP_EQ() -> i64 { return 80; }
+fn CMP_NE() -> i64 { return 81; }
+fn CMP_LT() -> i64 { return 82; }
+fn CMP_LE() -> i64 { return 83; }
+fn CMP_GT() -> i64 { return 84; }
+fn CMP_GE() -> i64 { return 85; }
+
+// ── Grade Tags (§1.2 graded modalities) ──────────────────────────────────────
+
+fn GRADE_ZERO() -> i64 { return 90; }   // erased / proof-only
+fn GRADE_ONE()  -> i64 { return 91; }   // linear — used exactly once
+fn GRADE_MANY() -> i64 { return 92; }   // unrestricted (ω)
+
+// ── Effect Kind Tags ──────────────────────────────────────────────────────────
+
+fn EFF_NONE()      -> i64 { return 100; }
+fn EFF_ALLOC()     -> i64 { return 101; }
+fn EFF_IO()        -> i64 { return 102; }
+fn EFF_TELEMETRY() -> i64 { return 103; }
+fn EFF_PANIC()     -> i64 { return 104; }
+fn EFF_UNSAFE()    -> i64 { return 105; }
+fn EFF_NETWORK()   -> i64 { return 106; }
+
+// ── Width Tags ────────────────────────────────────────────────────────────────
+
+fn WIDTH_8()   -> i64 { return 8; }
+fn WIDTH_16()  -> i64 { return 16; }
+fn WIDTH_32()  -> i64 { return 32; }
+fn WIDTH_64()  -> i64 { return 64; }
+fn WIDTH_128() -> i64 { return 128; }
+
+// ── LowerEnv Struct ───────────────────────────────────────────────────────────
+// Mirrors Python LowerEnv: register counter, block counter, current block id,
+// and a flag indicating whether the current block already has a terminator.
+
+pub struct LowerEnv {
+    next_reg: i64,
+    block_counter: i64,
+    current_block_id: i64,
+    has_terminator: i64,
+    error_count: i64,
+}
+
+pub fn make_lower_env() -> LowerEnv {
+    return LowerEnv {
+        next_reg: 0,
+        block_counter: 1,
+        current_block_id: 0,
+        has_terminator: 0,
+        error_count: 0,
+    };
+}
+
+pub fn env_alloc_reg(e: LowerEnv) -> i64 {
+    return e.next_reg;
+}
+
+pub fn env_next_reg(e: LowerEnv) -> LowerEnv {
+    return LowerEnv {
+        next_reg: e.next_reg + 1,
+        block_counter: e.block_counter,
+        current_block_id: e.current_block_id,
+        has_terminator: e.has_terminator,
+        error_count: e.error_count,
+    };
+}
+
+pub fn env_new_block_id(e: LowerEnv) -> i64 {
+    return e.block_counter;
+}
+
+pub fn env_next_block(e: LowerEnv) -> LowerEnv {
+    return LowerEnv {
+        next_reg: e.next_reg,
+        block_counter: e.block_counter + 1,
+        current_block_id: e.current_block_id,
+        has_terminator: e.has_terminator,
+        error_count: e.error_count,
+    };
+}
+
+pub fn env_set_block(e: LowerEnv, blk_id: i64) -> LowerEnv {
+    return LowerEnv {
+        next_reg: e.next_reg,
+        block_counter: e.block_counter,
+        current_block_id: blk_id,
+        has_terminator: 0,
+        error_count: e.error_count,
+    };
+}
+
+pub fn env_set_terminated(e: LowerEnv) -> LowerEnv {
+    return LowerEnv {
+        next_reg: e.next_reg,
+        block_counter: e.block_counter,
+        current_block_id: e.current_block_id,
+        has_terminator: 1,
+        error_count: e.error_count,
+    };
+}
+
+pub fn env_add_error(e: LowerEnv) -> LowerEnv {
+    return LowerEnv {
+        next_reg: e.next_reg,
+        block_counter: e.block_counter,
+        current_block_id: e.current_block_id,
+        has_terminator: e.has_terminator,
+        error_count: e.error_count + 1,
+    };
+}
+
+pub fn env_is_terminated(e: LowerEnv) -> bool {
+    return e.has_terminator == 1;
+}
+
+pub fn env_is_ok(e: LowerEnv) -> bool {
+    return e.error_count == 0;
+}
+
+// ── TyNode: lowered UniIR type ────────────────────────────────────────────────
+
+pub struct TyNode {
+    kind: i64,
+    width: i64,
+    name: str,
+}
+
+pub fn make_ty_unit() -> TyNode {
+    return TyNode { kind: 0, width: 0, name: "()" };
+}
+
+pub fn make_ty_bool() -> TyNode {
+    return TyNode { kind: 1, width: 1, name: "bool" };
+}
+
+pub fn make_ty_int(width: i64) -> TyNode {
+    return TyNode { kind: 2, width: width, name: "int" };
+}
+
+pub fn make_ty_float(width: i64) -> TyNode {
+    return TyNode { kind: 6, width: width, name: "float" };
+}
+
+pub fn make_ty_ref() -> TyNode {
+    return TyNode { kind: 8, width: 0, name: "ref" };
+}
+
+pub fn make_ty_adt(name: str) -> TyNode {
+    return TyNode { kind: 11, width: 0, name: name };
+}
+
+pub fn make_ty_unknown() -> TyNode {
+    return TyNode { kind: 99, width: 0, name: "?" };
+}
+
+// Classify a primitive type name into a TyNode (mirrors _lower_type in Python).
+pub fn classify_type_prim(name: str) -> TyNode {
+    if name == "i64" {
+        return make_ty_int(64);
+    }
+    if name == "i32" {
+        return make_ty_int(32);
+    }
+    if name == "i16" {
+        return make_ty_int(16);
+    }
+    if name == "i8" {
+        return make_ty_int(8);
+    }
+    if name == "u64" {
+        return make_ty_int(64);
+    }
+    if name == "u32" {
+        return make_ty_int(32);
+    }
+    if name == "u8" {
+        return make_ty_int(8);
+    }
+    if name == "f64" {
+        return make_ty_float(64);
+    }
+    if name == "f32" {
+        return make_ty_float(32);
+    }
+    if name == "bool" {
+        return make_ty_bool();
+    }
+    if name == "()" {
+        return make_ty_unit();
+    }
+    if name == "unit" {
+        return make_ty_unit();
+    }
+    if name == "str" {
+        return make_ty_ref();
+    }
+    return make_ty_unknown();
+}
+
+pub fn ty_is_numeric(ty: TyNode) -> bool {
+    return ty.kind == 2 || ty.kind == 6;
+}
+
+pub fn ty_is_integer(ty: TyNode) -> bool {
+    return ty.kind == 2;
+}
+
+pub fn ty_is_unit(ty: TyNode) -> bool {
+    return ty.kind == 0;
+}
+
+pub fn ty_is_bool(ty: TyNode) -> bool {
+    return ty.kind == 1;
+}
+
+pub fn ty_is_known(ty: TyNode) -> bool {
+    return ty.kind != 99;
+}
+
+// ── ValNode: lowered value ─────────────────────────────────────────────────────
+
+pub struct ValNode {
+    kind: i64,
+    reg: i64,
+    lit_kind: i64,
+    lit_int: i64,
+    lit_bool: i64,
+    lit_str: str,
+}
+
+pub fn make_val_reg(reg: i64) -> ValNode {
+    return ValNode { kind: 20, reg: reg, lit_kind: 0, lit_int: 0, lit_bool: 0, lit_str: "" };
+}
+
+pub fn make_val_unit() -> ValNode {
+    return ValNode { kind: 21, reg: 0, lit_kind: 30, lit_int: 0, lit_bool: 0, lit_str: "" };
+}
+
+pub fn make_val_bool(v: bool) -> ValNode {
+    let mut bv = 0;
+    if v {
+        bv = 1;
+    }
+    return ValNode { kind: 21, reg: 0, lit_kind: 31, lit_int: bv, lit_bool: bv, lit_str: "" };
+}
+
+pub fn make_val_int(v: i64) -> ValNode {
+    return ValNode { kind: 21, reg: 0, lit_kind: 32, lit_int: v, lit_bool: 0, lit_str: "" };
+}
+
+pub fn make_val_str(s: str) -> ValNode {
+    return ValNode { kind: 21, reg: 0, lit_kind: 34, lit_int: 0, lit_bool: 0, lit_str: s };
+}
+
+pub fn make_val_undef() -> ValNode {
+    return ValNode { kind: 22, reg: 0, lit_kind: 0, lit_int: 0, lit_bool: 0, lit_str: "" };
+}
+
+pub fn val_is_reg(v: ValNode) -> bool {
+    return v.kind == 20;
+}
+
+pub fn val_is_const(v: ValNode) -> bool {
+    return v.kind == 21;
+}
+
+pub fn val_is_undef(v: ValNode) -> bool {
+    return v.kind == 22;
+}
+
+// ── InstrNode: single SSA instruction summary ─────────────────────────────────
+
+pub struct InstrNode {
+    kind: i64,
+    dest: i64,
+    lhs: i64,
+    rhs: i64,
+    cmp_op: i64,
+    call_arg_count: i64,
+    effects: i64,
+    name: str,
+}
+
+pub fn make_instr_arith(kind: i64, dest: i64, lhs: i64, rhs: i64) -> InstrNode {
+    return InstrNode {
+        kind: kind, dest: dest, lhs: lhs, rhs: rhs,
+        cmp_op: 0, call_arg_count: 0, effects: 100, name: "",
+    };
+}
+
+pub fn make_instr_cmp(op: i64, dest: i64, lhs: i64, rhs: i64) -> InstrNode {
+    return InstrNode {
+        kind: 50, dest: dest, lhs: lhs, rhs: rhs,
+        cmp_op: op, call_arg_count: 0, effects: 100, name: "",
+    };
+}
+
+pub fn make_instr_call(dest: i64, func_reg: i64, arg_count: i64, effects: i64) -> InstrNode {
+    return InstrNode {
+        kind: 52, dest: dest, lhs: func_reg, rhs: 0,
+        cmp_op: 0, call_arg_count: arg_count, effects: effects, name: "",
+    };
+}
+
+pub fn make_instr_not(dest: i64, src: i64) -> InstrNode {
+    return InstrNode {
+        kind: 47, dest: dest, lhs: src, rhs: 0,
+        cmp_op: 0, call_arg_count: 0, effects: 100, name: "",
+    };
+}
+
+pub fn make_instr_neg(dest: i64, src: i64) -> InstrNode {
+    // Negate: 0 - src  (mirrors Python ISub(VConst(LInt(0)), operand))
+    return InstrNode {
+        kind: 41, dest: dest, lhs: 0, rhs: src,
+        cmp_op: 0, call_arg_count: 0, effects: 100, name: "",
+    };
+}
+
+pub fn make_instr_get_field(dest: i64, base_reg: i64, field_idx: i64) -> InstrNode {
+    return InstrNode {
+        kind: 56, dest: dest, lhs: base_reg, rhs: field_idx,
+        cmp_op: 0, call_arg_count: 0, effects: 100, name: "",
+    };
+}
+
+pub fn make_instr_phi(dest: i64, src_a: i64, src_b: i64) -> InstrNode {
+    return InstrNode {
+        kind: 59, dest: dest, lhs: src_a, rhs: src_b,
+        cmp_op: 0, call_arg_count: 0, effects: 100, name: "",
+    };
+}
+
+// ── Binary Op Classification ──────────────────────────────────────────────────
+// Maps operator string → instruction kind tag. Mirrors _lower_expr EBinOp branch.
+
+pub fn classify_binop(op: str) -> i64 {
+    if op == "+" { return 40; }
+    if op == "-" { return 41; }
+    if op == "*" { return 42; }
+    if op == "/" { return 43; }
+    if op == "&&" { return 44; }
+    if op == "||" { return 45; }
+    if op == "^" { return 46; }
+    if op == "<<" { return 48; }
+    if op == ">>" { return 49; }
+    if op == "==" { return 50; }
+    if op == "!=" { return 50; }
+    if op == "<"  { return 50; }
+    if op == "<=" { return 50; }
+    if op == ">"  { return 50; }
+    if op == ">=" { return 50; }
+    return 99;
+}
+
+pub fn is_comparison_op(op: str) -> bool {
+    if op == "==" { return true; }
+    if op == "!=" { return true; }
+    if op == "<"  { return true; }
+    if op == "<=" { return true; }
+    if op == ">"  { return true; }
+    if op == ">=" { return true; }
+    return false;
+}
+
+pub fn is_arithmetic_op(op: str) -> bool {
+    if op == "+" { return true; }
+    if op == "-" { return true; }
+    if op == "*" { return true; }
+    if op == "/" { return true; }
+    return false;
+}
+
+pub fn is_logical_op(op: str) -> bool {
+    if op == "&&" { return true; }
+    if op == "||" { return true; }
+    return false;
+}
+
+pub fn is_bitwise_op(op: str) -> bool {
+    if op == "&" { return true; }
+    if op == "|" { return true; }
+    if op == "^" { return true; }
+    if op == "<<" { return true; }
+    if op == ">>" { return true; }
+    return false;
+}
+
+// Map comparison operator string → CmpOp tag.
+pub fn classify_cmp_op(op: str) -> i64 {
+    if op == "==" { return 80; }
+    if op == "!=" { return 81; }
+    if op == "<"  { return 82; }
+    if op == "<=" { return 83; }
+    if op == ">"  { return 84; }
+    if op == ">=" { return 85; }
+    return 0;
+}
+
+// Result type of a binary op: comparisons → bool, arithmetic → lhs type.
+pub fn binop_result_ty_kind(op: str, lhs_ty: i64) -> i64 {
+    if is_comparison_op(op) {
+        return 1;
+    }
+    return lhs_ty;
+}
+
+// ── BlockDef: basic block summary ────────────────────────────────────────────
+
+pub struct BlockDef {
+    id: i64,
+    instr_count: i64,
+    term_kind: i64,
+    term_a: i64,
+    term_b: i64,
+    ret_reg: i64,
+}
+
+pub fn make_block_ret(id: i64, ret_reg: i64) -> BlockDef {
+    return BlockDef {
+        id: id, instr_count: 0,
+        term_kind: 70, term_a: ret_reg, term_b: 0, ret_reg: ret_reg,
+    };
+}
+
+pub fn make_block_jmp(id: i64, target: i64) -> BlockDef {
+    return BlockDef {
+        id: id, instr_count: 0,
+        term_kind: 72, term_a: target, term_b: 0, ret_reg: 0,
+    };
+}
+
+pub fn make_block_br(id: i64, cond_reg: i64, then_id: i64, else_id: i64) -> BlockDef {
+    return BlockDef {
+        id: id, instr_count: 0,
+        term_kind: 71, term_a: then_id, term_b: else_id, ret_reg: cond_reg,
+    };
+}
+
+pub fn block_is_terminated(b: BlockDef) -> bool {
+    return b.term_kind != 0;
+}
+
+// ── Control Flow Block Allocation ─────────────────────────────────────────────
+// These mirror the block ID allocation in _lower_if and _lower_while.
+
+pub fn alloc_if_blocks(env: LowerEnv, has_else: bool) -> BlockDef {
+    // then_id = block_counter, else_id = block_counter+1 (if else), cont_id follows
+    let then_id = env.block_counter;
+    let mut cont_id = then_id + 1;
+    if has_else {
+        cont_id = then_id + 2;
+    }
+    return make_block_br(env.current_block_id, 0, then_id, cont_id);
+}
+
+pub fn alloc_while_blocks(env: LowerEnv) -> BlockDef {
+    // loop_header = block_counter, body = block_counter+1, cont = block_counter+2
+    let loop_id = env.block_counter;
+    let body_id = loop_id + 1;
+    let cont_id = loop_id + 2;
+    return make_block_br(loop_id, 0, body_id, cont_id);
+}
+
+pub fn if_then_block_id(env: LowerEnv) -> i64 {
+    return env.block_counter;
+}
+
+pub fn if_else_block_id(env: LowerEnv) -> i64 {
+    return env.block_counter + 1;
+}
+
+pub fn if_cont_block_id(env: LowerEnv, has_else: bool) -> i64 {
+    if has_else {
+        return env.block_counter + 2;
+    }
+    return env.block_counter + 1;
+}
+
+pub fn while_loop_block_id(env: LowerEnv) -> i64 {
+    return env.block_counter;
+}
+
+pub fn while_body_block_id(env: LowerEnv) -> i64 {
+    return env.block_counter + 1;
+}
+
+pub fn while_cont_block_id(env: LowerEnv) -> i64 {
+    return env.block_counter + 2;
+}
+
+// How many blocks does lowering an if/else produce?
+pub fn if_block_count(has_else: bool) -> i64 {
+    if has_else {
+        return 3;
+    }
+    return 2;
+}
+
+// ── FunSummary: lowered function metadata ─────────────────────────────────────
+
+pub struct FunSummary {
+    name: str,
+    param_count: i64,
+    block_count: i64,
+    instr_count: i64,
+    reg_count: i64,
+    effects: i64,
+    error_count: i64,
+    ret_ty_kind: i64,
+}
+
+pub fn make_fun_summary(name: str, param_count: i64, ret_ty_kind: i64) -> FunSummary {
+    return FunSummary {
+        name: name, param_count: param_count, block_count: 1,
+        instr_count: 0, reg_count: param_count,
+        effects: 100, error_count: 0, ret_ty_kind: ret_ty_kind,
+    };
+}
+
+pub fn fun_summary_add_block(s: FunSummary) -> FunSummary {
+    return FunSummary {
+        name: s.name, param_count: s.param_count,
+        block_count: s.block_count + 1,
+        instr_count: s.instr_count, reg_count: s.reg_count,
+        effects: s.effects, error_count: s.error_count,
+        ret_ty_kind: s.ret_ty_kind,
+    };
+}
+
+pub fn fun_summary_add_instr(s: FunSummary) -> FunSummary {
+    return FunSummary {
+        name: s.name, param_count: s.param_count,
+        block_count: s.block_count, instr_count: s.instr_count + 1,
+        reg_count: s.reg_count + 1, effects: s.effects,
+        error_count: s.error_count, ret_ty_kind: s.ret_ty_kind,
+    };
+}
+
+pub fn fun_summary_set_effects(s: FunSummary, eff: i64) -> FunSummary {
+    return FunSummary {
+        name: s.name, param_count: s.param_count,
+        block_count: s.block_count, instr_count: s.instr_count,
+        reg_count: s.reg_count, effects: eff,
+        error_count: s.error_count, ret_ty_kind: s.ret_ty_kind,
+    };
+}
+
+pub fn fun_summary_is_ok(s: FunSummary) -> bool {
+    return s.error_count == 0 && s.block_count >= 1;
+}
+
+// ── ModSummary: lowered module metadata ───────────────────────────────────────
+
+pub struct ModSummary {
+    fn_count: i64,
+    adt_count: i64,
+    total_blocks: i64,
+    total_instrs: i64,
+    error_count: i64,
+}
+
+pub fn make_mod_summary() -> ModSummary {
+    return ModSummary {
+        fn_count: 0, adt_count: 0,
+        total_blocks: 0, total_instrs: 0, error_count: 0,
+    };
+}
+
+pub fn mod_summary_add_fn(s: ModSummary, fs: FunSummary) -> ModSummary {
+    return ModSummary {
+        fn_count: s.fn_count + 1,
+        adt_count: s.adt_count,
+        total_blocks: s.total_blocks + fs.block_count,
+        total_instrs: s.total_instrs + fs.instr_count,
+        error_count: s.error_count + fs.error_count,
+    };
+}
+
+pub fn mod_summary_add_adt(s: ModSummary) -> ModSummary {
+    return ModSummary {
+        fn_count: s.fn_count, adt_count: s.adt_count + 1,
+        total_blocks: s.total_blocks, total_instrs: s.total_instrs,
+        error_count: s.error_count,
+    };
+}
+
+pub fn mod_summary_is_ok(s: ModSummary) -> bool {
+    return s.error_count == 0 && s.fn_count >= 0;
+}
+
+// ── Effect Classification ──────────────────────────────────────────────────────
+// Mirrors _lower_effects in Python. Effects are encoded as a bitmask i64.
+
+fn EFF_BIT_ALLOC()     -> i64 { return 1; }
+fn EFF_BIT_IO()        -> i64 { return 2; }
+fn EFF_BIT_TELEMETRY() -> i64 { return 4; }
+fn EFF_BIT_PANIC()     -> i64 { return 8; }
+fn EFF_BIT_UNSAFE()    -> i64 { return 16; }
+fn EFF_BIT_NETWORK()   -> i64 { return 32; }
+
+pub fn effects_empty() -> i64 { return 0; }
+
+pub fn effects_add_alloc(row: i64) -> i64 { return row + 1; }
+pub fn effects_add_io(row: i64) -> i64 { return row + 2; }
+pub fn effects_add_telemetry(row: i64) -> i64 { return row + 4; }
+pub fn effects_add_panic(row: i64) -> i64 { return row + 8; }
+pub fn effects_add_unsafe(row: i64) -> i64 { return row + 16; }
+
+pub fn effects_has_alloc(row: i64) -> bool { return row == 1 || row == 3 || row == 5 || row == 7; }
+pub fn effects_has_io(row: i64)    -> bool { return row == 2 || row == 3 || row == 6 || row == 7; }
+
+pub fn classify_effect_name(name: str) -> i64 {
+    if name == "alloc" { return 101; }
+    if name == "io" { return 102; }
+    if name == "telemetry" { return 103; }
+    if name == "panic" { return 104; }
+    if name == "unsafe" { return 105; }
+    if name == "network" { return 106; }
+    return 100;
+}
+
+// ── Literal Lowering ──────────────────────────────────────────────────────────
+// Mirrors _lower_literal in Python.
+
+pub fn lower_lit_bool(v: bool) -> ValNode {
+    return make_val_bool(v);
+}
+
+pub fn lower_lit_int(v: i64) -> ValNode {
+    return make_val_int(v);
+}
+
+pub fn lower_lit_unit() -> ValNode {
+    return make_val_unit();
+}
+
+pub fn lower_lit_str(s: str) -> ValNode {
+    return make_val_str(s);
+}
+
+// ── Register Allocation Helpers ───────────────────────────────────────────────
+
+// Allocate N consecutive parameter registers starting at 0.
+// Returns the first available temp register (= param_count).
+pub fn param_regs_end(param_count: i64) -> i64 {
+    return param_count;
+}
+
+// Compute how many registers a block of statements might need (estimate).
+// Used for pre-allocation in stage3b host.
+pub fn estimate_instr_regs(stmt_count: i64) -> i64 {
+    return stmt_count * 3;
+}
+
+// ── Ownership / Grade Lowering ────────────────────────────────────────────────
+// Encodes move vs copy semantics as grade annotations on SSA params/calls.
+
+pub fn grade_for_copy_type(ty: TyNode) -> i64 {
+    // Copy types (primitives, refs) get MANY (ω) grade.
+    // Use direct field comparison to avoid consuming the TyNode struct.
+    if ty.kind == 2 { return 92; }   // int
+    if ty.kind == 1 { return 92; }   // bool
+    if ty.kind == 0 { return 92; }   // unit
+    if ty.kind == 8 { return 92; }   // ref
+    // Non-Copy (ADT) defaults to ONE (linear) for stage 0.
+    return 91;
+}
+
+pub fn grade_for_move(ty: TyNode) -> i64 {
+    // Value being consumed: linear unless Copy.
+    if ty.kind == 2 { return 92; }
+    if ty.kind == 1 { return 92; }
+    if ty.kind == 0 { return 92; }
+    if ty.kind == 8 { return 92; }
+    return 91;
+}
+
+pub fn grade_for_borrow() -> i64 {
+    return 92;
+}
+
+// ── SSA Builder Helpers ───────────────────────────────────────────────────────
+// High-level construction sequences corresponding to Python emit_instr.
+
+// Lower a binary arithmetic expression: allocate dest reg, return InstrNode.
+pub fn lower_binop_expr(op: str, lhs_reg: i64, rhs_reg: i64, dest: i64) -> InstrNode {
+    let ins_kind = classify_binop(op);
+    if is_comparison_op(op) {
+        let cmp_op = classify_cmp_op(op);
+        return make_instr_cmp(cmp_op, dest, lhs_reg, rhs_reg);
+    }
+    return make_instr_arith(ins_kind, dest, lhs_reg, rhs_reg);
+}
+
+// Lower a unary expression.
+pub fn lower_unop_expr(op: str, src_reg: i64, dest: i64) -> InstrNode {
+    if op == "-" {
+        return make_instr_neg(dest, src_reg);
+    }
+    if op == "!" {
+        return make_instr_not(dest, src_reg);
+    }
+    return make_instr_not(dest, src_reg);
+}
+
+// Lower a function call site.
+pub fn lower_call_expr(func_reg: i64, arg_count: i64, dest: i64, effects: i64) -> InstrNode {
+    return make_instr_call(dest, func_reg, arg_count, effects);
+}
+
+// Lower a field access (obj.field → GEP-like).
+pub fn lower_field_access(base_reg: i64, field_idx: i64, dest: i64) -> InstrNode {
+    return make_instr_get_field(dest, base_reg, field_idx);
+}
+
+// ── Module-level Verification ─────────────────────────────────────────────────
+
+pub fn verify_fun_blocks(block_count: i64) -> bool {
+    return block_count >= 1;
+}
+
+pub fn verify_fun_params(param_count: i64) -> bool {
+    return param_count >= 0;
+}
+
+pub fn verify_mod(s: ModSummary) -> bool {
+    return s.error_count == 0;
+}
+
+// ── Lowering Hash Seed ────────────────────────────────────────────────────────
+// Contributes to the content-addressed module hash (§5.4).
+
+pub fn lowering_hash_seed() -> i64 {
+    return 2403;
+}

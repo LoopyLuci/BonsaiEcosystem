@@ -1,0 +1,29 @@
+// tests/test_supervisor_tree.ti
+// Supervisor tree test — parent actors detect child failures and restart them.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Spawn supervisor
+    let supervisor_spawned: i64 = spawn_actor("supervisor", 0);
+    if supervisor_spawned == 1 { score = score + 1; }
+
+    // Spawn child under supervisor
+    let child_spawned: i64 = spawn_actor("child-1", 10);
+    if child_spawned == 1 { score = score + 1; }
+
+    // Send work to child
+    let sent: i64 = send_actor_msg("child-1", "task-1");
+    if sent == 1 { score = score + 1; }
+
+    // Supervisor monitors child — if child fails, supervisor restarts it
+    let supervisor_check: i64 = send_actor_msg("supervisor", "health_check");
+    if supervisor_check == 1 { score = score + 1; }
+
+    // Child still active after health check
+    let child_alive: i64 = send_actor_msg("child-1", "status");
+    if child_alive == 1 { score = score + 1; }
+
+    if score == 5 { return 111; }
+    return score * 10;
+}

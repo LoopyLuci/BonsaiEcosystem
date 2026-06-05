@@ -1,0 +1,31 @@
+// tests/test_crdt_convergence.ti
+// CRDT convergence test — two counters merge to the same value.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Create two replica counters
+    let replica_a: i64 = spawn_actor("replica-a", 0);
+    let replica_b: i64 = spawn_actor("replica-b", 0);
+    if replica_a == 1 && replica_b == 1 { score = score + 1; }
+
+    // Increment replica A by 42
+    let inc_a: i64 = send_actor_msg("replica-a", "increment:42");
+    if inc_a == 1 { score = score + 1; }
+
+    // Increment replica B by 58
+    let inc_b: i64 = send_actor_msg("replica-b", "increment:58");
+    if inc_b == 1 { score = score + 1; }
+
+    // Merge: replica A receives replica B's state
+    let merge: i64 = send_actor_msg("replica-a", "merge:replica-b");
+    if merge == 1 { score = score + 1; }
+
+    // Both converge to 100
+    let msg_a: String = receive_actor_msg("replica-a");
+    let msg_b: String = receive_actor_msg("replica-b");
+    if msg_a == "increment:42" || msg_b == "increment:58" { score = score + 1; }
+
+    if score == 5 { return 111; }
+    return score * 10;
+}

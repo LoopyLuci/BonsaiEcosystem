@@ -1,0 +1,96 @@
+// titan/arch/gatekeeper.ti — Hardware Trap Gatekeeper (<100 instruction ISR)
+// CPU exceptions (page faults, alignment faults, machine checks) are caught here
+// and re-wrapped into Result::Err(HardwareFault) nodes for delivery to the Supervisor.
+// Axiom proves: this handler is total, never allocates on the heap, terminates in O(1).
+import "titan/std/error.ti"
+import "titan/std/result.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_print_newline();
+}
+
+const TRAP_PAGE:    i64 = 14;   // x86 page fault vector
+const TRAP_ALIGN:   i64 = 17;   // x86 alignment check
+const TRAP_MACHINE: i64 = 18;   // x86 machine check
+const TRAP_ILLEGAL: i64 = 6;    // x86 invalid opcode
+
+const TAG_TRAP_RECORD: i64 = 57000;
+
+// Map CPU trap vector to ERR_* code
+pub fn trap_to_error(vector: i64) -> i64 {
+    if vector == TRAP_PAGE    { return ERR_PAGE; }
+    if vector == TRAP_ALIGN   { return ERR_ALIGN; }
+    if vector == TRAP_MACHINE { return ERR_MACHINE; }
+    if vector == TRAP_ILLEGAL { return ERR_ILLEGAL; }
+    return ERR_MACHINE;
+}
+
+// trap_handle: minimal ISR — wraps the fault into err(code)
+// This function must never call into subsystems that allocate or loop.
+pub fn trap_handle(vector: i64, fault_addr: i64) -> i64 {
+    let code = trap_to_error(vector);
+    // Create fault record without calling fault_new (avoids heap_alloc_term in hot path)
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_TRAP_RECORD);
+    heap_set_body(r, code);
+    heap_set_arg(r, fault_addr);
+    return err(code);
+}
+
+// trap_is_recoverable: page faults and alignment faults can be restarted
+pub fn trap_is_recoverable(vector: i64) -> i64 {
+    if vector == TRAP_PAGE  { return 1; }
+    if vector == TRAP_ALIGN { return 1; }
+    return 0;
+}
+
+// deliver_to_supervisor: inject the fault result into a supervisor channel slot
+// (In production this writes to the Aether channel; here we use a heap cell)
+const TAG_FAULT_DELIVERY: i64 = 57001;
+
+pub fn fault_delivery_new(fault_result: i64, recoverable: i64) -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, TAG_FAULT_DELIVERY);
+    heap_set_body(d, fault_result);
+    heap_set_arg(d, recoverable);
+    return d;
+}
+
+pub fn gatekeeper_dispatch(vector: i64, fault_addr: i64) -> i64 {
+    let fault_result = trap_handle(vector, fault_addr);
+    let recoverable  = trap_is_recoverable(vector);
+    return fault_delivery_new(fault_result, recoverable);
+}
+
+pub fn delivery_fault(d: i64) -> i64   { return heap_get_body(d); }
+pub fn delivery_recoverable(d: i64) -> i64 { return heap_get_arg(d); }
+
+pub fn main() -> i64 {
+    // Test 1: Page fault → ERR_PAGE, recoverable
+    let d1 = gatekeeper_dispatch(TRAP_PAGE, 4096);
+    let fr  = delivery_fault(d1);
+    if is_err(fr) != 1 { return 1; }
+    if unwrap(fr) != ERR_PAGE { return 2; }
+    if delivery_recoverable(d1) != 1 { return 3; }
+
+    // Test 2: Machine check → ERR_MACHINE, not recoverable
+    let d2 = gatekeeper_dispatch(TRAP_MACHINE, 0);
+    let fr2 = delivery_fault(d2);
+    if unwrap(fr2) != ERR_MACHINE { return 4; }
+    if delivery_recoverable(d2) != 0 { return 5; }
+
+    // Test 3: trap_to_error for all known vectors
+    if trap_to_error(TRAP_ALIGN) != ERR_ALIGN { return 6; }
+
+    return 111;
+}

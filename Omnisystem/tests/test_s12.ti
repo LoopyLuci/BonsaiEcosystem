@@ -1,0 +1,100 @@
+// tests/test_s12.ti — Phase S12 Axiom Verification Integration Test
+// All helpers inlined with ts12_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS12_T_FUZZ: i64 = 9900;
+const TS12_T_INV:  i64 = 9901;
+
+// ===== Fuzzer =====
+pub fn ts12_fuzz_seed(seed: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TS12_T_FUZZ); heap_set_body(s, seed); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn ts12_fuzz_next(state: i64) -> i64 {
+    let x = heap_get_body(state);
+    let y = x * 1103515245 + 12345;
+    let mut r = (y / 65536) % 2147483648;
+    if r < 0 { r = -r; }
+    heap_set_body(state, y);
+    return r;
+}
+
+pub fn ts12_fuzz_range(state: i64, max: i64) -> i64 {
+    let r = ts12_fuzz_next(state);
+    return r % max;
+}
+
+// ===== Invariant checker =====
+pub fn ts12_inv_create(name: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, TS12_T_INV); heap_set_body(inv, name); heap_set_arg(inv, 1); heap_set_domain(inv, 0);
+    return inv;
+}
+
+pub fn ts12_inv_check(inv: i64, condition: i64) -> i64 {
+    if condition == 0 { heap_set_arg(inv, 0); }
+    return heap_get_arg(inv);
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Fuzzer: 50 values in [0,1000)
+    let st = ts12_fuzz_seed(12345);
+    let mut i: i64 = 0;
+    while i < 50 {
+        let r = ts12_fuzz_range(st, 1000);
+        if r < 0    { return 1; }
+        if r >= 1000 { return 2; }
+        i = i + 1;
+    }
+
+    // Invariant: passing → returns 1
+    let inv = ts12_inv_create(10);
+    if ts12_inv_check(inv, 1) == 0 { return 3; }
+    // Failing → sets to 0 and returns 0
+    if ts12_inv_check(inv, 0) != 0 { return 4; }
+    // Latched: subsequent pass still returns 0
+    if ts12_inv_check(inv, 1) != 0 { return 5; }
+
+    // Independent invariants don't interfere
+    let mut j: i64 = 0;
+    while j < 10 {
+        let inv2 = ts12_inv_create(j);
+        if ts12_inv_check(inv2, 1) == 0 { return 6; }
+        j = j + 1;
+    }
+
+    // Fail one invariant in a batch, others unaffected
+    let ia = ts12_inv_create(100);
+    let ib = ts12_inv_create(200);
+    let ic = ts12_inv_create(300);
+    ts12_inv_check(ib, 0);
+    if ts12_inv_check(ia, 1) == 0 { return 7; }
+    if ts12_inv_check(ib, 1) != 0 { return 8; }
+    if ts12_inv_check(ic, 1) == 0 { return 9; }
+
+    // Two fuzzers with different seeds produce independent streams
+    let st2 = ts12_fuzz_seed(99);
+    let v1a = ts12_fuzz_range(st, 10000);
+    let v2a = ts12_fuzz_range(st2, 10000);
+    // Both in range
+    if v1a < 0     { return 10; }
+    if v1a >= 10000 { return 11; }
+    if v2a < 0     { return 12; }
+    if v2a >= 10000 { return 13; }
+
+    return 111;
+}

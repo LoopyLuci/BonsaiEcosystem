@@ -1,0 +1,32 @@
+// Test bitwise via function calls (extern approach)
+extern "titan" {
+    fn bit_xor(a: i64, b: i64) -> i64;
+    fn bit_or(a: i64, b: i64) -> i64;
+    fn bit_and(a: i64, b: i64) -> i64;
+    fn bit_shl(a: i64, b: i64) -> i64;
+    fn bit_shr(a: i64, b: i64) -> i64;
+}
+
+pub fn main() -> i64 {
+    // Test XOR via function call
+    let xor_result = bit_xor(5, 3);  // 5^3 = 6
+    if xor_result != 6 { return 1; }
+    
+    // Test OR via function call
+    let or_result = bit_or(5, 3);    // 5|3 = 7
+    if or_result != 7 { return 2; }
+    
+    // Test AND via function call
+    let and_result = bit_and(5, 3);  // 5&3 = 1
+    if and_result != 1 { return 3; }
+    
+    // Test left shift via function call
+    let shl_result = bit_shl(1, 3);  // 1<<3 = 8
+    if shl_result != 8 { return 4; }
+    
+    // Test right shift via function call
+    let shr_result = bit_shr(16, 2); // 16>>2 = 4
+    if shr_result != 4 { return 5; }
+    
+    return 111;
+}

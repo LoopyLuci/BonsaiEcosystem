@@ -1,0 +1,11 @@
+// Test parameter string matching
+pub fn main() -> i64 {
+    return check("Window") + check("Button") + check("Text");
+}
+
+pub fn check(s: String) -> i64 {
+    if s == "Window" { return 1; }
+    if s == "Button" { return 2; }
+    if s == "Text" { return 3; }
+    return 0;
+}

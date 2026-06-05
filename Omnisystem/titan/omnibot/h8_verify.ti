@@ -1,0 +1,9 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_PROOF:i64=24700;const T_INV:i64=24701;
+pub fn h8_proof_create(name:i64,valid:i64)->i64{let p=heap_alloc_term();heap_set_tag(p,T_PROOF);heap_set_body(p,name);heap_set_arg(p,valid);return p;}
+pub fn h8_proof_valid(p:i64)->i64{return heap_get_arg(p);}
+pub fn h8_inv_create(cond:i64)->i64{let inv=heap_alloc_term();heap_set_tag(inv,T_INV);heap_set_body(inv,cond);heap_set_arg(inv,1);return inv;}
+pub fn h8_inv_check(inv:i64,actual:i64)->i64{if actual==0{heap_set_arg(inv,0);return 0;}return heap_get_arg(inv);}
+pub fn h8_privacy_check(mem:i64,key:i64)->i64{return mem^key;}
+pub fn h8_integrity_check(data:i64,hash:i64)->i64{let expected:i64=data*31+7;if expected==hash{return 1;}return 0;}
+pub fn main()->i64{let p=h8_proof_create(1,1);if h8_proof_valid(p)!=1{return 1;}let inv=h8_inv_create(2);if h8_inv_check(inv,1)!=1{return 2;}h8_inv_check(inv,0);if heap_get_arg(inv)!=0{return 3;}if h8_privacy_check(42,7)!=45{return 4;}if h8_integrity_check(10,317)!=1{return 5;}if h8_integrity_check(10,999)!=0{return 6;}return 111;}

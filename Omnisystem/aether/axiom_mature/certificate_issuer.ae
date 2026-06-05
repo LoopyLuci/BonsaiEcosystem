@@ -1,0 +1,33 @@
+// Aether — Phase 106: Proof certificate issuer actor
+
+actor CertificateIssuer {
+    var issued_count: i64 = 0;
+
+    on_start() {
+        emit telemetry { event: "certificate_issuer_ready" };
+    }
+
+    handle Issue(theorem_name: str, proof_hash: str) -> str {
+        self.issued_count = self.issued_count + 1;
+        emit telemetry {
+            event: "certificate_issued",
+            theorem: theorem_name,
+            hash: proof_hash
+        };
+        return proof_hash;
+    }
+
+    handle Revoke(cert_id: str) {
+        emit telemetry { event: "certificate_revoked", cert_id: cert_id };
+    }
+
+    handle GetCount() -> i64 {
+        return self.issued_count;
+    }
+}
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}

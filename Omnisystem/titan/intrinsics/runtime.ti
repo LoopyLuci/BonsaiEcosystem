@@ -1,0 +1,55 @@
+// titan/intrinsics/runtime.ti — Gated FFI declarations (Intrinsic Sandbox)
+// Every C-runtime function is mapped to a gated intrinsic with a declared effect.
+// The AxiomSemanticPass enforces: calling fn must have effect >= required.
+//   sys_malloc  requires EFF_MEM
+//   sys_free    requires EFF_MEM
+//   sys_write   requires EFF_IO
+//   sys_read    requires EFF_IO
+//   sys_wreg    requires EFF_HW
+// In the bootstrap these are stub wrappers; a full compiler emits real syscalls.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_print_newline();
+}
+
+const INTR_MALLOC: i64 = 1;
+const INTR_FREE:   i64 = 2;
+const INTR_WRITE:  i64 = 3;
+const INTR_READ:   i64 = 4;
+const INTR_WREG:   i64 = 5;
+
+// Required effect for each intrinsic (matches EFF_* from effects.ti)
+const REQ_MEM: i64 = 4;
+const REQ_IO:  i64 = 1;
+const REQ_HW:  i64 = 16;
+
+pub fn intrinsic_required_effect(intr_id: i64) -> i64 {
+    if intr_id == INTR_MALLOC { return REQ_MEM; }
+    if intr_id == INTR_FREE   { return REQ_MEM; }
+    if intr_id == INTR_WRITE  { return REQ_IO; }
+    if intr_id == INTR_READ   { return REQ_IO; }
+    if intr_id == INTR_WREG   { return REQ_HW; }
+    return 0;
+}
+
+// Stub implementations (real calls happen in C runtime)
+pub fn sys_malloc(size: i64) -> i64 { return size; }
+pub fn sys_free(ptr: i64) -> i64    { return 0; }
+pub fn sys_write(fd: i64, buf: i64, len: i64) -> i64 { return len; }
+pub fn sys_read(fd: i64, buf: i64, len: i64)  -> i64 { return 0; }
+pub fn sys_wreg(addr: i64, val: i64) -> i64   { return 0; }
+
+pub fn main() -> i64 {
+    // Verify effect table is correct
+    if intrinsic_required_effect(INTR_MALLOC) != REQ_MEM { return 1; }
+    if intrinsic_required_effect(INTR_WRITE)  != REQ_IO  { return 2; }
+    if intrinsic_required_effect(INTR_WREG)   != REQ_HW  { return 3; }
+    // Unknown intrinsic → 0 (Pure, safe to call anywhere)
+    if intrinsic_required_effect(99) != 0 { return 4; }
+
+    return 111;
+}

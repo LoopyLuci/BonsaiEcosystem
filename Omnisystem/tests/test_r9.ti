@@ -1,0 +1,92 @@
+// tests/test_r9.ti — Phase R9 Integration with OmniAgent & OmniBot Integration Test
+// All helpers inlined with tr9_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR9_T_AR:  i64 = 22800;
+const TR9_T_BOT: i64 = 22801;
+const TR9_T_WRP: i64 = 22803;
+
+pub fn tr9_agent_create(aid: i64, cap: i64) -> i64 {
+    let a = heap_alloc_term();
+    heap_set_tag(a, TR9_T_AR); heap_set_body(a, aid); heap_set_arg(a, cap); heap_set_domain(a, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TR9_T_WRP); heap_set_body(w, a); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tr9_agent_cap(w: i64) -> i64 {
+    let a = heap_get_body(w);
+    return heap_get_arg(a);
+}
+
+pub fn tr9_bot_create(bid: i64, mem: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TR9_T_BOT); heap_set_body(b, bid); heap_set_arg(b, mem); heap_set_domain(b, 0);
+    return b;
+}
+
+pub fn tr9_bot_connect(b: i64, w: i64) {
+    let h = heap_get_domain(b);
+    heap_set_domain(w, h);
+    heap_set_domain(b, w);
+}
+
+pub fn tr9_bot_agent_count(b: i64) -> i64 {
+    let mut cur: i64 = heap_get_domain(b);
+    let mut n: i64 = 0;
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+pub fn tr9_route(b: i64) -> i64 {
+    let mut cur: i64 = heap_get_domain(b);
+    let mut best: i64 = 0;
+    let mut best_cap: i64 = -1;
+    while cur != 0 {
+        let w = cur;
+        let c = tr9_agent_cap(w);
+        if c > best_cap { best_cap = c; best = w; }
+        cur = heap_get_domain(cur);
+    }
+    return best;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let b = tr9_bot_create(7, 50);
+    let w1 = tr9_agent_create(1, 10);
+    let w2 = tr9_agent_create(2, 90);
+    tr9_bot_connect(b, w1);
+    tr9_bot_connect(b, w2);
+    if tr9_bot_agent_count(b) != 2  { return 1; }
+    let r = tr9_route(b);
+    if r != w2                       { return 2; }
+
+    // Empty bot → route returns 0
+    let b2 = tr9_bot_create(9, 10);
+    if tr9_route(b2) != 0            { return 3; }
+
+    // Three agents, middle has highest cap
+    let b3 = tr9_bot_create(3, 200);
+    let wa = tr9_agent_create(10, 40);
+    let wb = tr9_agent_create(20, 99);
+    let wc = tr9_agent_create(30, 55);
+    tr9_bot_connect(b3, wa);
+    tr9_bot_connect(b3, wb);
+    tr9_bot_connect(b3, wc);
+    if tr9_bot_agent_count(b3) != 3  { return 4; }
+    if tr9_route(b3) != wb           { return 5; }
+
+    return 111;
+}

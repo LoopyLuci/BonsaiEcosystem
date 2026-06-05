@@ -1,0 +1,36 @@
+// tests/test_inspector.ti — Integration test for Inspector write-back and lens cycling
+import "titan/ui/inspector.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+pub fn main() -> i64 {
+    let i = insp_create();
+
+    // Test 1: set target 5, lens MANIFEST
+    insp_set_target(i, 5);
+    insp_set_lens(i, LENS_MANIFEST);
+    if insp_target(i) != 5            { return 1; }
+    if insp_lens(i)   != LENS_MANIFEST { return 2; }
+
+    // Test 2: valid write-back → non-zero event with type 5
+    let evt = insp_handle_writeback(3, 1, 500);
+    if evt == 0             { return 3; }
+    let t: i64 = evt_type(evt);
+    if t != EVT_CONFIG_CHANGE { return 4; }
+
+    // Test 3: invalid prop_key (-1) → 0
+    let evt2 = insp_handle_writeback(3, -1, 500);
+    if evt2 != 0 { return 5; }
+
+    return 111;
+}

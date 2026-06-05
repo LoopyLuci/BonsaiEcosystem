@@ -1,0 +1,11 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_SUCC:i64=28000;const T_NAT:i64=28001;
+pub fn ax1_zero()->i64{let z=heap_alloc_term();heap_set_tag(z,T_NAT);heap_set_body(z,0);return z;}
+pub fn ax1_succ(n:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,T_SUCC);heap_set_body(s,n);return s;}
+pub fn ax1_is_zero(n:i64)->i64{let t=heap_get_tag(n);if t==T_NAT{if heap_get_body(n)==0{return 1;}}return 0;}
+pub fn ax1_add(a:i64,b:i64)->i64{if ax1_is_zero(a)==1{return b;}let pred=heap_get_body(a);return ax1_succ(ax1_add(pred,b));}
+pub fn ax1_mul(a:i64,b:i64)->i64{if ax1_is_zero(a)==1{return ax1_zero();}let pred=heap_get_body(a);return ax1_add(b,ax1_mul(pred,b));}
+pub fn ax1_nat_eq(a:i64,b:i64)->i64{if ax1_is_zero(a)==1{if ax1_is_zero(b)==1{return 1;}return 0;}if ax1_is_zero(b)==1{return 0;}return ax1_nat_eq(heap_get_body(a),heap_get_body(b));}
+pub fn ax1_to_i64(n:i64)->i64{if ax1_is_zero(n)==1{return 0;}return 1+ax1_to_i64(heap_get_body(n));}
+pub fn ax1_from_i64(k:i64)->i64{if k<=0{return ax1_zero();}return ax1_succ(ax1_from_i64(k-1));}
+pub fn main()->i64{let z=ax1_zero();if ax1_is_zero(z)!=1{return 1;}let one=ax1_succ(z);let two=ax1_succ(one);let three=ax1_succ(two);if ax1_is_zero(two)!=0{return 2;}let a=ax1_add(two,three);let five=ax1_from_i64(5);if ax1_nat_eq(a,five)!=1{return 3;}let m=ax1_mul(two,three);let six=ax1_from_i64(6);if ax1_nat_eq(m,six)!=1{return 4;}if ax1_to_i64(five)!=5{return 5;}if ax1_nat_eq(ax1_add(z,three),three)!=1{return 6;}if ax1_nat_eq(ax1_mul(one,three),three)!=1{return 7;}return 111;}

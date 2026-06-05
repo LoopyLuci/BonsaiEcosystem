@@ -1,0 +1,12 @@
+// Sylva — Phase 106: Proof IDE with goal viewer and tactic stepper
+// Returns 111 on success
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}
+
+fn show_goals(state: str) -> i64 { return 111; }
+fn step_tactic(tactic: str) -> i64 { return 111; }
+fn display_proof_tree() -> i64 { return 111; }

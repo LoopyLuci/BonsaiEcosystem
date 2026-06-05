@@ -1,0 +1,150 @@
+// titan/agent_core/task_decomposer.ti — Task Decomposition Engine
+// Splits high-level objectives into dependency-ordered sub-tasks.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+const TAG_TASK:       i64 = 6000;
+const TAG_TASK_GRAPH: i64 = 6001;
+
+// Task status codes
+const TASK_PENDING:     i64 = 0;
+const TASK_ASSIGNED:    i64 = 1;
+const TASK_IN_PROGRESS: i64 = 2;
+const TASK_COMPLETE:    i64 = 3;
+const TASK_FAILED:      i64 = 4;
+const TASK_BLOCKED:     i64 = 5;
+
+// Agent type codes (must match agent_manager)
+const AGENT_PLANNER:  i64 = 0;
+const AGENT_CODER:    i64 = 1;
+const AGENT_TESTER:   i64 = 2;
+const AGENT_VERIFIER: i64 = 3;
+
+// Task cell layout — body holds the meta chain so domain stays free for the
+// linked list of tasks without clobbering meta pointers:
+//
+//   task:  tag=TAG_TASK, body=meta1, arg=status, domain=next_task
+//   meta1: body=description_id, arg=agent_type, domain=meta2
+//   meta2: body=assigned_agent, arg=priority, domain=dep_list_head
+//   dep:   tag=TAG_TASK_GRAPH, body=dep_task, domain=next_dep
+
+pub fn task_create(description_id: i64, agent_type: i64, priority: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, 0);        // assigned_agent = none
+    heap_set_arg(meta2, priority);
+    heap_set_domain(meta2, 0);      // dep_list_head = empty
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, description_id);
+    heap_set_arg(meta1, agent_type);
+    heap_set_domain(meta1, meta2);
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_TASK);
+    heap_set_body(t, meta1);
+    heap_set_arg(t, TASK_PENDING);
+    heap_set_domain(t, 0);          // next_task = end (safe to overwrite later)
+    return t;
+}
+
+pub fn task_set_status(t: i64, status: i64) { heap_set_arg(t, status); }
+pub fn task_status(t: i64) -> i64           { return heap_get_arg(t); }
+pub fn task_description(t: i64) -> i64      { return heap_get_body(heap_get_body(t)); }
+pub fn task_agent_type(t: i64) -> i64       { return heap_get_arg(heap_get_body(t)); }
+pub fn task_assigned_agent(t: i64) -> i64 {
+    let meta1 = heap_get_body(t);
+    return heap_get_body(heap_get_domain(meta1));
+}
+pub fn task_set_assigned_agent(t: i64, agent: i64) {
+    let meta1 = heap_get_body(t);
+    let meta2 = heap_get_domain(meta1);
+    heap_set_body(meta2, agent);
+}
+
+pub fn task_add_dependency(task: i64, dep_task: i64) {
+    let meta1    = heap_get_body(task);
+    let meta2    = heap_get_domain(meta1);
+    let dep_node = heap_alloc_term();
+    heap_set_tag(dep_node, TAG_TASK_GRAPH);
+    heap_set_body(dep_node, dep_task);
+    heap_set_domain(dep_node, heap_get_domain(meta2));
+    heap_set_domain(meta2, dep_node);
+}
+
+pub fn task_dependencies_satisfied(task: i64) -> bool {
+    let meta1 = heap_get_body(task);
+    let meta2 = heap_get_domain(meta1);
+    let mut dep = heap_get_domain(meta2);
+    while dep != 0 {
+        let dep_task = heap_get_body(dep);
+        if task_status(dep_task) != TASK_COMPLETE { return false; }
+        dep = heap_get_domain(dep);
+    }
+    return true;
+}
+
+// Returns a linked list of tasks: plan → implement → test → verify → 0
+// Tasks are linked via their domain field (safe because meta is in body chain).
+pub fn decompose_objective(objective_id: i64) -> i64 {
+    let plan      = task_create(heap_alloc_term(), AGENT_PLANNER,  1);
+    let implement = task_create(heap_alloc_term(), AGENT_CODER,    2);
+    let test      = task_create(heap_alloc_term(), AGENT_TESTER,   2);
+    let verify    = task_create(heap_alloc_term(), AGENT_VERIFIER, 3);
+
+    // Dependencies added BEFORE linking the list (meta2.domain not yet touched by linking)
+    task_add_dependency(implement, plan);    task_set_status(implement, TASK_BLOCKED);
+    task_add_dependency(test, implement);    task_set_status(test, TASK_BLOCKED);
+    task_add_dependency(verify, test);       task_set_status(verify, TASK_BLOCKED);
+
+    // Link via domain — does not touch meta1 or meta2 (accessed via body)
+    heap_set_domain(plan, implement);
+    heap_set_domain(implement, test);
+    heap_set_domain(test, verify);
+    heap_set_domain(verify, 0);
+    return plan;
+}
+
+pub fn task_count(tasks: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = tasks;
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    return count;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let tasks = decompose_objective(heap_alloc_term());
+    if task_count(tasks) != 4 { return 1; }
+
+    // tasks head = plan
+    let plan = tasks;
+    if task_status(plan) != TASK_PENDING { return 2; }
+
+    // second = implement
+    let implement = heap_get_domain(plan);
+    if task_status(implement) != TASK_BLOCKED { return 3; }
+    if task_dependencies_satisfied(implement)  { return 4; }   // plan not complete
+
+    task_set_status(plan, TASK_COMPLETE);
+    if !task_dependencies_satisfied(implement) { return 5; }   // now satisfied
+
+    // Verify agent types propagate
+    if task_agent_type(plan) != AGENT_PLANNER  { return 6; }
+    if task_agent_type(implement) != AGENT_CODER { return 7; }
+
+    // Verify assigned-agent round-trip
+    task_set_assigned_agent(plan, 999);
+    if task_assigned_agent(plan) != 999 { return 8; }
+
+    return 111;
+}

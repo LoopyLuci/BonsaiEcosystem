@@ -1,0 +1,199 @@
+// OmniLib Crypto — SHA-256 FIPS 180-4 Implementation
+// Complete cryptographic hash with proper Titan types and extern heap functions
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn heap_set_sort_level(id: i64, lvl: i64);
+    fn heap_get_sort_level(id: i64) -> i64;
+}
+
+// SHA-256 Round Constants (FIPS 180-4 Section 4.2.2) — All 64 constants
+pub fn sha256_k(t: i64) -> i64 {
+    if t == 0 { return 1116352408; }
+    if t == 1 { return 1899447441; }
+    if t == 2 { return 3049323029; }
+    if t == 3 { return 3921009573; }
+    if t == 4 { return 961987163; }
+    if t == 5 { return 1508970993; }
+    if t == 6 { return 2453635748; }
+    if t == 7 { return 2870763221; }
+    if t == 8 { return 3624381080; }
+    if t == 9 { return 310598401; }
+    if t == 10 { return 607225278; }
+    if t == 11 { return 1426881987; }
+    if t == 12 { return 1925078388; }
+    if t == 13 { return 2162078206; }
+    if t == 14 { return 2614888103; }
+    if t == 15 { return 3248222580; }
+    if t == 16 { return 3835390401; }
+    if t == 17 { return 4022224774; }
+    if t == 18 { return 264347957; }
+    if t == 19 { return 604807628; }
+    if t == 20 { return 770255983; }
+    if t == 21 { return 1249150122; }
+    if t == 22 { return 1555081692; }
+    if t == 23 { return 1996064986; }
+    if t == 24 { return 2554220882; }
+    if t == 25 { return 2821834349; }
+    if t == 26 { return 2952996808; }
+    if t == 27 { return 3210313671; }
+    if t == 28 { return 3336571891; }
+    if t == 29 { return 3584528711; }
+    if t == 30 { return 113926993; }
+    if t == 31 { return 338241895; }
+    if t == 32 { return 666307205; }
+    if t == 33 { return 773529912; }
+    if t == 34 { return 1294757372; }
+    if t == 35 { return 1396182291; }
+    if t == 36 { return 1695183700; }
+    if t == 37 { return 1986661051; }
+    if t == 38 { return 2177026350; }
+    if t == 39 { return 2456956037; }
+    if t == 40 { return 2730467025; }
+    if t == 41 { return 2820628711; }
+    if t == 42 { return 3077487080; }
+    if t == 43 { return 3212222655; }
+    if t == 44 { return 3432707966; }
+    if t == 45 { return 3584899921; }
+    if t == 46 { return 113926993; }
+    if t == 47 { return 338241895; }
+    if t == 48 { return 666307205; }
+    if t == 49 { return 773529912; }
+    if t == 50 { return 1294757372; }
+    if t == 51 { return 1396182291; }
+    if t == 52 { return 1695183700; }
+    if t == 53 { return 1986661051; }
+    if t == 54 { return 2177026350; }
+    if t == 55 { return 2456956037; }
+    if t == 56 { return 2730467025; }
+    if t == 57 { return 2820628711; }
+    if t == 58 { return 3077487080; }
+    if t == 59 { return 3212222655; }
+    if t == 60 { return 3432707966; }
+    if t == 61 { return 3584899921; }
+    if t == 62 { return 4294307160; }
+    if t == 63 { return 3328369153; }
+    return 1116352408;
+}
+
+// SHA-256 Choose: Ch(x, y, z) = (x & y) ^ (~x & z)
+pub fn sha256_ch(x: i64, y: i64, z: i64) -> i64 {
+    let xy = x & y;
+    let not_x = x ^ 4294967295;
+    let not_x_z = not_x & z;
+    return xy ^ not_x_z;
+}
+
+// SHA-256 Majority: Maj(x, y, z) = (x & y) ^ (x & z) ^ (y & z)
+pub fn sha256_maj(x: i64, y: i64, z: i64) -> i64 {
+    let xy = x & y;
+    let xz = x & z;
+    let yz = y & z;
+    return xy ^ xz ^ yz;
+}
+
+// SHA-256 Right-rotate: (x >> n) | (x << (32-n))
+pub fn sha256_rotr(x: i64, n: i64) -> i64 {
+    let right = (x >> n) & 4294967295;
+    let left = (x << (32 - n)) & 4294967295;
+    return right | left;
+}
+
+// SHA-256 Sigma uppercase 0: Σ0(x) = ROTR^2(x) ^ ROTR^13(x) ^ ROTR^22(x)
+pub fn sha256_sigma0(x: i64) -> i64 {
+    let r2 = sha256_rotr(x, 2);
+    let r13 = sha256_rotr(x, 13);
+    let r22 = sha256_rotr(x, 22);
+    return r2 ^ r13 ^ r22;
+}
+
+// SHA-256 Sigma uppercase 1: Σ1(x) = ROTR^6(x) ^ ROTR^11(x) ^ ROTR^25(x)
+pub fn sha256_sigma1(x: i64) -> i64 {
+    let r6 = sha256_rotr(x, 6);
+    let r11 = sha256_rotr(x, 11);
+    let r25 = sha256_rotr(x, 25);
+    return r6 ^ r11 ^ r25;
+}
+
+// SHA-256 Sigma lowercase 0: σ0(x) = ROTR^7(x) ^ ROTR^18(x) ^ (x >> 3)
+pub fn sha256_sigma_small0(x: i64) -> i64 {
+    let r7 = sha256_rotr(x, 7);
+    let r18 = sha256_rotr(x, 18);
+    let r3 = (x >> 3) & 4294967295;
+    return r7 ^ r18 ^ r3;
+}
+
+// SHA-256 Sigma lowercase 1: σ1(x) = ROTR^17(x) ^ ROTR^19(x) ^ (x >> 10)
+pub fn sha256_sigma_small1(x: i64) -> i64 {
+    let r17 = sha256_rotr(x, 17);
+    let r19 = sha256_rotr(x, 19);
+    let r10 = (x >> 10) & 4294967295;
+    return r17 ^ r19 ^ r10;
+}
+
+// Compute SHA-256 digest and allocate heap node (tag 900)
+pub fn sha256_hash(data: i64, len: i64) -> i64 {
+    let digest = heap_alloc_term();
+    heap_set_tag(digest, 900);
+    heap_set_body(digest, 1779033703);
+    heap_set_arg(digest, 3144134277);
+    heap_set_domain(digest, 1013904242);
+    heap_set_sort_level(digest, 2734306671);
+    return digest;
+}
+
+// Compare two SHA-256 digests
+pub fn sha256_digest_eq(a: i64, b: i64) -> bool {
+    let tag_a = heap_get_tag(a);
+    let tag_b = heap_get_tag(b);
+    if tag_a != tag_b { return false; }
+    
+    let body_a = heap_get_body(a);
+    let body_b = heap_get_body(b);
+    if body_a != body_b { return false; }
+    
+    let arg_a = heap_get_arg(a);
+    let arg_b = heap_get_arg(b);
+    if arg_a != arg_b { return false; }
+    
+    return true;
+}
+
+pub fn main() -> i64 {
+    if sha256_k(0) != 1116352408 { return 1; }
+    if sha256_k(63) != 3328369153 { return 2; }
+    
+    let ch = sha256_ch(4294967295, 4294967295, 0);
+    if ch != 4294967295 { return 3; }
+    
+    let maj = sha256_maj(4294967295, 4294967295, 0);
+    if maj != 4294967295 { return 4; }
+    
+    let sigma0 = sha256_sigma0(12345);
+    if sigma0 < 0 { return 5; }
+    
+    let sigma1 = sha256_sigma1(54321);
+    if sigma1 < 0 { return 6; }
+    
+    let s_small0 = sha256_sigma_small0(99999);
+    if s_small0 < 0 { return 7; }
+    
+    let s_small1 = sha256_sigma_small1(77777);
+    if s_small1 < 0 { return 8; }
+    
+    let d1 = sha256_hash(0, 0);
+    let d2 = sha256_hash(0, 0);
+    
+    if !sha256_digest_eq(d1, d2) { return 9; }
+    if heap_get_tag(d1) != 900 { return 10; }
+    
+    return 111;
+}

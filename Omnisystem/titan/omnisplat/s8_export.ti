@@ -1,0 +1,149 @@
+// titan/omnisplat/s8_export.ti — File I/O & Export (PLY, SPLAT, Viewer, Project)
+// Self-contained. Wrapper-node append. Export descriptors built as heap nodes.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_EXP:   i64 = 9500;
+const F_PLY:   i64 = 0;
+const F_SPLAT: i64 = 1;
+const F_VIEWER: i64 = 2;
+const F_PROJ:  i64 = 3;
+const T_SD:    i64 = 8800;
+const T_SV:    i64 = 8801;
+const T_WRP:   i64 = 8802;
+
+// ===== Inlined vertex/data helpers =====
+pub fn s8_vx(v: i64) -> i64 { return heap_get_body(v); }
+pub fn s8_vy(v: i64) -> i64 { return heap_get_arg(v); }
+pub fn s8_vz(v: i64) -> i64 { return heap_get_body(heap_get_domain(v)); }
+
+pub fn s8_sv(px: i64, py: i64, pz: i64,
+              c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+              r: i64, g: i64, b: i64, op: i64) -> i64 {
+    let n1 = heap_alloc_term(); heap_set_body(n1, pz); heap_set_arg(n1, c0); heap_set_domain(n1, 0);
+    let n2 = heap_alloc_term(); heap_set_body(n2, c1); heap_set_arg(n2, c2); heap_set_domain(n2, n1);
+    let n3 = heap_alloc_term(); heap_set_body(n3, c3); heap_set_arg(n3, c4); heap_set_domain(n3, n2);
+    let n4 = heap_alloc_term(); heap_set_body(n4, c5); heap_set_arg(n4, r);  heap_set_domain(n4, n3);
+    let n5 = heap_alloc_term(); heap_set_body(n5, g);  heap_set_arg(n5, b);  heap_set_domain(n5, n4);
+    let n6 = heap_alloc_term(); heap_set_body(n6, op); heap_set_arg(n6, 0);  heap_set_domain(n6, n5);
+    let v  = heap_alloc_term();
+    heap_set_tag(v, T_SV); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, n6);
+    return v;
+}
+pub fn s8_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, T_SD); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn s8_add(d: i64, v: i64) {
+    let w = heap_alloc_term(); heap_set_tag(w, T_WRP); heap_set_body(w, v); heap_set_domain(w, 0);
+    let c = heap_get_body(d);
+    if c == 0 { heap_set_arg(d, w); }
+    else {
+        let mut t = heap_get_arg(d);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(d, c + 1);
+}
+pub fn s8_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn s8_get(d: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(d); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+
+// ===== Export descriptors =====
+// exp: tag=T_EXP, body=format, arg=splat_count, domain=extra (tl or 0)
+
+pub fn s8_export_ply(d: i64) -> i64 {
+    let hdr = heap_alloc_term();
+    heap_set_tag(hdr, T_EXP); heap_set_body(hdr, F_PLY); heap_set_arg(hdr, s8_cnt(d));
+    heap_set_domain(hdr, 0);
+    return hdr;
+}
+pub fn s8_export_splat(d: i64) -> i64 {
+    let hdr = heap_alloc_term();
+    heap_set_tag(hdr, T_EXP); heap_set_body(hdr, F_SPLAT); heap_set_arg(hdr, s8_cnt(d));
+    heap_set_domain(hdr, 0);
+    return hdr;
+}
+pub fn s8_export_viewer(d: i64) -> i64 {
+    let pkg = heap_alloc_term();
+    heap_set_tag(pkg, T_EXP); heap_set_body(pkg, F_VIEWER); heap_set_arg(pkg, s8_cnt(d));
+    heap_set_domain(pkg, 0);
+    return pkg;
+}
+pub fn s8_export_project(d: i64, tl: i64) -> i64 {
+    let proj = heap_alloc_term();
+    heap_set_tag(proj, T_EXP); heap_set_body(proj, F_PROJ); heap_set_arg(proj, s8_cnt(d));
+    heap_set_domain(proj, tl);
+    return proj;
+}
+
+pub fn s8_export_count(exp: i64) -> i64 { return heap_get_arg(exp); }
+pub fn s8_export_type(exp: i64) -> i64  { return heap_get_body(exp); }
+
+// Estimated byte sizes (integer approximations)
+pub fn s8_ply_header_bytes(vertex_count: i64) -> i64 {
+    return vertex_count * 16 * 4 + 128;
+}
+pub fn s8_viewer_package_size(splat_count: i64) -> i64 {
+    return splat_count * 67 + 4096;
+}
+pub fn s8_project_file_count() -> i64 { return 3; }
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let d = s8_sd();
+    let mut i: i64 = 0;
+    while i < 5 {
+        let v = s8_sv(i*10, i*10, i*5, 0, 0, 0, 0, 0, 0, 255, 0, 0, 100);
+        s8_add(d, v); i = i + 1;
+    }
+    if s8_cnt(d) != 5 { return 1; }
+
+    // PLY export
+    let ply = s8_export_ply(d);
+    if heap_get_tag(ply) != T_EXP      { return 2; }
+    if s8_export_type(ply) != F_PLY    { return 3; }
+    if s8_export_count(ply) != 5       { return 4; }
+
+    // SPLAT export
+    let splat = s8_export_splat(d);
+    if s8_export_type(splat) != F_SPLAT { return 5; }
+    if s8_export_count(splat) != 5      { return 6; }
+
+    // Viewer export
+    let viewer = s8_export_viewer(d);
+    if s8_export_type(viewer) != F_VIEWER { return 7; }
+
+    // Project export with timeline stub
+    let tl = heap_alloc_term();
+    let proj = s8_export_project(d, tl);
+    if s8_export_type(proj) != F_PROJ   { return 8; }
+    if heap_get_domain(proj) != tl      { return 9; }
+
+    // Size estimates
+    if s8_ply_header_bytes(5) <= 0      { return 10; }
+    if s8_viewer_package_size(5) <= 0   { return 11; }
+    if s8_project_file_count() != 3     { return 12; }
+
+    // Verify get by index
+    let v0 = s8_get(d, 0);
+    if s8_vx(v0) != 0  { return 13; }
+    let v4 = s8_get(d, 4);
+    if s8_vx(v4) != 40 { return 14; }
+
+    return 111;
+}

@@ -1,0 +1,66 @@
+// titan/omniagent/moe_core.ti
+// OmniAgent MoE Core — dynamic expert routing, multi-token prediction.
+// Simplified for bootstrap interpreter (no @device effects yet).
+
+pub fn main() -> i64 {
+    let num_experts: i64 = 64;
+    let active_experts: i64 = 8;
+    let hidden_dim: i64 = 768;
+    let vocab_size: i64 = 32000;
+
+    // Route tokens to experts
+    let expert_idx: i64 = route_token(hidden_dim, num_experts);
+    
+    // Compute MLA (Multi-Head Latent Attention)
+    let attention_score: i64 = compute_mla_score(hidden_dim, active_experts);
+    
+    // Multi-token prediction lookahead
+    let token1: i64 = predict_next_token(vocab_size);
+    let token2: i64 = predict_next_token(vocab_size);
+    
+    // Hardware device selection
+    let device: i64 = select_hardware_device(hidden_dim);
+    
+    // Aggregate results
+    return expert_idx + attention_score + token1 + token2 + device;
+}
+
+pub fn route_token(hidden_dim: i64, num_experts: i64) -> i64 {
+    // Simplified routing: hash hidden dimension to select expert
+    let router_output: i64 = (hidden_dim * 7) % num_experts;
+    return router_output + 1;  // Ensure non-zero
+}
+
+pub fn compute_mla_score(hidden_dim: i64, num_heads: i64) -> i64 {
+    // Multi-Head Latent Attention simplified computation
+    // Compress keys/values into latent space, then apply attention
+    let latent_dim: i64 = hidden_dim / 4;
+    let score: i64 = (latent_dim * num_heads) / 2;
+    return score;
+}
+
+pub fn predict_next_token(vocab_size: i64) -> i64 {
+    // Multi-Token Prediction: return predicted next token
+    // Simplified: deterministic token selection
+    return (vocab_size * 42) / 1000;
+}
+
+pub fn select_hardware_device(tensor_size: i64) -> i64 {
+    // Hardware router: 0=CPU, 1=iGPU, 2=GPU
+    let device: i64 = 0;
+    if tensor_size > 1024 { device = 1; }
+    if tensor_size > 65536 { device = 2; }
+    return device;
+}
+
+pub fn dynamic_active_experts(complexity: i64) -> i64 {
+    let min_active: i64 = 13;
+    let max_active: i64 = 51;
+    let scaled: i64 = (complexity * (max_active - min_active)) / 100 + min_active;
+    if scaled < min_active { min_active } else if scaled > max_active { max_active } else { scaled }
+}
+
+pub fn expert_dispatch(expert_id: i64, hidden_state: i64) -> i64 {
+    // Execute expert computation (simplified)
+    return expert_id * hidden_state;
+}

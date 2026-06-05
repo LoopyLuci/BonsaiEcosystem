@@ -1,0 +1,97 @@
+// OmniLib Priority Queue -- min-priority queue with ordered linked nodes
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_PQ: i64 = 7030;
+const TAG_PQ_NODE: i64 = 7031;
+
+// PQ layout: body=head(min), domain=size
+pub fn pq_new() -> i64 {
+    let pq = heap_alloc_term();
+    heap_set_tag(pq, TAG_PQ);
+    heap_set_body(pq, 0);
+    heap_set_arg(pq, 0);
+    heap_set_domain(pq, 0);
+    return pq;
+}
+
+pub fn pq_is_empty(pq: i64) -> i64 {
+    if heap_get_domain(pq) == 0 { return 1; }
+    return 0;
+}
+
+pub fn pq_size(pq: i64) -> i64 {
+    return heap_get_domain(pq);
+}
+
+pub fn pq_insert(pq: i64, value: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_PQ_NODE);
+    heap_set_body(n, value);
+    heap_set_arg(n, 0);
+
+    let head = heap_get_body(pq);
+    if head == 0 || value < heap_get_body(head) {
+        heap_set_arg(n, head);
+        heap_set_body(pq, n);
+        heap_set_domain(pq, heap_get_domain(pq) + 1);
+        return pq;
+    }
+
+    let mut cur = head;
+    while heap_get_arg(cur) != 0 {
+        let nxt = heap_get_arg(cur);
+        if value < heap_get_body(nxt) { break; }
+        cur = nxt;
+    }
+
+    heap_set_arg(n, heap_get_arg(cur));
+    heap_set_arg(cur, n);
+    heap_set_domain(pq, heap_get_domain(pq) + 1);
+    return pq;
+}
+
+pub fn pq_peek(pq: i64) -> i64 {
+    let head = heap_get_body(pq);
+    if head == 0 { return 0; }
+    return heap_get_body(head);
+}
+
+pub fn pq_pop(pq: i64) -> i64 {
+    let head = heap_get_body(pq);
+    if head == 0 { return 0; }
+
+    let v = heap_get_body(head);
+    heap_set_body(pq, heap_get_arg(head));
+    heap_set_domain(pq, heap_get_domain(pq) - 1);
+    return v;
+}
+
+pub fn main() -> i64 {
+    let pq = pq_new();
+    if pq_is_empty(pq) != 1 { return 1; }
+
+    pq_insert(pq, 30);
+    pq_insert(pq, 10);
+    pq_insert(pq, 20);
+
+    if pq_size(pq) != 3 { return 2; }
+    if pq_peek(pq) != 10 { return 3; }
+
+    if pq_pop(pq) != 10 { return 4; }
+    if pq_pop(pq) != 20 { return 5; }
+    if pq_pop(pq) != 30 { return 6; }
+    if pq_pop(pq) != 0 { return 7; }
+
+    if pq_is_empty(pq) != 1 { return 8; }
+
+    return 111;
+}

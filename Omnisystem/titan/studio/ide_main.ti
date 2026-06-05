@@ -1,0 +1,228 @@
+// titan/studio/ide_main.ti — Main IDE Entry Point
+// Wires layout, services, command palette, and event bus into one verified boot sequence.
+// Self-contained: all subsystem functions inlined.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+// ===== Layout (inlined from studio_config) =====
+const TAG_LAYOUT:    i64 = 8702;
+const PANEL_EXPLORER: i64 = 0;
+const PANEL_EDITOR:   i64 = 1;
+const PANEL_TERMINAL: i64 = 2;
+const PANEL_DEBUGGER: i64 = 3;
+const PANEL_AGENT:    i64 = 4;
+const PANEL_RAG:      i64 = 5;
+const PANEL_PIPELINE: i64 = 6;
+
+pub fn im_layout_create() -> i64 {
+    let l = heap_alloc_term();
+    heap_set_tag(l, TAG_LAYOUT);
+    heap_set_body(l, 0); heap_set_arg(l, 0); heap_set_domain(l, 0);
+    return l;
+}
+pub fn im_layout_add_panel(layout: i64, zone: i64, panel_type: i64) {
+    let panel = heap_alloc_term();
+    heap_set_body(panel, panel_type);
+    heap_set_arg(panel, zone);
+    if zone == 0 {
+        heap_set_domain(panel, heap_get_body(layout)); heap_set_body(layout, panel);
+    } else if zone == 1 {
+        heap_set_domain(panel, heap_get_arg(layout)); heap_set_arg(layout, panel);
+    } else {
+        heap_set_domain(panel, heap_get_domain(layout)); heap_set_domain(layout, panel);
+    }
+}
+pub fn im_layout_panel_count(layout: i64) -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = heap_get_body(layout);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    curr = heap_get_arg(layout);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    curr = heap_get_domain(layout);
+    while curr != 0 { count = count + 1; curr = heap_get_domain(curr); }
+    return count;
+}
+
+// ===== Services (inlined from service_manager) =====
+const TAG_SERVICE:      i64 = 8710;
+const SVC_LSP:          i64 = 0;
+const SVC_RAG:          i64 = 1;
+const SVC_ORCHESTRATOR: i64 = 2;
+const SVC_AGENT_POOL:   i64 = 3;
+const SVC_STOPPED:      i64 = 0;
+const SVC_RUNNING:      i64 = 2;
+
+static mut IM_SERVICE_LIST:  i64 = 0;
+static mut IM_SERVICE_COUNT: i64 = 0;
+
+pub fn im_svc_create(svc_type: i64, name_id: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SERVICE); heap_set_body(s, svc_type);
+    heap_set_arg(s, SVC_STOPPED); heap_set_domain(s, name_id);
+    return s;
+}
+pub fn im_svc_register(svc_type: i64) -> i64 {
+    let s = im_svc_create(svc_type, heap_alloc_term());
+    heap_set_domain(s, IM_SERVICE_LIST); IM_SERVICE_LIST = s;
+    IM_SERVICE_COUNT = IM_SERVICE_COUNT + 1;
+    return s;
+}
+pub fn im_svc_start_all() -> i64 {
+    let mut running: i64 = 0;
+    let mut curr = IM_SERVICE_LIST;
+    while curr != 0 { heap_set_arg(curr, SVC_RUNNING); running = running + 1; curr = heap_get_domain(curr); }
+    return running;
+}
+pub fn im_svc_stop_all() {
+    let mut curr = IM_SERVICE_LIST;
+    while curr != 0 { heap_set_arg(curr, SVC_STOPPED); curr = heap_get_domain(curr); }
+}
+pub fn im_svc_count() -> i64 { return IM_SERVICE_COUNT; }
+pub fn im_svc_running_count() -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = IM_SERVICE_LIST;
+    while curr != 0 {
+        if heap_get_arg(curr) == SVC_RUNNING { count = count + 1; }
+        curr = heap_get_domain(curr);
+    }
+    return count;
+}
+
+// ===== Command palette (inlined from command_palette) =====
+const TAG_COMMAND:        i64 = 8720;
+const CMD_NEW_FILE:       i64 = 0;
+const CMD_OPEN_FILE:      i64 = 1;
+const CMD_BUILD:          i64 = 3;
+const CMD_RUN:            i64 = 4;
+const CMD_DEBUG:          i64 = 5;
+const CMD_AGENT_DECOMPOSE: i64 = 12;
+const CMD_AION_RUN:       i64 = 13;
+
+static mut IM_CMD_LIST:  i64 = 0;
+static mut IM_CMD_COUNT: i64 = 0;
+
+pub fn im_cmd_register(the_id: i64) {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, 0); heap_set_arg(meta, 0); heap_set_domain(meta, 0);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_COMMAND); heap_set_body(c, the_id);
+    heap_set_arg(c, heap_alloc_term()); heap_set_domain(c, meta);
+    heap_set_domain(c, IM_CMD_LIST); IM_CMD_LIST = c;
+    IM_CMD_COUNT = IM_CMD_COUNT + 1;
+}
+pub fn im_cmd_find_by_id(target_id: i64) -> i64 {
+    let mut curr = IM_CMD_LIST;
+    while curr != 0 {
+        if heap_get_body(curr) == target_id { return curr; }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+pub fn im_cmd_seed_defaults() {
+    IM_CMD_LIST = 0; IM_CMD_COUNT = 0;
+    im_cmd_register(CMD_NEW_FILE);
+    im_cmd_register(CMD_OPEN_FILE);
+    im_cmd_register(CMD_BUILD);
+    im_cmd_register(CMD_RUN);
+    im_cmd_register(CMD_DEBUG);
+    im_cmd_register(CMD_AGENT_DECOMPOSE);
+    im_cmd_register(CMD_AION_RUN);
+}
+pub fn im_cmd_count() -> i64 { return IM_CMD_COUNT; }
+
+// ===== Event bus (inlined from event_bus) =====
+const TAG_EVENT: i64 = 8730;
+const EVT_FILE_OPENED:    i64 = 0;
+const EVT_BUILD_STARTED:  i64 = 2;
+const EVT_BUILD_COMPLETE: i64 = 3;
+const EVT_AGENT_ARTIFACT: i64 = 4;
+
+static mut IM_EVENT_QUEUE: i64 = 0;
+static mut IM_QUEUE_COUNT: i64 = 0;
+static mut IM_SUBSCRIBERS: i64 = 0;
+
+pub fn im_bus_subscribe(the_evt_type: i64, panel_id: i64) {
+    let s = heap_alloc_term();
+    heap_set_body(s, the_evt_type); heap_set_arg(s, panel_id); heap_set_domain(s, IM_SUBSCRIBERS);
+    IM_SUBSCRIBERS = s;
+}
+pub fn im_bus_publish(the_evt_type: i64, payload: i64) {
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_EVENT); heap_set_body(e, the_evt_type);
+    heap_set_arg(e, 0); heap_set_domain(e, payload);
+    if IM_EVENT_QUEUE == 0 {
+        IM_EVENT_QUEUE = e;
+    } else {
+        let mut tail = IM_EVENT_QUEUE;
+        while heap_get_domain(tail) != 0 { tail = heap_get_domain(tail); }
+        heap_set_domain(tail, e);
+    }
+    IM_QUEUE_COUNT = IM_QUEUE_COUNT + 1;
+}
+pub fn im_bus_pending() -> i64 { return IM_QUEUE_COUNT; }
+pub fn im_bus_drain() -> i64 { let n = IM_QUEUE_COUNT; IM_EVENT_QUEUE = 0; IM_QUEUE_COUNT = 0; return n; }
+
+// ===== IDE state =====
+const TAG_IDE_STATE: i64 = 8740;
+pub fn ide_state_create() -> i64 {
+    let state = heap_alloc_term();
+    heap_set_tag(state, TAG_IDE_STATE);
+    heap_set_body(state, 0); heap_set_arg(state, 0); heap_set_domain(state, 0);
+    return state;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    IM_SERVICE_LIST = 0; IM_SERVICE_COUNT = 0;
+    IM_CMD_LIST = 0; IM_CMD_COUNT = 0;
+    IM_EVENT_QUEUE = 0; IM_QUEUE_COUNT = 0; IM_SUBSCRIBERS = 0;
+
+    // 1. Layout
+    let layout = im_layout_create();
+    if heap_get_tag(layout) != TAG_LAYOUT { return 1; }
+    im_layout_add_panel(layout, 0, PANEL_EXPLORER);
+    im_layout_add_panel(layout, 1, PANEL_EDITOR);
+    im_layout_add_panel(layout, 2, PANEL_TERMINAL);
+    if im_layout_panel_count(layout) != 3 { return 2; }
+
+    // 2. Services
+    im_svc_register(SVC_LSP);
+    im_svc_register(SVC_RAG);
+    im_svc_register(SVC_AGENT_POOL);
+    let started = im_svc_start_all();
+    if started != 3              { return 3; }
+    if im_svc_running_count() != 3 { return 4; }
+
+    // 3. Commands
+    im_cmd_seed_defaults();
+    if im_cmd_count() != 7                      { return 5; }
+    if im_cmd_find_by_id(CMD_BUILD) == 0        { return 6; }
+
+    // 4. Event bus
+    im_bus_subscribe(EVT_FILE_OPENED, 1);
+    im_bus_publish(EVT_FILE_OPENED, heap_alloc_term());
+    if im_bus_pending() != 1                    { return 7; }
+    im_bus_drain();
+
+    // 5. IDE state node
+    let state = ide_state_create();
+    if heap_get_tag(state) != TAG_IDE_STATE     { return 8; }
+
+    // 6. Shutdown
+    im_svc_stop_all();
+    if im_svc_running_count() != 0              { return 9; }
+
+    return 111;
+}

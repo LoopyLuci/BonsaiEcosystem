@@ -1,0 +1,65 @@
+// OmniLib Thread — thread spawning and synchronization
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn int_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+    fn thread_spawn(func_id: i64, arg: i64) -> i64;
+    fn thread_join(thread_id: i64) -> i64;
+    fn thread_yield();
+    fn thread_sleep(millis: i64);
+    fn thread_id_current() -> i64;
+}
+
+const TAG_THREAD: i64 = 1030;
+
+pub fn thread_spawn(func_id: i64, arg: i64) -> i64 {
+    let raw = thread_spawn(func_id, arg);
+    if raw < 0 {
+        return -1;
+    }
+    let th = heap_alloc_term();
+    heap_set_tag(th, TAG_THREAD);
+    heap_set_body(th, raw);
+    th
+}
+
+pub fn thread_join(th: i64) -> i64 {
+    let raw = heap_get_body(th);
+    thread_join(raw)
+}
+
+pub fn thread_yield() {
+    thread_yield()
+}
+
+pub fn thread_sleep(millis: i64) {
+    thread_sleep(millis)
+}
+
+pub fn thread_current_id() -> i64 {
+    thread_id_current()
+}
+
+pub pub fn main() -> i64 {
+    let current_id = thread_current_id();
+    if current_id < 0 { return 1; }
+
+    thread_yield();
+
+    thread_sleep(1);
+
+    let th = thread_spawn(0, 0);
+    if th == -1 {
+        return 111;
+    }
+    if heap_get_tag(th) != TAG_THREAD { return 2; }
+    let result = thread_join(th);
+
+    return 111;
+}

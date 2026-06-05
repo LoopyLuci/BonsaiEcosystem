@@ -1,0 +1,113 @@
+// OmniView Renderer -- native drawing surface for OmniShell
+extern "titan" {
+   fn heap_alloc_term() -> i64;
+   fn heap_set_tag(id: i64, tag: i64);
+   fn heap_get_tag(id: i64) -> i64;
+   fn heap_set_body(id: i64, body: i64);
+   fn heap_get_body(id: i64) -> i64;
+   fn heap_set_arg(id: i64, arg: i64);
+   fn heap_get_arg(id: i64) -> i64;
+   fn heap_set_domain(id: i64, dom: i64);
+   fn heap_get_domain(id: i64) -> i64;
+
+   fn renderer_init(window_handle: i64) -> i64;
+   fn renderer_begin_frame(surface: i64);
+   fn renderer_end_frame(surface: i64);
+   fn renderer_clear(surface: i64, color: i64);
+   fn renderer_fill_rect(surface: i64, x: i64, y: i64, w: i64, h: i64, color: i64);
+   fn renderer_draw_text(surface: i64, x: i64, y: i64, text_id: i64, color: i64);
+   fn renderer_draw_line(surface: i64, x1: i64, y1: i64, x2: i64, y2: i64, color: i64);
+   fn renderer_measure_text(text_id: i64) -> i64;
+   fn renderer_set_clip(surface: i64, x: i64, y: i64, w: i64, h: i64);
+   fn renderer_reset_clip(surface: i64);
+}
+
+const TAG_SURFACE: i64 = 2100;
+
+pub fn color_rgba(r: i64, g: i64, b: i64, a: i64) -> i64 {
+   return (r * 16777216) + (g * 65536) + (b * 256) + a;
+}
+
+pub fn color_white() -> i64 { return color_rgba(255, 255, 255, 255); }
+pub fn color_black() -> i64 { return color_rgba(0, 0, 0, 255); }
+pub fn color_red() -> i64 { return color_rgba(255, 0, 0, 255); }
+pub fn color_green() -> i64 { return color_rgba(0, 255, 0, 255); }
+pub fn color_blue() -> i64 { return color_rgba(0, 0, 255, 255); }
+pub fn color_gray(level: i64) -> i64 { return color_rgba(level, level, level, 255); }
+
+pub fn surface_create(window_handle: i64) -> i64 {
+   let raw = renderer_init(window_handle);
+   if raw < 0 { return -1; }
+   let surf = heap_alloc_term();
+   heap_set_tag(surf, TAG_SURFACE);
+   heap_set_body(surf, raw);
+   return surf;
+}
+
+pub fn surface_begin_frame(surf: i64) {
+   renderer_begin_frame(heap_get_body(surf));
+   return;
+}
+
+pub fn surface_end_frame(surf: i64) {
+   renderer_end_frame(heap_get_body(surf));
+   return;
+}
+
+pub fn surface_clear(surf: i64, color: i64) {
+   renderer_clear(heap_get_body(surf), color);
+   return;
+}
+
+pub fn surface_fill_rect(surf: i64, x: i64, y: i64, w: i64, h: i64, color: i64) {
+   renderer_fill_rect(heap_get_body(surf), x, y, w, h, color);
+   return;
+}
+
+pub fn surface_draw_text(surf: i64, x: i64, y: i64, text_id: i64, color: i64) {
+   renderer_draw_text(heap_get_body(surf), x, y, text_id, color);
+   return;
+}
+
+pub fn surface_draw_line(surf: i64, x1: i64, y1: i64, x2: i64, y2: i64, color: i64) {
+   renderer_draw_line(heap_get_body(surf), x1, y1, x2, y2, color);
+   return;
+}
+
+pub fn surface_set_clip(surf: i64, x: i64, y: i64, w: i64, h: i64) {
+   renderer_set_clip(heap_get_body(surf), x, y, w, h);
+   return;
+}
+
+pub fn surface_reset_clip(surf: i64) {
+   renderer_reset_clip(heap_get_body(surf));
+   return;
+}
+
+pub fn layout_horizontal(x: i64, spacing: i64, count: i64) -> i64 {
+   return x + (count * spacing);
+}
+
+pub fn layout_vertical(y: i64, spacing: i64, count: i64) -> i64 {
+   return y + (count * spacing);
+}
+
+pub fn layout_center(parent_size: i64, child_size: i64) -> i64 {
+   return (parent_size - child_size) / 2;
+}
+
+pub fn main() -> i64 {
+   let white = color_white();
+   if white != ((255 * 16777216) + (255 * 65536) + (255 * 256) + 255) { return 1; }
+
+   let black = color_black();
+   if black != 255 { return 2; }
+
+   let x = layout_horizontal(0, 10, 5);
+   if x != 50 { return 3; }
+
+   let center = layout_center(800, 200);
+   if center != 300 { return 4; }
+
+   return 111;
+}

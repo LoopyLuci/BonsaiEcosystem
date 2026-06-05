@@ -1,0 +1,8 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_RF5:i64=27400;const tT_CD5:i64=27401;
+pub fn tl5_raft_create(node_id:i64)->i64{let r=heap_alloc_term();heap_set_tag(r,tT_RF5);heap_set_body(r,node_id);heap_set_arg(r,0);heap_set_domain(r,0);return r;}
+pub fn tl5_raft_term(r:i64)->i64{return heap_get_arg(r);}
+pub fn tl5_crdt_create()->i64{let c=heap_alloc_term();heap_set_tag(c,tT_CD5);heap_set_body(c,0);heap_set_arg(c,0);heap_set_domain(c,0);return c;}
+pub fn tl5_crdt_add(c:i64,value:i64){heap_set_body(c,heap_get_body(c)+value);}
+pub fn tl5_crdt_value(c:i64)->i64{return heap_get_body(c);}
+pub fn main()->i64{let c=tl5_crdt_create();tl5_crdt_add(c,5);tl5_crdt_add(c,15);if tl5_crdt_value(c)!=20{return 1;}return 111;}

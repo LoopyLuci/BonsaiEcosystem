@@ -1,0 +1,93 @@
+// tests/test_t3.ti — Phase T3 Abstractive Compressor Integration Test
+// All helpers inlined with tt3_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TT3_T_ABS:  i64 = 21200;
+const TT3_T_TOK3: i64 = 21201;
+const TT3_T_WRP3: i64 = 21202;
+
+pub fn tt3_token_create(content: i64, len: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TT3_T_TOK3); heap_set_body(t, content); heap_set_arg(t, len); heap_set_domain(t, 0);
+    return t;
+}
+pub fn tt3_token_len(t: i64) -> i64 { return heap_get_arg(t); }
+
+pub fn tt3_compressor_create(ratio: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TT3_T_ABS); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, ratio);
+    return c;
+}
+
+pub fn tt3_compressor_add(c: i64, tok: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TT3_T_WRP3); heap_set_body(w, tok); heap_set_domain(w, 0);
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+pub fn tt3_compressor_token_count(c: i64) -> i64 { return heap_get_body(c); }
+pub fn tt3_compressor_ratio(c: i64) -> i64        { return heap_get_domain(c); }
+
+pub fn tt3_compress(c: i64) -> i64 {
+    let n = heap_get_body(c);
+    let ratio = heap_get_domain(c);
+    let mut target: i64 = n * ratio / 100;
+    if target < 1 { target = 1; }
+    return target;
+}
+
+// ===== Integration test =====
+// 3 tokens, ratio=30 → 3*30/100=0 → capped to 1
+pub fn main() -> i64 {
+    let c = tt3_compressor_create(30);
+    if tt3_compressor_ratio(c) != 30              { return 1; }
+    if tt3_compressor_token_count(c) != 0         { return 2; }
+
+    tt3_compressor_add(c, tt3_token_create(10, 4));
+    tt3_compressor_add(c, tt3_token_create(20, 2));
+    tt3_compressor_add(c, tt3_token_create(30, 6));
+    if tt3_compressor_token_count(c) != 3         { return 3; }
+    if tt3_compress(c) != 1                       { return 4; }
+
+    // ratio=50, n=6 → 6*50/100=3
+    let c2 = tt3_compressor_create(50);
+    tt3_compressor_add(c2, tt3_token_create(1, 1));
+    tt3_compressor_add(c2, tt3_token_create(2, 2));
+    tt3_compressor_add(c2, tt3_token_create(3, 3));
+    tt3_compressor_add(c2, tt3_token_create(4, 4));
+    tt3_compressor_add(c2, tt3_token_create(5, 5));
+    tt3_compressor_add(c2, tt3_token_create(6, 6));
+    if tt3_compressor_token_count(c2) != 6        { return 5; }
+    if tt3_compress(c2) != 3                      { return 6; }
+
+    // ratio=100 → target = n
+    let c3 = tt3_compressor_create(100);
+    tt3_compressor_add(c3, tt3_token_create(1, 1));
+    tt3_compressor_add(c3, tt3_token_create(2, 2));
+    if tt3_compress(c3) != 2                      { return 7; }
+
+    // ratio=1, n=1 → 0 → capped to 1
+    let c4 = tt3_compressor_create(1);
+    tt3_compressor_add(c4, tt3_token_create(1, 5));
+    if tt3_compress(c4) != 1                      { return 8; }
+
+    return 111;
+}

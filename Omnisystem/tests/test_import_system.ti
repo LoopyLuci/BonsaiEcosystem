@@ -1,0 +1,40 @@
+// tests/test_import_system.ti — verifies cross-file imports work end-to-end
+import "titan/aether/omnicrodt.ti"
+import "titan/axiom/proof_search.ti"
+import "titan/sylva/verify.ti"
+
+extern "titan" {
+    fn heap_alloc() -> i64;
+    fn heap_set(id: i64, field: i64, v: i64);
+    fn heap_get(id: i64, field: i64) -> i64;
+    fn repl_print_int(v: i64);
+    fn repl_newline();
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Test 1: Call gctr_new from omnicrodt.ti (imported)
+    let ctr = gctr_new(1);
+    gctr_increment(ctr);
+    gctr_increment(ctr);
+    if gctr_value(ctr) == 2 {
+        score = score + 37;
+    }
+
+    // Test 2: Call pctx_new from proof_search.ti (imported)
+    let ctx = pctx_new();
+    let g = pctx_add_goal(ctx, 1, 7, 7);
+    tactic_refl(ctx, g);
+    if pctx_all_proved(ctx) == 1 {
+        score = score + 37;
+    }
+
+    // Test 3: Call sv_fn_new from verify.ti (imported)
+    let f = sv_fn_new(42);
+    if sv_fn_status(f) == 0 {
+        score = score + 37;
+    }
+
+    return score;
+}

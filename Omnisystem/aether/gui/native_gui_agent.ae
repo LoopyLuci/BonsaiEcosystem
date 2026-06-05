@@ -1,0 +1,106 @@
+// aether/gui/native_gui_agent.ae — Native GUI Agent
+// Autonomous agent loop: observe screen, decide action, inject input. All simulated.
+
+extern "rust" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+}
+
+// ===== Agent status =====
+const TAG_NATIVE_AGENT: i64 = 8550;
+const AGENT_IDLE:    i64 = 0;
+const AGENT_RUNNING: i64 = 1;
+const AGENT_DONE:    i64 = 2;
+const AGENT_ERROR:   i64 = 3;
+
+// agent: tag=TAG_NATIVE_AGENT, body=instruction_id, arg=status, domain=meta
+// meta:  body=step_count, arg=max_steps, domain=0
+
+pub fn native_agent_create(instruction_id: i64, max_steps: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, 0);          // step_count
+    heap_set_arg(meta, max_steps);
+    heap_set_domain(meta, 0);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_NATIVE_AGENT);
+    heap_set_body(a, instruction_id);
+    heap_set_arg(a, AGENT_IDLE);
+    heap_set_domain(a, meta);
+    return a;
+}
+
+pub fn agent_status(a: i64) -> i64      { return heap_get_arg(a); }
+pub fn agent_set_status(a: i64, s: i64) { heap_set_arg(a, s); }
+pub fn agent_step_count(a: i64) -> i64  { return heap_get_body(heap_get_domain(a)); }
+pub fn agent_max_steps(a: i64) -> i64   { return heap_get_arg(heap_get_domain(a)); }
+pub fn agent_inc_step(a: i64) {
+    let meta = heap_get_domain(a);
+    heap_set_body(meta, heap_get_body(meta) + 1);
+}
+
+// ===== Simulated screen capture =====
+const TAG_SCREENSHOT: i64 = 8510;
+pub fn nga_screen_capture() -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, 1920); heap_set_arg(meta, 1080); heap_set_domain(meta, 0);
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SCREENSHOT); heap_set_body(s, meta); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+// ===== Simulated action =====
+const TAG_ACTION: i64 = 8500;
+const ACT_CLICK: i64 = 0;
+pub fn nga_make_action() -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, 100); heap_set_arg(meta2, 0); heap_set_domain(meta2, 0);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, ACT_CLICK); heap_set_arg(meta1, 100); heap_set_domain(meta1, meta2);
+    let a = heap_alloc_term();
+    heap_set_tag(a, TAG_ACTION); heap_set_body(a, meta1); heap_set_arg(a, 0); heap_set_domain(a, 0);
+    return a;
+}
+
+// ===== Step =====
+pub fn native_agent_step(agent: i64) -> i64 {
+    let step = agent_step_count(agent);
+    let maxs = agent_max_steps(agent);
+    if step >= maxs {
+        agent_set_status(agent, AGENT_DONE);
+        return AGENT_DONE;
+    }
+    nga_screen_capture();
+    nga_make_action();
+    agent_inc_step(agent);
+    return AGENT_RUNNING;
+}
+
+pub fn native_agent_run(agent: i64) -> i64 {
+    agent_set_status(agent, AGENT_RUNNING);
+    while agent_status(agent) == AGENT_RUNNING {
+        native_agent_step(agent);
+    }
+    return agent_status(agent);
+}
+
+pub fn main() -> i64 {
+    let instr = heap_alloc_term();
+    let ag = native_agent_create(instr, 3);
+    if heap_get_tag(ag) != TAG_NATIVE_AGENT { return 1; }
+    if agent_status(ag) != AGENT_IDLE       { return 2; }
+
+    let result = native_agent_run(ag);
+    if result != AGENT_DONE                 { return 3; }
+    if agent_step_count(ag) != 3            { return 4; }
+
+    return 111;
+}

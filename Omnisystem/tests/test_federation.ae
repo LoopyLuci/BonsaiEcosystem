@@ -1,0 +1,190 @@
+// tests/test_federation.ae
+// Test suite for federated learning coordinator.
+
+use crate::aether::aion::federation::*;
+
+#[test]
+fn test_federation_coordinator_basic() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    assert_eq!(coordinator.current_round(), 0);
+    assert_eq!(coordinator.participant_count(), 0);
+}
+
+#[test]
+fn test_register_multiple_participants() {
+    let mut coordinator = FederationCoordinator::new(1.0, 3);
+    
+    for i in 0..5 {
+        let node_id = format!("node-{}", i);
+        let mut key = [0u8; 32];
+        key[0] = i as u8;
+        coordinator.register_participant(node_id, key);
+    }
+    
+    assert_eq!(coordinator.participant_count(), 5);
+}
+
+#[test]
+fn test_start_round_requires_min_participants() {
+    let mut coordinator = FederationCoordinator::new(1.0, 3);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    coordinator.register_participant("node2".to_string(), [1u8; 32]);
+    
+    let result = coordinator.start_round();
+    assert!(result.is_err());
+    assert_eq!(coordinator.current_round(), 0);
+}
+
+#[test]
+fn test_start_round_success() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    coordinator.register_participant("node2".to_string(), [1u8; 32]);
+    
+    let result = coordinator.start_round();
+    assert!(result.is_ok());
+    assert_eq!(coordinator.current_round(), 1);
+}
+
+#[test]
+fn test_receive_update_from_participant() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    coordinator.register_participant("node2".to_string(), [1u8; 32]);
+    coordinator.start_round().unwrap();
+    
+    let update = WeightUpdate {
+        round: 1,
+        weights: vec![1.5, 2.5, 3.5],
+        noise_applied: 0.5,
+        proof_hash: "proof-hash-1".to_string(),
+    };
+    
+    coordinator.receive_update("node1".to_string(), update);
+    
+    // Verify telemetry was emitted (indirectly verified via no panic)
+}
+
+#[test]
+fn test_receive_update_insufficient_noise() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    coordinator.register_participant("node2".to_string(), [1u8; 32]);
+    coordinator.start_round().unwrap();
+    
+    let update = WeightUpdate {
+        round: 1,
+        weights: vec![1.5, 2.5, 3.5],
+        noise_applied: 0.001, // Too small
+        proof_hash: "proof-hash-1".to_string(),
+    };
+    
+    coordinator.receive_update("node1".to_string(), update);
+    // Update should be rejected
+}
+
+#[test]
+fn test_aggregation_with_multiple_updates() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    coordinator.register_participant("node2".to_string(), [1u8; 32]);
+    coordinator.start_round().unwrap();
+    
+    let update1 = WeightUpdate {
+        round: 1,
+        weights: vec![1.0, 2.0, 3.0],
+        noise_applied: 0.5,
+        proof_hash: "proof1".to_string(),
+    };
+    
+    let update2 = WeightUpdate {
+        round: 1,
+        weights: vec![2.0, 3.0, 4.0],
+        noise_applied: 0.5,
+        proof_hash: "proof2".to_string(),
+    };
+    
+    coordinator.receive_update("node1".to_string(), update1);
+    coordinator.receive_update("node2".to_string(), update2);
+    
+    let weights = coordinator.get_global_weights();
+    assert!(weights.is_some());
+    let w = weights.unwrap();
+    
+    // Averaged: [(1+2)/2, (2+3)/2, (3+4)/2] = [1.5, 2.5, 3.5]
+    assert!(w.len() == 3);
+}
+
+#[test]
+fn test_privacy_budget_affects_noise() {
+    let mut c1 = FederationCoordinator::new(0.1, 2);
+    let mut c2 = FederationCoordinator::new(1.0, 2);
+    
+    c1.register_participant("n1".to_string(), [0u8; 32]);
+    c1.register_participant("n2".to_string(), [1u8; 32]);
+    
+    c2.register_participant("n1".to_string(), [0u8; 32]);
+    c2.register_participant("n2".to_string(), [1u8; 32]);
+    
+    let noise1 = c1.compute_noise_scale();
+    let noise2 = c2.compute_noise_scale();
+    
+    // Smaller privacy budget should have larger noise scale
+    assert!(noise1 > noise2);
+}
+
+#[test]
+fn test_federation_stats() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    coordinator.register_participant("node2".to_string(), [1u8; 32]);
+    
+    let stats = coordinator.get_stats();
+    assert_eq!(stats.total_participants, 2);
+    assert_eq!(stats.rounds_completed, 0);
+}
+
+#[test]
+fn test_multiple_rounds() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    coordinator.register_participant("node2".to_string(), [1u8; 32]);
+    
+    // Round 1
+    coordinator.start_round().unwrap();
+    assert_eq!(coordinator.current_round(), 1);
+    
+    coordinator.receive_update("node1".to_string(), WeightUpdate {
+        round: 1,
+        weights: vec![1.0, 2.0],
+        noise_applied: 0.5,
+        proof_hash: "p1".to_string(),
+    });
+    
+    coordinator.receive_update("node2".to_string(), WeightUpdate {
+        round: 1,
+        weights: vec![2.0, 3.0],
+        noise_applied: 0.5,
+        proof_hash: "p2".to_string(),
+    });
+    
+    // Round 2
+    coordinator.start_round().unwrap();
+    assert_eq!(coordinator.current_round(), 2);
+}
+
+#[test]
+fn test_unknown_participant_rejected() {
+    let mut coordinator = FederationCoordinator::new(1.0, 2);
+    coordinator.register_participant("node1".to_string(), [0u8; 32]);
+    
+    let update = WeightUpdate {
+        round: 1,
+        weights: vec![1.0],
+        noise_applied: 0.5,
+        proof_hash: "p1".to_string(),
+    };
+    
+    // Should not panic, just reject silently
+    coordinator.receive_update("unknown".to_string(), update);
+}

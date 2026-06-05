@@ -1,0 +1,34 @@
+// tests/test_real_actors_concurrent.ti
+// Real concurrent Aether actor test — two actors exchange messages and converge.
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Spawn two actors with initial counter state
+    let a1: i64 = spawn_actor("counter-a", 0);
+    let a2: i64 = spawn_actor("counter-b", 0);
+    if a1 == 1 && a2 == 1 { score = score + 1; }
+
+    // Actor A increments by 42
+    let inc_a: i64 = send_actor_msg("counter-a", "inc:42");
+    if inc_a == 1 { score = score + 1; }
+
+    // Actor B increments by 58
+    let inc_b: i64 = send_actor_msg("counter-b", "inc:58");
+    if inc_b == 1 { score = score + 1; }
+
+    // Actor A requests Actor B's state
+    let req: i64 = send_actor_msg("counter-a", "request:counter-b");
+    if req == 1 { score = score + 1; }
+
+    // Actor B sends its state to Actor A
+    let reply: i64 = send_actor_msg("counter-b", "reply:counter-a:58");
+    if reply == 1 { score = score + 1; }
+
+    // Actor A now merges: 42 + 58 = 100
+    let merge: i64 = send_actor_msg("counter-a", "merge:58");
+    if merge == 1 { score = score + 1; }
+
+    if score == 6 { return 111; }
+    return score * 15;
+}

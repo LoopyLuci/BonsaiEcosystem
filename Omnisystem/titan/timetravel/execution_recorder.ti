@@ -1,0 +1,136 @@
+// titan/timetravel/execution_recorder.ti — VM Execution Trace Recorder
+// Captures every instruction step into a linked trace chain.
+// Body-for-meta layout; domain reserved for next-step link.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_TRACE_STEP:     i64 = 7200;
+const TAG_TRACE_SNAPSHOT: i64 = 7201;
+
+const STEP_EXECUTE: i64 = 0;
+const STEP_STORE:   i64 = 1;
+const STEP_LOAD:    i64 = 2;
+const STEP_CALL:    i64 = 3;
+const STEP_RETURN:  i64 = 4;
+const STEP_JUMP:    i64 = 5;
+
+const OP_PUSH: i64 = 1;
+const OP_ADD:  i64 = 2;
+const OP_RET:  i64 = 14;
+
+// step cell layout:
+//   step: tag=TAG_TRACE_STEP, body=meta1, arg=opcode, domain=next_step
+//   meta1: body=step_type, arg=pc, domain=meta2
+//   meta2: body=arg_val, arg=sp, domain=stack_top_value
+
+static mut TRACE_HEAD:      i64  = 0;
+static mut TRACE_TAIL:      i64  = 0;
+static mut TRACE_COUNT:     i64  = 0;
+static mut TRACE_RECORDING: bool = false;
+
+pub fn trace_step_type(step: i64) -> i64       { return heap_get_body(heap_get_body(step)); }
+pub fn trace_step_opcode(step: i64) -> i64     { return heap_get_arg(step); }
+pub fn trace_step_pc(step: i64) -> i64         { return heap_get_arg(heap_get_body(step)); }
+pub fn trace_step_arg(step: i64) -> i64        { return heap_get_body(heap_get_domain(heap_get_body(step))); }
+pub fn trace_step_sp(step: i64) -> i64         { return heap_get_arg(heap_get_domain(heap_get_body(step))); }
+pub fn trace_step_stack_top(step: i64) -> i64  { return heap_get_domain(heap_get_domain(heap_get_body(step))); }
+
+pub fn trace_start() {
+    TRACE_HEAD      = 0;
+    TRACE_TAIL      = 0;
+    TRACE_COUNT     = 0;
+    TRACE_RECORDING = true;
+}
+
+pub fn trace_stop() { TRACE_RECORDING = false; }
+pub fn trace_is_recording() -> bool { return TRACE_RECORDING; }
+pub fn trace_count() -> i64 { return TRACE_COUNT; }
+pub fn trace_head() -> i64  { return TRACE_HEAD; }
+
+pub fn trace_record(step_type: i64, opcode: i64, arg: i64,
+                    pc: i64, sp: i64, stack_top: i64) {
+    if !TRACE_RECORDING { return; }
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, arg);
+    heap_set_arg(meta2, sp);
+    heap_set_domain(meta2, stack_top);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, step_type);
+    heap_set_arg(meta1, pc);
+    heap_set_domain(meta1, meta2);
+    let step = heap_alloc_term();
+    heap_set_tag(step, TAG_TRACE_STEP);
+    heap_set_body(step, meta1);
+    heap_set_arg(step, opcode);
+    heap_set_domain(step, 0);
+    // Append to tail (forward order)
+    if TRACE_TAIL != 0 {
+        heap_set_domain(TRACE_TAIL, step);
+    } else {
+        TRACE_HEAD = step;
+    }
+    TRACE_TAIL  = step;
+    TRACE_COUNT = TRACE_COUNT + 1;
+}
+
+// Returns a snapshot cell whose body points to the step node at the given index.
+pub fn trace_snapshot_at_index(index: i64) -> i64 {
+    let mut curr = TRACE_HEAD;
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index {
+            let snap = heap_alloc_term();
+            heap_set_tag(snap, TAG_TRACE_SNAPSHOT);
+            heap_set_body(snap, curr);
+            return snap;
+        }
+        i    = i + 1;
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    TRACE_HEAD      = 0;
+    TRACE_TAIL      = 0;
+    TRACE_COUNT     = 0;
+    TRACE_RECORDING = false;
+
+    trace_start();
+    if !trace_is_recording()   { return 1; }
+
+    trace_record(STEP_CALL,   OP_PUSH, 42, 0, 0, 0);
+    trace_record(STEP_RETURN, OP_RET,  0,  1, 1, 42);
+    trace_stop();
+
+    if trace_count() != 2      { return 2; }
+    if trace_is_recording()    { return 3; }
+
+    let snap0 = trace_snapshot_at_index(0);
+    if snap0 == 0              { return 4; }
+    let step0 = heap_get_body(snap0);
+    if trace_step_type(step0) != STEP_CALL   { return 5; }
+    if trace_step_opcode(step0) != OP_PUSH   { return 6; }
+    if trace_step_pc(step0)   != 0           { return 7; }
+
+    let snap1 = trace_snapshot_at_index(1);
+    if snap1 == 0              { return 8; }
+    let step1 = heap_get_body(snap1);
+    if trace_step_type(step1) != STEP_RETURN { return 9; }
+
+    // Out-of-bounds returns 0
+    if trace_snapshot_at_index(99) != 0      { return 10; }
+
+    return 111;
+}

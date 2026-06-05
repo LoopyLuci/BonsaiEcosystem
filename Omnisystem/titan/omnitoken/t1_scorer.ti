@@ -1,0 +1,128 @@
+// titan/omnitoken/t1_scorer.ti — Token Importance Scorer
+// Self-contained. Wrapper-node APPEND for token list.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_TOKEN:  i64 = 21000;
+const T_SCORER: i64 = 21001;
+const T_WRPT1:  i64 = 21002;
+
+// ===== Token =====
+// token: tag=T_TOKEN, body=content, arg=len
+
+pub fn t1_token_create(content: i64, len: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_TOKEN); heap_set_body(t, content); heap_set_arg(t, len); heap_set_domain(t, 0);
+    return t;
+}
+
+pub fn t1_token_content(t: i64) -> i64 { return heap_get_body(t); }
+pub fn t1_token_len(t: i64) -> i64     { return heap_get_arg(t); }
+
+// ===== Scorer =====
+// scorer: tag=T_SCORER, body=token_count, arg=list_head(wrappers)
+// wrapper: tag=T_WRPT1, body=token, domain=next_wrapper
+
+pub fn t1_scorer_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_SCORER); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn t1_scorer_add_token(s: i64, token: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRPT1); heap_set_body(w, token); heap_set_domain(w, 0);
+    let h = heap_get_arg(s);
+    if h == 0 { heap_set_arg(s, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+
+pub fn t1_scorer_token_count(s: i64) -> i64 { return heap_get_body(s); }
+
+pub fn t1_scorer_get_token(s: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(s); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Scoring heuristics =====
+// len > 3 → 90 (high importance), len > 1 → 70 (medium), else 50 (low)
+
+pub fn t1_score_token(token: i64) -> i64 {
+    let len = heap_get_arg(token);
+    if len > 3 { return 90; }
+    if len > 1 { return 70; }
+    return 50;
+}
+
+pub fn t1_score_all(s: i64) -> i64 {
+    let n = heap_get_body(s);
+    let mut total: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let t = t1_scorer_get_token(s, i);
+        if t != 0 { total = total + t1_score_token(t); }
+        i = i + 1;
+    }
+    return total;
+}
+
+pub fn t1_importance_above(s: i64, threshold: i64) -> i64 {
+    let n = heap_get_body(s);
+    let mut count: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let t = t1_scorer_get_token(s, i);
+        if t != 0 { if t1_score_token(t) >= threshold { count = count + 1; } }
+        i = i + 1;
+    }
+    return count;
+}
+
+// ===== Self-test =====
+// Tokens: len5→90, len2→70, len1→50, len6→90. Total=300. ≥70: 3.
+pub fn main() -> i64 {
+    let s = t1_scorer_create();
+    t1_scorer_add_token(s, t1_token_create(10, 5));
+    t1_scorer_add_token(s, t1_token_create(20, 2));
+    t1_scorer_add_token(s, t1_token_create(30, 1));
+    t1_scorer_add_token(s, t1_token_create(40, 6));
+    if t1_scorer_token_count(s) != 4     { return 1; }
+
+    let t0 = t1_scorer_get_token(s, 0);
+    if t1_token_content(t0) != 10        { return 2; }
+    if t1_token_len(t0) != 5             { return 3; }
+    if t1_score_token(t0) != 90          { return 4; }
+
+    let t2 = t1_scorer_get_token(s, 2);
+    if t1_score_token(t2) != 50          { return 5; }
+
+    if t1_score_all(s) != 300            { return 6; }
+    if t1_importance_above(s, 70) != 3   { return 7; }
+    if t1_importance_above(s, 90) != 2   { return 8; }
+    if t1_importance_above(s, 100) != 0  { return 9; }
+
+    // Isolation: second scorer
+    let s2 = t1_scorer_create();
+    t1_scorer_add_token(s2, t1_token_create(1, 1));
+    if t1_scorer_token_count(s2) != 1    { return 10; }
+    if t1_scorer_token_count(s) != 4     { return 11; }
+
+    return 111;
+}

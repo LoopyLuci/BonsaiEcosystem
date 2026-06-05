@@ -1,0 +1,170 @@
+// titan/ai/model_registry.ti — Local Model Registry
+// Manages available AI models with capabilities and metadata.
+// Body-for-meta layout: model.body=meta1, model.domain=next_model (safe for list).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+}
+
+const TAG_MODEL_ENTRY: i64 = 8000;
+
+// Capability bitmasks
+const CAP_COMPLETION:   i64 = 1;
+const CAP_CHAT:         i64 = 2;
+const CAP_REASONING:    i64 = 4;
+const CAP_PROOF_SEARCH: i64 = 8;
+const CAP_CODE_GEN:     i64 = 16;
+const CAP_EMBEDDING:    i64 = 32;
+
+// Model sources
+const MODEL_LOCAL: i64 = 0;
+const MODEL_CLOUD: i64 = 1;
+const MODEL_WASM:  i64 = 2;
+
+// model cell layout:
+//   model:  tag=TAG_MODEL_ENTRY, body=meta1, arg=0, domain=next_model
+//   meta1:  body=name_id, arg=source, domain=meta2
+//   meta2:  body=capabilities, arg=token_limit, domain=meta3
+//   meta3:  body=cost_per_1k, arg=endpoint_id, domain=0
+
+pub fn model_create(name_id: i64, source: i64, capabilities: i64,
+                    token_limit: i64, cost_per_1k: i64, endpoint_id: i64) -> i64 {
+    let meta3 = heap_alloc_term();
+    heap_set_body(meta3, cost_per_1k);
+    heap_set_arg(meta3, endpoint_id);
+    heap_set_domain(meta3, 0);
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, capabilities);
+    heap_set_arg(meta2, token_limit);
+    heap_set_domain(meta2, meta3);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, name_id);
+    heap_set_arg(meta1, source);
+    heap_set_domain(meta1, meta2);
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_MODEL_ENTRY);
+    heap_set_body(m, meta1);
+    heap_set_arg(m, 0);
+    heap_set_domain(m, 0);  // next_model; safe for list link
+    return m;
+}
+
+pub fn model_name(m: i64) -> i64 {
+    return heap_get_body(heap_get_body(m));                                     // meta1.body
+}
+pub fn model_source(m: i64) -> i64 {
+    return heap_get_arg(heap_get_body(m));                                      // meta1.arg
+}
+pub fn model_capabilities(m: i64) -> i64 {
+    return heap_get_body(heap_get_domain(heap_get_body(m)));                    // meta2.body
+}
+pub fn model_token_limit(m: i64) -> i64 {
+    return heap_get_arg(heap_get_domain(heap_get_body(m)));                     // meta2.arg
+}
+pub fn model_cost(m: i64) -> i64 {
+    return heap_get_body(heap_get_domain(heap_get_domain(heap_get_body(m))));   // meta3.body
+}
+pub fn model_endpoint(m: i64) -> i64 {
+    return heap_get_arg(heap_get_domain(heap_get_domain(heap_get_body(m))));    // meta3.arg
+}
+pub fn model_has_capability(m: i64, cap: i64) -> bool {
+    return (model_capabilities(m) & cap) != 0;
+}
+
+// Registry linked list
+static mut MODEL_LIST:  i64 = 0;
+static mut MODEL_COUNT: i64 = 0;
+
+pub fn registry_register(name_id: i64, source: i64, capabilities: i64,
+                          token_limit: i64, cost_per_1k: i64, endpoint_id: i64) -> i64 {
+    let m = model_create(name_id, source, capabilities, token_limit, cost_per_1k, endpoint_id);
+    heap_set_domain(m, MODEL_LIST);    // model.domain = next_model (safe — meta chain is in body)
+    MODEL_LIST  = m;
+    MODEL_COUNT = MODEL_COUNT + 1;
+    return m;
+}
+
+// Return model with highest token_limit that has required_cap.
+pub fn registry_find_by_capability(required_cap: i64) -> i64 {
+    let mut curr = MODEL_LIST;
+    let mut best:             i64 = 0;
+    let mut best_token_limit: i64 = 0;
+    while curr != 0 {
+        if model_has_capability(curr, required_cap) {
+            let limit = model_token_limit(curr);
+            if limit > best_token_limit {
+                best_token_limit = limit;
+                best             = curr;
+            }
+        }
+        curr = heap_get_domain(curr);
+    }
+    return best;
+}
+
+pub fn registry_find_by_name(name_id: i64) -> i64 {
+    let mut curr = MODEL_LIST;
+    while curr != 0 {
+        if str_eq(model_name(curr), name_id) { return curr; }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+pub fn registry_count() -> i64 { return MODEL_COUNT; }
+
+pub fn registry_seed_defaults() {
+    // Local completion + code-gen model
+    registry_register(heap_alloc_term(), MODEL_LOCAL,
+                      CAP_COMPLETION | CAP_CODE_GEN, 4096, 0, heap_alloc_term());
+    // Cloud reasoning model
+    registry_register(heap_alloc_term(), MODEL_CLOUD,
+                      CAP_CHAT | CAP_REASONING | CAP_CODE_GEN, 128000, 3, heap_alloc_term());
+    // Local embedding model
+    registry_register(heap_alloc_term(), MODEL_LOCAL,
+                      CAP_EMBEDDING, 512, 0, heap_alloc_term());
+    // Local proof-search model
+    registry_register(heap_alloc_term(), MODEL_LOCAL,
+                      CAP_PROOF_SEARCH, 8192, 0, heap_alloc_term());
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    MODEL_LIST  = 0;
+    MODEL_COUNT = 0;
+    registry_seed_defaults();
+    if registry_count() != 4 { return 1; }
+
+    // Completion model should be local
+    let comp_model = registry_find_by_capability(CAP_COMPLETION);
+    if comp_model == 0                                   { return 2; }
+    if !model_has_capability(comp_model, CAP_COMPLETION) { return 3; }
+
+    // Reasoning model should be cloud with high token limit
+    let reason_model = registry_find_by_capability(CAP_REASONING);
+    if reason_model == 0                                 { return 4; }
+    if model_source(reason_model) != MODEL_CLOUD         { return 5; }
+    if model_token_limit(reason_model) < 100000          { return 6; }
+
+    // Proof model should NOT have chat capability
+    let proof_model = registry_find_by_capability(CAP_PROOF_SEARCH);
+    if proof_model == 0                                  { return 7; }
+    if model_has_capability(proof_model, CAP_CHAT)       { return 8; }
+
+    // Embedding model
+    let emb_model = registry_find_by_capability(CAP_EMBEDDING);
+    if emb_model == 0                                    { return 9; }
+    if model_source(emb_model) != MODEL_LOCAL            { return 10; }
+
+    return 111;
+}

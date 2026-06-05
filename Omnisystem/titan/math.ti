@@ -1,0 +1,11 @@
+// Titan math module - Basic arithmetic
+// Provides simple math functions callable from Sylva
+
+fn add_nums(a: i64, b: i64) -> i64 {
+    return a + b;
+}
+
+fn multiply_nums(a: i64, b: i64) -> i64 {
+    return a * b;
+}
+

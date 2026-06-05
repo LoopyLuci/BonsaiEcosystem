@@ -1,0 +1,18 @@
+// sylva/omniview/view_macro.sy — OmniView declarative UI macro
+// view! { ... } expands to Aether actor trees.
+
+pub fn main() -> i64 {
+    let window_count: i64 = count_widgets(0);
+    let button_count: i64 = count_widgets(1);
+    let text_count: i64 = count_widgets(2);
+    let sum1: i64 = window_count + button_count;
+    let total: i64 = sum1 + text_count;
+    return total;
+}
+
+pub fn count_widgets(widget_type: i64) -> i64 {
+    if widget_type == 0 { return 1; }
+    if widget_type == 1 { return 2; }
+    if widget_type == 2 { return 3; }
+    return 0;
+}

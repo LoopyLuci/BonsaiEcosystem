@@ -1,0 +1,69 @@
+// titan/std/error.ti — Extended error taxonomy: application codes + hardware fault codes
+// Every subsystem error and every hardware exception maps to one of these codes.
+// Hardware faults (ERR_PAGE, ERR_ALIGN, ERR_MACHINE) are re-wrapped into Result::Err
+// by the Trap Gatekeeper before being delivered to the Supervisor's error channel.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+// Application-level error codes
+const ERR_FILE:    i64 = 1;
+const ERR_PERM:    i64 = 2;
+const ERR_OOM:     i64 = 3;
+const ERR_NET:     i64 = 4;
+const ERR_BOUNDS:  i64 = 5;
+
+// Hardware fault codes (injected by trap_gatekeeper into the error monad)
+const ERR_ALIGN:   i64 = 6;
+const ERR_PAGE:    i64 = 7;
+const ERR_ILLEGAL: i64 = 8;
+const ERR_MACHINE: i64 = 9;
+
+const TAG_FAULT: i64 = 52000;
+
+pub fn fault_new(code: i64, addr: i64) -> i64 {
+    let f = heap_alloc_term();
+    heap_set_tag(f, TAG_FAULT);
+    heap_set_body(f, code);
+    heap_set_arg(f, addr);
+    return f;
+}
+
+pub fn fault_code(f: i64) -> i64 {
+    return heap_get_body(f);
+}
+
+pub fn fault_addr(f: i64) -> i64 {
+    return heap_get_arg(f);
+}
+
+pub fn error_is_hw(code: i64) -> i64 {
+    if code >= ERR_ALIGN {
+        if code <= ERR_MACHINE {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+pub fn main() -> i64 {
+    if ERR_ALIGN != 6 { return 1; }
+    if ERR_PAGE  != 7 { return 2; }
+    if error_is_hw(ERR_PAGE) != 1 { return 3; }
+    if error_is_hw(ERR_NET)  != 0 { return 4; }
+
+    let f = fault_new(ERR_PAGE, 4096);
+    if fault_code(f) != ERR_PAGE { return 5; }
+    if fault_addr(f) != 4096 { return 6; }
+
+    return 111;
+}

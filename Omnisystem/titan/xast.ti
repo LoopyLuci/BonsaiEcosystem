@@ -1,0 +1,370 @@
+// titan/xast.ti
+// Cross‑Language Abstract Syntax Tree (XAST) — Universal pivot representation.
+// Part of the self‑hosted Omnisystem bootstrap. No external dependencies.
+
+// ── Node kind enumeration ──────────────────────────────────────
+pub enum XNodeKind {
+    MODULE,
+    FUNC,
+    VAR_DECL,
+    ASSIGN,
+    BINARY_OP,
+    UNARY_OP,
+    CALL,
+    IF,
+    WHILE,
+    FOR,
+    RETURN,
+    LITERAL,
+    IDENT,
+    BLOCK,
+    PARAM,
+    STRUCT_DEF,
+    ENUM_DEF,
+    FIELD_ACCESS,
+    INDEX,
+    ARRAY_LITERAL,
+    CAST,
+    MATCH,
+}
+
+// ── Literal kind enumeration ───────────────────────────────────
+pub enum XLiteralKind {
+    INT,
+    FLOAT,
+    STRING,
+    BOOL,
+    NULL,
+    CHAR,
+}
+
+// ── Binary operators ───────────────────────────────────────────
+pub enum XBinaryOp {
+    ADD,      // +
+    SUB,      // -
+    MUL,      // *
+    DIV,      // /
+    MOD,      // %
+    EQ,       // ==
+    NEQ,      // !=
+    LT,       // <
+    GT,       // >
+    LE,       // <=
+    GE,       // >=
+    AND,      // &&
+    OR,       // ||
+}
+
+// ── Unary operators ────────────────────────────────────────────
+pub enum XUnaryOp {
+    NEG,      // negation (numeric -)
+    NOT,      // boolean not (!)
+    BITWISE_NOT,  // ~
+    ADDR_OF,  // &
+    DEREF,    // *
+}
+
+// ── XAST Node structure ────────────────────────────────────────
+pub struct XNode {
+    pub kind: XNodeKind,
+    pub children: Vec<XNode>,
+    pub value: String,           // identifier, operator text, literal value
+    pub type_annotation: String, // source type (i32, &str, void, etc.)
+    pub line: i64,
+    pub col: i64,
+    pub metadata: String,        // optional JSON‑encoded metadata
+}
+
+impl XNode {
+    pub fn new(kind: XNodeKind) -> XNode {
+        XNode {
+            kind: kind,
+            children: Vec::new(),
+            value: String::new(),
+            type_annotation: String::new(),
+            line: 0,
+            col: 0,
+            metadata: String::new(),
+        }
+    }
+}
+
+// ── Factory function: Module ───────────────────────────────────
+pub fn x_module(body: Vec<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::MODULE);
+    node.children = body;
+    node
+}
+
+// ── Factory function: Function definition ──────────────────────
+pub fn x_func(name: String, params: Vec<(String, String)>, body: Vec<XNode>, ret_type: String) -> XNode {
+    let mut node = XNode::new(XNodeKind::FUNC);
+    node.value = name;
+    node.type_annotation = ret_type;
+    
+    // Add parameter nodes
+    for (param_name, param_type) in params {
+        let mut param_node = XNode::new(XNodeKind::PARAM);
+        param_node.value = param_name;
+        param_node.type_annotation = param_type;
+        node.children.push(param_node);
+    }
+    
+    // Add body statements
+    for stmt in body {
+        node.children.push(stmt);
+    }
+    
+    node
+}
+
+// ── Factory function: Parameter ────────────────────────────────
+pub fn x_param(name: String, type_ann: String) -> XNode {
+    let mut node = XNode::new(XNodeKind::PARAM);
+    node.value = name;
+    node.type_annotation = type_ann;
+    node
+}
+
+// ── Factory function: Variable declaration ─────────────────────
+pub fn x_var_decl(name: String, type_ann: String, init: Option<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::VAR_DECL);
+    node.value = name;
+    node.type_annotation = type_ann;
+    if let Some(init_expr) = init {
+        node.children.push(init_expr);
+    }
+    node
+}
+
+// ── Factory function: Assignment ───────────────────────────────
+pub fn x_assign(target: String, value: XNode) -> XNode {
+    let mut node = XNode::new(XNodeKind::ASSIGN);
+    node.value = target;
+    node.children.push(value);
+    node
+}
+
+// ── Factory function: Binary operation ─────────────────────────
+pub fn x_binary(op: XBinaryOp, left: XNode, right: XNode) -> XNode {
+    let mut node = XNode::new(XNodeKind::BINARY_OP);
+    node.value = match op {
+        XBinaryOp::ADD => String::from_literal("+"),
+        XBinaryOp::SUB => String::from_literal("-"),
+        XBinaryOp::MUL => String::from_literal("*"),
+        XBinaryOp::DIV => String::from_literal("/"),
+        XBinaryOp::MOD => String::from_literal("%"),
+        XBinaryOp::EQ => String::from_literal("=="),
+        XBinaryOp::NEQ => String::from_literal("!="),
+        XBinaryOp::LT => String::from_literal("<"),
+        XBinaryOp::GT => String::from_literal(">"),
+        XBinaryOp::LE => String::from_literal("<="),
+        XBinaryOp::GE => String::from_literal(">="),
+        XBinaryOp::AND => String::from_literal("&&"),
+        XBinaryOp::OR => String::from_literal("||"),
+    };
+    node.children.push(left);
+    node.children.push(right);
+    node
+}
+
+// ── Factory function: Unary operation ──────────────────────────
+pub fn x_unary(op: XUnaryOp, expr: XNode) -> XNode {
+    let mut node = XNode::new(XNodeKind::UNARY_OP);
+    node.value = match op {
+        XUnaryOp::NEG => String::from_literal("-"),
+        XUnaryOp::NOT => String::from_literal("!"),
+        XUnaryOp::BITWISE_NOT => String::from_literal("~"),
+        XUnaryOp::ADDR_OF => String::from_literal("&"),
+        XUnaryOp::DEREF => String::from_literal("*"),
+    };
+    node.children.push(expr);
+    node
+}
+
+// ── Factory function: Function call ────────────────────────────
+pub fn x_call(func_name: String, args: Vec<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::CALL);
+    node.value = func_name;
+    node.children = args;
+    node
+}
+
+// ── Factory function: Identifier ───────────────────────────────
+pub fn x_ident(name: String) -> XNode {
+    let mut node = XNode::new(XNodeKind::IDENT);
+    node.value = name;
+    node
+}
+
+// ── Factory function: Literal ──────────────────────────────────
+pub fn x_literal(value: String, kind: XLiteralKind) -> XNode {
+    let mut node = XNode::new(XNodeKind::LITERAL);
+    node.value = value;
+    node.type_annotation = match kind {
+        XLiteralKind::INT => String::from_literal("INT"),
+        XLiteralKind::FLOAT => String::from_literal("FLOAT"),
+        XLiteralKind::STRING => String::from_literal("STRING"),
+        XLiteralKind::BOOL => String::from_literal("BOOL"),
+        XLiteralKind::NULL => String::from_literal("NULL"),
+        XLiteralKind::CHAR => String::from_literal("CHAR"),
+    };
+    node
+}
+
+// ── Factory function: If statement ─────────────────────────────
+pub fn x_if(cond: XNode, then_body: Vec<XNode>, else_body: Option<Vec<XNode>>) -> XNode {
+    let mut node = XNode::new(XNodeKind::IF);
+    node.children.push(cond);
+    
+    let mut then_block = XNode::new(XNodeKind::BLOCK);
+    then_block.children = then_body;
+    node.children.push(then_block);
+    
+    if let Some(else_stmts) = else_body {
+        let mut else_block = XNode::new(XNodeKind::BLOCK);
+        else_block.children = else_stmts;
+        node.children.push(else_block);
+    }
+    
+    node
+}
+
+// ── Factory function: While loop ───────────────────────────────
+pub fn x_while(cond: XNode, body: Vec<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::WHILE);
+    node.children.push(cond);
+    
+    let mut block = XNode::new(XNodeKind::BLOCK);
+    block.children = body;
+    node.children.push(block);
+    
+    node
+}
+
+// ── Factory function: For loop ─────────────────────────────────
+pub fn x_for(init: XNode, cond: XNode, update: XNode, body: Vec<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::FOR);
+    node.children.push(init);
+    node.children.push(cond);
+    node.children.push(update);
+    
+    let mut block = XNode::new(XNodeKind::BLOCK);
+    block.children = body;
+    node.children.push(block);
+    
+    node
+}
+
+// ── Factory function: Return statement ─────────────────────────
+pub fn x_return(expr: Option<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::RETURN);
+    if let Some(e) = expr {
+        node.children.push(e);
+    }
+    node
+}
+
+// ── Factory function: Block ────────────────────────────────────
+pub fn x_block(stmts: Vec<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::BLOCK);
+    node.children = stmts;
+    node
+}
+
+// ── Factory function: Struct definition ────────────────────────
+pub fn x_struct(name: String, fields: Vec<(String, String)>) -> XNode {
+    let mut node = XNode::new(XNodeKind::STRUCT_DEF);
+    node.value = name;
+    for (field_name, field_type) in fields {
+        let mut field = XNode::new(XNodeKind::PARAM);  // reuse PARAM for struct fields
+        field.value = field_name;
+        field.type_annotation = field_type;
+        node.children.push(field);
+    }
+    node
+}
+
+// ── Factory function: Enum definition ──────────────────────────
+pub fn x_enum(name: String, variants: Vec<String>) -> XNode {
+    let mut node = XNode::new(XNodeKind::ENUM_DEF);
+    node.value = name;
+    for variant in variants {
+        let mut var_node = XNode::new(XNodeKind::IDENT);
+        var_node.value = variant;
+        node.children.push(var_node);
+    }
+    node
+}
+
+// ── Factory function: Field access ─────────────────────────────
+pub fn x_field_access(object: XNode, field: String) -> XNode {
+    let mut node = XNode::new(XNodeKind::FIELD_ACCESS);
+    node.value = field;
+    node.children.push(object);
+    node
+}
+
+// ── Factory function: Array indexing ───────────────────────────
+pub fn x_index(array: XNode, index: XNode) -> XNode {
+    let mut node = XNode::new(XNodeKind::INDEX);
+    node.children.push(array);
+    node.children.push(index);
+    node
+}
+
+// ── Factory function: Array literal ────────────────────────────
+pub fn x_array_literal(elements: Vec<XNode>) -> XNode {
+    let mut node = XNode::new(XNodeKind::ARRAY_LITERAL);
+    node.children = elements;
+    node
+}
+
+// ── Factory function: Type cast ────────────────────────────────
+pub fn x_cast(expr: XNode, target_type: String) -> XNode {
+    let mut node = XNode::new(XNodeKind::CAST);
+    node.type_annotation = target_type;
+    node.children.push(expr);
+    node
+}
+
+// ── Utility: Check if node is a literal ────────────────────────
+pub fn is_literal(node: &XNode) -> bool {
+    node.kind == XNodeKind::LITERAL
+}
+
+// ── Utility: Check if node is an identifier ────────────────────
+pub fn is_ident(node: &XNode) -> bool {
+    node.kind == XNodeKind::IDENT
+}
+
+// ── Utility: Check if node is a binary operation ────────────────
+pub fn is_binary(node: &XNode) -> bool {
+    node.kind == XNodeKind::BINARY_OP
+}
+
+// ── Utility: Check if node is a function call ──────────────────
+pub fn is_call(node: &XNode) -> bool {
+    node.kind == XNodeKind::CALL
+}
+
+// ── Visitor trait for AST traversal ────────────────────────────
+pub trait XASTVisitor {
+    fn visit(&mut self, node: &XNode);
+    fn visit_children(&mut self, node: &XNode) {
+        for child in &node.children {
+            self.visit(child);
+        }
+    }
+}
+
+// ── Helper: Flatten nested blocks into single statement list ───
+pub fn flatten_block(block: &XNode) -> Vec<XNode> {
+    let mut result = Vec::new();
+    if block.kind == XNodeKind::BLOCK {
+        result = block.children.clone();
+    } else {
+        result.push(block.clone());
+    }
+    result
+}

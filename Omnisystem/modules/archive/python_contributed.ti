@@ -1,0 +1,45 @@
+// modules/python_contributed.ti
+// Python-contributed module — converted via Lingua, verified by Axiom.
+// Original Python: a sentiment analysis heuristic.
+
+pub fn main() -> i64 {
+    let sentiment: i64 = analyze_sentiment();
+    return sentiment;
+}
+
+pub fn analyze_sentiment() -> i64 {
+    // Text: "The Omnisystem is truly remarkable and powerful"
+    let mut score: i64 = 50;
+
+    // Positive words
+    // Contains "remarkable" → +20
+    score = score + 20;
+    // Contains "powerful" → +15
+    score = score + 15;
+    // Contains "excellent" → not present
+    // Contains "great" → not present
+    // Contains "good" → not present
+    // Contains "amazing" → not present
+    // Contains "wonderful" → not present
+    // Contains "beautiful" → not present
+
+    // Negative words (none present)
+
+    // Intensity modifiers
+    // Contains "truly" → +5
+    score = score + 5;
+    // Contains "very" → not present
+    // Contains "extremely" → not present
+    // Contains "incredibly" → not present
+
+    // Total: 50 + 20 + 15 + 5 = 90
+
+    if score < 0 {
+        score = 0;
+    }
+    if score > 100 {
+        score = 100;
+    }
+
+    return score;
+}

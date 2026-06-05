@@ -1,0 +1,93 @@
+(* Titan Formal Grammar — EBNF *)
+(* Version 0.3 — Phase 103 *)
+
+program        = { item } ;
+item           = fn_def | struct_def | enum_def | trait_def | impl_block | use_decl | extern_block ;
+
+fn_def         = [ "pub" ] "fn" IDENT [ generic_params ] "(" [ param_list ] ")"
+                 [ "->" ty ] [ effect_clause ] fn_body ;
+effect_clause  = "!" "{" effect_list "}" ;
+effect_list    = effect { "," effect } ;
+effect         = "alloc" | "io" | "network" "(" STRING ")" | "telemetry" | "panic" ;
+fn_body        = block ;
+
+block          = "{" { stmt } [ expr ] "}" ;
+
+stmt           = let_stmt | expr_stmt | while_stmt | for_stmt | return_stmt | if_stmt ;
+let_stmt       = "let" [ "mut" ] IDENT [ ":" ty ] "=" expr ";" ;
+expr_stmt      = expr ";" ;
+while_stmt     = "while" expr block ;
+for_stmt       = "for" IDENT "in" expr block ;
+return_stmt    = "return" [ expr ] ";" ;
+if_stmt        = "if" expr block [ "else" ( block | if_stmt ) ] ;
+
+expr           = assign_expr ;
+assign_expr    = or_expr [ "=" assign_expr ] ;
+or_expr        = and_expr { "||" and_expr } ;
+and_expr       = cmp_expr { "&&" cmp_expr } ;
+cmp_expr       = add_expr { ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) add_expr } ;
+add_expr       = mul_expr { ( "+" | "-" ) mul_expr } ;
+mul_expr       = unary_expr { ( "*" | "/" | "%" ) unary_expr } ;
+unary_expr     = ( "-" | "!" | "&" [ "mut" ] | "*" ) unary_expr | postfix_expr ;
+postfix_expr   = primary_expr { call_suffix | field_suffix | index_suffix } ;
+call_suffix    = "(" [ arg_list ] ")" ;
+field_suffix   = "." IDENT ;
+index_suffix   = "[" expr "]" ;
+primary_expr   = literal | IDENT | "(" expr ")" | block | struct_literal | closure_expr ;
+struct_literal = IDENT "{" field_init_list "}" ;
+field_init_list= field_init { "," field_init } [ "," ] ;
+field_init     = IDENT ":" expr ;
+closure_expr   = "|" [ param_list ] "|" ( expr | block ) ;
+
+literal        = INT_LIT | FLOAT_LIT | STRING_LIT | "true" | "false" ;
+arg_list       = expr { "," expr } ;
+param_list     = param { "," param } ;
+param          = IDENT ":" ty ;
+
+ty             = primitive_ty | ref_ty | slice_ty | fn_ty | named_ty | array_ty ;
+primitive_ty   = "i64" | "i32" | "i16" | "i8" | "u64" | "u32" | "u16" | "u8"
+               | "f64" | "f32" | "bool" | "str" | "bytes" | "()" ;
+ref_ty         = "&" [ "mut" ] ty ;
+slice_ty       = "[" ty "]" ;
+array_ty       = "[" ty ";" INT_LIT "]" ;
+fn_ty          = "fn" "(" [ ty_list ] ")" [ "->" ty ] ;
+named_ty       = IDENT [ "<" ty_list ">" ] ;
+ty_list        = ty { "," ty } ;
+
+generic_params = "<" IDENT { "," IDENT } ">" ;
+
+struct_def     = [ "pub" ] "struct" IDENT [ generic_params ] "{" field_list "}" ;
+field_list     = { field "," } [ field ] ;
+field          = [ "pub" ] IDENT ":" ty ;
+
+enum_def       = [ "pub" ] "enum" IDENT [ generic_params ] "{" variant_list "}" ;
+variant_list   = { variant "," } [ variant ] ;
+variant        = IDENT [ "(" ty_list ")" | "{" field_list "}" ] ;
+
+trait_def      = [ "pub" ] "trait" IDENT [ generic_params ] "{" { trait_item } "}" ;
+trait_item     = fn_sig ";" | fn_def ;
+fn_sig         = "fn" IDENT [ generic_params ] "(" [ param_list ] ")" [ "->" ty ] ;
+
+impl_block     = "impl" [ generic_params ] [ IDENT "for" ] IDENT "{" { fn_def } "}" ;
+
+use_decl       = "use" use_path ";" ;
+use_path       = IDENT { "::" IDENT } [ "::" "*" | "::" "{" use_path_list "}" ] ;
+use_path_list  = use_path { "," use_path } ;
+
+extern_block   = "extern" STRING_LIT "{" { extern_fn ";" } "}" ;
+extern_fn      = "fn" IDENT "(" [ param_list ] ")" [ "->" ty ] ;
+
+(* Lexical rules *)
+IDENT          = ( ALPHA | "_" ) { ALPHA | DIGIT | "_" } ;
+INT_LIT        = DIGIT { DIGIT } [ INT_SUFFIX ] ;
+INT_SUFFIX     = "i64" | "i32" | "u64" | "u32" ;
+FLOAT_LIT      = DIGIT { DIGIT } "." { DIGIT } [ FLOAT_SUFFIX ] ;
+FLOAT_SUFFIX   = "f64" | "f32" ;
+STRING_LIT     = '"' { STRING_CHAR } '"' ;
+STRING_CHAR    = any character except '"' and newline, or ESCAPE_SEQ ;
+ESCAPE_SEQ     = "\" ( '"' | "\" | "n" | "t" | "r" | "0" ) ;
+ALPHA          = "a" | ... | "z" | "A" | ... | "Z" ;
+DIGIT          = "0" | ... | "9" ;
+COMMENT        = "//" { any character } newline
+               | "/*" { any character } "*/" ;
+WHITESPACE     = " " | "\t" | "\n" | "\r" ;

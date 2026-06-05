@@ -1,0 +1,36 @@
+// sylva/studio/ide.sy
+// Omni Studio IDE — Terminal-based development environment.
+// All four languages, AI assistance, build system — running on Omnisystem itself.
+// Replaces omnicore/src/bin/omni_ide.rs.
+
+import titan::omnicore::kernel;
+import aether::runtime::kernel;
+import sylva::repl::main;
+
+fn main() {
+    print("🌲 Omni Studio IDE v0.1.0");
+    print("===========================");
+    print("Omnisystem Self-Hosted Development Environment");
+
+    let mut core = kernel::OmniCore::new();
+    core.initialize();
+    print("OmniCore initialized — Trust Score:", core.trust_score(), "/ 100");
+
+    let mut node = kernel::ActorNode::new();
+    print("Aether runtime online —", node.actor_count(), "actors");
+
+    print("");
+    print("Commands:");
+    print("  :help      Show help");
+    print("  :quit      Exit IDE");
+    print("  :build     Build project");
+    print("  :run       Run program");
+    print("  :ask       AI assistance");
+    print("");
+
+    let mut repl = main::SylvaREPL::new();
+    repl.run();
+
+    print("");
+    print("Omni Studio IDE session complete.");
+}

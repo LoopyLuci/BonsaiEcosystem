@@ -1,0 +1,325 @@
+// tests/test_time_travel.ti — Phase 204 Integration Test
+// Exercises diff → rollback → record → debug → timeline.
+// All functions self-contained; no cross-file imports.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// ===== AST & Diff =====
+const TAG_DIFF_CHANGE: i64 = 7000;
+const DIFF_INSERT:     i64 = 0;
+const DIFF_DELETE:     i64 = 1;
+const DIFF_MODIFY:     i64 = 2;
+const DIFF_IDENTICAL:  i64 = 4;
+const AST_INT:         i64 = 100;
+const AST_BINOP:       i64 = 110;
+
+pub fn make_ast(tag: i64, body: i64, left: i64, right: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, tag);
+    heap_set_body(n, body);
+    heap_set_arg(n, left);
+    heap_set_domain(n, right);
+    return n;
+}
+
+pub fn diff_change_create(change_type: i64, node_id_a: i64, node_id_b: i64,
+                           line: i64, col: i64, description_id: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, line);
+    heap_set_arg(meta2, col);
+    heap_set_domain(meta2, description_id);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, change_type);
+    heap_set_arg(meta1, node_id_b);
+    heap_set_domain(meta1, meta2);
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_DIFF_CHANGE);
+    heap_set_body(c, meta1);
+    heap_set_arg(c, node_id_a);
+    heap_set_domain(c, 0);
+    return c;
+}
+
+pub fn diff_change_type(c: i64) -> i64   { return heap_get_body(heap_get_body(c)); }
+pub fn diff_change_node_b(c: i64) -> i64 { return heap_get_arg(heap_get_body(c)); }
+
+pub fn diff_count(changes: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = changes;
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+
+pub fn diff_compare(old_ast: i64, new_ast: i64) -> i64 {
+    if old_ast == 0 && new_ast == 0 { return 0; }
+    if old_ast == 0 { return diff_change_create(DIFF_INSERT, 0, new_ast, 0, 0, 0); }
+    if new_ast == 0 { return diff_change_create(DIFF_DELETE, old_ast, 0, 0, 0, 0); }
+    let old_tag  = heap_get_tag(old_ast);
+    let new_tag  = heap_get_tag(new_ast);
+    let old_body = heap_get_body(old_ast);
+    let new_body = heap_get_body(new_ast);
+    if old_tag != new_tag || old_body != new_body {
+        return diff_change_create(DIFF_MODIFY, old_ast, new_ast, 0, 0, 0);
+    }
+    return 0;
+}
+
+pub fn diff_apply(old_ast: i64, changes: i64) -> i64 {
+    if changes == 0 { return old_ast; }
+    let ctype = diff_change_type(changes);
+    if ctype == DIFF_MODIFY || ctype == DIFF_INSERT { return diff_change_node_b(changes); }
+    if ctype == DIFF_DELETE { return 0; }
+    return old_ast;
+}
+
+// ===== Snapshot / Rollback =====
+const TAG_SNAPSHOT: i64 = 7100;
+static mut SNAPSHOT_HEAD:  i64 = 0;
+static mut SNAPSHOT_COUNT: i64 = 0;
+
+pub fn snapshot_ast(snap: i64) -> i64   { return heap_get_body(snap); }
+pub fn snapshot_parent(snap: i64) -> i64 { return heap_get_arg(snap); }
+pub fn snapshot_count() -> i64           { return SNAPSHOT_COUNT; }
+
+pub fn snapshot_push(ast: i64, description_id: i64) -> i64 {
+    let snap = heap_alloc_term();
+    heap_set_tag(snap, TAG_SNAPSHOT);
+    heap_set_body(snap, ast);
+    heap_set_arg(snap, SNAPSHOT_HEAD);
+    heap_set_domain(snap, description_id);
+    SNAPSHOT_HEAD  = snap;
+    SNAPSHOT_COUNT = SNAPSHOT_COUNT + 1;
+    return snap;
+}
+
+pub fn snapshot_pop() -> i64 {
+    if SNAPSHOT_HEAD == 0 { return 0; }
+    let snap       = SNAPSHOT_HEAD;
+    SNAPSHOT_HEAD  = snapshot_parent(snap);
+    SNAPSHOT_COUNT = SNAPSHOT_COUNT - 1;
+    return snap;
+}
+
+pub fn snapshot_rollback() -> i64 {
+    let snap = snapshot_pop();
+    if snap == 0 { return 0; }
+    return snapshot_ast(snap);
+}
+
+// ===== Execution recorder =====
+const TAG_TRACE_STEP:     i64 = 7200;
+const TAG_TRACE_SNAPSHOT: i64 = 7201;
+const STEP_EXECUTE: i64 = 0;
+const STEP_CALL:    i64 = 3;
+const STEP_RETURN:  i64 = 4;
+const OP_PUSH: i64 = 1;
+const OP_RET:  i64 = 14;
+
+static mut TRACE_HEAD:      i64  = 0;
+static mut TRACE_TAIL:      i64  = 0;
+static mut TRACE_COUNT:     i64  = 0;
+static mut TRACE_RECORDING: bool = false;
+
+pub fn trace_step_type(step: i64) -> i64   { return heap_get_body(heap_get_body(step)); }
+pub fn trace_step_pc(step: i64) -> i64     { return heap_get_arg(heap_get_body(step)); }
+
+pub fn trace_start() {
+    TRACE_HEAD = 0; TRACE_TAIL = 0; TRACE_COUNT = 0; TRACE_RECORDING = true;
+}
+pub fn trace_stop()         { TRACE_RECORDING = false; }
+pub fn trace_count() -> i64 { return TRACE_COUNT; }
+
+pub fn trace_record(step_type: i64, opcode: i64, arg: i64,
+                    pc: i64, sp: i64, stack_top: i64) {
+    if !TRACE_RECORDING { return; }
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, arg);
+    heap_set_arg(meta2, sp);
+    heap_set_domain(meta2, stack_top);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, step_type);
+    heap_set_arg(meta1, pc);
+    heap_set_domain(meta1, meta2);
+    let step = heap_alloc_term();
+    heap_set_tag(step, TAG_TRACE_STEP);
+    heap_set_body(step, meta1);
+    heap_set_arg(step, opcode);
+    heap_set_domain(step, 0);
+    if TRACE_TAIL != 0 { heap_set_domain(TRACE_TAIL, step); } else { TRACE_HEAD = step; }
+    TRACE_TAIL  = step;
+    TRACE_COUNT = TRACE_COUNT + 1;
+}
+
+pub fn trace_snapshot_at_index(index: i64) -> i64 {
+    let mut curr = TRACE_HEAD;
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index {
+            let snap = heap_alloc_term();
+            heap_set_tag(snap, TAG_TRACE_SNAPSHOT);
+            heap_set_body(snap, curr);
+            return snap;
+        }
+        i = i + 1; curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Breakpoints & Debugger =====
+const TAG_BREAKPOINT: i64 = 7300;
+const BP_PC: i64 = 0;
+
+static mut BREAKPOINTS: i64 = 0;
+static mut BP_COUNT:    i64 = 0;
+static mut DEBUG_CURRENT_STEP: i64 = 0;
+
+pub fn bp_add(bp_type: i64, location: i64, condition: i64) {
+    let bp = heap_alloc_term();
+    heap_set_tag(bp, TAG_BREAKPOINT);
+    heap_set_body(bp, location);
+    heap_set_arg(bp, bp_type);
+    heap_set_domain(bp, BREAKPOINTS);
+    BREAKPOINTS = bp;
+    BP_COUNT    = BP_COUNT + 1;
+}
+
+pub fn bp_remove(location: i64) -> bool {
+    let mut prev: i64 = 0;
+    let mut curr = BREAKPOINTS;
+    while curr != 0 {
+        if heap_get_body(curr) == location {
+            let next = heap_get_domain(curr);
+            if prev == 0 { BREAKPOINTS = next; }
+            else         { heap_set_domain(prev, next); }
+            BP_COUNT = BP_COUNT - 1;
+            return true;
+        }
+        prev = curr; curr = heap_get_domain(curr);
+    }
+    return false;
+}
+
+pub fn bp_check(location: i64) -> bool {
+    let mut curr = BREAKPOINTS;
+    while curr != 0 {
+        if heap_get_body(curr) == location { return true; }
+        curr = heap_get_domain(curr);
+    }
+    return false;
+}
+
+pub fn debug_load_trace()         { DEBUG_CURRENT_STEP = 0; }
+pub fn debug_current_step() -> i64 { return DEBUG_CURRENT_STEP; }
+
+pub fn debug_step_forward() -> i64 {
+    let next = DEBUG_CURRENT_STEP + 1;
+    if next < TRACE_COUNT { DEBUG_CURRENT_STEP = next; }
+    return trace_snapshot_at_index(DEBUG_CURRENT_STEP);
+}
+
+pub fn debug_step_backward() -> i64 {
+    if DEBUG_CURRENT_STEP > 0 { DEBUG_CURRENT_STEP = DEBUG_CURRENT_STEP - 1; }
+    return trace_snapshot_at_index(DEBUG_CURRENT_STEP);
+}
+
+// ===== Timeline =====
+const TAG_TIMELINE_ENTRY: i64 = 7400;
+
+pub fn timeline_entry_create(step_index: i64, label_id: i64, color: i64,
+                              duration: i64, parent_index: i64) -> i64 {
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_TIMELINE_ENTRY);
+    heap_set_body(e, step_index);
+    heap_set_arg(e, label_id);
+    heap_set_domain(e, 0);
+    return e;
+}
+
+pub fn timeline_count(entries: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = entries;
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+
+pub fn timeline_build() -> i64 {
+    let mut head: i64 = 0;
+    let mut tail: i64 = 0;
+    let mut i: i64 = 0;
+    while i < TRACE_COUNT {
+        let e = timeline_entry_create(i, i, 0, 1, 0);
+        if tail != 0 { heap_set_domain(tail, e); }
+        else         { head = e; }
+        tail = e;
+        i    = i + 1;
+    }
+    return head;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    SNAPSHOT_HEAD = 0; SNAPSHOT_COUNT = 0;
+    TRACE_HEAD = 0; TRACE_TAIL = 0; TRACE_COUNT = 0; TRACE_RECORDING = false;
+    BREAKPOINTS = 0; BP_COUNT = 0; DEBUG_CURRENT_STEP = 0;
+
+    // --- Diff ---
+    let ast1 = make_ast(AST_INT, 10, 0, 0);
+    let ast2 = make_ast(AST_INT, 20, 0, 0);
+
+    let changes = diff_compare(ast1, ast2);
+    if changes == 0                              { return 1; }
+    if diff_count(changes) != 1                 { return 2; }
+    if diff_change_type(changes) != DIFF_MODIFY { return 3; }
+
+    let applied = diff_apply(ast1, changes);
+    if applied != ast2                          { return 4; }
+
+    // --- Rollback ---
+    snapshot_push(ast1, 0);
+    snapshot_push(ast2, 0);
+    if snapshot_count() != 2 { return 5; }
+
+    let restored = snapshot_rollback();
+    if restored != ast2       { return 6; }
+    if snapshot_count() != 1  { return 7; }
+
+    // --- Trace ---
+    trace_start();
+    trace_record(STEP_CALL,    OP_PUSH, 10, 0, 0, 0);
+    trace_record(STEP_RETURN,  OP_RET,  0,  1, 0, 0);
+    trace_stop();
+    if trace_count() != 2 { return 8; }
+
+    // --- Debug ---
+    debug_load_trace();
+    let sf = debug_step_forward();
+    if sf == 0                    { return 9; }
+    if debug_current_step() != 1  { return 10; }
+
+    let sb = debug_step_backward();
+    if sb == 0                    { return 11; }
+    if debug_current_step() != 0  { return 12; }
+
+    // --- Breakpoints ---
+    bp_add(BP_PC, 1, 0);
+    if !bp_check(1) { return 13; }
+
+    bp_remove(1);
+    if bp_check(1)  { return 14; }
+
+    // --- Timeline ---
+    let entries = timeline_build();
+    if timeline_count(entries) != 2 { return 15; }
+
+    return 111;
+}

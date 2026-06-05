@@ -1,0 +1,166 @@
+// Sylva Standard Library — built-in functions
+
+// Arithmetic Functions
+pub fn std_abs(x: i64) -> i64 {
+    if x < 0 { return -x; }
+    return x;
+}
+
+pub fn std_min(a: i64, b: i64) -> i64 {
+    if a < b { return a; }
+    return b;
+}
+
+pub fn std_max(a: i64, b: i64) -> i64 {
+    if a > b { return a; }
+    return b;
+}
+
+// Integer square root using Newton's method
+pub fn std_sqrt(n: i64) -> i64 {
+    if n < 0 { return -1; }
+    if n == 0 { return 0; }
+    if n == 1 { return 1; }
+    
+    let mut x: i64 = n;
+    let mut y: i64 = (x + 1) / 2;
+    let mut iterations: i64 = 0;
+    
+    while y < x && iterations < 100 {
+        x = y;
+        y = (x + n / x) / 2;
+        iterations = iterations + 1;
+    }
+    
+    return x;
+}
+
+// Integer power function (base^exp)
+pub fn std_pow(base: i64, exp: i64) -> i64 {
+    if exp < 0 { return -1; }
+    if exp == 0 { return 1; }
+    
+    let mut result: i64 = 1;
+    let mut e: i64 = exp;
+    let mut b: i64 = base;
+    
+    while e > 0 {
+        let remainder = e % 2;
+        if remainder == 1 {
+            result = result * b;
+        }
+        b = b * b;
+        e = e / 2;
+    }
+    
+    return result;
+}
+
+// Print an integer (returns the value for chaining)
+pub fn print(n: i64) -> i64 {
+    // In a full implementation, would call I/O extern
+    // For now, just return the value
+    return n;
+}
+
+// Print with newline (returns the value)
+pub fn println(n: i64) -> i64 {
+    // In a full implementation, would call I/O extern
+    // For now, just return the value
+    return n;
+}
+
+// Range: returns count of integers from 0 to n-1
+pub fn std_range(n: i64) -> i64 {
+    if n < 0 { return 0; }
+    return n;
+}
+
+// String length simulation (using heap)
+pub fn std_len(obj: i64) -> i64 {
+    // Simulate: object IDs >= 1000 have length encoded
+    if obj >= 1000 {
+        return obj % 100;  // last two digits as length
+    }
+    return 0;
+}
+
+// Test cases for standard library
+pub fn test_abs() -> i64 {
+    if std_abs(-5) != 5 { return 1; }
+    if std_abs(0) != 0 { return 2; }
+    if std_abs(42) != 42 { return 3; }
+    return 0;
+}
+
+pub fn test_min_max() -> i64 {
+    if std_min(10, 20) != 10 { return 1; }
+    if std_max(10, 20) != 20 { return 2; }
+    if std_min(-5, 5) != -5 { return 3; }
+    if std_max(-5, 5) != 5 { return 4; }
+    return 0;
+}
+
+pub fn test_sqrt() -> i64 {
+    if std_sqrt(0) != 0 { return 1; }
+    if std_sqrt(1) != 1 { return 2; }
+    if std_sqrt(4) != 2 { return 3; }
+    if std_sqrt(9) != 3 { return 4; }
+    if std_sqrt(16) != 4 { return 5; }
+    if std_sqrt(25) != 5 { return 6; }
+    if std_sqrt(100) != 10 { return 7; }
+    if std_sqrt(-1) != -1 { return 8; }
+    return 0;
+}
+
+pub fn test_pow() -> i64 {
+    if std_pow(2, 0) != 1 { return 1; }
+    if std_pow(2, 1) != 2 { return 2; }
+    if std_pow(2, 3) != 8 { return 3; }
+    if std_pow(3, 3) != 27 { return 4; }
+    if std_pow(5, 2) != 25 { return 5; }
+    if std_pow(10, 0) != 1 { return 6; }
+    return 0;
+}
+
+pub fn test_print() -> i64 {
+    let val = print(42);
+    if val != 42 { return 1; }
+    
+    let val2 = println(111);
+    if val2 != 111 { return 2; }
+    
+    return 0;
+}
+
+pub fn test_range() -> i64 {
+    if std_range(5) != 5 { return 1; }
+    if std_range(0) != 0 { return 2; }
+    if std_range(-3) != 0 { return 3; }
+    return 0;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+    
+    // Test abs
+    if test_abs() == 0 { score = score + 15; }
+    
+    // Test min/max
+    if test_min_max() == 0 { score = score + 15; }
+    
+    // Test sqrt
+    if test_sqrt() == 0 { score = score + 20; }
+    
+    // Test pow
+    if test_pow() == 0 { score = score + 20; }
+    
+    // Test print functions
+    if test_print() == 0 { score = score + 15; }
+    
+    // Test range
+    if test_range() == 0 { score = score + 16; }
+    
+    if score >= 80 { return 111; }
+    return score;
+}

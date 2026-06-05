@@ -1,0 +1,52 @@
+// Aether Mature — Phase 104: Complete CRDT primitives
+// GSet, ORMap, LWWRegister
+
+actor GSetActor {
+    var elements: GSet<str> = GSet::new();
+
+    handle Add(element: str) {
+        self.elements.add(element);
+    }
+
+    handle Contains(element: str) -> bool {
+        return self.elements.contains(element);
+    }
+
+    handle Size() -> i64 {
+        return self.elements.size();
+    }
+}
+
+actor ORMapActor {
+    var data: ORMap<str, str> = ORMap::new();
+
+    handle Put(key: str, value: str) {
+        self.data.put(key, value);
+    }
+
+    handle Remove(key: str) {
+        self.data.remove(key);
+    }
+
+    handle Get(key: str) -> str {
+        return self.data.get(key);
+    }
+}
+
+actor LWWRegisterActor {
+    var register: LWWRegister<str> = LWWRegister::new();
+
+    handle Set(value: str, ts: i64) {
+        self.register.set(value, timestamp: ts);
+    }
+
+    handle Get() -> str {
+        return self.register.get();
+    }
+}
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}

@@ -1,0 +1,164 @@
+// titan/omnisplat/s12_verify.ti — Axiom Verification & Robustness
+// Self-contained. Inlines s8 data helpers with s12_ prefix.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_FUZZ: i64 = 9900;
+const T_INV:  i64 = 9901;
+
+// Inlined from s8_export (needed for roundtrip check)
+const S12_T_SD:  i64 = 8800;
+const S12_T_SV:  i64 = 8801;
+const S12_T_WRP: i64 = 8802;
+const S12_T_EXP: i64 = 9500;
+const S12_F_PLY: i64 = 0;
+
+pub fn s12_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, S12_T_SD); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn s12_sv(px: i64, py: i64, pz: i64,
+               c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+               r: i64, g: i64, b: i64, op: i64) -> i64 {
+    let n1 = heap_alloc_term(); heap_set_body(n1, pz); heap_set_arg(n1, c0); heap_set_domain(n1, 0);
+    let n2 = heap_alloc_term(); heap_set_body(n2, c1); heap_set_arg(n2, c2); heap_set_domain(n2, n1);
+    let n3 = heap_alloc_term(); heap_set_body(n3, c3); heap_set_arg(n3, c4); heap_set_domain(n3, n2);
+    let n4 = heap_alloc_term(); heap_set_body(n4, c5); heap_set_arg(n4, r);  heap_set_domain(n4, n3);
+    let n5 = heap_alloc_term(); heap_set_body(n5, g);  heap_set_arg(n5, b);  heap_set_domain(n5, n4);
+    let n6 = heap_alloc_term(); heap_set_body(n6, op); heap_set_arg(n6, 0);  heap_set_domain(n6, n5);
+    let v  = heap_alloc_term();
+    heap_set_tag(v, S12_T_SV); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, n6);
+    return v;
+}
+pub fn s12_add(d: i64, v: i64) {
+    let w = heap_alloc_term(); heap_set_tag(w, S12_T_WRP); heap_set_body(w, v); heap_set_domain(w, 0);
+    let c = heap_get_body(d);
+    if c == 0 { heap_set_arg(d, w); }
+    else {
+        let mut t = heap_get_arg(d);
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(d, c + 1);
+}
+pub fn s12_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn s12_export_ply(d: i64) -> i64 {
+    let hdr = heap_alloc_term();
+    heap_set_tag(hdr, S12_T_EXP); heap_set_body(hdr, S12_F_PLY); heap_set_arg(hdr, s12_cnt(d));
+    heap_set_domain(hdr, 0);
+    return hdr;
+}
+pub fn s12_export_count(exp: i64) -> i64 { return heap_get_arg(exp); }
+
+// ===== Fuzzer =====
+// state: tag=T_FUZZ, body=seed (updated each step)
+
+pub fn s12_fuzz_seed(seed: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_FUZZ); heap_set_body(s, seed); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn s12_fuzz_next(state: i64) -> i64 {
+    let x = heap_get_body(state);
+    let y = x * 1103515245 + 12345;
+    let mut r = (y / 65536) % 2147483648;
+    if r < 0 { r = -r; }
+    heap_set_body(state, y);
+    return r;
+}
+
+pub fn s12_fuzz_range(state: i64, max: i64) -> i64 {
+    let r = s12_fuzz_next(state);
+    return r % max;
+}
+
+// ===== Invariant checker =====
+// inv: tag=T_INV, body=name, arg=ok(1=passing,0=failed)
+// Once failed, stays failed. Returns 0 when currently failed or just failed.
+
+pub fn s12_inv_create(name: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, T_INV); heap_set_body(inv, name); heap_set_arg(inv, 1); heap_set_domain(inv, 0);
+    return inv;
+}
+
+pub fn s12_inv_check(inv: i64, condition: i64) -> i64 {
+    if condition == 0 { heap_set_arg(inv, 0); }
+    return heap_get_arg(inv);
+}
+
+// ===== Axiom helpers =====
+
+pub fn s12_projection_invariant(c00: i64, c11: i64, c22: i64) -> i64 {
+    if c00 < 0 { return 0; }
+    if c11 < 0 { return 0; }
+    if c22 < 0 { return 0; }
+    return 1;
+}
+
+pub fn s12_roundtrip_export(d: i64) -> i64 {
+    let n = s12_cnt(d);
+    let ply = s12_export_ply(d);
+    if s12_export_count(ply) == n { return 1; }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Fuzzer: 20 values in [0,100)
+    let st = s12_fuzz_seed(42);
+    let mut i: i64 = 0;
+    while i < 20 {
+        let r = s12_fuzz_range(st, 100);
+        if r < 0   { return 1; }
+        if r >= 100 { return 2; }
+        i = i + 1;
+    }
+
+    // Invariant: passing check keeps ok=1
+    let inv1 = s12_inv_create(1);
+    if s12_inv_check(inv1, 1) == 0 { return 3; }
+    // Failing check sets ok=0 and returns 0
+    if s12_inv_check(inv1, 0) != 0 { return 4; }
+    // Still 0 after subsequent pass (latched)
+    if s12_inv_check(inv1, 1) != 0 { return 5; }
+
+    // Projection invariant
+    if s12_projection_invariant(1, 1, 1) == 0  { return 6; }
+    if s12_projection_invariant(-1, 1, 1) != 0  { return 7; }
+    if s12_projection_invariant(0, 0, 0) == 0   { return 8; }
+
+    // Roundtrip export
+    let d = s12_sd();
+    let mut j: i64 = 0;
+    while j < 5 {
+        let v = s12_sv(j * 10, j * 10, j * 5, 0, 0, 0, 0, 0, 0, 255, 0, 0, 100);
+        s12_add(d, v);
+        j = j + 1;
+    }
+    if s12_roundtrip_export(d) == 0 { return 9; }
+
+    // Fuzzer with different seed produces values in range
+    let st2 = s12_fuzz_seed(999);
+    let mut k: i64 = 0;
+    while k < 10 {
+        let r2 = s12_fuzz_range(st2, 500);
+        if r2 < 0    { return 10; }
+        if r2 >= 500 { return 11; }
+        k = k + 1;
+    }
+
+    return 111;
+}

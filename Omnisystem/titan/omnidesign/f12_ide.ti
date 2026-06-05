@@ -1,0 +1,9 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_PAN12:i64=26100;const T_SVC12:i64=26101;const T_WRP12:i64=26102;
+pub fn f12_panel_create(ptype:i64,label:i64)->i64{let p=heap_alloc_term();heap_set_tag(p,T_PAN12);heap_set_body(p,ptype);heap_set_arg(p,label);heap_set_domain(p,0);let w=heap_alloc_term();heap_set_tag(w,T_WRP12);heap_set_body(w,p);heap_set_domain(w,0);return w;}
+pub fn f12_panel_type(w:i64)->i64{return heap_get_body(heap_get_body(w));}
+pub fn f12_service_create(name:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,T_SVC12);heap_set_body(s,name);heap_set_arg(s,0);heap_set_domain(s,0);return s;}
+pub fn f12_service_start(s:i64){heap_set_arg(s,1);}
+pub fn f12_service_running(s:i64)->i64{return heap_get_arg(s);}
+pub fn f12_dock_panel(panel:i64,zone:i64)->i64{return f12_panel_type(panel)+zone;}
+pub fn main()->i64{let w=f12_panel_create(50,100);if f12_panel_type(w)!=50{return 1;}let s=f12_service_create(200);if f12_service_running(s)!=0{return 2;}f12_service_start(s);if f12_service_running(s)!=1{return 3;}if f12_dock_panel(w,3)!=53{return 4;}return 111;}

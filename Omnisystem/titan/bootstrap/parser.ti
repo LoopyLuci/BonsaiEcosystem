@@ -1,0 +1,455 @@
+// titan/bootstrap/parser.ti
+// Titan Bootstrap Parser — Recursive descent parser.
+// Produces an AST from the token stream.
+
+// ── AST Node Kinds ──────────────────────────────────────────
+pub enum AstKind {
+    MODULE,
+    FUNC_DEF,
+    PARAM,
+    BLOCK,
+    VAR_DECL,
+    ASSIGN,
+    RETURN_STMT,
+    IF_STMT,
+    WHILE_STMT,
+    BINARY_EXPR,
+    UNARY_EXPR,
+    CALL_EXPR,
+    LITERAL_EXPR,
+    IDENT_EXPR,
+    TYPE_ANNOT,
+    EFFECT_DECL,
+}
+
+// ── AST Node ────────────────────────────────────────────────
+pub struct AstNode {
+    pub kind: AstKind,
+    pub value: String,
+    pub type_ann: String,
+    pub children: Vec<AstNode>,
+    pub line: i64,
+    pub col: i64,
+}
+
+impl AstNode {
+    pub fn clone(&self) -> AstNode {
+        let mut children = Vec::new();
+        for child in self.children.iter() {
+            children.push(child.clone());
+        }
+        AstNode {
+            kind: self.kind,
+            value: self.value.clone(),
+            type_ann: self.type_ann.clone(),
+            children: children,
+            line: self.line,
+            col: self.col,
+        }
+    }
+}
+
+// ── Parser State ────────────────────────────────────────────
+pub struct Parser {
+    pub tokens: Vec<Token>,
+    pub pos: i64,
+    pub errors: Vec<String>,
+}
+
+impl Parser {
+    pub fn new(tokens: Vec<Token>) -> Parser {
+        Parser {
+            tokens: tokens,
+            pos: 0,
+            errors: Vec::new(),
+        }
+    }
+
+    pub fn parse_module(&mut self) -> AstNode {
+        let mut functions = Vec::new();
+        while !self.is_at_end() {
+            let func = self.parse_function();
+            functions.push(func);
+        }
+        AstNode {
+            kind: AstKind::MODULE,
+            value: "".to_string(),
+            type_ann: "".to_string(),
+            children: functions,
+            line: 0,
+            col: 0,
+        }
+    }
+
+    fn parse_function(&mut self) -> AstNode {
+        self.expect(TokenKind::KW_FN);
+        let name = self.expect_ident();
+        self.expect(TokenKind::LPAREN);
+        let params = self.parse_params();
+        self.expect(TokenKind::RPAREN);
+        let ret_type = if self.match_kind(TokenKind::ARROW) {
+            self.parse_type()
+        } else {
+            "void".to_string()
+        };
+        let body = self.parse_block();
+
+        let mut children = params;
+        children.push(body);
+
+        AstNode {
+            kind: AstKind::FUNC_DEF,
+            value: name,
+            type_ann: ret_type,
+            children: children,
+            line: 0,
+            col: 0,
+        }
+    }
+
+    fn parse_params(&mut self) -> Vec<AstNode> {
+        let mut params = Vec::new();
+        if self.check(TokenKind::RPAREN) {
+            return params;
+        }
+        loop {
+            let name = self.expect_ident();
+            self.expect(TokenKind::COLON);
+            let ty = self.parse_type();
+            params.push(AstNode {
+                kind: AstKind::PARAM,
+                value: name,
+                type_ann: ty,
+                children: Vec::new(),
+                line: 0,
+                col: 0,
+            });
+            if !self.match_kind(TokenKind::COMMA) {
+                break;
+            }
+        }
+        params
+    }
+
+    fn parse_type(&mut self) -> String {
+        let token = self.advance();
+        token.lexeme.clone()
+    }
+
+    fn parse_block(&mut self) -> AstNode {
+        self.expect(TokenKind::LBRACE);
+        let mut stmts = Vec::new();
+        while !self.check(TokenKind::RBRACE) && !self.is_at_end() {
+            let stmt = self.parse_stmt();
+            stmts.push(stmt);
+        }
+        self.expect(TokenKind::RBRACE);
+        AstNode {
+            kind: AstKind::BLOCK,
+            value: "".to_string(),
+            type_ann: "".to_string(),
+            children: stmts,
+            line: 0,
+            col: 0,
+        }
+    }
+
+    fn parse_stmt(&mut self) -> AstNode {
+        if self.match_kind(TokenKind::KW_LET) {
+            self.parse_var_decl()
+        } else if self.match_kind(TokenKind::KW_RETURN) {
+            self.parse_return()
+        } else if self.match_kind(TokenKind::KW_IF) {
+            self.parse_if()
+        } else if self.match_kind(TokenKind::KW_WHILE) {
+            self.parse_while()
+        } else {
+            let expr = self.parse_expr();
+            self.consume_semicolon();
+            expr
+        }
+    }
+
+    fn parse_var_decl(&mut self) -> AstNode {
+        let _mut_kw = self.match_kind(TokenKind::KW_MUT);
+        let name = self.expect_ident();
+        let type_ann = if self.match_kind(TokenKind::COLON) {
+            self.parse_type()
+        } else {
+            "".to_string()
+        };
+        self.expect(TokenKind::EQ);
+        let init = self.parse_expr();
+        self.consume_semicolon();
+        AstNode {
+            kind: AstKind::VAR_DECL,
+            value: name,
+            type_ann: type_ann,
+            children: vec![init],
+            line: 0,
+            col: 0,
+        }
+    }
+
+    fn parse_return(&mut self) -> AstNode {
+        let expr = if self.check(TokenKind::SEMICOLON) {
+            None
+        } else {
+            Some(self.parse_expr())
+        };
+        self.consume_semicolon();
+        let children = match expr {
+            Some(e) => vec![e],
+            None => Vec::new(),
+        };
+        AstNode {
+            kind: AstKind::RETURN_STMT,
+            value: "".to_string(),
+            type_ann: "".to_string(),
+            children: children,
+            line: 0,
+            col: 0,
+        }
+    }
+
+    fn parse_if(&mut self) -> AstNode {
+        let cond = self.parse_expr();
+        let then_block = self.parse_block();
+        let else_block = if self.match_kind(TokenKind::KW_ELSE) {
+            if self.check(TokenKind::KW_IF) {
+                vec![self.parse_if()]
+            } else {
+                vec![self.parse_block()]
+            }
+        } else {
+            Vec::new()
+        };
+        let mut children = vec![cond, then_block];
+        children.extend(else_block);
+        AstNode {
+            kind: AstKind::IF_STMT,
+            value: "".to_string(),
+            type_ann: "".to_string(),
+            children: children,
+            line: 0,
+            col: 0,
+        }
+    }
+
+    fn parse_while(&mut self) -> AstNode {
+        let cond = self.parse_expr();
+        let body = self.parse_block();
+        AstNode {
+            kind: AstKind::WHILE_STMT,
+            value: "".to_string(),
+            type_ann: "".to_string(),
+            children: vec![cond, body],
+            line: 0,
+            col: 0,
+        }
+    }
+
+    fn parse_expr(&mut self) -> AstNode {
+        self.parse_binary_expr(0)
+    }
+
+    fn parse_binary_expr(&mut self, min_prec: i64) -> AstNode {
+        let mut left = self.parse_unary();
+        loop {
+            let prec = self.current_precedence();
+            if prec < min_prec {
+                break;
+            }
+            let op = self.advance().lexeme.clone();
+            let right = self.parse_binary_expr(prec + 1);
+            left = AstNode {
+                kind: AstKind::BINARY_EXPR,
+                value: op,
+                type_ann: "".to_string(),
+                children: vec![left, right],
+                line: 0,
+                col: 0,
+            };
+        }
+        left
+    }
+
+    fn parse_unary(&mut self) -> AstNode {
+        if self.match_kind(TokenKind::MINUS) || self.match_kind(TokenKind::NOT) {
+            let op = self.tokens[self.pos as usize - 1].lexeme.clone();
+            let operand = self.parse_unary();
+            return AstNode {
+                kind: AstKind::UNARY_EXPR,
+                value: op,
+                type_ann: "".to_string(),
+                children: vec![operand],
+                line: 0,
+                col: 0,
+            };
+        }
+        self.parse_primary()
+    }
+
+    fn parse_primary(&mut self) -> AstNode {
+        if self.match_kind(TokenKind::INT_LIT) {
+            let token = &self.tokens[self.pos as usize - 1];
+            AstNode {
+                kind: AstKind::LITERAL_EXPR,
+                value: token.value.clone(),
+                type_ann: "i64".to_string(),
+                children: Vec::new(),
+                line: 0,
+                col: 0,
+            }
+        } else if self.match_kind(TokenKind::STRING_LIT) {
+            let token = &self.tokens[self.pos as usize - 1];
+            AstNode {
+                kind: AstKind::LITERAL_EXPR,
+                value: token.value.clone(),
+                type_ann: "str".to_string(),
+                children: Vec::new(),
+                line: 0,
+                col: 0,
+            }
+        } else if self.match_kind(TokenKind::BOOL_LIT) {
+            let token = &self.tokens[self.pos as usize - 1];
+            AstNode {
+                kind: AstKind::LITERAL_EXPR,
+                value: token.value.clone(),
+                type_ann: "bool".to_string(),
+                children: Vec::new(),
+                line: 0,
+                col: 0,
+            }
+        } else if self.match_kind(TokenKind::LPAREN) {
+            let expr = self.parse_expr();
+            self.expect(TokenKind::RPAREN);
+            expr
+        } else if self.check(TokenKind::IDENT) && self.peek_next_is(TokenKind::LPAREN) {
+            let name = self.expect_ident();
+            self.expect(TokenKind::LPAREN);
+            let mut args = Vec::new();
+            if !self.check(TokenKind::RPAREN) {
+                loop {
+                    args.push(self.parse_expr());
+                    if !self.match_kind(TokenKind::COMMA) {
+                        break;
+                    }
+                }
+            }
+            self.expect(TokenKind::RPAREN);
+            AstNode {
+                kind: AstKind::CALL_EXPR,
+                value: name,
+                type_ann: "".to_string(),
+                children: args,
+                line: 0,
+                col: 0,
+            }
+        } else if self.check(TokenKind::IDENT) {
+            let name = self.expect_ident();
+            AstNode {
+                kind: AstKind::IDENT_EXPR,
+                value: name,
+                type_ann: "".to_string(),
+                children: Vec::new(),
+                line: 0,
+                col: 0,
+            }
+        } else {
+            let token = self.advance();
+            self.errors.push(format!("Unexpected token: {}", token.lexeme));
+            AstNode {
+                kind: AstKind::LITERAL_EXPR,
+                value: "0".to_string(),
+                type_ann: "i64".to_string(),
+                children: Vec::new(),
+                line: 0,
+                col: 0,
+            }
+        }
+    }
+
+    fn current_precedence(&self) -> i64 {
+        if self.is_at_end() {
+            return 0;
+        }
+        let token = &self.tokens[self.pos as usize];
+        match token.kind {
+            TokenKind::EQ => 1,
+            TokenKind::OR => 2,
+            TokenKind::AND => 3,
+            TokenKind::EQEQ => 4,
+            TokenKind::NEQ => 4,
+            TokenKind::LT => 5,
+            TokenKind::GT => 5,
+            TokenKind::LE => 5,
+            TokenKind::GE => 5,
+            TokenKind::PLUS => 6,
+            TokenKind::MINUS => 6,
+            TokenKind::STAR => 7,
+            TokenKind::SLASH => 7,
+            TokenKind::PERCENT => 7,
+            _ => 0,
+        }
+    }
+
+    fn peek_next_is(&self, kind: TokenKind) -> bool {
+        if self.pos + 1 >= self.tokens.len() as i64 {
+            return false;
+        }
+        self.tokens[self.pos as usize + 1].kind == kind
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.pos >= self.tokens.len() as i64 || self.tokens[self.pos as usize].kind == TokenKind::EOF
+    }
+
+    fn check(&self, kind: TokenKind) -> bool {
+        !self.is_at_end() && self.tokens[self.pos as usize].kind == kind
+    }
+
+    fn match_kind(&mut self, kind: TokenKind) -> bool {
+        if self.check(kind) {
+            self.pos = self.pos + 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn advance(&mut self) -> Token {
+        let token = &self.tokens[self.pos as usize];
+        self.pos = self.pos + 1;
+        token.clone()
+    }
+
+    fn expect(&mut self, kind: TokenKind) {
+        if self.match_kind(kind) {
+            return;
+        }
+        let token = &self.tokens[self.pos as usize];
+        self.errors.push(format!("Expected token"));
+    }
+
+    fn expect_ident(&mut self) -> String {
+        let token = self.advance();
+        token.lexeme.clone()
+    }
+
+    fn consume_semicolon(&mut self) {
+        self.match_kind(TokenKind::SEMICOLON);
+    }
+}
+
+impl Token {
+    pub fn clone(&self) -> Token {
+        Token {
+            kind: self.kind,
+            lexeme: self.lexeme.clone(),
+            line: self.line,
+            col: self.col,
+            value: self.value.clone(),
+        }
+    }
+}

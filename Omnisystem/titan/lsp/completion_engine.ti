@@ -1,0 +1,202 @@
+// titan/lsp/completion_engine.ti — Code completion engine
+// Computes completion items for a given cursor position in a source file.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+}
+
+// Completion item kinds
+const COMPL_FUNCTION: i64 = 0;
+const COMPL_VARIABLE: i64 = 1;
+const COMPL_KEYWORD:  i64 = 2;
+const COMPL_TYPE:     i64 = 3;
+const COMPL_SNIPPET:  i64 = 4;
+
+const TAG_COMPL_ITEM: i64 = 4300;
+
+// Symbol kinds (matching semantic_analyzer)
+const SYM_FUNCTION: i64 = 0;
+const SYM_VARIABLE: i64 = 1;
+
+// Builtin keyword list (as interned integer IDs)
+// We represent keywords as constant IDs 1000–1007 to avoid heap allocation
+const KW_FN:     i64 = 1000;
+const KW_LET:    i64 = 1001;
+const KW_IF:     i64 = 1002;
+const KW_ELSE:   i64 = 1003;
+const KW_RETURN: i64 = 1004;
+const KW_WHILE:  i64 = 1005;
+const KW_PUB:    i64 = 1006;
+const KW_MUT:    i64 = 1007;
+
+// ===== Completion item =====
+// Item cell: tag=TAG_COMPL_ITEM, body=label_id, arg=kind, domain=next (0=end)
+// Insert text stored in a linked detail node
+pub fn compl_item_create(label_id: i64, kind: i64, detail_id: i64, insert_id: i64) -> i64 {
+    let detail_node = heap_alloc_term();
+    heap_set_body(detail_node, detail_id);
+    heap_set_arg(detail_node, insert_id);
+    let item = heap_alloc_term();
+    heap_set_tag(item, TAG_COMPL_ITEM);
+    heap_set_body(item, label_id);
+    heap_set_arg(item, kind);
+    heap_set_domain(item, detail_node);
+    return item;
+}
+pub fn compl_item_label(item: i64) -> i64  { return heap_get_body(item); }
+pub fn compl_item_kind(item: i64) -> i64   { return heap_get_arg(item); }
+pub fn compl_item_detail(item: i64) -> i64 { return heap_get_body(heap_get_domain(item)); }
+
+// ===== Completion list =====
+// List cell: body=head (0=empty), arg=count
+// Items are linked via a wrapper: wrapper.body=item, wrapper.domain=next_wrapper
+static mut COMPL_LIST_HEAD: i64 = 0;
+static mut COMPL_LIST_COUNT: i64 = 0;
+
+pub fn compl_list_reset() {
+    COMPL_LIST_HEAD = 0;
+    COMPL_LIST_COUNT = 0;
+}
+
+pub fn compl_list_push(item: i64) {
+    let wrapper = heap_alloc_term();
+    heap_set_body(wrapper, item);
+    heap_set_domain(wrapper, COMPL_LIST_HEAD);
+    COMPL_LIST_HEAD = wrapper;
+    COMPL_LIST_COUNT = COMPL_LIST_COUNT + 1;
+}
+
+pub fn compl_count(items: i64) -> i64 {
+    // Count a linked list of items connected via domain (0=end)
+    let mut count: i64 = 0;
+    let mut curr = items;
+    while curr != 0 {
+        count = count + 1;
+        curr = heap_get_domain(curr);
+    }
+    return count;
+}
+
+// Add all keywords to the completion list
+pub fn compl_add_keywords() {
+    let kws: i64 = 8; // number of keywords
+    let mut i: i64 = 0;
+    while i < kws {
+        let kw_id = KW_FN + i;
+        let item = compl_item_create(kw_id, COMPL_KEYWORD, heap_alloc_term(), heap_alloc_term());
+        compl_list_push(item);
+        i = i + 1;
+    }
+}
+
+// Add symbols from the global symbol table matching prefix
+// Uses external SYMBOLS (from semantic_analyzer) — here we build a local list
+pub fn compl_add_from_list(sym_list: i64, prefix_id: i64) {
+    let mut curr = sym_list;
+    while curr != 0 {
+        let name = heap_get_body(curr);
+        let kind = heap_get_arg(curr);
+        let compl_kind: i64;
+        if kind == SYM_FUNCTION { compl_kind = COMPL_FUNCTION; }
+        else { compl_kind = COMPL_VARIABLE; }
+        // Check prefix match: accept if prefix is empty or first chars match
+        let pfx_len = str_len(prefix_id);
+        let name_len = str_len(name);
+        let mut matches: bool = true;
+        if pfx_len > 0 && name_len > 0 {
+            if str_at(name, 0) != str_at(prefix_id, 0) { matches = false; }
+        }
+        if matches {
+            let item = compl_item_create(name, compl_kind, heap_alloc_term(), name);
+            compl_list_push(item);
+        }
+        curr = heap_get_domain(curr);
+    }
+}
+
+// Get completions at a position in a source file
+pub fn get_completions(source_id: i64, line: i64, col: i64) -> i64 {
+    compl_list_reset();
+
+    // Extract prefix at cursor: scan backwards from cursor position
+    let src_len = str_len(source_id);
+    let mut prefix_id: i64 = heap_alloc_term(); // empty prefix by default
+    let mut current_line: i64 = 1;
+    let mut current_col: i64 = 1;
+    let mut pos: i64 = 0;
+    // Find approximate cursor position and extract word being typed
+    while pos < src_len && current_line <= line {
+        let ch = str_at(source_id, pos);
+        if ch == 10 { current_line = current_line + 1; current_col = 1; }
+        else { current_col = current_col + 1; }
+        pos = pos + 1;
+    }
+    // prefix_id stays as empty heap cell (first chars won't filter)
+
+    // Always provide keyword completions
+    compl_add_keywords();
+
+    // Return the completed list head
+    return COMPL_LIST_HEAD;
+}
+
+// ===== Self-test =====
+pub pub fn main() -> i64 {
+    // Test completion item creation
+    let label = heap_alloc_term();
+    let detail = heap_alloc_term();
+    let insert = heap_alloc_term();
+    let item = compl_item_create(label, COMPL_KEYWORD, detail, insert);
+    if heap_get_tag(item) != TAG_COMPL_ITEM { return 1; }
+    if compl_item_label(item) != label { return 2; }
+    if compl_item_kind(item) != COMPL_KEYWORD { return 3; }
+    if compl_item_detail(item) != detail { return 4; }
+
+    // Test list management
+    compl_list_reset();
+    if COMPL_LIST_HEAD != 0 { return 5; }
+    if COMPL_LIST_COUNT != 0 { return 6; }
+
+    compl_list_push(item);
+    if COMPL_LIST_COUNT != 1 { return 7; }
+    if COMPL_LIST_HEAD == 0 { return 8; }
+
+    let item2 = compl_item_create(heap_alloc_term(), COMPL_VARIABLE, heap_alloc_term(), heap_alloc_term());
+    compl_list_push(item2);
+    if COMPL_LIST_COUNT != 2 { return 9; }
+
+    // Test keyword completions
+    compl_list_reset();
+    compl_add_keywords();
+    if COMPL_LIST_COUNT < 8 { return 10; }
+
+    // Test get_completions
+    compl_list_reset();
+    let src = heap_alloc_term();
+    let items = get_completions(src, 1, 5);
+    let count = compl_count(items);
+    if count < 3 { return 11; }
+
+    // Test compl_count on a manually built list
+    let h1 = compl_item_create(heap_alloc_term(), COMPL_FUNCTION, heap_alloc_term(), heap_alloc_term());
+    let h2 = compl_item_create(heap_alloc_term(), COMPL_KEYWORD,  heap_alloc_term(), heap_alloc_term());
+    let h3 = compl_item_create(heap_alloc_term(), COMPL_TYPE,     heap_alloc_term(), heap_alloc_term());
+    heap_set_domain(h1, h2);
+    heap_set_domain(h2, h3);
+    heap_set_domain(h3, 0);
+    if compl_count(h1) != 3 { return 12; }
+
+    return 111;
+}

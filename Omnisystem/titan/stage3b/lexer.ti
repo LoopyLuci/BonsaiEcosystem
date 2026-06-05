@@ -1,0 +1,570 @@
+// Titan Stage 3B — Lexer (Stage-0 Compatible Rewrite)
+// Phase 3 P2.1 / Closure: Self-hosting translation of titan/stage0/lexer.py
+//
+// Rewrites the aspirational Stage-1 lexer.ti into Stage-0-parseable syntax:
+// i64 discriminant tags instead of enum variants, fn-constant helpers,
+// str comparison for character classification (no char literals).
+//
+// Coverage:
+//   §1  Token kind tags (mirrors Python TT enum)
+//   §2  Keyword → token kind mapping
+//   §3  Character classification helpers
+//   §4  Single-char token classification
+//   §5  Multi-char token hints (operator prefix detection)
+//   §6  Token struct + constructor
+//   §7  LexState struct + helpers
+//   §8  Literal kind detection
+//   §9  Identifier vs keyword classification
+//   §10 Lexer validation + hash seed
+
+// ── §1  Token Kind Tags ───────────────────────────────────────────────────────
+// Mirrors Python TT enum. Each token kind is an i64 constant.
+
+fn TT_INT_LIT()    -> i64 { return 1; }
+fn TT_FLOAT_LIT()  -> i64 { return 2; }
+fn TT_STR_LIT()    -> i64 { return 3; }
+fn TT_BOOL_LIT()   -> i64 { return 4; }
+fn TT_UNIT_LIT()   -> i64 { return 5; }
+fn TT_IDENT()      -> i64 { return 10; }
+
+// Keywords
+fn TT_KW_FN()       -> i64 { return 20; }
+fn TT_KW_PUB()      -> i64 { return 21; }
+fn TT_KW_LET()      -> i64 { return 22; }
+fn TT_KW_MUT()      -> i64 { return 23; }
+fn TT_KW_RETURN()   -> i64 { return 24; }
+fn TT_KW_IF()       -> i64 { return 25; }
+fn TT_KW_ELSE()     -> i64 { return 26; }
+fn TT_KW_WHILE()    -> i64 { return 27; }
+fn TT_KW_FOR()      -> i64 { return 28; }
+fn TT_KW_IN()       -> i64 { return 29; }
+fn TT_KW_STRUCT()   -> i64 { return 30; }
+fn TT_KW_ENUM()     -> i64 { return 31; }
+fn TT_KW_MATCH()    -> i64 { return 32; }
+fn TT_KW_TRUE()     -> i64 { return 33; }
+fn TT_KW_FALSE()    -> i64 { return 34; }
+fn TT_KW_EXTERN()   -> i64 { return 35; }
+fn TT_KW_USE()      -> i64 { return 36; }
+fn TT_KW_MOD()      -> i64 { return 37; }
+fn TT_KW_MOVE()     -> i64 { return 38; }
+fn TT_KW_SELF()     -> i64 { return 39; }
+fn TT_KW_LOOP()     -> i64 { return 40; }
+fn TT_KW_BREAK()    -> i64 { return 41; }
+fn TT_KW_CONTINUE() -> i64 { return 42; }
+fn TT_KW_ALLOC()    -> i64 { return 43; }
+fn TT_KW_EMIT()     -> i64 { return 44; }
+fn TT_KW_ASYNC()    -> i64 { return 45; }
+fn TT_KW_AWAIT()    -> i64 { return 46; }
+fn TT_KW_IMPL()     -> i64 { return 47; }
+fn TT_KW_TRAIT()    -> i64 { return 48; }
+fn TT_KW_WHERE()    -> i64 { return 49; }
+fn TT_KW_TYPE()     -> i64 { return 50; }
+
+// Primitive type keywords
+fn TT_TY_I8()    -> i64 { return 60; }
+fn TT_TY_I16()   -> i64 { return 61; }
+fn TT_TY_I32()   -> i64 { return 62; }
+fn TT_TY_I64()   -> i64 { return 63; }
+fn TT_TY_I128()  -> i64 { return 64; }
+fn TT_TY_ISIZE() -> i64 { return 65; }
+fn TT_TY_U8()    -> i64 { return 66; }
+fn TT_TY_U16()   -> i64 { return 67; }
+fn TT_TY_U32()   -> i64 { return 68; }
+fn TT_TY_U64()   -> i64 { return 69; }
+fn TT_TY_F32()   -> i64 { return 70; }
+fn TT_TY_F64()   -> i64 { return 71; }
+fn TT_TY_BOOL()  -> i64 { return 72; }
+fn TT_TY_STR()   -> i64 { return 73; }
+fn TT_TY_UNIT()  -> i64 { return 74; }
+
+// Punctuation
+fn TT_LPAREN()   -> i64 { return 100; }
+fn TT_RPAREN()   -> i64 { return 101; }
+fn TT_LBRACE()   -> i64 { return 102; }
+fn TT_RBRACE()   -> i64 { return 103; }
+fn TT_LBRACKET() -> i64 { return 104; }
+fn TT_RBRACKET() -> i64 { return 105; }
+fn TT_COMMA()    -> i64 { return 106; }
+fn TT_SEMI()     -> i64 { return 107; }
+fn TT_COLON()    -> i64 { return 108; }
+fn TT_COLONCOLON() -> i64 { return 109; }
+fn TT_DOT()      -> i64 { return 110; }
+fn TT_DOTDOT()   -> i64 { return 111; }
+fn TT_DOTDOTDOT() -> i64 { return 112; }
+fn TT_HASH()     -> i64 { return 113; }
+fn TT_AT()       -> i64 { return 114; }
+fn TT_TILDE()    -> i64 { return 115; }
+fn TT_QUESTION() -> i64 { return 116; }
+
+// Operators
+fn TT_PLUS()     -> i64 { return 120; }
+fn TT_MINUS()    -> i64 { return 121; }
+fn TT_STAR()     -> i64 { return 122; }
+fn TT_SLASH()    -> i64 { return 123; }
+fn TT_PERCENT()  -> i64 { return 124; }
+fn TT_AMP()      -> i64 { return 125; }
+fn TT_PIPE()     -> i64 { return 126; }
+fn TT_CARET()    -> i64 { return 127; }
+fn TT_BANG()     -> i64 { return 128; }
+fn TT_LT()       -> i64 { return 129; }
+fn TT_GT()       -> i64 { return 130; }
+fn TT_EQ()       -> i64 { return 131; }
+fn TT_LTEQ()     -> i64 { return 132; }
+fn TT_GTEQ()     -> i64 { return 133; }
+fn TT_EQEQ()     -> i64 { return 134; }
+fn TT_BANGEQ()   -> i64 { return 135; }
+fn TT_AMPAMP()   -> i64 { return 136; }
+fn TT_PIPEPIPE() -> i64 { return 137; }
+fn TT_SHL()      -> i64 { return 138; }
+fn TT_SHR()      -> i64 { return 139; }
+fn TT_ARROW()    -> i64 { return 140; }
+fn TT_FAT_ARROW() -> i64 { return 141; }
+fn TT_PLUSEQ()   -> i64 { return 142; }
+fn TT_MINUSEQ()  -> i64 { return 143; }
+fn TT_STAREQ()   -> i64 { return 144; }
+fn TT_SLASHEQ()  -> i64 { return 145; }
+fn TT_BANG_EQ()  -> i64 { return 146; }
+
+// Special
+fn TT_EOF()      -> i64 { return 200; }
+fn TT_ERROR()    -> i64 { return 201; }
+fn TT_UNKNOWN()  -> i64 { return 202; }
+
+// ── §2  Keyword → Token Kind Mapping ─────────────────────────────────────────
+// Mirrors Python lex() keyword table. Maps keyword str → token kind tag.
+
+pub fn keyword_kind(word: str) -> i64 {
+    if word == "fn"       { return 20; }
+    if word == "pub"      { return 21; }
+    if word == "let"      { return 22; }
+    if word == "mut"      { return 23; }
+    if word == "return"   { return 24; }
+    if word == "if"       { return 25; }
+    if word == "else"     { return 26; }
+    if word == "while"    { return 27; }
+    if word == "for"      { return 28; }
+    if word == "in"       { return 29; }
+    if word == "struct"   { return 30; }
+    if word == "enum"     { return 31; }
+    if word == "match"    { return 32; }
+    if word == "true"     { return 33; }
+    if word == "false"    { return 34; }
+    if word == "extern"   { return 35; }
+    if word == "use"      { return 36; }
+    if word == "mod"      { return 37; }
+    if word == "move"     { return 38; }
+    if word == "self"     { return 39; }
+    if word == "loop"     { return 40; }
+    if word == "break"    { return 41; }
+    if word == "continue" { return 42; }
+    if word == "alloc"    { return 43; }
+    if word == "emit"     { return 44; }
+    if word == "async"    { return 45; }
+    if word == "await"    { return 46; }
+    if word == "impl"     { return 47; }
+    if word == "trait"    { return 48; }
+    if word == "where"    { return 49; }
+    if word == "type"     { return 50; }
+    if word == "i8"       { return 60; }
+    if word == "i16"      { return 61; }
+    if word == "i32"      { return 62; }
+    if word == "i64"      { return 63; }
+    if word == "i128"     { return 64; }
+    if word == "isize"    { return 65; }
+    if word == "u8"       { return 66; }
+    if word == "u16"      { return 67; }
+    if word == "u32"      { return 68; }
+    if word == "u64"      { return 69; }
+    if word == "f32"      { return 70; }
+    if word == "f64"      { return 71; }
+    if word == "bool"     { return 72; }
+    if word == "str"      { return 73; }
+    return 10;
+}
+
+pub fn is_keyword(word: str) -> bool {
+    return keyword_kind(word) != 10;
+}
+
+pub fn is_type_keyword(kind: i64) -> bool {
+    if kind == 60 { return true; }
+    if kind == 61 { return true; }
+    if kind == 62 { return true; }
+    if kind == 63 { return true; }
+    if kind == 64 { return true; }
+    if kind == 65 { return true; }
+    if kind == 66 { return true; }
+    if kind == 67 { return true; }
+    if kind == 68 { return true; }
+    if kind == 69 { return true; }
+    if kind == 70 { return true; }
+    if kind == 71 { return true; }
+    if kind == 72 { return true; }
+    if kind == 73 { return true; }
+    return false;
+}
+
+// ── §3  Character Classification Helpers ──────────────────────────────────────
+// Mirrors Python is_digit, is_alpha, is_alnum, is_whitespace.
+// Uses str comparison (no char literals — Stage 0 doesn't support char syntax).
+
+pub fn is_whitespace_str(ch: str) -> bool {
+    if ch == " "  { return true; }
+    if ch == "\t" { return true; }
+    if ch == "\r" { return true; }
+    if ch == "\n" { return true; }
+    return false;
+}
+
+pub fn is_digit_str(ch: str) -> bool {
+    if ch == "0" { return true; }
+    if ch == "1" { return true; }
+    if ch == "2" { return true; }
+    if ch == "3" { return true; }
+    if ch == "4" { return true; }
+    if ch == "5" { return true; }
+    if ch == "6" { return true; }
+    if ch == "7" { return true; }
+    if ch == "8" { return true; }
+    if ch == "9" { return true; }
+    return false;
+}
+
+pub fn is_alpha_str(ch: str) -> bool {
+    if ch == "_" { return true; }
+    if ch == "a" { return true; }
+    if ch == "b" { return true; }
+    if ch == "c" { return true; }
+    if ch == "d" { return true; }
+    if ch == "e" { return true; }
+    if ch == "f" { return true; }
+    if ch == "g" { return true; }
+    if ch == "h" { return true; }
+    if ch == "i" { return true; }
+    if ch == "j" { return true; }
+    if ch == "k" { return true; }
+    if ch == "l" { return true; }
+    if ch == "m" { return true; }
+    if ch == "n" { return true; }
+    if ch == "o" { return true; }
+    if ch == "p" { return true; }
+    if ch == "q" { return true; }
+    if ch == "r" { return true; }
+    if ch == "s" { return true; }
+    if ch == "t" { return true; }
+    if ch == "u" { return true; }
+    if ch == "v" { return true; }
+    if ch == "w" { return true; }
+    if ch == "x" { return true; }
+    if ch == "y" { return true; }
+    if ch == "z" { return true; }
+    if ch == "A" { return true; }
+    if ch == "B" { return true; }
+    if ch == "C" { return true; }
+    if ch == "D" { return true; }
+    if ch == "E" { return true; }
+    if ch == "F" { return true; }
+    if ch == "G" { return true; }
+    if ch == "H" { return true; }
+    if ch == "I" { return true; }
+    if ch == "J" { return true; }
+    if ch == "K" { return true; }
+    if ch == "L" { return true; }
+    if ch == "M" { return true; }
+    if ch == "N" { return true; }
+    if ch == "O" { return true; }
+    if ch == "P" { return true; }
+    if ch == "Q" { return true; }
+    if ch == "R" { return true; }
+    if ch == "S" { return true; }
+    if ch == "T" { return true; }
+    if ch == "U" { return true; }
+    if ch == "V" { return true; }
+    if ch == "W" { return true; }
+    if ch == "X" { return true; }
+    if ch == "Y" { return true; }
+    if ch == "Z" { return true; }
+    return false;
+}
+
+pub fn is_alnum_str(ch: str) -> bool {
+    if is_digit_str(ch) { return true; }
+    if is_alpha_str(ch) { return true; }
+    return false;
+}
+
+// ── §4  Single-Character Token Classification ─────────────────────────────────
+// Maps single-char string → token kind tag.
+// Mirrors Python lex() single-char dispatch table.
+
+pub fn single_char_token_kind(ch: str) -> i64 {
+    if ch == "(" { return 100; }
+    if ch == ")" { return 101; }
+    if ch == "{" { return 102; }
+    if ch == "}" { return 103; }
+    if ch == "[" { return 104; }
+    if ch == "]" { return 105; }
+    if ch == "," { return 106; }
+    if ch == ";" { return 107; }
+    if ch == "#" { return 113; }
+    if ch == "@" { return 114; }
+    if ch == "~" { return 115; }
+    if ch == "?" { return 116; }
+    if ch == "+" { return 120; }
+    if ch == "-" { return 121; }
+    if ch == "*" { return 122; }
+    if ch == "/" { return 123; }
+    if ch == "%" { return 124; }
+    if ch == "&" { return 125; }
+    if ch == "|" { return 126; }
+    if ch == "^" { return 127; }
+    if ch == "!" { return 128; }
+    if ch == "<" { return 129; }
+    if ch == ">" { return 130; }
+    if ch == "=" { return 131; }
+    if ch == ":" { return 108; }
+    if ch == "." { return 110; }
+    return 202;
+}
+
+pub fn single_char_is_known(ch: str) -> bool {
+    return single_char_token_kind(ch) != 202;
+}
+
+// ── §5  Multi-Char Operator Detection ────────────────────────────────────────
+// Returns expected compound token kind for a two-char sequence.
+// Mirrors Python lex() lookahead for operators like ->, ==, !=, <=, >=.
+
+pub fn two_char_token_kind(first: str, second: str) -> i64 {
+    if first == "-" {
+        if second == ">" { return 140; }
+        if second == "=" { return 143; }
+    }
+    if first == "=" {
+        if second == "=" { return 134; }
+        if second == ">" { return 141; }
+    }
+    if first == "!" {
+        if second == "=" { return 135; }
+    }
+    if first == "<" {
+        if second == "=" { return 132; }
+        if second == "<" { return 138; }
+    }
+    if first == ">" {
+        if second == "=" { return 133; }
+        if second == ">" { return 139; }
+    }
+    if first == "&" {
+        if second == "&" { return 136; }
+    }
+    if first == "|" {
+        if second == "|" { return 137; }
+    }
+    if first == "+" {
+        if second == "=" { return 142; }
+    }
+    if first == "*" {
+        if second == "=" { return 144; }
+    }
+    if first == "/" {
+        if second == "=" { return 145; }
+    }
+    if first == ":" {
+        if second == ":" { return 109; }
+    }
+    if first == "." {
+        if second == "." { return 111; }
+    }
+    return 202;
+}
+
+pub fn is_two_char_op(first: str, second: str) -> bool {
+    return two_char_token_kind(first, second) != 202;
+}
+
+// ── §6  Token Struct + Constructor ───────────────────────────────────────────
+
+pub struct LexToken {
+    kind: i64,
+    lexeme: str,
+    line: i64,
+    col: i64,
+}
+
+pub fn make_lex_token(kind: i64, lexeme: str, line: i64, col: i64) -> LexToken {
+    return LexToken { kind: kind, lexeme: lexeme, line: line, col: col };
+}
+
+pub fn make_eof_token(line: i64, col: i64) -> LexToken {
+    return LexToken { kind: 200, lexeme: "", line: line, col: col };
+}
+
+pub fn make_error_token(lexeme: str, line: i64, col: i64) -> LexToken {
+    return LexToken { kind: 201, lexeme: lexeme, line: line, col: col };
+}
+
+pub fn token_is_eof(tok: LexToken) -> bool {
+    return tok.kind == 200;
+}
+
+pub fn token_is_error(tok: LexToken) -> bool {
+    return tok.kind == 201;
+}
+
+pub fn token_is_keyword(tok: LexToken) -> bool {
+    if tok.kind >= 20 && tok.kind <= 50 { return true; }
+    if tok.kind >= 60 && tok.kind <= 74 { return true; }
+    return false;
+}
+
+pub fn token_is_literal(tok: LexToken) -> bool {
+    if tok.kind == 1 { return true; }
+    if tok.kind == 2 { return true; }
+    if tok.kind == 3 { return true; }
+    if tok.kind == 4 { return true; }
+    if tok.kind == 5 { return true; }
+    return false;
+}
+
+pub fn token_is_ident(tok: LexToken) -> bool {
+    return tok.kind == 10;
+}
+
+// ── §7  LexState Struct ───────────────────────────────────────────────────────
+// Mirrors Python Lexer position tracking state.
+
+pub struct LexState {
+    pos: i64,
+    line: i64,
+    col: i64,
+    token_count: i64,
+    error_count: i64,
+}
+
+pub fn make_lex_state() -> LexState {
+    return LexState { pos: 0, line: 1, col: 1, token_count: 0, error_count: 0 };
+}
+
+pub fn lexstate_advance(s: LexState) -> LexState {
+    return LexState {
+        pos: s.pos + 1, line: s.line,
+        col: s.col + 1, token_count: s.token_count,
+        error_count: s.error_count,
+    };
+}
+
+pub fn lexstate_newline(s: LexState) -> LexState {
+    return LexState {
+        pos: s.pos + 1, line: s.line + 1,
+        col: 1, token_count: s.token_count,
+        error_count: s.error_count,
+    };
+}
+
+pub fn lexstate_emit(s: LexState) -> LexState {
+    return LexState {
+        pos: s.pos, line: s.line, col: s.col,
+        token_count: s.token_count + 1,
+        error_count: s.error_count,
+    };
+}
+
+pub fn lexstate_error(s: LexState) -> LexState {
+    return LexState {
+        pos: s.pos, line: s.line, col: s.col,
+        token_count: s.token_count,
+        error_count: s.error_count + 1,
+    };
+}
+
+pub fn lexstate_is_ok(s: LexState) -> bool {
+    return s.error_count == 0;
+}
+
+// ── §8  Literal Kind Detection ────────────────────────────────────────────────
+
+pub fn is_int_start(ch: str) -> bool {
+    return is_digit_str(ch);
+}
+
+pub fn is_float_marker(ch: str) -> bool {
+    return ch == ".";
+}
+
+pub fn is_str_quote(ch: str) -> bool {
+    return ch == "\"";
+}
+
+pub fn is_comment_start(ch: str, next: str) -> bool {
+    return ch == "/" && next == "/";
+}
+
+pub fn is_block_comment_start(ch: str, next: str) -> bool {
+    return ch == "/" && next == "*";
+}
+
+pub fn is_ident_start(ch: str) -> bool {
+    return is_alpha_str(ch);
+}
+
+pub fn is_ident_continue(ch: str) -> bool {
+    return is_alnum_str(ch);
+}
+
+// ── §9  LexSummary: per-module lexer statistics ───────────────────────────────
+
+pub struct LexSummary {
+    token_count: i64,
+    error_count: i64,
+    keyword_count: i64,
+    ident_count: i64,
+    literal_count: i64,
+    line_count: i64,
+}
+
+pub fn make_lex_summary() -> LexSummary {
+    return LexSummary {
+        token_count: 0, error_count: 0,
+        keyword_count: 0, ident_count: 0,
+        literal_count: 0, line_count: 1,
+    };
+}
+
+pub fn lex_summary_add_token(s: LexSummary, kind: i64) -> LexSummary {
+    let mut kw = s.keyword_count;
+    let mut id = s.ident_count;
+    let mut lt = s.literal_count;
+    if is_type_keyword(kind) { kw = kw + 1; }
+    if kind == 10 { id = id + 1; }
+    if kind >= 1 && kind <= 5 { lt = lt + 1; }
+    return LexSummary {
+        token_count: s.token_count + 1,
+        error_count: s.error_count,
+        keyword_count: kw, ident_count: id,
+        literal_count: lt, line_count: s.line_count,
+    };
+}
+
+pub fn lex_summary_is_ok(s: LexSummary) -> bool {
+    return s.error_count == 0 && s.token_count >= 1;
+}
+
+// ── §10  Validation + Hash Seed ───────────────────────────────────────────────
+
+pub fn lex_token_kind_is_valid(kind: i64) -> bool {
+    if kind >= 1 && kind <= 5 { return true; }   // literals
+    if kind == 10 { return true; }                 // ident
+    if kind >= 20 && kind <= 74 { return true; }  // keywords + types
+    if kind >= 100 && kind <= 145 { return true; } // punctuation + operators
+    if kind >= 200 && kind <= 202 { return true; } // EOF, error, unknown
+    return false;
+}
+
+pub fn lex_hash_seed() -> i64 {
+    return 2401;
+}
+
+pub fn lex_version() -> i64 {
+    return 1;
+}

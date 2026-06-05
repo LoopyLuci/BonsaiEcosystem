@@ -1,0 +1,6 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_PS:i64=25300;const tT_PP:i64=25301;const tT_WR:i64=25302;
+pub fn tf4_pass_create(name:i64,order:i64,enabled:i64)->i64{let p=heap_alloc_term();heap_set_tag(p,tT_PS);heap_set_body(p,name);heap_set_arg(p,order);heap_set_domain(p,enabled);let w=heap_alloc_term();heap_set_tag(w,tT_WR);heap_set_body(w,p);heap_set_domain(w,0);return w;}
+pub fn tf4_pipeline_create()->i64{let p=heap_alloc_term();heap_set_tag(p,tT_PP);heap_set_body(p,0);heap_set_arg(p,0);return p;}
+pub fn tf4_pipeline_add(p:i64,w:i64){let h=heap_get_arg(p);if h==0{heap_set_arg(p,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(p,heap_get_body(p)+1);}
+pub fn main()->i64{let p=tf4_pipeline_create();tf4_pipeline_add(p,tf4_pass_create(10,0,1));tf4_pipeline_add(p,tf4_pass_create(20,1,0));if heap_get_body(p)!=2{return 1;}return 111;}

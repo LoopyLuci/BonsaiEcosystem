@@ -1,0 +1,130 @@
+// OmniLib BTree -- ordered key/value map with sorted linked nodes
+// Note: internal representation is a sorted list preserving key order.
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_BTREE: i64 = 7040;
+const TAG_BNODE: i64 = 7041;
+
+// Tree layout: body=head(sorted by key), domain=size
+// Node layout: body=key, arg=value, domain=next
+pub fn btree_new() -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TAG_BTREE);
+    heap_set_body(t, 0);
+    heap_set_arg(t, 0);
+    heap_set_domain(t, 0);
+    return t;
+}
+
+pub fn btree_size(t: i64) -> i64 {
+    return heap_get_domain(t);
+}
+
+pub fn btree_insert(t: i64, key: i64, value: i64) {
+    let head = heap_get_body(t);
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_BNODE);
+    heap_set_body(n, key);
+    heap_set_arg(n, value);
+    heap_set_domain(n, 0);
+
+    if head == 0 {
+        heap_set_body(t, n);
+        heap_set_domain(t, 1);
+        return;
+    }
+
+    if key < heap_get_body(head) {
+        heap_set_domain(n, head);
+        heap_set_body(t, n);
+        heap_set_domain(t, heap_get_domain(t) + 1);
+        return;
+    }
+
+    let mut prev: i64 = 0;
+    let mut cur = head;
+    while cur != 0 {
+        let ck = heap_get_body(cur);
+        if ck == key {
+            heap_set_arg(cur, value);
+            return;
+        }
+        if ck > key { break; }
+        prev = cur;
+        cur = heap_get_domain(cur);
+    }
+
+    heap_set_domain(n, cur);
+    heap_set_domain(prev, n);
+    heap_set_domain(t, heap_get_domain(t) + 1);
+}
+
+pub fn btree_find(t: i64, key: i64) -> i64 {
+    let mut cur = heap_get_body(t);
+    while cur != 0 {
+        let ck = heap_get_body(cur);
+        if ck == key { return heap_get_arg(cur); }
+        if ck > key { return 0; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+pub fn btree_min_key(t: i64) -> i64 {
+    let head = heap_get_body(t);
+    if head == 0 { return 0; }
+    return heap_get_body(head);
+}
+
+pub fn btree_max_key(t: i64) -> i64 {
+    let mut cur = heap_get_body(t);
+    if cur == 0 { return 0; }
+    while heap_get_domain(cur) != 0 {
+        cur = heap_get_domain(cur);
+    }
+    return heap_get_body(cur);
+}
+
+pub fn btree_count_nodes(t: i64) -> i64 {
+    let mut c: i64 = 0;
+    let mut cur = heap_get_body(t);
+    while cur != 0 {
+        c = c + 1;
+        cur = heap_get_domain(cur);
+    }
+    return c;
+}
+
+pub fn main() -> i64 {
+    let t = btree_new();
+    if btree_size(t) != 0 { return 1; }
+
+    btree_insert(t, 50, 500);
+    btree_insert(t, 30, 300);
+    btree_insert(t, 70, 700);
+    btree_insert(t, 40, 400);
+
+    if btree_size(t) != 4 { return 2; }
+    if btree_count_nodes(t) != 4 { return 3; }
+    if btree_find(t, 30) != 300 { return 4; }
+    if btree_find(t, 70) != 700 { return 5; }
+    if btree_find(t, 99) != 0 { return 6; }
+
+    if btree_min_key(t) != 30 { return 7; }
+    if btree_max_key(t) != 70 { return 8; }
+
+    btree_insert(t, 50, 555);
+    if btree_size(t) != 4 { return 9; }
+    if btree_find(t, 50) != 555 { return 10; }
+
+    return 111;
+}

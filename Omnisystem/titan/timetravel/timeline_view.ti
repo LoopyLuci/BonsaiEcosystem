@@ -1,0 +1,176 @@
+// titan/timetravel/timeline_view.ti — Visual Execution Timeline
+// Builds a forward-ordered list of timeline entries from the trace.
+// Inlines all execution_recorder functions.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// ===== Execution recorder (inlined) =====
+const TAG_TRACE_STEP:     i64 = 7200;
+const TAG_TRACE_SNAPSHOT: i64 = 7201;
+
+const STEP_EXECUTE: i64 = 0;
+const STEP_STORE:   i64 = 1;
+const STEP_LOAD:    i64 = 2;
+const STEP_CALL:    i64 = 3;
+const STEP_RETURN:  i64 = 4;
+const STEP_JUMP:    i64 = 5;
+
+const OP_PUSH: i64 = 1;
+const OP_ADD:  i64 = 2;
+const OP_RET:  i64 = 14;
+
+static mut TRACE_HEAD:      i64  = 0;
+static mut TRACE_TAIL:      i64  = 0;
+static mut TRACE_COUNT:     i64  = 0;
+static mut TRACE_RECORDING: bool = false;
+
+pub fn trace_step_type(step: i64) -> i64   { return heap_get_body(heap_get_body(step)); }
+pub fn trace_step_opcode(step: i64) -> i64 { return heap_get_arg(step); }
+pub fn trace_step_pc(step: i64) -> i64     { return heap_get_arg(heap_get_body(step)); }
+
+pub fn trace_start() {
+    TRACE_HEAD = 0; TRACE_TAIL = 0; TRACE_COUNT = 0; TRACE_RECORDING = true;
+}
+pub fn trace_stop()                  { TRACE_RECORDING = false; }
+pub fn trace_count() -> i64          { return TRACE_COUNT; }
+
+pub fn trace_record(step_type: i64, opcode: i64, arg: i64,
+                    pc: i64, sp: i64, stack_top: i64) {
+    if !TRACE_RECORDING { return; }
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, arg);
+    heap_set_arg(meta2, sp);
+    heap_set_domain(meta2, stack_top);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, step_type);
+    heap_set_arg(meta1, pc);
+    heap_set_domain(meta1, meta2);
+    let step = heap_alloc_term();
+    heap_set_tag(step, TAG_TRACE_STEP);
+    heap_set_body(step, meta1);
+    heap_set_arg(step, opcode);
+    heap_set_domain(step, 0);
+    if TRACE_TAIL != 0 { heap_set_domain(TRACE_TAIL, step); } else { TRACE_HEAD = step; }
+    TRACE_TAIL  = step;
+    TRACE_COUNT = TRACE_COUNT + 1;
+}
+
+pub fn trace_snapshot_at_index(index: i64) -> i64 {
+    let mut curr = TRACE_HEAD;
+    let mut i: i64 = 0;
+    while curr != 0 {
+        if i == index {
+            let snap = heap_alloc_term();
+            heap_set_tag(snap, TAG_TRACE_SNAPSHOT);
+            heap_set_body(snap, curr);
+            return snap;
+        }
+        i = i + 1; curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Timeline entries =====
+// entry: tag=TAG_TIMELINE_ENTRY, body=step_index, arg=label_id, domain=next_entry
+const TAG_TIMELINE_ENTRY: i64 = 7400;
+
+pub fn timeline_entry_create(step_index: i64, label_id: i64, color: i64,
+                              duration: i64, parent_index: i64) -> i64 {
+    let e = heap_alloc_term();
+    heap_set_tag(e, TAG_TIMELINE_ENTRY);
+    heap_set_body(e, step_index);
+    heap_set_arg(e, label_id);
+    heap_set_domain(e, 0);
+    return e;
+}
+
+pub fn timeline_entry_step(e: i64) -> i64  { return heap_get_body(e); }
+pub fn timeline_entry_label(e: i64) -> i64 { return heap_get_arg(e); }
+
+pub fn timeline_count(entries: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = entries;
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+
+// Build a forward-ordered timeline list from the current trace.
+// Appends to tail so index 0 is first in the list.
+pub fn timeline_build() -> i64 {
+    let mut head: i64 = 0;
+    let mut tail: i64 = 0;
+    let mut i: i64 = 0;
+    while i < TRACE_COUNT {
+        let e = timeline_entry_create(i, i, 0, 1, 0);
+        if tail != 0 { heap_set_domain(tail, e); }
+        else         { head = e; }
+        tail = e;
+        i    = i + 1;
+    }
+    return head;
+}
+
+// Find the matching RETURN step for the CALL at call_index.
+// Returns a heap cell: body=call_index, arg=return_index.
+pub fn timeline_find_call_span(entries: i64, call_index: i64) -> i64 {
+    let result = heap_alloc_term();
+    heap_set_body(result, call_index);
+    heap_set_arg(result, call_index);   // default: span of 1
+
+    // Walk trace looking for RETURN after CALL at call_index
+    let mut i: i64 = call_index + 1;
+    while i < TRACE_COUNT {
+        let snap = trace_snapshot_at_index(i);
+        if snap != 0 {
+            let step_node = heap_get_body(snap);
+            let stype = trace_step_type(step_node);
+            if stype == STEP_RETURN {
+                heap_set_arg(result, i);
+                return result;
+            }
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    TRACE_HEAD = 0; TRACE_TAIL = 0; TRACE_COUNT = 0; TRACE_RECORDING = false;
+
+    trace_start();
+    trace_record(STEP_CALL,    OP_PUSH, 10, 0, 0, 0);
+    trace_record(STEP_EXECUTE, OP_ADD,  0,  1, 1, 10);
+    trace_record(STEP_RETURN,  OP_RET,  0,  2, 0, 0);
+    trace_stop();
+    if trace_count() != 3 { return 1; }
+
+    let entries = timeline_build();
+    if timeline_count(entries) != 3 { return 2; }
+
+    // First entry should have step_index=0
+    if timeline_entry_step(entries) != 0 { return 3; }
+
+    // Call span: CALL is at index 0, RETURN at index 2
+    let span = timeline_find_call_span(entries, 0);
+    if heap_get_body(span) != 0 { return 4; }  // call start
+    if heap_get_arg(span)  != 2 { return 5; }  // return index
+
+    // Manual entry creation
+    let e = timeline_entry_create(5, 99, 1, 3, 0);
+    if heap_get_tag(e) != TAG_TIMELINE_ENTRY { return 6; }
+    if timeline_entry_step(e) != 5           { return 7; }
+    if timeline_entry_label(e) != 99         { return 8; }
+
+    return 111;
+}

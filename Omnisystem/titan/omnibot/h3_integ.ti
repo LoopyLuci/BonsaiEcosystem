@@ -1,0 +1,11 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const T_CONN:i64=24200;const T_VAULT:i64=24201;const T_REG:i64=24202;const T_WRP:i64=24203;
+pub fn h3_conn_create(service_id:i64,status:i64,token_id:i64)->i64{let c=heap_alloc_term();heap_set_tag(c,T_CONN);heap_set_body(c,service_id);heap_set_arg(c,status);heap_set_domain(c,token_id);let w=heap_alloc_term();heap_set_tag(w,T_WRP);heap_set_body(w,c);heap_set_domain(w,0);return w;}
+pub fn h3_conn_service(w:i64)->i64{return heap_get_body(heap_get_body(w));}
+pub fn h3_conn_status(w:i64)->i64{return heap_get_arg(heap_get_body(w));}
+pub fn h3_conn_set_status(w:i64,st:i64){let c=heap_get_body(w);heap_set_arg(c,st);}
+pub fn h3_registry_create()->i64{let r=heap_alloc_term();heap_set_tag(r,T_REG);heap_set_body(r,0);heap_set_arg(r,0);return r;}
+pub fn h3_registry_add(r:i64,w:i64){let h=heap_get_arg(r);if h==0{heap_set_arg(r,w);}else{let mut cur:i64=h;while heap_get_domain(cur)!=0{cur=heap_get_domain(cur);}heap_set_domain(cur,w);}heap_set_body(r,heap_get_body(r)+1);}
+pub fn h3_registry_count(r:i64)->i64{return heap_get_body(r);}
+pub fn h3_registry_active_count(r:i64)->i64{let mut cur:i64=heap_get_arg(r);let mut n:i64=0;while cur!=0{if h3_conn_status(cur)==1{n=n+1;}cur=heap_get_domain(cur);}return n;}
+pub fn main()->i64{let r=h3_registry_create();let w1=h3_conn_create(1,1,100);let w2=h3_conn_create(2,0,200);let w3=h3_conn_create(3,1,300);h3_registry_add(r,w1);h3_registry_add(r,w2);h3_registry_add(r,w3);if h3_registry_count(r)!=3{return 1;}if h3_conn_service(w2)!=2{return 2;}if h3_conn_status(w2)!=0{return 3;}if h3_registry_active_count(r)!=2{return 4;}h3_conn_set_status(w2,1);if h3_registry_active_count(r)!=3{return 5;}return 111;}

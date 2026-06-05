@@ -1,0 +1,149 @@
+// Sylva UI Components -- heap-backed component tree model
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const CMP_WINDOW: i64 = 0;
+const CMP_PANEL: i64 = 1;
+const CMP_BUTTON: i64 = 2;
+const CMP_LABEL: i64 = 3;
+const CMP_INPUT: i64 = 4;
+const CMP_LIST: i64 = 5;
+const CMP_TREE: i64 = 6;
+const CMP_TABS: i64 = 7;
+const CMP_EDITOR: i64 = 8;
+const CMP_TOOLBAR: i64 = 9;
+const CMP_STATUSBAR: i64 = 10;
+const CMP_SCROLLBAR: i64 = 11;
+const CMP_MENU: i64 = 12;
+
+const TAG_COMPONENT: i64 = 2300;
+const TAG_COMPONENT_META: i64 = 2301;
+const TAG_COMPONENT_BOUNDS: i64 = 2302;
+
+// Component layout:
+// body=component type, arg=meta handle, domain=first child handle
+// Meta layout: body=on_click, arg=bounds handle, domain=next sibling handle
+// Bounds layout: body=packed(x,y), arg=packed(w,h), domain=text_id
+pub fn component_create(cmp_type: i64, parent: i64) -> i64 {
+    let cmp = heap_alloc_term();
+    let meta = heap_alloc_term();
+    heap_set_tag(cmp, TAG_COMPONENT);
+    heap_set_tag(meta, TAG_COMPONENT_META);
+    heap_set_body(cmp, cmp_type);
+    heap_set_arg(cmp, meta);
+    heap_set_domain(cmp, 0);
+    heap_set_body(meta, 0);
+    heap_set_arg(meta, 0);
+    heap_set_domain(meta, 0);
+
+    if parent != 0 {
+        let parent_head = heap_get_domain(parent);
+        heap_set_domain(meta, parent_head);
+        heap_set_domain(parent, cmp);
+    }
+    return cmp;
+}
+
+pub fn component_type(cmp: i64) -> i64 {
+    return heap_get_body(cmp);
+}
+
+pub fn component_first_child(cmp: i64) -> i64 {
+    return heap_get_domain(cmp);
+}
+
+pub fn component_next_sibling(cmp: i64) -> i64 {
+    let meta = heap_get_arg(cmp);
+    return heap_get_domain(meta);
+}
+
+pub fn pack2(a: i64, b: i64) -> i64 {
+    return (a * 1000000) + b;
+}
+
+pub fn unpack_first(packed: i64) -> i64 {
+    return packed / 1000000;
+}
+
+pub fn unpack_second(packed: i64) -> i64 {
+    return packed % 1000000;
+}
+
+pub fn component_set_bounds(cmp: i64, x: i64, y: i64, w: i64, h: i64) {
+    let meta = heap_get_arg(cmp);
+    let bounds = heap_alloc_term();
+    heap_set_tag(bounds, TAG_COMPONENT_BOUNDS);
+    heap_set_body(bounds, pack2(x, y));
+    heap_set_arg(bounds, pack2(w, h));
+    heap_set_domain(bounds, 0);
+    heap_set_arg(meta, bounds);
+    return;
+}
+
+pub fn component_bounds_handle(cmp: i64) -> i64 {
+    let meta = heap_get_arg(cmp);
+    let bounds = heap_get_arg(meta);
+    if bounds != 0 { return bounds; }
+
+    component_set_bounds(cmp, 0, 0, 0, 0);
+    return heap_get_arg(meta);
+}
+
+pub fn component_set_text(cmp: i64, text_id: i64) {
+    let bounds = component_bounds_handle(cmp);
+    heap_set_domain(bounds, text_id);
+    return;
+}
+
+pub fn component_set_on_click(cmp: i64, handler_id: i64) {
+    let meta = heap_get_arg(cmp);
+    heap_set_body(meta, handler_id);
+    return;
+}
+
+pub fn component_text(cmp: i64) -> i64 {
+    let bounds = component_bounds_handle(cmp);
+    return heap_get_domain(bounds);
+}
+
+pub fn layout_split_horizontal(parent_w: i64, split_ratio: i64) -> i64 {
+    return (parent_w * split_ratio) / 100;
+}
+
+pub fn layout_split_vertical(parent_h: i64, split_ratio: i64) -> i64 {
+    return (parent_h * split_ratio) / 100;
+}
+
+pub fn main() -> i64 {
+    let window = component_create(CMP_WINDOW, 0);
+    if window == 0 { return 1; }
+    if component_type(window) != CMP_WINDOW { return 2; }
+
+    let toolbar = component_create(CMP_TOOLBAR, window);
+    let editor = component_create(CMP_EDITOR, window);
+    let statusbar = component_create(CMP_STATUSBAR, window);
+    if toolbar == 0 || editor == 0 || statusbar == 0 { return 3; }
+
+    let child = component_first_child(window);
+    if child == 0 { return 4; }
+
+    component_set_bounds(editor, 100, 40, 800, 600);
+    component_set_text(editor, 777);
+    if component_text(editor) != 777 { return 5; }
+
+    let left = layout_split_horizontal(1920, 70);
+    let top = layout_split_vertical(1080, 80);
+    if left != 1344 { return 6; }
+    if top != 864 { return 7; }
+
+    return 111;
+}

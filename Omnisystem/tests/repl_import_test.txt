@@ -1,0 +1,3 @@
+import 2aa62a0a1e1b1fe3 as math
+math::add_nums(10, 20)
+math::multiply_nums(5, 6)

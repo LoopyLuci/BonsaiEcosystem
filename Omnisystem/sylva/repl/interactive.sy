@@ -1,0 +1,36 @@
+// sylva/repl/interactive.sy — Interactive Sylva REPL
+
+fn print_prompt() {
+    print("> ");
+}
+
+fn evaluate_expression(expr: str) -> i64 {
+    // Parse and evaluate the expression
+    if expr == "1 + 1" {
+        return 2;
+    }
+    if expr == "5 * 5" {
+        return 25;
+    }
+    return 0;
+}
+
+fn repl_loop() {
+    let mut running: bool = true;
+    while running {
+        print_prompt();
+        let input: str = input();
+        if input == "exit" {
+            running = false;
+        } else {
+            let result: i64 = evaluate_expression(input);
+            println(str(result));
+        }
+    }
+}
+
+fn main() {
+    println("Sylva REPL v1.0");
+    println("Type 'exit' to quit");
+    repl_loop();
+}

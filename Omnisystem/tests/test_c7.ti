@@ -1,0 +1,52 @@
+// tests/test_c7.ti — Phase C7 Axiom Verification Integration Test
+// All helpers inlined with tc7_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TC7_T_PROOF: i64 = 23600;
+const TC7_T_INV:   i64 = 23601;
+
+pub fn tc7_proof_create(name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TC7_T_PROOF); heap_set_body(p, name); heap_set_arg(p, 1);
+    return p;
+}
+pub fn tc7_proof_valid(p: i64) -> i64 { return heap_get_arg(p); }
+
+pub fn tc7_inv_create(cond: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, TC7_T_INV); heap_set_body(inv, cond); heap_set_arg(inv, 1);
+    return inv;
+}
+pub fn tc7_inv_check(inv: i64, actual: i64) -> i64 {
+    if actual == 0 { heap_set_arg(inv, 0); return 0; }
+    return heap_get_arg(inv);
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let p = tc7_proof_create(5);
+    if tc7_proof_valid(p) != 1         { return 1; }
+
+    let inv = tc7_inv_create(10);
+    if tc7_inv_check(inv, 1) != 1      { return 2; }
+    tc7_inv_check(inv, 0);
+    if heap_get_arg(inv) != 0          { return 3; }
+
+    // Once failed, stays failed even if actual=1
+    let inv2 = tc7_inv_create(1);
+    tc7_inv_check(inv2, 0);
+    if tc7_inv_check(inv2, 1) != 0     { return 4; }
+
+    return 111;
+}

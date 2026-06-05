@@ -1,0 +1,91 @@
+// Layout Engine -- block/flex-like box placement over DOM tree
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_LAYOUT_BOX: i64 = 3200;
+const TAG_LAYOUT_DIMS: i64 = 3201;
+
+// Box layout:
+// body=dom node, arg=x, domain=dims node
+// dims: body=width, arg=height, domain=y
+pub fn layout_create(node: i64) -> i64 {
+    let b = heap_alloc_term();
+    let d = heap_alloc_term();
+    heap_set_tag(b, TAG_LAYOUT_BOX);
+    heap_set_tag(d, TAG_LAYOUT_DIMS);
+    heap_set_body(b, node);
+    heap_set_arg(b, 0);
+    heap_set_domain(b, d);
+    heap_set_body(d, 0);
+    heap_set_arg(d, 0);
+    heap_set_domain(d, 0);
+    return b;
+}
+
+pub fn layout_set_pos(box_id: i64, x: i64, y: i64) {
+    heap_set_arg(box_id, x);
+    let dims = heap_get_domain(box_id);
+    heap_set_domain(dims, y);
+    return;
+}
+
+pub fn layout_set_size(box_id: i64, w: i64, h: i64) {
+    let dims = heap_get_domain(box_id);
+    heap_set_body(dims, w);
+    heap_set_arg(dims, h);
+    return;
+}
+
+pub fn layout_get_x(box_id: i64) -> i64 { return heap_get_arg(box_id); }
+
+pub fn layout_get_y(box_id: i64) -> i64 {
+    let dims = heap_get_domain(box_id);
+    return heap_get_domain(dims);
+}
+
+pub fn layout_get_width(box_id: i64) -> i64 {
+    let dims = heap_get_domain(box_id);
+    return heap_get_body(dims);
+}
+
+pub fn layout_get_height(box_id: i64) -> i64 {
+    let dims = heap_get_domain(box_id);
+    return heap_get_arg(dims);
+}
+
+pub fn layout_block(parent_box: i64, parent_x: i64, parent_y: i64, parent_w: i64) {
+    let mut computed_h: i64 = 0;
+    if parent_w <= 0 {
+        parent_w = 1;
+    }
+    computed_h = 24;
+    layout_set_pos(parent_box, parent_x, parent_y);
+    layout_set_size(parent_box, parent_w, computed_h);
+    return;
+}
+
+pub fn main() -> i64 {
+    let node = heap_alloc_term();
+    let box_id = layout_create(node);
+    layout_set_pos(box_id, 10, 20);
+    layout_set_size(box_id, 300, 140);
+
+    if layout_get_x(box_id) != 10 { return 1; }
+    if layout_get_y(box_id) != 20 { return 2; }
+    if layout_get_width(box_id) != 300 { return 3; }
+    if layout_get_height(box_id) != 140 { return 4; }
+
+    layout_block(box_id, 0, 0, 800);
+    if layout_get_width(box_id) != 800 { return 5; }
+    if layout_get_height(box_id) <= 0 { return 6; }
+    return 111;
+}

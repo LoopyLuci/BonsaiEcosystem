@@ -1,0 +1,139 @@
+// titan/omnirender/g5_proofs.ti — Axiom Graphics Proofs: proof, invariant, verification
+// Self-contained. Buffer/cmdbuf accessors read fields directly (G1 layout: body=size/count).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_PROOF5: i64 = 20400;
+const T_INV5:   i64 = 20401;
+const T_WRP5:   i64 = 20402;
+
+// ===== Proof =====
+// proof: tag=T_PROOF5, body=name, arg=valid(1=valid,0=invalid), domain=0
+
+pub fn g5_proof_create(name: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T_PROOF5); heap_set_body(p, name); heap_set_arg(p, 1); heap_set_domain(p, 0);
+    return p;
+}
+
+pub fn g5_proof_name(p: i64) -> i64     { return heap_get_body(p); }
+pub fn g5_proof_valid(p: i64) -> i64    { return heap_get_arg(p); }
+pub fn g5_proof_set_valid(p: i64, v: i64) { heap_set_arg(p, v); }
+
+// ===== Invariant =====
+// inv: tag=T_INV5, body=cond, arg=ok(1=passing,0=failed, latched)
+
+pub fn g5_invariant_create(cond: i64) -> i64 {
+    let inv = heap_alloc_term();
+    heap_set_tag(inv, T_INV5); heap_set_body(inv, cond); heap_set_arg(inv, 1); heap_set_domain(inv, 0);
+    return inv;
+}
+
+pub fn g5_invariant_check(inv: i64, actual: i64) -> i64 {
+    if actual == 0 { heap_set_arg(inv, 0); return 0; }
+    return heap_get_arg(inv);
+}
+
+pub fn g5_invariant_status(inv: i64) -> i64 { return heap_get_arg(inv); }
+
+// ===== Verification helpers =====
+// g5_verify_shader: identity check (same token = same shader)
+pub fn g5_verify_shader(shader: i64, reference: i64) -> i64 {
+    if shader == reference { return 1; }
+    return 0;
+}
+
+// g5_verify_buffer: G1 buf layout — body=size
+pub fn g5_verify_buffer(buf: i64, expected_size: i64) -> i64 {
+    if heap_get_body(buf) == expected_size { return 1; }
+    return 0;
+}
+
+// g5_verify_cmdbuf: G1 cmdbuf layout — body=op_count
+pub fn g5_verify_cmdbuf(cb: i64, expected_ops: i64) -> i64 {
+    if heap_get_body(cb) == expected_ops { return 1; }
+    return 0;
+}
+
+// ===== Inline G1-compatible constructors for self-test =====
+const G5_T_BUF:    i64 = 20001;
+const G5_T_CMDBUF: i64 = 20002;
+const G5_T_WRP:    i64 = 20003;
+
+pub fn g5_buf_create(size: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, G5_T_BUF); heap_set_body(b, size); heap_set_arg(b, 0); heap_set_domain(b, 0);
+    return b;
+}
+
+pub fn g5_cmdbuf_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, G5_T_CMDBUF); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    return c;
+}
+
+pub fn g5_cmdbuf_add(c: i64, op: i64, arg: i64) {
+    let n = heap_alloc_term();
+    heap_set_body(n, op); heap_set_arg(n, arg); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, G5_T_WRP); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Proof lifecycle
+    let p = g5_proof_create(1);
+    if g5_proof_name(p) != 1   { return 1; }
+    if g5_proof_valid(p) != 1  { return 2; }
+    g5_proof_set_valid(p, 0);
+    if g5_proof_valid(p) != 0  { return 3; }
+
+    // Invariant: pass then fail (latched)
+    let inv = g5_invariant_create(2);
+    if g5_invariant_check(inv, 1) != 1 { return 4; }
+    if g5_invariant_check(inv, 0) != 0 { return 5; }
+    if g5_invariant_status(inv) != 0   { return 6; }
+    // Still 0 after another pass
+    if g5_invariant_check(inv, 1) != 0 { return 7; }
+
+    // Shader verification
+    if g5_verify_shader(42, 42) != 1   { return 8; }
+    if g5_verify_shader(10, 20) != 0   { return 9; }
+
+    // Buffer verification
+    let buf = g5_buf_create(2048);
+    if g5_verify_buffer(buf, 2048) != 1 { return 10; }
+    if g5_verify_buffer(buf, 1024) != 0 { return 11; }
+
+    // Cmdbuf verification
+    let cb = g5_cmdbuf_create();
+    g5_cmdbuf_add(cb, 1, 10);
+    g5_cmdbuf_add(cb, 2, 20);
+    if g5_verify_cmdbuf(cb, 2) != 1    { return 12; }
+    if g5_verify_cmdbuf(cb, 3) != 0    { return 13; }
+
+    // Independent proofs — isolation
+    let p2 = g5_proof_create(99);
+    if g5_proof_valid(p2) != 1         { return 14; }
+    if g5_proof_valid(p) != 0          { return 15; }
+
+    return 111;
+}

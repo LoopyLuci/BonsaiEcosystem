@@ -1,0 +1,110 @@
+// OmniLib Net — TCP socket primitives for network communication
+// All functions use proper Titan types. No i64 workarounds for bool.
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn heap_set_sort_level(id: i64, lvl: i64);
+    fn heap_get_sort_level(id: i64) -> i64;
+    fn int_eq(a: i64, b: i64) -> bool;
+    fn panic(msg: i64);
+    // Socket externs (provided by host OS via bootstrap)
+    fn socket_create() -> i64;
+    fn socket_connect(handle: i64, host_id: i64, port: i64) -> bool;
+    fn socket_bind(handle: i64, port: i64) -> bool;
+    fn socket_listen(handle: i64, backlog: i64) -> bool;
+    fn socket_accept(handle: i64) -> i64;
+    fn socket_read(handle: i64, buf_id: i64, max_bytes: i64) -> i64;
+    fn socket_write(handle: i64, buf_id: i64, count: i64) -> i64;
+    fn socket_close(handle: i64) -> bool;
+    fn socket_is_valid(handle: i64) -> bool;
+}
+
+// Socket handle wrapper tag: 800
+
+pub fn net_socket_create() -> i64 {
+    let raw = socket_create();
+    if raw < 0 {
+        return -1;
+    }
+    let sock = heap_alloc_term();
+    heap_set_tag(sock, 800);
+    heap_set_body(sock, raw);
+    sock
+}
+
+pub fn net_socket_connect(sock: i64, host_id: i64, port: i64) -> bool {
+    let raw = heap_get_body(sock);
+    socket_connect(raw, host_id, port)
+}
+
+pub fn net_socket_bind(sock: i64, port: i64) -> bool {
+    let raw = heap_get_body(sock);
+    socket_bind(raw, port)
+}
+
+pub fn net_socket_listen(sock: i64, backlog: i64) -> bool {
+    let raw = heap_get_body(sock);
+    socket_listen(raw, backlog)
+}
+
+pub fn net_socket_accept(sock: i64) -> i64 {
+    let raw = heap_get_body(sock);
+    let client_raw = socket_accept(raw);
+    if client_raw < 0 {
+        return -1;
+    }
+    let client_sock = heap_alloc_term();
+    heap_set_tag(client_sock, 800);
+    heap_set_body(client_sock, client_raw);
+    client_sock
+}
+
+pub fn net_socket_read(sock: i64, buf_id: i64, max_bytes: i64) -> i64 {
+    let raw = heap_get_body(sock);
+    socket_read(raw, buf_id, max_bytes)
+}
+
+pub fn net_socket_write(sock: i64, buf_id: i64, count: i64) -> i64 {
+    let raw = heap_get_body(sock);
+    socket_write(raw, buf_id, count)
+}
+
+pub fn net_socket_close(sock: i64) -> bool {
+    let raw = heap_get_body(sock);
+    socket_close(raw)
+}
+
+pub fn net_socket_is_valid(sock: i64) -> bool {
+    if sock == -1 { return false; }
+    let raw = heap_get_body(sock);
+    socket_is_valid(raw)
+}
+
+// ---------- Self-test ----------
+pub fn main() -> i64 {
+    // Test socket handle wrapper construction (using heap operations that work)
+    let sock = heap_alloc_term();
+    heap_set_tag(sock, 800);
+    heap_set_body(sock, 1);
+    if heap_get_tag(sock) != 800 { return 1; }
+    if heap_get_body(sock) != 1 { return 2; }
+
+    // Test another socket
+    let sock2 = heap_alloc_term();
+    heap_set_tag(sock2, 800);
+    heap_set_body(sock2, 2);
+    if heap_get_body(sock2) != 2 { return 3; }
+
+    // Note: Full socket operations (create, connect, close, etc.) 
+    // require socket_* externs that will be added to bootstrap expansion phase.
+    // The wrapper structure is validated here.
+
+    return 111;
+}

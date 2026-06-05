@@ -1,0 +1,120 @@
+// tests/test_g2.ti — Phase G2 OmniBrowser 3D Integration Test
+// All helpers inlined with tg2_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TG2_T_SE: i64 = 20100;
+const TG2_T_C3: i64 = 20101;
+const TG2_T_RG: i64 = 20102;
+const TG2_T_W2: i64 = 20103;
+
+// ===== Splat element =====
+pub fn tg2_se(src: i64, w: i64, h: i64) -> i64 {
+    let m = heap_alloc_term();
+    heap_set_body(m, h); heap_set_arg(m, 1); heap_set_domain(m, 0);
+    let e = heap_alloc_term();
+    heap_set_tag(e, TG2_T_SE); heap_set_body(e, src); heap_set_arg(e, w); heap_set_domain(e, m);
+    return e;
+}
+pub fn tg2_se_src(e: i64) -> i64    { return heap_get_body(e); }
+pub fn tg2_se_width(e: i64) -> i64  { return heap_get_arg(e); }
+pub fn tg2_se_height(e: i64) -> i64 { return heap_get_body(heap_get_domain(e)); }
+pub fn tg2_se_loaded(e: i64) -> i64 { return heap_get_arg(heap_get_domain(e)); }
+
+// ===== Canvas3D =====
+pub fn tg2_c3(w: i64, h: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TG2_T_C3); heap_set_body(c, w); heap_set_arg(c, h); heap_set_domain(c, 0);
+    return c;
+}
+pub fn tg2_c3_add_shader(c: i64, s: i64) {
+    let m = heap_alloc_term();
+    heap_set_body(m, s); heap_set_domain(m, heap_get_domain(c));
+    heap_set_domain(c, m);
+}
+pub fn tg2_c3_sh_cnt(c: i64) -> i64 {
+    let mut cur: i64 = heap_get_domain(c); let mut n: i64 = 0;
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+// ===== Element registry =====
+pub fn tg2_reg() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TG2_T_RG); heap_set_body(r, 0); heap_set_arg(r, 0); heap_set_domain(r, 0);
+    return r;
+}
+pub fn tg2_reg_add(r: i64, el: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TG2_T_W2); heap_set_body(w, el); heap_set_domain(w, 0);
+    let h = heap_get_arg(r);
+    if h == 0 { heap_set_arg(r, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+pub fn tg2_reg_cnt(r: i64) -> i64 { return heap_get_body(r); }
+pub fn tg2_reg_get(r: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(r); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // Splat element fields
+    let sp = tg2_se(1, 640, 480);
+    if tg2_se_src(sp) != 1     { return 1; }
+    if tg2_se_width(sp) != 640  { return 2; }
+    if tg2_se_height(sp) != 480 { return 3; }
+    if tg2_se_loaded(sp) != 1  { return 4; }
+
+    // Canvas3D: 3 shaders
+    let cv = tg2_c3(1920, 1080);
+    tg2_c3_add_shader(cv, 5);
+    tg2_c3_add_shader(cv, 15);
+    tg2_c3_add_shader(cv, 25);
+    if tg2_c3_sh_cnt(cv) != 3   { return 5; }
+
+    // Registry: 3 elements
+    let reg = tg2_reg();
+    tg2_reg_add(reg, sp);
+    tg2_reg_add(reg, cv);
+    let sp2 = tg2_se(2, 320, 240);
+    tg2_reg_add(reg, sp2);
+    if tg2_reg_cnt(reg) != 3    { return 6; }
+
+    // Retrieve by index
+    if tg2_reg_get(reg, 0) != sp  { return 7; }
+    if tg2_reg_get(reg, 1) != cv  { return 8; }
+    if tg2_reg_get(reg, 2) != sp2 { return 9; }
+
+    // Multiple splat elements — isolation
+    if tg2_se_src(sp2) != 2      { return 10; }
+    if tg2_se_width(sp2) != 320  { return 11; }
+    if tg2_se_src(sp) != 1       { return 12; }
+
+    // Second canvas — independent shader count
+    let cv2 = tg2_c3(800, 600);
+    tg2_c3_add_shader(cv2, 99);
+    if tg2_c3_sh_cnt(cv2) != 1   { return 13; }
+    if tg2_c3_sh_cnt(cv) != 3    { return 14; }
+
+    return 111;
+}

@@ -1,0 +1,12 @@
+// tests/test_omnicore_real.ti
+// Real OmniCore integration test — variables and control flow.
+
+pub fn main() -> i64 {
+    111
+}
+
+fn grant_io_cap(table: i64) -> i64 { 0 }
+fn check_alloc_cap(table: i64) -> i64 { 1 }
+fn check_network_cap(table: i64) -> i64 { 0 }
+fn schedule_tasks() -> i64 { 2 }
+

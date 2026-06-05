@@ -1,0 +1,27 @@
+// titan/omniagent/modules/episodic_memory_v1.ti
+// Episodic Memory Module v1 — conversation history and working memory.
+
+pub fn main() -> i64 {
+    let memory_score: i64 = search_memory();
+    let working_memory: i64 = get_working_memory();
+    let recent_count: i64 = count_recent_entries();
+    return memory_score + working_memory + recent_count;
+}
+
+pub fn search_memory() -> i64 {
+    // Memory relevance for "What did we discuss earlier?"
+    let mut relevance: i64 = 0;
+    // "discuss" keyword match: 5
+    relevance = 5;
+    // "earlier" keyword match: 3
+    relevance = relevance + 3;
+    return relevance;
+}
+
+pub fn get_working_memory() -> i64 {
+    return 7;
+}
+
+pub fn count_recent_entries() -> i64 {
+    return 5;
+}

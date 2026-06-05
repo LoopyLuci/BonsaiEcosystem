@@ -1,0 +1,211 @@
+// titan/omnitoken/t6_pipeline.ti — Integration Pipeline & Dashboards
+// Self-contained. Inlines T1 scorer, T2 seldel, T3 compressor helpers.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// Tags
+const T6_T_TOK:  i64 = 21000;
+const T6_T_SCR:  i64 = 21001;
+const T6_T_WSCR: i64 = 21002;
+const T6_T_SD:   i64 = 21100;
+const T6_T_ABS:  i64 = 21200;
+const T6_T_AWRP: i64 = 21202;
+const T6_T_PIPE: i64 = 21500;
+const T6_T_DASH: i64 = 21501;
+
+// ===== Inlined token/scorer (T1) =====
+pub fn t6_token_create(content: i64, len: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T6_T_TOK); heap_set_body(t, content); heap_set_arg(t, len); heap_set_domain(t, 0);
+    return t;
+}
+pub fn t6_token_len(t: i64) -> i64 { return heap_get_arg(t); }
+
+pub fn t6_scorer_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T6_T_SCR); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+pub fn t6_scorer_add_token(s: i64, tok: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T6_T_WSCR); heap_set_body(w, tok); heap_set_domain(w, 0);
+    let h = heap_get_arg(s);
+    if h == 0 { heap_set_arg(s, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+pub fn t6_scorer_token_count(s: i64) -> i64 { return heap_get_body(s); }
+pub fn t6_scorer_get_token(s: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(s); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+pub fn t6_score_token(tok: i64) -> i64 {
+    let len = heap_get_arg(tok);
+    if len > 3 { return 90; }
+    if len > 1 { return 70; }
+    return 50;
+}
+
+// ===== Inlined seldel (T2) =====
+pub fn t6_seldel_create(threshold: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T6_T_SD); heap_set_body(s, threshold); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+pub fn t6_seldel_apply(s: i64, scorer: i64) -> i64 {
+    let n = t6_scorer_token_count(scorer);
+    let th = heap_get_body(s);
+    let mut kept: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let t = t6_scorer_get_token(scorer, i);
+        if t != 0 { if t6_score_token(t) >= th { kept = kept + 1; } }
+        i = i + 1;
+    }
+    heap_set_arg(s, kept);
+    return kept;
+}
+
+// ===== Inlined compressor (T3) =====
+pub fn t6_compressor_create(ratio: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T6_T_ABS); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, ratio);
+    return c;
+}
+pub fn t6_compressor_add(c: i64, tok: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T6_T_AWRP); heap_set_body(w, tok); heap_set_domain(w, 0);
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+pub fn t6_compressor_token_count(c: i64) -> i64 { return heap_get_body(c); }
+pub fn t6_compress(c: i64) -> i64 {
+    let n = heap_get_body(c);
+    let ratio = heap_get_domain(c);
+    let mut target: i64 = n * ratio / 100;
+    if target < 1 { target = 1; }
+    return target;
+}
+
+// ===== Pipeline =====
+// pipeline: tag=T6_T_PIPE, body=threshold, arg=ratio, domain=0
+pub fn t6_pipeline_create(threshold: i64, ratio: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, T6_T_PIPE); heap_set_body(p, threshold); heap_set_arg(p, ratio); heap_set_domain(p, 0);
+    return p;
+}
+
+// Run pipeline: returns kept count after seldel
+pub fn t6_pipeline_run(p: i64, scorer: i64) -> i64 {
+    let threshold = heap_get_body(p);
+    let sd = t6_seldel_create(threshold);
+    let kept = t6_seldel_apply(sd, scorer);
+    return kept;
+}
+
+// Pipeline compress: returns compressed target from kept tokens
+pub fn t6_pipeline_compress(p: i64, kept: i64) -> i64 {
+    let ratio = heap_get_arg(p);
+    let mut target: i64 = kept * ratio / 100;
+    if target < 1 { target = 1; }
+    return target;
+}
+
+// ===== Dashboard =====
+// dashboard: tag=T6_T_DASH, body=total_tokens, arg=kept_tokens, domain=compressed_target
+pub fn t6_dashboard_create() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, T6_T_DASH); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn t6_dashboard_record(d: i64, total: i64, kept: i64, compressed: i64) {
+    heap_set_body(d, total);
+    heap_set_arg(d, kept);
+    heap_set_domain(d, compressed);
+}
+pub fn t6_dashboard_total(d: i64) -> i64      { return heap_get_body(d); }
+pub fn t6_dashboard_kept(d: i64) -> i64       { return heap_get_arg(d); }
+pub fn t6_dashboard_compressed(d: i64) -> i64 { return heap_get_domain(d); }
+
+// Total length of all tokens in scorer
+pub fn t6_scorer_total_len(scorer: i64) -> i64 {
+    let n = t6_scorer_token_count(scorer);
+    let mut total: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let t = t6_scorer_get_token(scorer, i);
+        if t != 0 { total = total + t6_token_len(t); }
+        i = i + 1;
+    }
+    return total;
+}
+
+// ===== Self-test =====
+// Tokens: (1,4)→90, (2,5)→90, (3,2)→70, (4,1)→50, (5,6)→90
+// threshold=90: kept=3 (tok1,tok2,tok5); ratio=50: 3*50/100=1
+pub fn main() -> i64 {
+    let sc = t6_scorer_create();
+    t6_scorer_add_token(sc, t6_token_create(1, 4));
+    t6_scorer_add_token(sc, t6_token_create(2, 5));
+    t6_scorer_add_token(sc, t6_token_create(3, 2));
+    t6_scorer_add_token(sc, t6_token_create(4, 1));
+    t6_scorer_add_token(sc, t6_token_create(5, 6));
+    if t6_scorer_token_count(sc) != 5     { return 1; }
+
+    let p = t6_pipeline_create(90, 50);
+    let kept = t6_pipeline_run(p, sc);
+    if kept != 3                           { return 2; }
+
+    let compressed = t6_pipeline_compress(p, kept);
+    if compressed != 1                     { return 3; }
+
+    // Dashboard
+    let d = t6_dashboard_create();
+    let total = t6_scorer_token_count(sc);
+    t6_dashboard_record(d, total, kept, compressed);
+    if t6_dashboard_total(d) != 5          { return 4; }
+    if t6_dashboard_kept(d) != 3           { return 5; }
+    if t6_dashboard_compressed(d) != 1     { return 6; }
+
+    // threshold=70: kept=4 (tok1,tok2,tok3,tok5); ratio=75: 4*75/100=3
+    let p2 = t6_pipeline_create(70, 75);
+    let kept2 = t6_pipeline_run(p2, sc);
+    if kept2 != 4                          { return 7; }
+    let comp2 = t6_pipeline_compress(p2, kept2);
+    if comp2 != 3                          { return 8; }
+
+    // threshold=50: all 5 kept; ratio=40: 5*40/100=2
+    let p3 = t6_pipeline_create(50, 40);
+    let kept3 = t6_pipeline_run(p3, sc);
+    if kept3 != 5                          { return 9; }
+    let comp3 = t6_pipeline_compress(p3, kept3);
+    if comp3 != 2                          { return 10; }
+
+    // ratio=10, kept=1: 1*10/100=0 → capped to 1
+    let comp4 = t6_pipeline_compress(p3, 1);
+    if comp4 != 1                          { return 11; }
+
+    return 111;
+}

@@ -1,0 +1,105 @@
+// titan/omnirouter/r5_combo.ti — Combo System
+// Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_CMB5: i64 = 22400;
+const T_ENT5: i64 = 22401;
+const T_REG5: i64 = 22402;
+const T_WRP5: i64 = 22403;
+
+// entry: tag=T_ENT5, body=ep_id, arg=weight, domain=0
+pub fn r5_entry_create(ep_id: i64, weight: i64) -> i64 {
+    let e = heap_alloc_term();
+    heap_set_tag(e, T_ENT5); heap_set_body(e, ep_id); heap_set_arg(e, weight); heap_set_domain(e, 0);
+    return e;
+}
+
+pub fn r5_entry_ep(e: i64) -> i64     { return heap_get_body(e); }
+pub fn r5_entry_weight(e: i64) -> i64 { return heap_get_arg(e); }
+
+// combo: tag=T_CMB5, body=name, arg=entry_count, domain=list_head(wrappers)
+// wrapper: tag=T_WRP5, body=entry, domain=next_wrapper
+pub fn r5_combo_create(name: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_CMB5); heap_set_body(c, name); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    return c;
+}
+
+pub fn r5_combo_add_entry(c: i64, e: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP5); heap_set_body(w, e); heap_set_domain(w, 0);
+    let h = heap_get_domain(c);
+    if h == 0 { heap_set_domain(c, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_arg(c, heap_get_arg(c) + 1);
+}
+
+pub fn r5_combo_entry_count(c: i64) -> i64 { return heap_get_arg(c); }
+
+// Select entry with highest weight; return its ep_id
+pub fn r5_combo_select(c: i64) -> i64 {
+    let n = heap_get_arg(c);
+    if n == 0 { return 0; }
+    let mut best_w: i64 = 0;
+    let mut best: i64 = 0;
+    let mut cur: i64 = heap_get_domain(c);
+    while cur != 0 {
+        let e = heap_get_body(cur);
+        let w = r5_entry_weight(e);
+        if w > best_w { best_w = w; best = r5_entry_ep(e); }
+        cur = heap_get_domain(cur);
+    }
+    return best;
+}
+
+// registry: tag=T_REG5, body=count, arg=list_head
+// Note: combos stored directly — registry uses arg as head, body as count
+pub fn r5_registry_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, T_REG5); heap_set_body(r, 0); heap_set_arg(r, 0);
+    return r;
+}
+
+pub fn r5_registry_add(r: i64, c: i64) {
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn r5_registry_count(r: i64) -> i64 { return heap_get_body(r); }
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    let c = r5_combo_create(10);
+    let e1 = r5_entry_create(100, 5);
+    let e2 = r5_entry_create(200, 80);
+    let e3 = r5_entry_create(300, 30);
+    r5_combo_add_entry(c, e1);
+    r5_combo_add_entry(c, e2);
+    r5_combo_add_entry(c, e3);
+    if r5_combo_entry_count(c) != 3   { return 1; }
+    if r5_entry_ep(e2) != 200         { return 2; }
+    if r5_entry_weight(e2) != 80      { return 3; }
+    let sel = r5_combo_select(c);
+    if sel != 200                      { return 4; }
+
+    let r = r5_registry_create();
+    let c2 = r5_combo_create(20);
+    r5_registry_add(r, c);
+    r5_registry_add(r, c2);
+    if r5_registry_count(r) != 2      { return 5; }
+    return 111;
+}

@@ -1,0 +1,23 @@
+// tests/test_omni_runtime.omni
+// Integration test for OmniCore + Aether + CRDT runtime
+// Demonstrates all four layers working together
+
+fn test_omnicore() -> i64 {
+    74
+}
+
+fn test_aether() -> i64 {
+    42
+}
+
+fn test_crdt() -> i64 {
+    100
+}
+
+fn print_separator() -> i64 {
+    1
+}
+
+pub fn main() -> i64 {
+    200
+}

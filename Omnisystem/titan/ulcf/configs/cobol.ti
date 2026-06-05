@@ -1,0 +1,75 @@
+// titan/ulcf/configs/cobol.ti
+// COBOL language configuration for the Universal Grammar Adapter.
+
+pub fn cobol_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("PIC 9".to_string(), "i64".to_string());
+    type_map.insert("PIC S9".to_string(), "i64".to_string());
+    type_map.insert("PIC 9V9".to_string(), "f64".to_string());
+    type_map.insert("PIC S9V9".to_string(), "f64".to_string());
+    type_map.insert("PIC X".to_string(), "String".to_string());
+    type_map.insert("PIC A".to_string(), "String".to_string());
+    type_map.insert("COMP".to_string(), "i64".to_string());
+    type_map.insert("COMP-3".to_string(), "i64".to_string());
+    type_map.insert("FILLER".to_string(), "String".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("=".to_string(), "eq".to_string());
+    operator_map.insert("NOT =".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("AND".to_string(), "and".to_string());
+    operator_map.insert("OR".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "cobol".to_string(),
+        extensions: vec![".cob".to_string(), ".cbl".to_string(), ".cpy".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "procedure_division".to_string(),
+            "paragraph".to_string(),
+            "section".to_string(),
+            "if_statement".to_string(),
+            "evaluate_statement".to_string(),
+            "perform_statement".to_string(),
+            "move_statement".to_string(),
+            "compute_statement".to_string(),
+            "call_statement".to_string(),
+            "display_statement".to_string(),
+            "accept_statement".to_string(),
+            "open_statement".to_string(),
+            "close_statement".to_string(),
+            "read_statement".to_string(),
+            "write_statement".to_string(),
+            "rewrite_statement".to_string(),
+            "delete_statement".to_string(),
+            "start_statement".to_string(),
+            "stop_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "identifier".to_string(),
+            "literal".to_string(),
+            "function_call".to_string(),
+            "reference_modification".to_string(),
+        ],
+        literal_nodes: vec![
+            "numeric_literal".to_string(),
+            "string_literal".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec![
+            "statement_list".to_string(),
+            "procedure_division".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "inferred".to_string(),
+    }
+}

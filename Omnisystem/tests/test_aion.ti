@@ -1,0 +1,231 @@
+// tests/test_aion.ti — Phase 206 Integration Test
+// Exercises spec parse → gen project → run full pipeline.
+// All functions self-contained; inlines aion_config + spec_parser + code_gen + pipeline_runner.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn str_at(s: i64, idx: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+}
+
+// ===== Stage constants =====
+const STAGE_SPECIFICATION: i64 = 0;
+const STAGE_ARCHITECTURE:  i64 = 1;
+const STAGE_CODEGEN:       i64 = 2;
+const STAGE_TEST:          i64 = 3;
+const STAGE_VERIFY:        i64 = 4;
+const STAGE_PACKAGE:       i64 = 5;
+const STAGE_DEPLOY:        i64 = 6;
+const STAGE_MONITOR:       i64 = 7;
+const TAG_PIPELINE_STAGE:  i64 = 8400;
+const CAP_CHAT:         i64 = 2;
+const CAP_REASONING:    i64 = 4;
+const CAP_PROOF_SEARCH: i64 = 8;
+const CAP_CODE_GEN:     i64 = 16;
+const TEMPLATE_REST_API: i64 = 0;
+const TEMPLATE_CLI_TOOL: i64 = 2;
+const TEMPLATE_LIBRARY:  i64 = 3;
+
+static mut PIPELINE_STAGES: i64 = 0;
+static mut PIPELINE_COUNT:  i64 = 0;
+
+pub fn ta_stage_create(stype: i64, name_id: i64, desc_id: i64, order: i64, cap: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, desc_id); heap_set_arg(meta2, order); heap_set_domain(meta2, cap);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, stype); heap_set_arg(meta1, name_id); heap_set_domain(meta1, meta2);
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_PIPELINE_STAGE); heap_set_body(s, meta1); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+pub fn ta_stage_type(s: i64) -> i64  { return heap_get_body(heap_get_body(s)); }
+pub fn ta_stage_order(s: i64) -> i64 { return heap_get_arg(heap_get_domain(heap_get_body(s))); }
+
+pub fn pipeline_init() {
+    PIPELINE_STAGES = 0; PIPELINE_COUNT = 0;
+    let s7 = ta_stage_create(STAGE_MONITOR,       heap_alloc_term(), heap_alloc_term(), 7, CAP_CHAT);
+    heap_set_domain(s7, PIPELINE_STAGES); PIPELINE_STAGES = s7;
+    let s6 = ta_stage_create(STAGE_DEPLOY,        heap_alloc_term(), heap_alloc_term(), 6, CAP_CHAT);
+    heap_set_domain(s6, PIPELINE_STAGES); PIPELINE_STAGES = s6;
+    let s5 = ta_stage_create(STAGE_PACKAGE,       heap_alloc_term(), heap_alloc_term(), 5, CAP_CODE_GEN);
+    heap_set_domain(s5, PIPELINE_STAGES); PIPELINE_STAGES = s5;
+    let s4 = ta_stage_create(STAGE_VERIFY,        heap_alloc_term(), heap_alloc_term(), 4, CAP_PROOF_SEARCH);
+    heap_set_domain(s4, PIPELINE_STAGES); PIPELINE_STAGES = s4;
+    let s3 = ta_stage_create(STAGE_TEST,          heap_alloc_term(), heap_alloc_term(), 3, CAP_CODE_GEN);
+    heap_set_domain(s3, PIPELINE_STAGES); PIPELINE_STAGES = s3;
+    let s2 = ta_stage_create(STAGE_CODEGEN,       heap_alloc_term(), heap_alloc_term(), 2, CAP_CODE_GEN);
+    heap_set_domain(s2, PIPELINE_STAGES); PIPELINE_STAGES = s2;
+    let s1 = ta_stage_create(STAGE_ARCHITECTURE,  heap_alloc_term(), heap_alloc_term(), 1, CAP_REASONING);
+    heap_set_domain(s1, PIPELINE_STAGES); PIPELINE_STAGES = s1;
+    let s0 = ta_stage_create(STAGE_SPECIFICATION, heap_alloc_term(), heap_alloc_term(), 0, CAP_CHAT);
+    heap_set_domain(s0, PIPELINE_STAGES); PIPELINE_STAGES = s0;
+    PIPELINE_COUNT = 8;
+}
+pub fn pipeline_count() -> i64 { return PIPELINE_COUNT; }
+pub fn ta_stage_by_order(order: i64) -> i64 {
+    let mut curr = PIPELINE_STAGES;
+    while curr != 0 {
+        if ta_stage_order(curr) == order { return curr; }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+// ===== Spec parser =====
+const TAG_SPEC:        i64 = 8410;
+const TAG_ENTITY:      i64 = 8411;
+const ENTITY_API:      i64 = 5;
+const ENTITY_DATABASE: i64 = 3;
+
+pub fn spec_parse(spec_id: i64) -> i64 {
+    let mut entities: i64 = 0;
+    let len = str_len(spec_id);
+    if len > 0 {
+        let mut pos: i64 = 0;
+        while pos < len {
+            if pos + 2 < len {
+                if str_at(spec_id, pos) == 65 && str_at(spec_id, pos + 1) == 80 && str_at(spec_id, pos + 2) == 73 {
+                    let m = heap_alloc_term();
+                    heap_set_body(m, ENTITY_API); heap_set_arg(m, 0); heap_set_domain(m, 0);
+                    let e = heap_alloc_term();
+                    heap_set_tag(e, TAG_ENTITY); heap_set_body(e, m); heap_set_arg(e, 0);
+                    heap_set_domain(e, entities); entities = e;
+                }
+            }
+            pos = pos + 1;
+        }
+    }
+    let spec = heap_alloc_term();
+    heap_set_tag(spec, TAG_SPEC);
+    heap_set_body(spec, spec_id);
+    heap_set_arg(spec, 0);
+    heap_set_domain(spec, entities);
+    return spec;
+}
+
+pub fn spec_recommend_template(spec: i64) -> i64 {
+    let mut has_api: bool = false;
+    let mut has_db:  bool = false;
+    let mut curr = heap_get_domain(spec);
+    while curr != 0 {
+        let et = heap_get_body(heap_get_body(curr));
+        if et == ENTITY_API      { has_api = true; }
+        if et == ENTITY_DATABASE { has_db  = true; }
+        curr = heap_get_domain(curr);
+    }
+    if has_api && has_db { return TEMPLATE_REST_API; }
+    if has_api           { return TEMPLATE_CLI_TOOL; }
+    return TEMPLATE_LIBRARY;
+}
+
+// ===== Code generator =====
+const TAG_GEN_FILE:    i64 = 8420;
+const TAG_GEN_PROJECT: i64 = 8421;
+
+pub fn gen_file_create(path_id: i64, content_id: i64) -> i64 {
+    let f = heap_alloc_term();
+    heap_set_tag(f, TAG_GEN_FILE);
+    heap_set_body(f, path_id); heap_set_arg(f, content_id); heap_set_domain(f, 0);
+    return f;
+}
+pub fn gen_project_create(name_id: i64, template: i64) -> i64 {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TAG_GEN_PROJECT);
+    heap_set_body(p, name_id); heap_set_arg(p, template); heap_set_domain(p, 0);
+    return p;
+}
+pub fn gen_project_add_file(project: i64, file: i64) {
+    let head = heap_get_domain(project);
+    heap_set_domain(file, head);
+    heap_set_domain(project, file);
+}
+pub fn gen_project_file_count(project: i64) -> i64 {
+    let mut n: i64 = 0;
+    let mut c = heap_get_domain(project);
+    while c != 0 { n = n + 1; c = heap_get_domain(c); }
+    return n;
+}
+pub fn gen_from_spec(spec: i64) -> i64 {
+    let t = spec_recommend_template(spec);
+    let p = gen_project_create(heap_alloc_term(), t);
+    gen_project_add_file(p, gen_file_create(heap_alloc_term(), heap_alloc_term()));
+    return p;
+}
+
+// ===== Pipeline run =====
+const TAG_PIPELINE_RUN:  i64 = 8430;
+const RUN_NOT_STARTED:   i64 = 0;
+const RUN_IN_PROGRESS:   i64 = 1;
+const RUN_COMPLETE:      i64 = 3;
+const RUN_FAILED:        i64 = 4;
+
+pub fn run_create(spec_id: i64, name_id: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, name_id); heap_set_arg(meta, 0); heap_set_domain(meta, 0);
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_PIPELINE_RUN);
+    heap_set_body(r, spec_id); heap_set_arg(r, RUN_NOT_STARTED); heap_set_domain(r, meta);
+    return r;
+}
+pub fn run_status(r: i64) -> i64      { return heap_get_arg(r); }
+pub fn run_set_status(r: i64, s: i64) { heap_set_arg(r, s); }
+pub fn run_current_stage(r: i64) -> i64 { return heap_get_arg(heap_get_domain(r)); }
+pub fn run_set_current_stage(r: i64, stage: i64) { heap_set_arg(heap_get_domain(r), stage); }
+pub fn run_generated_project(r: i64) -> i64 { return heap_get_domain(heap_get_domain(r)); }
+pub fn run_set_generated_project(r: i64, p: i64) { heap_set_domain(heap_get_domain(r), p); }
+
+pub fn run_execute_stage(run: i64) -> i64 {
+    let order = run_current_stage(run);
+    let stage = ta_stage_by_order(order);
+    if stage == 0 { run_set_status(run, RUN_COMPLETE); return RUN_COMPLETE; }
+    let stype = ta_stage_type(stage);
+    if stype == STAGE_SPECIFICATION {
+        run_set_generated_project(run, spec_parse(heap_get_body(run)));
+        run_set_current_stage(run, order + 1); return RUN_IN_PROGRESS;
+    }
+    if stype == STAGE_ARCHITECTURE {
+        run_set_generated_project(run, gen_from_spec(run_generated_project(run)));
+        run_set_current_stage(run, order + 1); return RUN_IN_PROGRESS;
+    }
+    if stype == STAGE_MONITOR {
+        run_set_current_stage(run, order + 1);
+        run_set_status(run, RUN_COMPLETE); return RUN_COMPLETE;
+    }
+    run_set_current_stage(run, order + 1);
+    return RUN_IN_PROGRESS;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    PIPELINE_STAGES = 0; PIPELINE_COUNT = 0;
+    pipeline_init();
+    if pipeline_count() != 8 { return 1; }
+
+    let spec_id = heap_alloc_term();
+    let spec = spec_parse(spec_id);
+    if heap_get_tag(spec) != TAG_SPEC { return 2; }
+
+    let project = gen_from_spec(spec);
+    if heap_get_tag(project) != TAG_GEN_PROJECT  { return 3; }
+    if gen_project_file_count(project) < 1       { return 4; }
+
+    let run = run_create(spec_id, heap_alloc_term());
+    run_set_status(run, RUN_IN_PROGRESS);
+    let mut ticks: i64 = 0;
+    while run_status(run) == RUN_IN_PROGRESS && ticks < 10 {
+        run_execute_stage(run);
+        ticks = ticks + 1;
+    }
+    if run_status(run) != RUN_COMPLETE { return 5; }
+
+    return 111;
+}

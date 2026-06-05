@@ -1,0 +1,58 @@
+// titan/omniview/interactive_app.ti
+// Interactive terminal UI — form with keyboard navigation.
+// Tab to switch focus, Enter to activate, Escape to quit.
+
+pub fn main() -> i64 {
+    let mut focused: i64 = 0;  // 0=name, 1=email, 2=submit, 3=cancel
+    let mut running: i64 = 1;
+    let mut name_text: String = "";
+    let mut email_text: String = "";
+    let mut submit_count: i64 = 0;
+
+    while running == 1 {
+        // Render screen
+        let _: i64 = emit_ansi("\x1b[2J\x1b[H");
+        let _: i64 = emit_ansi("\x1b[38;5;39m");
+        let _: i64 = emit_string("┌────────────────────────────┐\n");
+        let _: i64 = emit_string("│        REGISTRATION         │\n");
+        let _: i64 = emit_string("├────────────────────────────┤\n");
+        let _: i64 = emit_string("│ Name:                       │\n");
+        let _: i64 = emit_string("│ Email:                      │\n");
+        let _: i64 = emit_string("├────────────────────────────┤\n");
+        let _: i64 = emit_string("│  [ Submit ]  [ Cancel ]    │\n");
+        let _: i64 = emit_string("└────────────────────────────┘\n");
+        let _: i64 = emit_ansi("\x1b[0m");
+
+        // Show focus
+        if focused == 0 {
+            let _: i64 = emit_ansi("\x1b[3;8H\x1b[7mName:\x1b[0m");
+        }
+        if focused == 1 {
+            let _: i64 = emit_ansi("\x1b[4;8H\x1b[7mEmail:\x1b[0m");
+        }
+        if focused == 2 {
+            let _: i64 = emit_ansi("\x1b[6;4H\x1b[7m[ Submit ]\x1b[0m");
+        }
+        if focused == 3 {
+            let _: i64 = emit_ansi("\x1b[6;16H\x1b[7m[ Cancel ]\x1b[0m");
+        }
+
+        // Read key
+        let key: i64 = read_key();
+
+        if key == 9 {  // Tab
+            focused += 1;
+            if focused > 3 { focused = 0; }
+        }
+        if key == 13 {  // Enter
+            if focused == 2 { submit_count += 1; }
+            if focused == 3 { running = 0; }
+        }
+        if key == 27 {  // Escape
+            running = 0;
+        }
+    }
+
+    let _: i64 = emit_ansi("\x1b[2J\x1b[H");
+    return submit_count;
+}

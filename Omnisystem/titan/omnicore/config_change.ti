@@ -1,0 +1,126 @@
+// titan/omnicore/config_change.ti — Runtime configuration change manager
+// Subsystems can propose config changes; the Supervisor validates and applies them.
+// Every change is logged in an immutable change list for audit and rollback.
+import "titan/std/result.ti"
+import "titan/std/error.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_CONFIG:  i64 = 65000;
+const TAG_CHANGE:  i64 = 65001;
+const TAG_CHGLOG:  i64 = 65002;
+
+// Config cell: body=key_id, arg=value, domain=version
+pub fn cfg_new(key_id: i64, initial_val: i64) -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, TAG_CONFIG);
+    heap_set_body(c, key_id);
+    heap_set_arg(c, initial_val);
+    heap_set_domain(c, 0);   // version 0
+    return c;
+}
+
+pub fn cfg_key(c: i64) -> i64     { return heap_get_body(c); }
+pub fn cfg_value(c: i64) -> i64   { return heap_get_arg(c); }
+pub fn cfg_version(c: i64) -> i64 { return heap_get_domain(c); }
+
+// Change record: body=key_id, arg=new_value, domain=next in log
+pub fn change_new(key_id: i64, new_val: i64) -> i64 {
+    let ch = heap_alloc_term();
+    heap_set_tag(ch, TAG_CHANGE);
+    heap_set_body(ch, key_id);
+    heap_set_arg(ch, new_val);
+    heap_set_domain(ch, 0);
+    return ch;
+}
+
+// Change log: body=count, arg=head (newest first), domain=rejected_count
+pub fn chglog_new() -> i64 {
+    let l = heap_alloc_term();
+    heap_set_tag(l, TAG_CHGLOG);
+    heap_set_body(l, 0);
+    heap_set_arg(l, 0);
+    heap_set_domain(l, 0);
+    return l;
+}
+
+pub fn chglog_count(l: i64) -> i64    { return heap_get_body(l); }
+pub fn chglog_rejected(l: i64) -> i64 { return heap_get_domain(l); }
+
+pub fn chglog_append(l: i64, ch: i64) {
+    let old_head = heap_get_arg(l);
+    heap_set_domain(ch, old_head);
+    heap_set_arg(l, ch);
+    heap_set_body(l, heap_get_body(l) + 1);
+}
+
+// Apply a change to a config entry: validates key match, bumps version
+pub fn cfg_apply(cfg: i64, ch: i64, log: i64) -> i64 {
+    if cfg_key(cfg) != heap_get_body(ch) {
+        heap_set_domain(log, heap_get_domain(log) + 1);
+        return err(ERR_PERM);
+    }
+    heap_set_arg(cfg, heap_get_arg(ch));
+    heap_set_domain(cfg, cfg_version(cfg) + 1);
+    chglog_append(log, ch);
+    return ok(cfg_version(cfg));
+}
+
+// Rollback: revert config to a prior value from the log entry
+pub fn cfg_rollback(cfg: i64, target_version: i64, log: i64) -> i64 {
+    let cur_ver = cfg_version(cfg);
+    if target_version >= cur_ver { return err(ERR_BOUNDS); }
+    // Walk the log until we find the entry that corresponds to the target version
+    let steps: i64 = cur_ver - target_version;
+    let mut cur: i64 = heap_get_arg(log);
+    let mut i: i64 = 0;
+    let mut stop: i64 = 0;
+    if cur == 0 { stop = 1; }
+    while stop == 0 {
+        if i == steps {
+            heap_set_arg(cfg, heap_get_arg(cur));
+            heap_set_domain(cfg, target_version);
+            stop = 1;
+        }
+        if stop == 0 {
+            i = i + 1;
+            cur = heap_get_domain(cur);
+            if cur == 0 { stop = 1; }
+        }
+    }
+    return ok(target_version);
+}
+
+pub fn main() -> i64 {
+    // Test 1: Apply two changes, version increments, log count grows
+    let cfg = cfg_new(1, 100);
+    let log = chglog_new();
+    let r1 = cfg_apply(cfg, change_new(1, 200), log);
+    let r2 = cfg_apply(cfg, change_new(1, 300), log);
+    if is_ok(r1) != 1 { return 1; }
+    if cfg_value(cfg) != 300 { return 2; }
+    if cfg_version(cfg) != 2 { return 3; }
+    if chglog_count(log) != 2 { return 4; }
+
+    // Test 2: Wrong key → err(ERR_PERM), rejected count increments
+    let r3 = cfg_apply(cfg, change_new(99, 999), log);
+    if is_err(r3) != 1 { return 5; }
+    if chglog_rejected(log) != 1 { return 6; }
+
+    // Test 3: Rollback to version 1 restores the value from that step
+    let rb = cfg_rollback(cfg, 1, log);
+    if is_ok(rb) != 1 { return 7; }
+    if cfg_version(cfg) != 1 { return 8; }
+
+    return 111;
+}

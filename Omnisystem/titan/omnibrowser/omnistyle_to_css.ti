@@ -1,0 +1,66 @@
+// OmniStyle -> CSS transpiler
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn str_concat(a: i64, b: i64) -> i64;
+    fn str_len(s: i64) -> i64;
+    fn file_write_all(path: i64, data: i64, len: i64) -> bool;
+}
+
+const TAG_STYLE: i64 = 3100;
+const TAG_STYLE_PROP: i64 = 3101;
+
+pub fn style_new() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_STYLE);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn style_set(s: i64, prop: i64, value: i64) {
+    let p = heap_alloc_term();
+    heap_set_tag(p, TAG_STYLE_PROP);
+    heap_set_body(p, prop);
+    heap_set_arg(p, value);
+    heap_set_domain(p, heap_get_domain(s));
+    heap_set_domain(s, p);
+    return;
+}
+
+pub fn emit_css_property(prop_node: i64) -> i64 {
+    let _prop = heap_get_body(prop_node);
+    let _value = heap_get_arg(prop_node);
+    return heap_alloc_term();
+}
+
+pub fn emit_css(style: i64, out: i64) -> i64 {
+    let mut p = heap_get_domain(style);
+    while p != 0 {
+        out = str_concat(out, emit_css_property(p));
+        p = heap_get_domain(p);
+    }
+    return out;
+}
+
+pub fn transpile_omnistyle(_style_src: i64, out_path: i64) -> bool {
+    let s = style_new();
+    style_set(s, 10, 16);
+    style_set(s, 11, 255);
+
+    let mut css = heap_alloc_term();
+    css = emit_css(s, css);
+    return file_write_all(out_path, css, str_len(css));
+}
+
+pub fn main() -> i64 {
+    let ok = transpile_omnistyle(heap_alloc_term(), heap_alloc_term());
+    if !ok { return 1; }
+    return 111;
+}

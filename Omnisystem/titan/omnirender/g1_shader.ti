@@ -1,0 +1,126 @@
+// titan/omnirender/g1_shader.ti — OmniRender Foundation: Shader, Buffer, Command Buffer
+// Self-contained. Wrapper-node APPEND for command buffer list.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_SHADER: i64 = 20000;
+const T_BUF:    i64 = 20001;
+const T_CMDBUF: i64 = 20002;
+const T_WRP:    i64 = 20003;
+
+// ===== Shader =====
+// shader: tag=T_SHADER, body=src, arg=1(valid)
+
+pub fn g1_shader_create(src: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_SHADER); heap_set_body(s, src); heap_set_arg(s, 1); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn g1_shader_valid(s: i64) -> i64 {
+    if heap_get_tag(s) == T_SHADER { return 1; }
+    return 0;
+}
+
+pub fn g1_shader_src(s: i64) -> i64 { return heap_get_body(s); }
+
+// ===== Buffer =====
+// buf: tag=T_BUF, body=size, arg=0
+
+pub fn g1_buf_create(size: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, T_BUF); heap_set_body(b, size); heap_set_arg(b, 0); heap_set_domain(b, 0);
+    return b;
+}
+
+pub fn g1_buf_size(b: i64) -> i64 { return heap_get_body(b); }
+
+// ===== Command buffer =====
+// cmdbuf: tag=T_CMDBUF, body=count, arg=list_head(wrappers)
+// wrapper: tag=T_WRP, body=cmd_node, domain=next_wrapper
+// cmd_node: body=op, arg=arg_val
+
+pub fn g1_cmdbuf_create() -> i64 {
+    let c = heap_alloc_term();
+    heap_set_tag(c, T_CMDBUF); heap_set_body(c, 0); heap_set_arg(c, 0); heap_set_domain(c, 0);
+    return c;
+}
+
+pub fn g1_cmdbuf_add(c: i64, op: i64, arg: i64) {
+    let n = heap_alloc_term();
+    heap_set_body(n, op); heap_set_arg(n, arg); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_WRP); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(c);
+    if h == 0 { heap_set_arg(c, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(c, heap_get_body(c) + 1);
+}
+
+pub fn g1_cmdbuf_count(c: i64) -> i64 { return heap_get_body(c); }
+
+pub fn g1_cmdbuf_op(c: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(c); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+pub fn g1_cmdbuf_arg(c: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(c); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_arg(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Shader
+    let sh = g1_shader_create(100);
+    if g1_shader_valid(sh) == 0  { return 1; }
+    if g1_shader_src(sh) != 100  { return 2; }
+
+    // Buffer
+    let b = g1_buf_create(1024);
+    if g1_buf_size(b) != 1024    { return 3; }
+
+    // Command buffer: 2 ops
+    let c = g1_cmdbuf_create();
+    g1_cmdbuf_add(c, 1, 42);
+    g1_cmdbuf_add(c, 2, 99);
+    if g1_cmdbuf_count(c) != 2   { return 4; }
+    if g1_cmdbuf_op(c, 0) != 1   { return 5; }
+    if g1_cmdbuf_op(c, 1) != 2   { return 6; }
+    if g1_cmdbuf_arg(c, 0) != 42 { return 7; }
+    if g1_cmdbuf_arg(c, 1) != 99 { return 8; }
+
+    // Independent shader — isolation
+    let sh2 = g1_shader_create(200);
+    if g1_shader_src(sh2) != 200 { return 9; }
+    if g1_shader_src(sh) != 100  { return 10; }
+
+    // Empty cmdbuf
+    let c2 = g1_cmdbuf_create();
+    if g1_cmdbuf_count(c2) != 0  { return 11; }
+    if g1_cmdbuf_op(c2, 0) != 0  { return 12; }
+
+    return 111;
+}

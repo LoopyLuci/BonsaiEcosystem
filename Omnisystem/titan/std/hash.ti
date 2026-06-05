@@ -1,0 +1,97 @@
+// OmniLib Hash – Hash Functions in Pure Titan
+// DJB2, Multiplicative, and Simple Integer Hashing
+
+pub fn hash_int(key: i64) -> i64 {
+    let mut k = key;
+    if k < 0 {
+        k = -k;
+    }
+    // Multiplicative hash using Knuth's golden ratio approximation
+    // Without bitwise ops, we use modulo to keep values bounded
+    let result = (k * 2654435761) % 9223372036854775807;
+    if result < 0 {
+        return -result;
+    }
+    result
+}
+
+// DJB2-like hash adapted for arithmetic operations
+pub fn hash_djb2(value: i64) -> i64 {
+    let mut hash: i64 = 5381;
+    let mut temp = value;
+    if temp < 0 {
+        temp = -temp;
+    }
+    // Use decimal digits for iterative hashing
+    while temp > 0 {
+        let digit = temp % 10;
+        hash = ((hash * 33) + digit) % 9223372036854775807;
+        temp = temp / 10;
+    }
+    hash
+}
+
+// FNV-1a adapted for arithmetic (no bitwise XOR)
+pub fn hash_fnv1a(value: i64) -> i64 {
+    let mut hash: i64 = 14695981039346656037;
+    let prime: i64 = 1099511628211;
+    let mut temp = value;
+    if temp < 0 {
+        temp = -temp;
+    }
+    while temp > 0 {
+        let byte = temp % 256;
+        // Replace XOR with addition (not cryptographically equivalent but diffusing)
+        hash = (hash + byte) % 9223372036854775807;
+        hash = (hash * prime) % 9223372036854775807;
+        temp = temp / 256;
+    }
+    hash
+}
+
+// Simple combining hash
+pub fn hash_combine(h1: i64, h2: i64) -> i64 {
+    let mut r1 = h1;
+    let mut r2 = h2;
+    if r1 < 0 { r1 = -r1; }
+    if r2 < 0 { r2 = -r2; }
+    // Combine using arithmetic instead of bitwise
+    ((r1 * 31) + r2 + (r1 / 2)) % 9223372036854775807
+}
+
+// Modulo-based hash for hash table sizing
+pub fn hash_mod(key: i64, capacity: i64) -> i64 {
+    let h = hash_int(key);
+    if h < 0 {
+        return ((-h) % capacity);
+    }
+    h % capacity
+}
+
+pub fn main() -> i64 {
+    // Test determinism
+    let h1 = hash_int(42);
+    let h2 = hash_int(42);
+    if h1 != h2 { return 1; }
+    
+    // Test DJB2
+    let d1 = hash_djb2(100);
+    let d2 = hash_djb2(100);
+    if d1 != d2 { return 2; }
+    
+    // Test FNV1a
+    let f1 = hash_fnv1a(200);
+    let f2 = hash_fnv1a(200);
+    if f1 != f2 { return 3; }
+    
+    // Test combine
+    let c1 = hash_combine(h1, d1);
+    let c2 = hash_combine(h1, d1);
+    if c1 != c2 { return 4; }
+    
+    // Test mod
+    let m1 = hash_mod(42, 16);
+    if m1 < 0 || m1 >= 16 { return 5; }
+    
+    return 111;
+}

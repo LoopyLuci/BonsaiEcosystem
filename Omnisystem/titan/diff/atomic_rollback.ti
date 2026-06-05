@@ -1,0 +1,105 @@
+// titan/diff/atomic_rollback.ti — Atomic Snapshot & Rollback
+// Maintains a snapshot stack for full state restoration.
+// snapshot layout: body=ast, arg=parent_snapshot, domain=description_id
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_SNAPSHOT: i64 = 7100;
+
+static mut SNAPSHOT_HEAD:  i64 = 0;
+static mut SNAPSHOT_COUNT: i64 = 0;
+
+pub fn snapshot_ast(snap: i64) -> i64        { return heap_get_body(snap); }
+pub fn snapshot_parent(snap: i64) -> i64     { return heap_get_arg(snap); }
+pub fn snapshot_description(snap: i64) -> i64 { return heap_get_domain(snap); }
+pub fn snapshot_count() -> i64               { return SNAPSHOT_COUNT; }
+pub fn snapshot_head() -> i64                { return SNAPSHOT_HEAD; }
+
+pub fn snapshot_push(ast: i64, description_id: i64) -> i64 {
+    let snap = heap_alloc_term();
+    heap_set_tag(snap, TAG_SNAPSHOT);
+    heap_set_body(snap, ast);
+    heap_set_arg(snap, SNAPSHOT_HEAD);
+    heap_set_domain(snap, description_id);
+    SNAPSHOT_HEAD  = snap;
+    SNAPSHOT_COUNT = SNAPSHOT_COUNT + 1;
+    return snap;
+}
+
+// Pop head snapshot; returns the snapshot node (or 0 if empty).
+pub fn snapshot_pop() -> i64 {
+    if SNAPSHOT_HEAD == 0 { return 0; }
+    let snap   = SNAPSHOT_HEAD;
+    SNAPSHOT_HEAD  = snapshot_parent(snap);
+    SNAPSHOT_COUNT = SNAPSHOT_COUNT - 1;
+    return snap;
+}
+
+// Rollback to the previous snapshot; returns restored AST.
+pub fn snapshot_rollback() -> i64 {
+    let snap = snapshot_pop();
+    if snap == 0 { return 0; }
+    return snapshot_ast(snap);
+}
+
+// Roll back until the stack head is target (exclusive); returns restored AST.
+pub fn snapshot_rollback_to(target: i64) -> i64 {
+    let mut last_ast: i64 = 0;
+    while SNAPSHOT_HEAD != 0 && SNAPSHOT_HEAD != target {
+        last_ast = snapshot_rollback();
+    }
+    return last_ast;
+}
+
+// Store a diff-first edit: push new state built from applying diff to current.
+pub fn snapshot_push_diff(current_ast: i64, new_ast: i64, description_id: i64) -> i64 {
+    return snapshot_push(new_ast, description_id);
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    SNAPSHOT_HEAD  = 0;
+    SNAPSHOT_COUNT = 0;
+
+    // Push three snapshots
+    let s1 = snapshot_push(10, 100);
+    let s2 = snapshot_push(20, 200);
+    let s3 = snapshot_push(30, 300);
+    if snapshot_count() != 3 { return 1; }
+    if heap_get_tag(s1) != TAG_SNAPSHOT { return 2; }
+
+    // Pop — should get s3 (ast=30)
+    let popped = snapshot_pop();
+    if snapshot_ast(popped) != 30 { return 3; }
+    if snapshot_count() != 2      { return 4; }
+
+    // Rollback — pops s2, returns ast=20
+    let ast = snapshot_rollback();
+    if ast != 20           { return 5; }
+    if snapshot_count() != 1 { return 6; }
+
+    // Rollback_to s1 — stack currently has s1; already at target, nothing pops
+    let _ = snapshot_rollback_to(s1);
+    if snapshot_count() != 1 { return 7; }
+
+    // Push two more for rollback_to test
+    snapshot_push(40, 400);
+    snapshot_push(50, 500);
+    if snapshot_count() != 3 { return 8; }
+
+    let last = snapshot_rollback_to(s1);
+    // Rolled back past 50 and 40; s1 is now the head again
+    if snapshot_count() != 1 { return 9; }
+
+    return 111;
+}

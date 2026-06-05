@@ -1,0 +1,88 @@
+// titan/ulcf/configs/clojure.ti
+// Clojure language configuration for the Universal Grammar Adapter.
+
+pub fn clojure_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("long".to_string(), "i64".to_string());
+    type_map.insert("double".to_string(), "f64".to_string());
+    type_map.insert("boolean".to_string(), "bool".to_string());
+    type_map.insert("string".to_string(), "String".to_string());
+    type_map.insert("keyword".to_string(), "String".to_string());
+    type_map.insert("symbol".to_string(), "String".to_string());
+    type_map.insert("vector".to_string(), "Vec<Any>".to_string());
+    type_map.insert("list".to_string(), "Vec<Any>".to_string());
+    type_map.insert("map".to_string(), "HashMap<Any,Any>".to_string());
+    type_map.insert("set".to_string(), "Vec<Any>".to_string());
+    type_map.insert("nil".to_string(), "Option<Any>".to_string());
+    type_map.insert("fn".to_string(), "Fn".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("mod".to_string(), "mod".to_string());
+    operator_map.insert("=".to_string(), "eq".to_string());
+    operator_map.insert("not=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("and".to_string(), "and".to_string());
+    operator_map.insert("or".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "clojure".to_string(),
+        extensions: vec![".clj".to_string(), ".cljs".to_string(), ".cljc".to_string(), ".edn".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "list".to_string(),
+            "vector".to_string(),
+            "def".to_string(),
+            "defn".to_string(),
+            "if".to_string(),
+            "when".to_string(),
+            "cond".to_string(),
+            "case".to_string(),
+            "for".to_string(),
+            "doseq".to_string(),
+            "loop".to_string(),
+            "recur".to_string(),
+            "let".to_string(),
+            "fn".to_string(),
+            "try".to_string(),
+            "catch".to_string(),
+        ],
+        expression_nodes: vec![
+            "list".to_string(),
+            "vector".to_string(),
+            "map".to_string(),
+            "set".to_string(),
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "nil_literal".to_string(),
+            "keyword_literal".to_string(),
+            "symbol".to_string(),
+            "anonymous_function".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "nil".to_string(),
+            "keyword_literal".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec![
+            "body".to_string(),
+            "do".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "let_binding".to_string(),
+    }
+}

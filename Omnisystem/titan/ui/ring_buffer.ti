@@ -1,0 +1,108 @@
+// titan/ui/ring_buffer.ti — Bounded FIFO ring buffer for decoupled event ingestion
+// TAG range 70000–70002 (clear of events 66000, error_boundary 69000).
+// rb_pop returns 0 on empty; rb_drain_all uses rb_size so zero-value events drain correctly.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const TAG_RB:   i64 = 70000;
+const TAG_SLOT: i64 = 70001;
+const TAG_WRP:  i64 = 70002;
+
+// Ring-buffer cell: body=capacity, arg=current_size, domain=wrapper_list_head
+pub fn rb_create(capacity: i64) -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TAG_RB);
+    heap_set_body(r, capacity);
+    heap_set_arg(r, 0);
+    heap_set_domain(r, 0);
+    return r;
+}
+
+// Appends evt to tail; returns 1 on success, 0 if at capacity
+pub fn rb_push(r: i64, evt: i64) -> i64 {
+    let cap = heap_get_body(r);
+    let sz  = heap_get_arg(r);
+    if sz >= cap { return 0; }
+    let slot = heap_alloc_term();
+    heap_set_tag(slot, TAG_SLOT);
+    heap_set_body(slot, evt);
+    heap_set_domain(slot, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TAG_WRP);
+    heap_set_body(w, slot);
+    heap_set_domain(w, 0);
+    let h = heap_get_domain(r);
+    if h == 0 {
+        heap_set_domain(r, w);
+    } else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 {
+            cur = heap_get_domain(cur);
+        }
+        heap_set_domain(cur, w);
+    }
+    heap_set_arg(r, sz + 1);
+    return 1;
+}
+
+// Removes and returns the head evt; returns 0 if empty
+pub fn rb_pop(r: i64) -> i64 {
+    let h = heap_get_domain(r);
+    if h == 0 { return 0; }
+    let slot = heap_get_body(h);    // wrapper.body = slot
+    let evt  = heap_get_body(slot); // slot.body    = evt
+    heap_set_domain(r, heap_get_domain(h));
+    heap_set_arg(r, heap_get_arg(r) - 1);
+    return evt;
+}
+
+pub fn rb_size(r: i64) -> i64 { return heap_get_arg(r); }
+
+// Drain all entries; uses rb_size so zero-value events don't terminate early
+pub fn rb_drain_all(r: i64) -> i64 {
+    let mut n: i64 = 0;
+    while rb_size(r) > 0 {
+        rb_pop(r);
+        n = n + 1;
+    }
+    return n;
+}
+
+pub fn main() -> i64 {
+    let r = rb_create(8);
+
+    // Test 1: push three items, size = 3
+    rb_push(r, 10);
+    rb_push(r, 20);
+    rb_push(r, 30);
+    if rb_size(r) != 3 { return 1; }
+
+    // Test 2: pop returns head (FIFO order)
+    let v = rb_pop(r);
+    if v != 10 { return 2; }
+
+    // Test 3: drain remaining 2
+    let d = rb_drain_all(r);
+    if d != 2 { return 3; }
+    if rb_size(r) != 0 { return 4; }
+
+    // Test 4: capacity enforcement
+    let s = rb_create(2);
+    rb_push(s, 1);
+    rb_push(s, 2);
+    let rejected = rb_push(s, 3);
+    if rejected != 0 { return 5; }
+    if rb_size(s) != 2 { return 6; }
+
+    return 111;
+}

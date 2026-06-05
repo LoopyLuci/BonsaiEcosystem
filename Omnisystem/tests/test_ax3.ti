@@ -1,0 +1,9 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_SP3:i64=28200;const tT_CK3:i64=28201;
+pub fn tax3_spec(pre:i64,post:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,tT_SP3);heap_set_body(s,pre);heap_set_arg(s,post);return s;}
+pub fn tax3_spec_pre(s:i64)->i64{return heap_get_body(s);}
+pub fn tax3_spec_post(s:i64)->i64{return heap_get_arg(s);}
+pub fn tax3_check(fn_name:i64,spec:i64)->i64{let c=heap_alloc_term();heap_set_tag(c,tT_CK3);heap_set_body(c,fn_name);heap_set_arg(c,spec);return c;}
+pub fn tax3_verify(chk:i64,input:i64,output:i64)->i64{let s=heap_get_arg(chk);let pre=tax3_spec_pre(s);let post=tax3_spec_post(s);if input<pre{return 0;}if output==post{return 1;}return 0;}
+pub fn tax3_hoare_triple(pre:i64,fn_result:i64,post:i64)->i64{if pre==0{return 1;}if fn_result==post{return 1;}return 0;}
+pub fn main()->i64{let s=tax3_spec(5,50);let chk=tax3_check(42,s);if tax3_verify(chk,10,50)!=1{return 1;}if tax3_verify(chk,3,50)!=0{return 2;}if tax3_hoare_triple(1,50,50)!=1{return 3;}if tax3_hoare_triple(1,50,51)!=0{return 4;}return 111;}

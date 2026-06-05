@@ -1,0 +1,180 @@
+// tests/test_s6.ti — Phase S6 Edit History Integration Test
+// All helpers inlined with ts6_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TS6_T_OP:   i64 = 9300;
+const TS6_T_STK:  i64 = 9301;
+const TS6_T_SWRP: i64 = 9302;
+const TS6_OP_MOVE: i64 = 0;
+const TS6_ST_SEL:  i64 = 1;
+
+// ===== Vertex/data helpers (ts6_ prefix) =====
+pub fn ts6_vx(v: i64) -> i64 { return heap_get_body(v); }
+pub fn ts6_vy(v: i64) -> i64 { return heap_get_arg(v); }
+pub fn ts6_vz(v: i64) -> i64 { return heap_get_body(heap_get_domain(v)); }
+pub fn ts6_setvx(v: i64, x: i64) { heap_set_body(v, x); }
+pub fn ts6_setvy(v: i64, y: i64) { heap_set_arg(v, y); }
+pub fn ts6_setvz(v: i64, z: i64) { heap_set_body(heap_get_domain(v), z); }
+
+pub fn ts6_sv(px: i64, py: i64, pz: i64,
+               c0: i64, c1: i64, c2: i64, c3: i64, c4: i64, c5: i64,
+               r: i64, g: i64, b: i64, op: i64) -> i64 {
+    let n1 = heap_alloc_term(); heap_set_body(n1, pz); heap_set_arg(n1, c0); heap_set_domain(n1, 0);
+    let n2 = heap_alloc_term(); heap_set_body(n2, c1); heap_set_arg(n2, c2); heap_set_domain(n2, n1);
+    let n3 = heap_alloc_term(); heap_set_body(n3, c3); heap_set_arg(n3, c4); heap_set_domain(n3, n2);
+    let n4 = heap_alloc_term(); heap_set_body(n4, c5); heap_set_arg(n4, r);  heap_set_domain(n4, n3);
+    let n5 = heap_alloc_term(); heap_set_body(n5, g);  heap_set_arg(n5, b);  heap_set_domain(n5, n4);
+    let n6 = heap_alloc_term(); heap_set_body(n6, op); heap_set_arg(n6, 0);  heap_set_domain(n6, n5);
+    let v  = heap_alloc_term();
+    heap_set_tag(v, 8801); heap_set_body(v, px); heap_set_arg(v, py); heap_set_domain(v, n6);
+    return v;
+}
+pub fn ts6_sd() -> i64 {
+    let d = heap_alloc_term();
+    heap_set_tag(d, 8800); heap_set_body(d, 0); heap_set_arg(d, 0); heap_set_domain(d, 0);
+    return d;
+}
+pub fn ts6_add(d: i64, v: i64) {
+    let w = heap_alloc_term(); heap_set_tag(w, 8802); heap_set_body(w, v); heap_set_domain(w, 0);
+    let c = heap_get_body(d);
+    if c == 0 { heap_set_arg(d, w); }
+    else { let mut t = heap_get_arg(d); while heap_get_domain(t) != 0 { t = heap_get_domain(t); } heap_set_domain(t, w); }
+    heap_set_body(d, c + 1);
+}
+pub fn ts6_cnt(d: i64) -> i64 { return heap_get_body(d); }
+pub fn ts6_get(d: i64, idx: i64) -> i64 {
+    let mut w = heap_get_arg(d); let mut i: i64 = 0;
+    while w != 0 { if i == idx { return heap_get_body(w); } i = i + 1; w = heap_get_domain(w); }
+    return 0;
+}
+pub fn ts6_ssc(n: i64) -> i64 {
+    let a = heap_alloc_term(); heap_set_body(a, n); heap_set_arg(a, 0);
+    return a;
+}
+pub fn ts6_sset(s: i64, idx: i64, fl: i64) {
+    let nd = heap_alloc_term(); heap_set_body(nd, idx); heap_set_arg(nd, fl);
+    heap_set_domain(nd, heap_get_arg(s)); heap_set_arg(s, nd);
+}
+pub fn ts6_sget(s: i64, idx: i64) -> i64 {
+    let mut c = heap_get_arg(s);
+    while c != 0 { if heap_get_body(c) == idx { return heap_get_arg(c); } c = heap_get_domain(c); }
+    return 0;
+}
+pub fn ts6_issel(d: i64, idx: i64) -> bool {
+    return (ts6_sget(heap_get_domain(d), idx) & TS6_ST_SEL) != 0;
+}
+
+// ===== Operation =====
+pub fn ts6_op(kind: i64, target: i64, before: i64, after: i64) -> i64 {
+    let meta = heap_alloc_term();
+    heap_set_body(meta, before); heap_set_arg(meta, after); heap_set_domain(meta, 0);
+    let o = heap_alloc_term();
+    heap_set_tag(o, TS6_T_OP); heap_set_body(o, kind); heap_set_arg(o, target); heap_set_domain(o, meta);
+    return o;
+}
+pub fn ts6_opkind(o: i64) -> i64 { return heap_get_body(o); }
+
+// ===== Stack (wrapper-node; op.domain never touched) =====
+pub fn ts6_stack() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TS6_T_STK); heap_set_body(s, 0); heap_set_arg(s, 0);
+    return s;
+}
+pub fn ts6_push(s: i64, op: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TS6_T_SWRP); heap_set_body(w, op); heap_set_domain(w, heap_get_body(s));
+    heap_set_body(s, w);
+    heap_set_arg(s, heap_get_arg(s) + 1);
+}
+pub fn ts6_pop(s: i64) -> i64 {
+    let w = heap_get_body(s);
+    if w == 0 { return 0; }
+    let op = heap_get_body(w);
+    heap_set_body(s, heap_get_domain(w));
+    heap_set_arg(s, heap_get_arg(s) - 1);
+    return op;
+}
+pub fn ts6_depth(s: i64) -> i64 { return heap_get_arg(s); }
+pub fn ts6_undo(su: i64) -> i64 { return ts6_pop(su); }
+
+// exec_move: moves all selected splats, records one op per splat
+pub fn ts6_exec_move(d: i64, dx: i64, dy: i64, dz: i64, su: i64, sr: i64) -> i64 {
+    let n = ts6_cnt(d); let mut c: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        if ts6_issel(d, i) {
+            let v = ts6_get(d, i);
+            let bx = ts6_vx(v); let by = ts6_vy(v); let bz = ts6_vz(v);
+            ts6_setvx(v, bx + dx); ts6_setvy(v, by + dy); ts6_setvz(v, bz + dz);
+            let op = ts6_op(TS6_OP_MOVE, i, bx, ts6_vx(v));
+            ts6_push(su, op);
+            c = c + 1;
+        }
+        i = i + 1;
+    }
+    return c;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let su = ts6_stack(); let sr = ts6_stack();
+
+    // 4 splats, all selected: positions (0,0),(25,25),(50,50),(75,75)
+    let d = ts6_sd();
+    let sa = ts6_ssc(4);
+    heap_set_domain(d, sa);
+    let mut i: i64 = 0;
+    while i < 4 {
+        let v = ts6_sv(i*25, i*25, 0, 0, 0, 0, 0, 0, 0, 0, i*60, 0, 100);
+        ts6_add(d, v); ts6_sset(sa, i, TS6_ST_SEL); i = i + 1;
+    }
+
+    // exec_move(d, 10, 10, 0) → 4 ops pushed
+    let m = ts6_exec_move(d, 10, 10, 0, su, sr);
+    if m != 4              { return 1; }
+    if ts6_depth(su) != 4  { return 2; }
+
+    // v0 moved: vx = 0+10 = 10
+    let v0 = ts6_get(d, 0);
+    if ts6_vx(v0) != 10    { return 3; }
+
+    // Undo: pops last op (for splat 3), depth → 3
+    let undo_op = ts6_undo(su);
+    if undo_op == 0        { return 4; }
+    if ts6_depth(su) != 3  { return 5; }
+    if ts6_opkind(undo_op) != TS6_OP_MOVE { return 6; }
+
+    // Push undo op onto redo stack
+    ts6_push(sr, undo_op);
+    if ts6_depth(sr) != 1  { return 7; }
+
+    // Pop from redo stack and verify it's OP_MOVE
+    let redo_op = ts6_pop(sr);
+    if ts6_opkind(redo_op) != TS6_OP_MOVE { return 8; }
+    if ts6_depth(sr) != 0  { return 9; }
+
+    // op meta preserved through push/pop cycle
+    // redo_op = same op as undo_op, opkind still OP_MOVE ✓
+
+    // Push multiple ops and verify LIFO order
+    let opa = ts6_op(TS6_OP_MOVE, 10, 100, 200);
+    let opb = ts6_op(TS6_OP_MOVE, 11, 300, 400);
+    ts6_push(su, opa); ts6_push(su, opb);
+    if ts6_depth(su) != 5  { return 10; }
+    let got = ts6_pop(su);
+    if ts6_opkind(got) != TS6_OP_MOVE { return 11; }
+    // got should be opb (last pushed)
+    if heap_get_arg(got) != 11 { return 12; } // target = 11
+
+    return 111;
+}

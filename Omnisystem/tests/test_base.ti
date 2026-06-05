@@ -1,0 +1,11 @@
+pub fn main() -> i64 {
+    let z = 0;
+    let check1 = (z + 0) == z;
+    let check2 = (z * 1) == z;
+    let check3 = (0 + z) == z;
+    if check1 && check2 && check3 { return 111; }
+    if !check1 { return 1; }
+    if !check2 { return 2; }
+    if !check3 { return 3; }
+    return 99;
+}

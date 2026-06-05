@@ -1,0 +1,219 @@
+// tests/test_nat_proofs.ti — Integration tests for Nat arithmetic proofs
+//
+// Self-contained: includes all kernel functions and nat_stdlib lemmas.
+// Tests a wider range of values than nat_stdlib.ti's own main().
+// Returns 111 only if every theorem holds for all tested inputs.
+
+// ── Term constructors ──────────────────────────────────────────────────────
+
+pub fn var_ref(idx: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 0); heap_set(id, 1, idx); return id;
+}
+pub fn lam(body: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 1); heap_set(id, 1, body); return id;
+}
+pub fn app(func: i64, arg: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 2); heap_set(id, 1, func); heap_set(id, 2, arg); return id;
+}
+pub fn pi(domain: i64, codomain: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 3); heap_set(id, 1, domain); heap_set(id, 2, codomain); return id;
+}
+pub fn sort(level: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 4); heap_set(id, 1, level); return id;
+}
+pub fn const_term(name: i64) -> i64 {
+    let id = heap_alloc(); heap_set(id, 0, 5); heap_set(id, 1, name); return id;
+}
+
+// ── Nat type ───────────────────────────────────────────────────────────────
+
+pub fn make_nat_type() -> i64 {
+    let zero_con = heap_alloc();
+    heap_set(zero_con, 0, 7); heap_set(zero_con, 2, 0); heap_set(zero_con, 3, 0);
+    let succ_con = heap_alloc();
+    heap_set(succ_con, 0, 7); heap_set(succ_con, 2, 1); heap_set(succ_con, 3, 1);
+    let nat = heap_alloc();
+    heap_set(nat, 0, 6); heap_set(nat, 1, 1);
+    heap_set(nat, 2, 0); heap_set(nat, 3, 2);
+    heap_set(nat, 4, zero_con); heap_set(nat, 5, succ_con);
+    heap_set(zero_con, 1, nat);
+    heap_set(succ_con, 1, nat);
+    return nat;
+}
+
+pub fn nat_zero(nat: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 7); heap_set(id, 1, nat);
+    heap_set(id, 2, 0); heap_set(id, 3, 0);
+    return id;
+}
+
+pub fn nat_succ(nat: i64, pred: i64) -> i64 {
+    let id = heap_alloc();
+    heap_set(id, 0, 7); heap_set(id, 1, nat);
+    heap_set(id, 2, 1); heap_set(id, 3, 1);
+    heap_set(id, 4, pred);
+    return id;
+}
+
+pub fn make_numeral(nat: i64, n: i64) -> i64 {
+    if n == 0 { return nat_zero(nat); }
+    return nat_succ(nat, make_numeral(nat, n - 1));
+}
+
+// ── Equality ───────────────────────────────────────────────────────────────
+
+pub fn eq_nat(a: i64, b: i64) -> i64 {
+    let ta = heap_get(a, 0); let tb = heap_get(b, 0);
+    if ta != tb { return 0; }
+    if ta == 7 {
+        if heap_get(a, 2) != heap_get(b, 2) { return 0; }
+        let arity = heap_get(a, 3);
+        if arity == 0 { return 1; }
+        return eq_nat(heap_get(a, 4), heap_get(b, 4));
+    }
+    return 0;
+}
+
+// ── Arithmetic ─────────────────────────────────────────────────────────────
+
+pub fn add(nat: i64, m: i64, n: i64) -> i64 {
+    if heap_get(m, 0) != 7 { return n; }
+    if heap_get(m, 2) == 0 { return n; }
+    return nat_succ(nat, add(nat, heap_get(m, 4), n));
+}
+
+pub fn mul(nat: i64, m: i64, n: i64) -> i64 {
+    if heap_get(m, 0) != 7 { return nat_zero(nat); }
+    if heap_get(m, 2) == 0 { return nat_zero(nat); }
+    return add(nat, n, mul(nat, heap_get(m, 4), n));
+}
+
+// ── Lemma checkers ─────────────────────────────────────────────────────────
+
+pub fn check_add_0_r(nat: i64, n: i64) -> i64 {
+    return eq_nat(add(nat, n, nat_zero(nat)), n);
+}
+
+pub fn check_add_succ_r(nat: i64, n: i64, m: i64) -> i64 {
+    return eq_nat(add(nat, n, nat_succ(nat, m)), nat_succ(nat, add(nat, n, m)));
+}
+
+pub fn check_add_comm(nat: i64, n: i64, m: i64) -> i64 {
+    return eq_nat(add(nat, n, m), add(nat, m, n));
+}
+
+pub fn check_add_assoc(nat: i64, n: i64, m: i64, p: i64) -> i64 {
+    return eq_nat(add(nat, add(nat, n, m), p), add(nat, n, add(nat, m, p)));
+}
+
+pub fn check_mul_0_r(nat: i64, n: i64) -> i64 {
+    return eq_nat(mul(nat, n, nat_zero(nat)), nat_zero(nat));
+}
+
+pub fn check_mul_succ_r(nat: i64, n: i64, m: i64) -> i64 {
+    return eq_nat(mul(nat, n, nat_succ(nat, m)), add(nat, mul(nat, n, m), n));
+}
+
+pub fn check_mul_comm(nat: i64, n: i64, m: i64) -> i64 {
+    return eq_nat(mul(nat, n, m), mul(nat, m, n));
+}
+
+pub fn check_distributive(nat: i64, n: i64, m: i64, p: i64) -> i64 {
+    let lhs = mul(nat, n, add(nat, m, p));
+    let rhs = add(nat, mul(nat, n, m), mul(nat, n, p));
+    return eq_nat(lhs, rhs);
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+pub fn main() -> i64 {
+    let nat = make_nat_type();
+
+    let n0 = make_numeral(nat, 0);
+    let n1 = make_numeral(nat, 1);
+    let n2 = make_numeral(nat, 2);
+    let n3 = make_numeral(nat, 3);
+    let n4 = make_numeral(nat, 4);
+    let n5 = make_numeral(nat, 5);
+
+    // ── Computation spot checks ────────────────────────────────────────────
+
+    // Test 1: 2 + 3 = 5
+    if eq_nat(add(nat, n2, n3), n5) != 1 { return 1; }
+
+    // Test 2: 2 * 3 = 6
+    let n6 = make_numeral(nat, 6);
+    if eq_nat(mul(nat, n2, n3), n6) != 1 { return 2; }
+
+    // Test 3: 0 + 4 = 4
+    if eq_nat(add(nat, n0, n4), n4) != 1 { return 3; }
+
+    // Test 4: 4 + 0 = 4
+    if eq_nat(add(nat, n4, n0), n4) != 1 { return 4; }
+
+    // ── Theorem: add_0_r ─────────────────────────────────────────────────
+
+    // Test 5: add_0_r for n = 0..4
+    if check_add_0_r(nat, n0) != 1 { return 5; }
+    if check_add_0_r(nat, n1) != 1 { return 6; }
+    if check_add_0_r(nat, n2) != 1 { return 7; }
+    if check_add_0_r(nat, n3) != 1 { return 8; }
+    if check_add_0_r(nat, n4) != 1 { return 9; }
+
+    // ── Theorem: add_succ_r ──────────────────────────────────────────────
+
+    // Test 6
+    if check_add_succ_r(nat, n0, n0) != 1 { return 10; }
+    if check_add_succ_r(nat, n2, n3) != 1 { return 11; }
+    if check_add_succ_r(nat, n4, n1) != 1 { return 12; }
+
+    // ── Theorem: add_comm ────────────────────────────────────────────────
+
+    // Test 7
+    if check_add_comm(nat, n0, n3) != 1 { return 13; }
+    if check_add_comm(nat, n2, n3) != 1 { return 14; }
+    if check_add_comm(nat, n4, n1) != 1 { return 15; }
+    if check_add_comm(nat, n3, n4) != 1 { return 16; }
+
+    // ── Theorem: add_assoc ───────────────────────────────────────────────
+
+    // Test 8
+    if check_add_assoc(nat, n1, n2, n3) != 1 { return 17; }
+    if check_add_assoc(nat, n0, n4, n1) != 1 { return 18; }
+    if check_add_assoc(nat, n2, n0, n3) != 1 { return 19; }
+    if check_add_assoc(nat, n3, n3, n3) != 1 { return 20; }
+
+    // ── Theorem: mul_0_r ─────────────────────────────────────────────────
+
+    // Test 9
+    if check_mul_0_r(nat, n0) != 1 { return 21; }
+    if check_mul_0_r(nat, n1) != 1 { return 22; }
+    if check_mul_0_r(nat, n3) != 1 { return 23; }
+    if check_mul_0_r(nat, n4) != 1 { return 24; }
+
+    // ── Theorem: mul_succ_r ──────────────────────────────────────────────
+
+    // Test 10
+    if check_mul_succ_r(nat, n0, n0) != 1 { return 25; }
+    if check_mul_succ_r(nat, n2, n1) != 1 { return 26; }
+    if check_mul_succ_r(nat, n3, n2) != 1 { return 27; }
+    if check_mul_succ_r(nat, n2, n3) != 1 { return 28; }
+
+    // ── Theorem: mul_comm ────────────────────────────────────────────────
+
+    // Test 11
+    if check_mul_comm(nat, n0, n3) != 1 { return 29; }
+    if check_mul_comm(nat, n2, n3) != 1 { return 30; }
+    if check_mul_comm(nat, n3, n4) != 1 { return 31; }
+
+    // ── Theorem: left distributivity n*(m+p) = n*m + n*p ────────────────
+
+    // Test 12
+    if check_distributive(nat, n2, n1, n3) != 1 { return 32; }
+    if check_distributive(nat, n3, n2, n2) != 1 { return 33; }
+    if check_distributive(nat, n0, n4, n3) != 1 { return 34; }
+    if check_distributive(nat, n4, n0, n2) != 1 { return 35; }
+
+    return 111;
+}

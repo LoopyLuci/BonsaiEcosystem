@@ -1,0 +1,6 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_SS4:i64=28300;
+pub fn tax4_session_create(protocol:i64)->i64{let s=heap_alloc_term();heap_set_tag(s,tT_SS4);heap_set_body(s,protocol);heap_set_arg(s,0);return s;}
+pub fn tax4_session_step(s:i64,action:i64)->i64{let proto=heap_get_body(s);if action==proto{heap_set_body(s,proto+1);return 1;}return 0;}
+pub fn tax4_lock_order(a:i64,b:i64)->i64{if a<b{return 1;}return 0;}
+pub fn main()->i64{let s=tax4_session_create(5);if tax4_session_step(s,5)!=1{return 1;}if tax4_session_step(s,5)!=0{return 2;}if tax4_session_step(s,6)!=1{return 3;}if tax4_lock_order(1,2)!=1{return 4;}if tax4_lock_order(2,1)!=0{return 5;}return 111;}

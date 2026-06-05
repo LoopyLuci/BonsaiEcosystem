@@ -1,0 +1,186 @@
+// OmniLib JSON -- heap-tagged JSON nodes with array/object containers
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const JSON_NULL: i64 = 0;
+const JSON_BOOL: i64 = 1;
+const JSON_INT: i64 = 2;
+const JSON_STRING: i64 = 3;
+const JSON_ARRAY: i64 = 4;
+const JSON_OBJECT: i64 = 5;
+const JSON_PAIR: i64 = 6;
+const JSON_LINK: i64 = 7;
+
+pub fn json_make_null() -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, JSON_NULL);
+    heap_set_body(n, 0);
+    heap_set_arg(n, 0);
+    heap_set_domain(n, 0);
+    return n;
+}
+
+pub fn json_make_bool(val: bool) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, JSON_BOOL);
+    if val { heap_set_body(n, 1); } else { heap_set_body(n, 0); }
+    heap_set_arg(n, 0);
+    heap_set_domain(n, 0);
+    return n;
+}
+
+pub fn json_make_int(val: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, JSON_INT);
+    heap_set_body(n, val);
+    heap_set_arg(n, 0);
+    heap_set_domain(n, 0);
+    return n;
+}
+
+pub fn json_make_string(str_id: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, JSON_STRING);
+    heap_set_body(n, str_id);
+    heap_set_arg(n, 0);
+    heap_set_domain(n, 0);
+    return n;
+}
+
+pub fn json_make_array() -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, JSON_ARRAY);
+    heap_set_body(n, 0);   // head link
+    heap_set_arg(n, 0);    // len
+    heap_set_domain(n, 0); // tail link
+    return n;
+}
+
+pub fn json_make_object() -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, JSON_OBJECT);
+    heap_set_body(n, 0);   // head pair
+    heap_set_arg(n, 0);    // count
+    heap_set_domain(n, 0); // tail pair
+    return n;
+}
+
+pub fn json_type(node: i64) -> i64 {
+    return heap_get_tag(node);
+}
+
+pub fn json_bool_value(node: i64) -> bool {
+    return heap_get_body(node) != 0;
+}
+
+pub fn json_int_value(node: i64) -> i64 {
+    return heap_get_body(node);
+}
+
+pub fn json_array_len(arr: i64) -> i64 {
+    return heap_get_arg(arr);
+}
+
+pub fn json_array_push(arr: i64, val: i64) {
+    let link = heap_alloc_term();
+    heap_set_tag(link, JSON_LINK);
+    heap_set_body(link, val);
+    heap_set_domain(link, 0);
+
+    if heap_get_arg(arr) == 0 {
+        heap_set_body(arr, link);
+        heap_set_domain(arr, link);
+    } else {
+        let tail = heap_get_domain(arr);
+        heap_set_domain(tail, link);
+        heap_set_domain(arr, link);
+    }
+
+    heap_set_arg(arr, heap_get_arg(arr) + 1);
+}
+
+pub fn json_array_get(arr: i64, idx: i64) -> i64 {
+    if idx < 0 || idx >= heap_get_arg(arr) { return 0; }
+    let mut cur = heap_get_body(arr);
+    let mut i: i64 = 0;
+    while i < idx {
+        cur = heap_get_domain(cur);
+        i = i + 1;
+    }
+    return heap_get_body(cur);
+}
+
+pub fn json_object_put(obj: i64, key: i64, val: i64) {
+    let mut cur = heap_get_body(obj);
+    while cur != 0 {
+        if heap_get_body(cur) == key {
+            heap_set_arg(cur, val);
+            return;
+        }
+        cur = heap_get_domain(cur);
+    }
+
+    let pair = heap_alloc_term();
+    heap_set_tag(pair, JSON_PAIR);
+    heap_set_body(pair, key);
+    heap_set_arg(pair, val);
+    heap_set_domain(pair, 0);
+
+    if heap_get_arg(obj) == 0 {
+        heap_set_body(obj, pair);
+        heap_set_domain(obj, pair);
+    } else {
+        let tail = heap_get_domain(obj);
+        heap_set_domain(tail, pair);
+        heap_set_domain(obj, pair);
+    }
+
+    heap_set_arg(obj, heap_get_arg(obj) + 1);
+}
+
+pub fn json_object_get(obj: i64, key: i64) -> i64 {
+    let mut cur = heap_get_body(obj);
+    while cur != 0 {
+        if heap_get_body(cur) == key { return heap_get_arg(cur); }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+pub fn main() -> i64 {
+    let n0 = json_make_null();
+    if json_type(n0) != JSON_NULL { return 1; }
+
+    let b1 = json_make_bool(true);
+    let b0 = json_make_bool(false);
+    if !json_bool_value(b1) { return 2; }
+    if json_bool_value(b0) { return 3; }
+
+    let i42 = json_make_int(42);
+    if json_int_value(i42) != 42 { return 4; }
+
+    let arr = json_make_array();
+    json_array_push(arr, json_make_int(10));
+    json_array_push(arr, json_make_int(20));
+    if json_array_len(arr) != 2 { return 5; }
+    if json_int_value(json_array_get(arr, 0)) != 10 { return 6; }
+    if json_int_value(json_array_get(arr, 1)) != 20 { return 7; }
+
+    let obj = json_make_object();
+    json_object_put(obj, 1001, json_make_int(7));
+    json_object_put(obj, 1002, json_make_bool(true));
+    if json_int_value(json_object_get(obj, 1001)) != 7 { return 8; }
+    if !json_bool_value(json_object_get(obj, 1002)) { return 9; }
+
+    return 111;
+}
+

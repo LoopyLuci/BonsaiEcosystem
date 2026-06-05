@@ -1,0 +1,108 @@
+// tests/test_r4.ti — Phase R4 MCP Manager Integration Test
+// All helpers inlined with tr4_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TR4_T_SRV:  i64 = 22300;
+const TR4_T_TOOL: i64 = 22301;
+const TR4_T_REG:  i64 = 22302;
+const TR4_T_WRP:  i64 = 22303;
+
+pub fn tr4_server_create(name: i64, state: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TR4_T_SRV); heap_set_body(s, name); heap_set_arg(s, state); heap_set_domain(s, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TR4_T_WRP); heap_set_body(w, s); heap_set_domain(w, 0);
+    return w;
+}
+
+pub fn tr4_server_state(w: i64) -> i64 {
+    let s = heap_get_body(w);
+    return heap_get_arg(s);
+}
+pub fn tr4_server_set_state(w: i64, st: i64) {
+    let s = heap_get_body(w);
+    heap_set_arg(s, st);
+}
+
+pub fn tr4_server_add_tool(w: i64, tool_name: i64) {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TR4_T_TOOL); heap_set_body(t, tool_name); heap_set_domain(t, 0);
+    let s = heap_get_body(w);
+    let h = heap_get_domain(s);
+    heap_set_domain(t, h);
+    heap_set_domain(s, t);
+}
+
+pub fn tr4_server_tool_count(w: i64) -> i64 {
+    let s = heap_get_body(w);
+    let mut cur: i64 = heap_get_domain(s);
+    let mut n: i64 = 0;
+    while cur != 0 { n = n + 1; cur = heap_get_domain(cur); }
+    return n;
+}
+
+pub fn tr4_registry_create() -> i64 {
+    let r = heap_alloc_term();
+    heap_set_tag(r, TR4_T_REG); heap_set_body(r, 0); heap_set_arg(r, 0);
+    return r;
+}
+
+pub fn tr4_registry_add(r: i64, w: i64) {
+    let h = heap_get_arg(r);
+    if h == 0 { heap_set_arg(r, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(r, heap_get_body(r) + 1);
+}
+
+pub fn tr4_registry_find_running(r: i64) -> i64 {
+    let mut cur: i64 = heap_get_arg(r);
+    while cur != 0 {
+        let w = cur;
+        if tr4_server_state(w) == 1 { return w; }
+        cur = heap_get_domain(cur);
+    }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    let s = tr4_server_create(50, 1);
+    tr4_server_add_tool(s, 1);
+    tr4_server_add_tool(s, 2);
+    if tr4_server_tool_count(s) != 2   { return 1; }
+    tr4_server_set_state(s, 2);
+    if tr4_server_state(s) != 2        { return 2; }
+
+    let r = tr4_registry_create();
+    let s2 = tr4_server_create(60, 0);
+    let s3 = tr4_server_create(70, 1);
+    tr4_registry_add(r, s);
+    tr4_registry_add(r, s2);
+    tr4_registry_add(r, s3);
+    if heap_get_body(r) != 3           { return 3; }
+    // s.state=2 (not 1), s2.state=0, s3.state=1 → find_running returns s3
+    let found = tr4_registry_find_running(r);
+    if found != s3                      { return 4; }
+
+    // No running servers → returns 0
+    tr4_server_set_state(s3, 0);
+    let found2 = tr4_registry_find_running(r);
+    if found2 != 0                      { return 5; }
+
+    return 111;
+}

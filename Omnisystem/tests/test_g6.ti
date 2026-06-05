@@ -1,0 +1,121 @@
+// tests/test_g6.ti — Phase G6 Performance & Streaming Integration Test
+// All helpers inlined with tg6_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TG6_T_LOD6: i64 = 20500;
+const TG6_T_BUD6: i64 = 20501;
+const TG6_T_WR6:  i64 = 20502;
+
+// ===== LOD =====
+pub fn tg6_lod_create(max_levels: i64) -> i64 {
+    let l = heap_alloc_term();
+    heap_set_tag(l, TG6_T_LOD6); heap_set_body(l, 0); heap_set_arg(l, 0); heap_set_domain(l, max_levels);
+    return l;
+}
+pub fn tg6_lod_add_level(l: i64, splat_count: i64, tri_count: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_body(n, splat_count); heap_set_arg(n, tri_count); heap_set_domain(n, 0);
+    let w = heap_alloc_term();
+    heap_set_tag(w, TG6_T_WR6); heap_set_body(w, n); heap_set_domain(w, 0);
+    let h = heap_get_arg(l);
+    if h == 0 { heap_set_arg(l, w); }
+    else {
+        let mut t: i64 = h;
+        while heap_get_domain(t) != 0 { t = heap_get_domain(t); }
+        heap_set_domain(t, w);
+    }
+    heap_set_body(l, heap_get_body(l) + 1);
+    return n;
+}
+pub fn tg6_lod_level_count(l: i64) -> i64 { return heap_get_body(l); }
+pub fn tg6_lod_level_splats(l: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(l); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+pub fn tg6_lod_level_tris(l: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(l); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_arg(heap_get_body(w)); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Budget =====
+pub fn tg6_budget_create(total_bytes: i64) -> i64 {
+    let b = heap_alloc_term();
+    heap_set_tag(b, TG6_T_BUD6); heap_set_body(b, total_bytes); heap_set_arg(b, total_bytes); heap_set_domain(b, 0);
+    return b;
+}
+pub fn tg6_budget_available(b: i64) -> i64 { return heap_get_arg(b); }
+pub fn tg6_budget_allocate(b: i64, bytes: i64) -> i64 {
+    let avail = heap_get_arg(b);
+    if bytes > avail { return 0; }
+    heap_set_arg(b, avail - bytes);
+    return 1;
+}
+pub fn tg6_budget_release(b: i64, bytes: i64) {
+    let avail = heap_get_arg(b);
+    let mut new_avail: i64 = avail + bytes;
+    if new_avail > heap_get_body(b) { new_avail = heap_get_body(b); }
+    heap_set_arg(b, new_avail);
+}
+
+// ===== Feasibility =====
+pub fn tg6_estimate_memory(splat_count: i64) -> i64 { return splat_count * 67; }
+pub fn tg6_is_feasible(splat_count: i64, mem_bytes: i64) -> i64 {
+    if tg6_estimate_memory(splat_count) <= mem_bytes { return 1; }
+    return 0;
+}
+
+// ===== Integration test =====
+pub fn main() -> i64 {
+    // LOD: 4 levels
+    let lod = tg6_lod_create(4);
+    tg6_lod_add_level(lod, 500000, 25000);
+    tg6_lod_add_level(lod, 50000,  2500);
+    tg6_lod_add_level(lod, 5000,   250);
+    tg6_lod_add_level(lod, 500,    25);
+    if tg6_lod_level_count(lod) != 4         { return 1; }
+    if tg6_lod_level_splats(lod, 0) != 500000 { return 2; }
+    if tg6_lod_level_splats(lod, 3) != 500   { return 3; }
+    if tg6_lod_level_tris(lod, 3) != 25      { return 4; }
+
+    // Budget: allocate, release, verify
+    let b = tg6_budget_create(500000);
+    if tg6_budget_allocate(b, 200000) != 1   { return 5; }
+    tg6_budget_release(b, 50000);
+    if tg6_budget_available(b) != 350000     { return 6; }
+
+    // Over-release capped at total
+    tg6_budget_release(b, 999999);
+    if tg6_budget_available(b) != 500000     { return 7; }
+
+    // Over-allocate rejected
+    if tg6_budget_allocate(b, 600000) != 0   { return 8; }
+    if tg6_budget_available(b) != 500000     { return 9; }
+
+    // Feasibility: 5000 splats × 67 = 335000 ≤ 300000? No → 0. Wait, 335000 > 300000 → 0
+    if tg6_is_feasible(5000, 300000) != 0    { return 10; }
+    // 4000 × 67 = 268000 ≤ 300000 → 1
+    if tg6_is_feasible(4000, 300000) != 1    { return 11; }
+    // 10000 × 67 = 670000 > 300000 → 0
+    if tg6_is_feasible(10000, 300000) != 0   { return 12; }
+
+    return 111;
+}

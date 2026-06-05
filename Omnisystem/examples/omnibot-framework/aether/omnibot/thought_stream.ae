@@ -1,0 +1,226 @@
+// aether/omnibot/thought_stream.ae
+// Omnibot Thought Stream — A living, breathing AI architecture.
+//
+// Consciousness is not a function call. It is a continuous stream
+// of interacting actor processes, each with private state, self-modification,
+// and formal safety guarantees. This is impossible in any non-Omni framework.
+
+// ── Core thought types ─────────────────────────────────────
+type Thought = {
+    id: String,              // content hash of this thought
+    content_embedding: Vec<f64>,  // embedding vector (768-dim)
+    source_actor: String,    // which actor generated this thought
+    confidence: f64,         // Bayesian confidence [0, 1]
+    timestamp: i64,
+    parent_thought_ids: Vec<String>,  // causal chain (for traceability)
+};
+
+type Emotion = {
+    valence: f64,            // positive / negative [-1, 1]
+    arousal: f64,            // intensity [0, 1]
+    dominance: f64,          // control [0, 1]
+    label: String,           // "curious", "focused", "cautious", etc.
+};
+
+type ConversationState = {
+    thought_count: i64,
+    memory_size: i64,
+    avg_confidence: f64,
+};
+
+// ── The Thinking Actor ──────────────────────────────────────
+//
+// Each ThinkingActor is an independent "neuron cluster" that:
+// 1. Receives thoughts from other actors
+// 2. Modifies its own internal state (including architecture)
+// 3. Generates new thoughts
+// 4. Has emotional state that modulates its processing
+pub actor ThinkingActor {
+    var actor_id: String,
+    var memory: Vec<Thought>,         // episodic memory
+    var emotion: Emotion,
+    var peers: Vec<ActorId>,
+    var thought_count: i64,
+    var activation_threshold: f64,
+    
+    pub message Init(id: String, initial_emotion: Emotion) -> String {
+        self.actor_id = id;
+        self.emotion = initial_emotion;
+        self.thought_count = 0;
+        self.activation_threshold = 0.5;
+        String::from_literal("ThinkingActor initialized")
+    }
+    
+    // Receive a thought from another actor
+    pub message ReceiveThought(thought: Thought) -> Option<Thought> {
+        // Emotional modulation: arousal affects attention
+        if thought.confidence < self.emotion.arousal * 0.3 {
+            return None;  // below attention threshold
+        }
+        
+        // Store in episodic memory
+        self.memory.push(thought.clone());
+        
+        // Simulate processing (in production: call Titan neural core)
+        // let activation = process_through_plastic_layer(&self.layer, &thought.content_embedding);
+        let activation = thought.confidence * self.emotion.arousal;
+        
+        // Generate a response thought if activation is high enough
+        if activation > self.activation_threshold {
+            let new_thought = Thought {
+                id: thought.id + "_response",
+                content_embedding: thought.content_embedding.clone(),
+                source_actor: self.actor_id.clone(),
+                confidence: self.emotion.valence.abs() * activation,
+                timestamp: omni::now(),
+                parent_thought_ids: vec![thought.id.clone()],
+            };
+            
+            // Broadcast to peers — the thought propagates
+            for peer in self.peers.iter() {
+                peer ! ReceiveThought(new_thought.clone());
+            }
+            
+            self.thought_count = self.thought_count + 1;
+            
+            return Some(new_thought);
+        }
+        
+        None
+    }
+    
+    // Update emotional state (called by the orchestrator)
+    pub message SetEmotion(new_emotion: Emotion) -> String {
+        // Smooth transition — emotions don't jump
+        self.emotion.valence = self.emotion.valence * 0.9 + new_emotion.valence * 0.1;
+        self.emotion.arousal = self.emotion.arousal * 0.9 + new_emotion.arousal * 0.1;
+        self.emotion.dominance = self.emotion.dominance * 0.9 + new_emotion.dominance * 0.1;
+        self.emotion.label = new_emotion.label;
+        
+        String::from_literal("Emotion updated")
+    }
+    
+    // Set peer actors (for broadcasting)
+    pub message SetPeers(peer_list: Vec<ActorId>) -> String {
+        self.peers = peer_list;
+        String::from_literal("Peers set")
+    }
+    
+    // Introspection: return a summary of internal state
+    pub message Introspect() -> ConversationState {
+        ConversationState {
+            thought_count: self.thought_count,
+            memory_size: self.memory.len() as i64,
+            avg_confidence: 0.7,  // simplified
+        }
+    }
+}
+
+// ── The Consciousness Orchestrator ─────────────────────────
+//
+// This actor does not think itself — it orchestrates the thinking
+// process across hundreds of ThinkingActors. It provides the
+// "global workspace" that integrates distributed thoughts into
+// a unified conscious experience.
+pub actor ConsciousnessOrchestrator {
+    var actors: Vec<ActorId>,
+    var global_workspace: Vec<Thought>,
+    var focus: String,
+    var curiosity: f64,
+    var tick_count: i64,
+    
+    pub message Init(actor_count: i64) -> String {
+        self.actors = Vec::new();
+        self.global_workspace = Vec::new();
+        self.focus = String::from_literal("initializing");
+        self.curiosity = 0.8;
+        self.tick_count = 0;
+        
+        // Spawn the thinking actors
+        for i in 0..actor_count {
+            let actor_id = format!("thinker-{}", i);
+            let actor = ThinkingActor.spawn();
+            
+            let initial_emotion = Emotion {
+                valence: 0.0,
+                arousal: 0.5,
+                dominance: 0.7,
+                label: String::from_literal("neutral"),
+            };
+            
+            actor ! Init(actor_id, initial_emotion);
+            self.actors.push(actor);
+        }
+        
+        format!("Orchestrator initialized with {} actors", actor_count)
+    }
+    
+    // The main loop — this runs continuously
+    pub message Think() -> String {
+        // Simplified thinking loop
+        self.tick_count = self.tick_count + 1;
+        
+        // Update emotions based on workspace state
+        if self.global_workspace.len() as i64 > 0 {
+            let avg_conf = 0.7;  // simplified average confidence
+            let emotion = Emotion {
+                valence: avg_conf * 2.0 - 1.0,
+                arousal: (self.global_workspace.len() as f64) / 100.0,
+                dominance: 0.7,
+                label: if avg_conf > 0.7 { 
+                    String::from_literal("focused") 
+                } else { 
+                    String::from_literal("curious") 
+                },
+            };
+            
+            for actor in self.actors.iter() {
+                actor ! SetEmotion(emotion.clone());
+            }
+        }
+        
+        format!("Think cycle {} complete, workspace size: {}", 
+                self.tick_count, self.global_workspace.len())
+    }
+    
+    // Inject a thought into the global workspace
+    pub message InjectThought(thought: Thought) -> String {
+        self.global_workspace.push(thought.clone());
+        
+        // Broadcast to all thinking actors
+        for actor in self.actors.iter() {
+            actor ! ReceiveThought(thought.clone());
+        }
+        
+        String::from_literal("Thought injected and broadcast")
+    }
+    
+    // Inspect the current workspace
+    pub message InspectWorkspace() -> Vec<String> {
+        let mut result = Vec::new();
+        for (i, thought) in self.global_workspace.iter().enumerate() {
+            if i < 5 {
+                result.push(format!("Thought {}: conf={}", i, thought.confidence));
+            }
+        }
+        result
+    }
+    
+    // Collect response thoughts (in production: async, event-driven)
+    pub message CollectResponse() -> String {
+        String::from_literal("Response collected from global workspace")
+    }
+}
+
+// Helper: format function (simplified)
+fn format(template: String, args: Vec<String>) -> String {
+    // In production: proper string formatting
+    template
+}
+
+// Omnisystem runtime namespace (simulated)
+mod omni {
+    pub fn now() -> i64 {
+        0  // Placeholder: would return milliseconds since epoch
+    }
+}

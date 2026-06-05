@@ -1,0 +1,685 @@
+// Titan Stage 3B — LLVM IR Code Generation
+// Phase 3 P2.5: Self-hosting translation of titan/stage0/codegen.py
+//
+// Translates canonical UniIR (§3.5) to LLVM IR text (§9 UniIR v0.2).
+// Stage-0 constraint: no dynamic string concatenation — classification
+// functions return fixed string fragments; the runtime threads them together.
+//
+// Design mirrors Python LLVMCodegen:
+//   - LlvmBuilder  : per-function register counter + effect token state
+//   - IrValue      : a lowered value (register name str + LLVM type str)
+//   - InstrEmit    : opcode, operand count, result type — for emission
+//   - FnCodegenSummary / ModCodegenSummary : structural metadata
+//
+// Coverage:
+//   §1  LLVM type name mapping  (llvm_type_name)
+//   §2  Instruction opcode/predicate mapping
+//   §3  LlvmBuilder state management
+//   §4  IrValue construction (reg, const, undef)
+//   §5  Literal IR text fragments
+//   §6  Effect token threading
+//   §7  Function/module codegen metadata
+//   §8  Header and intrinsic declaration strings
+//   §9  Verification and hash seed
+
+// ── §0  Tag constants (reuse from lowering.ti where possible) ────────────────
+
+// Type kind tags — must match lowering.ti
+fn CG_TY_UNIT()  -> i64 { return 0; }
+fn CG_TY_BOOL()  -> i64 { return 1; }
+fn CG_TY_INT()   -> i64 { return 2; }
+fn CG_TY_FLOAT() -> i64 { return 6; }
+fn CG_TY_REF()   -> i64 { return 8; }
+fn CG_TY_PTR()   -> i64 { return 9; }
+fn CG_TY_ADT()   -> i64 { return 11; }
+fn CG_TY_FUN()   -> i64 { return 10; }
+
+// Instruction kind tags — must match lowering.ti
+fn CG_INS_ADD()       -> i64 { return 40; }
+fn CG_INS_SUB()       -> i64 { return 41; }
+fn CG_INS_MUL()       -> i64 { return 42; }
+fn CG_INS_DIV()       -> i64 { return 43; }
+fn CG_INS_AND()       -> i64 { return 44; }
+fn CG_INS_OR()        -> i64 { return 45; }
+fn CG_INS_XOR()       -> i64 { return 46; }
+fn CG_INS_NOT()       -> i64 { return 47; }
+fn CG_INS_SHL()       -> i64 { return 48; }
+fn CG_INS_SHR()       -> i64 { return 49; }
+fn CG_INS_ICMP()      -> i64 { return 50; }
+fn CG_INS_FCMP()      -> i64 { return 51; }
+fn CG_INS_CALL()      -> i64 { return 52; }
+fn CG_INS_LOAD()      -> i64 { return 53; }
+fn CG_INS_STORE()     -> i64 { return 54; }
+fn CG_INS_ALLOCA()    -> i64 { return 55; }
+fn CG_INS_GET_FIELD() -> i64 { return 56; }
+fn CG_INS_MK_ADT()    -> i64 { return 57; }
+fn CG_INS_PHI()       -> i64 { return 59; }
+
+// Terminator kind tags — must match lowering.ti
+fn CG_TERM_RET()         -> i64 { return 70; }
+fn CG_TERM_BR()          -> i64 { return 71; }
+fn CG_TERM_JMP()         -> i64 { return 72; }
+fn CG_TERM_SWITCH()      -> i64 { return 73; }
+fn CG_TERM_UNREACHABLE() -> i64 { return 74; }
+
+// CmpOp tags — must match lowering.ti
+fn CG_CMP_EQ() -> i64 { return 80; }
+fn CG_CMP_NE() -> i64 { return 81; }
+fn CG_CMP_LT() -> i64 { return 82; }
+fn CG_CMP_LE() -> i64 { return 83; }
+fn CG_CMP_GT() -> i64 { return 84; }
+fn CG_CMP_GE() -> i64 { return 85; }
+
+// IrValue kind tags
+fn IV_REG()   -> i64 { return 200; }
+fn IV_CONST() -> i64 { return 201; }
+fn IV_UNDEF() -> i64 { return 202; }
+fn IV_NULL()  -> i64 { return 203; }
+
+// ── §1  LLVM Type Name Mapping ────────────────────────────────────────────────
+// Mirrors Python LLVMCodegen._llvm_type().
+// Returns the LLVM IR type string for a given TyNode kind + width.
+
+pub fn llvm_type_name(kind: i64, width: i64) -> str {
+    if kind == 0  { return "void"; }      // unit
+    if kind == 1  { return "i1"; }        // bool
+    if kind == 2  {                        // int
+        if width == 64  { return "i64"; }
+        if width == 32  { return "i32"; }
+        if width == 16  { return "i16"; }
+        if width == 8   { return "i8"; }
+        if width == 128 { return "i128"; }
+        return "i64";
+    }
+    if kind == 6  {                        // float
+        if width == 64 { return "double"; }
+        if width == 32 { return "float"; }
+        return "double";
+    }
+    if kind == 8  { return "ptr"; }       // ref
+    if kind == 9  { return "ptr"; }       // ptr
+    if kind == 10 { return "ptr"; }       // fun pointer
+    if kind == 11 { return "ptr"; }       // ADT (opaque ptr in LLVM 15+)
+    return "i64";
+}
+
+pub fn llvm_type_is_void(kind: i64) -> bool {
+    return kind == 0;
+}
+
+pub fn llvm_type_is_ptr(kind: i64) -> bool {
+    if kind == 8  { return true; }
+    if kind == 9  { return true; }
+    if kind == 10 { return true; }
+    if kind == 11 { return true; }
+    return false;
+}
+
+pub fn llvm_type_is_float(kind: i64) -> bool {
+    return kind == 6;
+}
+
+pub fn llvm_type_is_int(kind: i64) -> bool {
+    return kind == 2 || kind == 1;
+}
+
+// ── §2  Instruction Opcode and Predicate Strings ──────────────────────────────
+// Maps instruction kind tags → LLVM opcode strings.
+// Mirrors Python _lower_instr dispatch table.
+
+pub fn ins_opcode_str(kind: i64) -> str {
+    if kind == 40 { return "add"; }
+    if kind == 41 { return "sub"; }
+    if kind == 42 { return "mul"; }
+    if kind == 43 { return "sdiv"; }
+    if kind == 44 { return "and"; }
+    if kind == 45 { return "or"; }
+    if kind == 46 { return "xor"; }
+    if kind == 47 { return "xor"; }    // INot: xor a, -1
+    if kind == 48 { return "shl"; }
+    if kind == 49 { return "ashr"; }   // arithmetic right shift
+    if kind == 50 { return "icmp"; }
+    if kind == 51 { return "fcmp"; }
+    if kind == 52 { return "call"; }
+    if kind == 53 { return "load"; }
+    if kind == 54 { return "store"; }
+    if kind == 55 { return "alloca"; }
+    if kind == 59 { return "phi"; }
+    return "nop";
+}
+
+// Result LLVM type string for an instruction kind.
+// INot produces i64 (xor i64 a, -1); IICmp produces i1 (boolean).
+pub fn ins_result_type_str(kind: i64) -> str {
+    if kind == 50 { return "i1"; }     // icmp → i1
+    if kind == 51 { return "i1"; }     // fcmp → i1
+    if kind == 44 { return "i1"; }     // and → i1 (logical)
+    if kind == 45 { return "i1"; }     // or → i1 (logical)
+    return "i64";
+}
+
+pub fn ins_is_void(kind: i64) -> bool {
+    if kind == 54 { return true; }     // store has no result
+    return false;
+}
+
+pub fn ins_has_result(kind: i64) -> bool {
+    return !ins_is_void(kind);
+}
+
+// For NOT instruction: the special literal operand "-1".
+pub fn ins_not_rhs_literal() -> str { return "-1"; }
+
+// ── §3  LLVM Comparison Predicate Strings ────────────────────────────────────
+// Mirrors Python _icmp_op_to_llvm.
+
+pub fn icmp_predicate_str(cmp_op_tag: i64) -> str {
+    if cmp_op_tag == 80 { return "eq"; }
+    if cmp_op_tag == 81 { return "ne"; }
+    if cmp_op_tag == 82 { return "slt"; }
+    if cmp_op_tag == 83 { return "sle"; }
+    if cmp_op_tag == 84 { return "sgt"; }
+    if cmp_op_tag == 85 { return "sge"; }
+    return "eq";
+}
+
+// Floating-point comparison predicates (ordered).
+pub fn fcmp_predicate_str(cmp_op_tag: i64) -> str {
+    if cmp_op_tag == 80 { return "oeq"; }
+    if cmp_op_tag == 81 { return "one"; }
+    if cmp_op_tag == 82 { return "olt"; }
+    if cmp_op_tag == 83 { return "ole"; }
+    if cmp_op_tag == 84 { return "ogt"; }
+    if cmp_op_tag == 85 { return "oge"; }
+    return "oeq";
+}
+
+// ── §4  LlvmBuilder State ─────────────────────────────────────────────────────
+// Mirrors the per-function state in Python LLVMCodegen:
+//   next_reg_id, has_effect_token, effect_token_reg.
+
+pub struct LlvmBuilder {
+    next_reg: i64,
+    has_effect_token: i64,
+    fn_has_effects: i64,
+    error_count: i64,
+    current_block: i64,
+}
+
+pub fn make_llvm_builder() -> LlvmBuilder {
+    return LlvmBuilder {
+        next_reg: 1,
+        has_effect_token: 0,
+        fn_has_effects: 0,
+        error_count: 0,
+        current_block: 0,
+    };
+}
+
+pub fn builder_next_reg(b: LlvmBuilder) -> i64 {
+    return b.next_reg;
+}
+
+pub fn builder_advance_reg(b: LlvmBuilder) -> LlvmBuilder {
+    return LlvmBuilder {
+        next_reg: b.next_reg + 1,
+        has_effect_token: b.has_effect_token,
+        fn_has_effects: b.fn_has_effects,
+        error_count: b.error_count,
+        current_block: b.current_block,
+    };
+}
+
+pub fn builder_set_has_effects(b: LlvmBuilder, has: bool) -> LlvmBuilder {
+    let mut flag = 0;
+    if has { flag = 1; }
+    return LlvmBuilder {
+        next_reg: b.next_reg,
+        has_effect_token: flag,
+        fn_has_effects: flag,
+        error_count: b.error_count,
+        current_block: b.current_block,
+    };
+}
+
+pub fn builder_set_block(b: LlvmBuilder, blk_id: i64) -> LlvmBuilder {
+    return LlvmBuilder {
+        next_reg: b.next_reg,
+        has_effect_token: b.has_effect_token,
+        fn_has_effects: b.fn_has_effects,
+        error_count: b.error_count,
+        current_block: blk_id,
+    };
+}
+
+pub fn builder_add_error(b: LlvmBuilder) -> LlvmBuilder {
+    return LlvmBuilder {
+        next_reg: b.next_reg,
+        has_effect_token: b.has_effect_token,
+        fn_has_effects: b.fn_has_effects,
+        error_count: b.error_count + 1,
+        current_block: b.current_block,
+    };
+}
+
+pub fn builder_is_ok(b: LlvmBuilder) -> bool {
+    return b.error_count == 0;
+}
+
+pub fn builder_needs_effect_token(b: LlvmBuilder) -> bool {
+    return b.fn_has_effects == 1;
+}
+
+// Fresh register name prefix — actual name is "%" + str(next_reg).
+pub fn reg_prefix() -> str { return "%"; }
+
+// ── §5  IrValue: LLVM value representation ───────────────────────────────────
+// Mirrors Python LLVMValue(ir_text, llvm_type).
+// Stage 0 can't build strings dynamically, so we store kind + type tag.
+
+pub struct IrValue {
+    kind: i64,
+    reg_id: i64,
+    int_val: i64,
+    bool_val: i64,
+    ty_kind: i64,
+    ty_width: i64,
+    is_ptr: i64,
+}
+
+pub fn make_irval_reg(reg_id: i64, ty_kind: i64, ty_width: i64) -> IrValue {
+    return IrValue {
+        kind: 200, reg_id: reg_id, int_val: 0, bool_val: 0,
+        ty_kind: ty_kind, ty_width: ty_width, is_ptr: 0,
+    };
+}
+
+pub fn make_irval_int(v: i64) -> IrValue {
+    return IrValue {
+        kind: 201, reg_id: 0, int_val: v, bool_val: 0,
+        ty_kind: 2, ty_width: 64, is_ptr: 0,
+    };
+}
+
+pub fn make_irval_bool(v: bool) -> IrValue {
+    let mut bv = 0;
+    if v { bv = 1; }
+    return IrValue {
+        kind: 201, reg_id: 0, int_val: bv, bool_val: bv,
+        ty_kind: 1, ty_width: 1, is_ptr: 0,
+    };
+}
+
+pub fn make_irval_unit() -> IrValue {
+    return IrValue {
+        kind: 201, reg_id: 0, int_val: 0, bool_val: 0,
+        ty_kind: 0, ty_width: 0, is_ptr: 0,
+    };
+}
+
+pub fn make_irval_ptr(reg_id: i64) -> IrValue {
+    return IrValue {
+        kind: 200, reg_id: reg_id, int_val: 0, bool_val: 0,
+        ty_kind: 9, ty_width: 0, is_ptr: 1,
+    };
+}
+
+pub fn make_irval_undef(ty_kind: i64, ty_width: i64) -> IrValue {
+    return IrValue {
+        kind: 202, reg_id: 0, int_val: 0, bool_val: 0,
+        ty_kind: ty_kind, ty_width: ty_width, is_ptr: 0,
+    };
+}
+
+pub fn make_irval_null() -> IrValue {
+    return IrValue {
+        kind: 203, reg_id: 0, int_val: 0, bool_val: 0,
+        ty_kind: 9, ty_width: 0, is_ptr: 1,
+    };
+}
+
+pub fn irval_is_reg(v: IrValue) -> bool   { return v.kind == 200; }
+pub fn irval_is_const(v: IrValue) -> bool { return v.kind == 201; }
+pub fn irval_is_undef(v: IrValue) -> bool { return v.kind == 202; }
+pub fn irval_is_void(v: IrValue) -> bool  { return v.ty_kind == 0; }
+
+pub fn irval_llvm_type(v: IrValue) -> str {
+    return llvm_type_name(v.ty_kind, v.ty_width);
+}
+
+// Classify a literal kind into an IrValue (mirrors _eval_literal).
+pub fn irval_from_lit(lit_kind: i64, int_val: i64, bool_val: i64) -> IrValue {
+    if lit_kind == 30 { return make_irval_unit(); }       // LUnit
+    if lit_kind == 31 { return make_irval_bool(bool_val == 1); }  // LBool
+    if lit_kind == 32 { return make_irval_int(int_val); }  // LInt
+    if lit_kind == 34 { return make_irval_ptr(0); }        // LStr → ptr
+    return make_irval_undef(2, 64);
+}
+
+// ── §6  Effect Token Threading ────────────────────────────────────────────────
+// Mirrors Python _lower_call effect token logic and _lower_function init.
+
+pub fn effects_need_token(effects_row: i64) -> bool {
+    return effects_row != 0 && effects_row != 100;
+}
+
+pub fn call_threads_token(ins_effects: i64, fn_has_effects: i64) -> bool {
+    if fn_has_effects == 0 { return false; }
+    return ins_effects != 0 && ins_effects != 100;
+}
+
+// Names of effect-related runtime intrinsics (§9.3 cap check).
+pub fn intrinsic_cap_token() -> str   { return "@omni_cap_token"; }
+pub fn intrinsic_alloc() -> str       { return "@omni_alloc"; }
+pub fn intrinsic_free() -> str        { return "@omni_free"; }
+pub fn intrinsic_panic() -> str       { return "@omni_panic"; }
+pub fn intrinsic_emit_telem() -> str  { return "@omni_emit_telem"; }
+
+// Declaration lines for effect intrinsics.
+pub fn decl_cap_token() -> str   { return "declare ptr @omni_cap_token()"; }
+pub fn decl_alloc() -> str       { return "declare ptr @omni_alloc(i64)"; }
+pub fn decl_free() -> str        { return "declare void @omni_free(ptr)"; }
+pub fn decl_panic() -> str       { return "declare void @omni_panic(ptr)"; }
+pub fn decl_emit_telem() -> str  { return "declare void @omni_emit_telem(ptr, ptr)"; }
+
+// ── §7  Fixed IR Fragment Strings ─────────────────────────────────────────────
+// Fixed string fragments used in IR emission.
+// These are used verbatim in the generated LLVM IR text.
+
+// Module header fragments (mirrors _emit_header).
+pub fn header_target_triple_prefix() -> str { return "target triple = "; }
+pub fn header_datalayout_value() -> str {
+    return "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128";
+}
+pub fn header_datalayout_prefix() -> str { return "target datalayout = "; }
+
+// Default target triple for Titan Stage 0 bootstrap.
+pub fn default_target_triple() -> str { return "x86_64-unknown-linux-gnu"; }
+
+// Block label format: "bb{id}" (mirrors Python block_labels dict).
+pub fn block_label_prefix() -> str { return "bb"; }
+
+// Parameter name format: "%arg{i}" (mirrors Python _lower_function param loop).
+pub fn param_name_prefix() -> str { return "%arg"; }
+
+// Entry block label (always "entry:" for first block).
+pub fn entry_block_label() -> str { return "entry"; }
+
+// Metadata tag for noalias load/store (§8 ownership metadata).
+pub fn noalias_metadata() -> str { return ", !noalias !1"; }
+
+// ── §8  Instruction Emission Shape ────────────────────────────────────────────
+// Describes the SHAPE of an instruction's IR line — how many operands,
+// what type annotations are needed, whether a result register is assigned.
+
+pub struct InstrEmit {
+    opcode: str,
+    result_ty: str,
+    has_result: i64,
+    operand_count: i64,
+    is_special: i64,   // 1 = NOT (needs -1 literal), 2 = CALL (variadic args)
+}
+
+pub fn make_instr_emit_binary(opcode: str, result_ty: str) -> InstrEmit {
+    return InstrEmit {
+        opcode: opcode, result_ty: result_ty,
+        has_result: 1, operand_count: 2, is_special: 0,
+    };
+}
+
+pub fn make_instr_emit_unary(opcode: str, result_ty: str) -> InstrEmit {
+    return InstrEmit {
+        opcode: opcode, result_ty: result_ty,
+        has_result: 1, operand_count: 1, is_special: 0,
+    };
+}
+
+pub fn make_instr_emit_not() -> InstrEmit {
+    return InstrEmit {
+        opcode: "xor", result_ty: "i64",
+        has_result: 1, operand_count: 2, is_special: 1,
+    };
+}
+
+pub fn make_instr_emit_store() -> InstrEmit {
+    return InstrEmit {
+        opcode: "store", result_ty: "void",
+        has_result: 0, operand_count: 2, is_special: 0,
+    };
+}
+
+pub fn make_instr_emit_call() -> InstrEmit {
+    return InstrEmit {
+        opcode: "call", result_ty: "i64",
+        has_result: 1, operand_count: 0, is_special: 2,
+    };
+}
+
+// Map instruction kind tag → InstrEmit shape.
+pub fn ins_emit_shape(kind: i64) -> InstrEmit {
+    if kind == 40 { return make_instr_emit_binary("add", "i64"); }
+    if kind == 41 { return make_instr_emit_binary("sub", "i64"); }
+    if kind == 42 { return make_instr_emit_binary("mul", "i64"); }
+    if kind == 43 { return make_instr_emit_binary("sdiv", "i64"); }
+    if kind == 44 { return make_instr_emit_binary("and", "i64"); }
+    if kind == 45 { return make_instr_emit_binary("or", "i64"); }
+    if kind == 46 { return make_instr_emit_binary("xor", "i64"); }
+    if kind == 47 { return make_instr_emit_not(); }
+    if kind == 48 { return make_instr_emit_binary("shl", "i64"); }
+    if kind == 49 { return make_instr_emit_binary("ashr", "i64"); }
+    if kind == 50 { return make_instr_emit_binary("icmp", "i1"); }
+    if kind == 51 { return make_instr_emit_binary("fcmp", "i1"); }
+    if kind == 52 { return make_instr_emit_call(); }
+    if kind == 53 { return make_instr_emit_unary("load", "i64"); }
+    if kind == 54 { return make_instr_emit_store(); }
+    if kind == 55 { return make_instr_emit_unary("alloca", "ptr"); }
+    return make_instr_emit_unary("nop", "i64");
+}
+
+// ── §8b  Terminator Emission Shape ───────────────────────────────────────────
+
+pub struct TermEmit {
+    opcode: str,
+    operand_count: i64,
+    is_conditional: i64,
+    is_switch: i64,
+}
+
+pub fn term_emit_ret() -> TermEmit {
+    return TermEmit { opcode: "ret", operand_count: 1, is_conditional: 0, is_switch: 0 };
+}
+
+pub fn term_emit_br() -> TermEmit {
+    return TermEmit { opcode: "br", operand_count: 3, is_conditional: 1, is_switch: 0 };
+}
+
+pub fn term_emit_jmp() -> TermEmit {
+    return TermEmit { opcode: "br", operand_count: 1, is_conditional: 0, is_switch: 0 };
+}
+
+pub fn term_emit_switch() -> TermEmit {
+    return TermEmit { opcode: "switch", operand_count: 2, is_conditional: 0, is_switch: 1 };
+}
+
+pub fn term_emit_unreachable() -> TermEmit {
+    return TermEmit { opcode: "unreachable", operand_count: 0, is_conditional: 0, is_switch: 0 };
+}
+
+pub fn term_shape(kind: i64) -> TermEmit {
+    if kind == 70 { return term_emit_ret(); }
+    if kind == 71 { return term_emit_br(); }
+    if kind == 72 { return term_emit_jmp(); }
+    if kind == 73 { return term_emit_switch(); }
+    if kind == 74 { return term_emit_unreachable(); }
+    return term_emit_unreachable();
+}
+
+pub fn term_is_conditional(kind: i64) -> bool {
+    return kind == 71;
+}
+
+pub fn term_is_return(kind: i64) -> bool {
+    return kind == 70;
+}
+
+pub fn term_is_jmp(kind: i64) -> bool {
+    return kind == 72;
+}
+
+// ── §9  Function Codegen Summary ──────────────────────────────────────────────
+
+pub struct FnCodegenSummary {
+    name: str,
+    block_count: i64,
+    instr_count: i64,
+    line_count: i64,
+    has_effects: i64,
+    ret_ty_kind: i64,
+    param_count: i64,
+    error_count: i64,
+}
+
+pub fn make_fn_codegen_summary(name: str, param_count: i64, ret_ty_kind: i64) -> FnCodegenSummary {
+    return FnCodegenSummary {
+        name: name, block_count: 1, instr_count: 0, line_count: 0,
+        has_effects: 0, ret_ty_kind: ret_ty_kind, param_count: param_count,
+        error_count: 0,
+    };
+}
+
+pub fn fn_cg_add_block(s: FnCodegenSummary) -> FnCodegenSummary {
+    return FnCodegenSummary {
+        name: s.name, block_count: s.block_count + 1,
+        instr_count: s.instr_count, line_count: s.line_count,
+        has_effects: s.has_effects, ret_ty_kind: s.ret_ty_kind,
+        param_count: s.param_count, error_count: s.error_count,
+    };
+}
+
+pub fn fn_cg_add_instr(s: FnCodegenSummary) -> FnCodegenSummary {
+    return FnCodegenSummary {
+        name: s.name, block_count: s.block_count,
+        instr_count: s.instr_count + 1, line_count: s.line_count + 1,
+        has_effects: s.has_effects, ret_ty_kind: s.ret_ty_kind,
+        param_count: s.param_count, error_count: s.error_count,
+    };
+}
+
+pub fn fn_cg_set_effects(s: FnCodegenSummary, has: bool) -> FnCodegenSummary {
+    let mut flag = 0;
+    if has { flag = 1; }
+    return FnCodegenSummary {
+        name: s.name, block_count: s.block_count,
+        instr_count: s.instr_count, line_count: s.line_count,
+        has_effects: flag, ret_ty_kind: s.ret_ty_kind,
+        param_count: s.param_count, error_count: s.error_count,
+    };
+}
+
+pub fn fn_cg_is_ok(s: FnCodegenSummary) -> bool {
+    return s.error_count == 0;
+}
+
+// Minimum lines expected for a function (sig + entry: + ret = 3).
+pub fn fn_min_line_count() -> i64 { return 3; }
+
+// ── §9b  Module Codegen Summary ───────────────────────────────────────────────
+
+pub struct ModCodegenSummary {
+    fn_count: i64,
+    total_blocks: i64,
+    total_instrs: i64,
+    total_lines: i64,
+    error_count: i64,
+}
+
+pub fn make_mod_codegen_summary() -> ModCodegenSummary {
+    return ModCodegenSummary {
+        fn_count: 0, total_blocks: 0,
+        total_instrs: 0, total_lines: 0, error_count: 0,
+    };
+}
+
+pub fn mod_cg_add_fn(s: ModCodegenSummary, fs: FnCodegenSummary) -> ModCodegenSummary {
+    return ModCodegenSummary {
+        fn_count: s.fn_count + 1,
+        total_blocks: s.total_blocks + fs.block_count,
+        total_instrs: s.total_instrs + fs.instr_count,
+        total_lines: s.total_lines + fs.line_count,
+        error_count: s.error_count + fs.error_count,
+    };
+}
+
+pub fn mod_cg_is_ok(s: ModCodegenSummary) -> bool {
+    return s.error_count == 0;
+}
+
+// Estimate of header lines (target triple + datalayout + blank + intrinsics).
+pub fn header_line_count() -> i64 { return 8; }
+
+// ── §10  Helpers: register naming / param emission ────────────────────────────
+
+// Param index → LLVM param IR: "%arg0", "%arg1", etc.
+// We can't build this dynamically, so the caller uses the index.
+pub fn param_index_to_reg(index: i64) -> i64 {
+    return index;
+}
+
+// Determine whether a function ret_ty should emit "ret void" or "ret <ty> <val>".
+pub fn ret_is_void(ret_ty_kind: i64) -> bool {
+    return ret_ty_kind == 0;
+}
+
+// The "define" keyword that starts a function definition.
+pub fn kw_define() -> str { return "define"; }
+
+// The "declare" keyword for external declarations.
+pub fn kw_declare() -> str { return "declare"; }
+
+// Label separator (": " after label name).
+pub fn label_sep() -> str { return ":"; }
+
+// Indentation for instruction lines.
+pub fn instr_indent() -> str { return "  "; }
+
+// ── §11  Ownership Metadata Emission ─────────────────────────────────────────
+// Mirrors Python metadata emission: !noalias !1 on loads/stores (§9 ownership).
+
+pub fn load_needs_noalias() -> bool  { return true; }
+pub fn store_needs_noalias() -> bool { return true; }
+
+// Metadata domain tags.
+pub fn metadata_noalias_id() -> i64   { return 1; }
+pub fn metadata_tbaa_id() -> i64      { return 2; }
+
+// The noalias annotation string fragment.
+pub fn noalias_annot() -> str { return "!noalias !1"; }
+
+// ── §12  Verification ─────────────────────────────────────────────────────────
+
+pub fn verify_ir_fn(s: FnCodegenSummary) -> bool {
+    if s.error_count != 0 { return false; }
+    if s.block_count < 1 { return false; }
+    return true;
+}
+
+pub fn verify_ir_mod(s: ModCodegenSummary) -> bool {
+    return s.error_count == 0;
+}
+
+// Expected minimum line count for a module with N functions.
+pub fn min_module_lines(fn_count: i64) -> i64 {
+    return header_line_count() + fn_count * fn_min_line_count();
+}
+
+// ── §13  Codegen Hash Seed ────────────────────────────────────────────────────
+// Contributes to content-addressed module identity (§5.4 UniIR spec).
+
+pub fn codegen_hash_seed() -> i64 {
+    return 2405;
+}
+
+// Combined pipeline hash seed (all five stage3b modules).
+pub fn full_pipeline_hash_seed() -> i64 {
+    return 2401 + 2402 + 2403 + 2404 + 2405;
+}

@@ -1,0 +1,155 @@
+// titan/omnitoken/t5_recycle.ti — Token Recycling & Multi-Agent Sharing
+// Self-contained. Prefix store + shared store.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const T_PSTORE: i64 = 21400;
+const T_SSTORE: i64 = 21401;
+const T_RTOK:   i64 = 21402;
+const T_RWRP:   i64 = 21403;
+
+// recyclable token: tag=T_RTOK, body=content, arg=len, domain=ref_count
+// wrapper: tag=T_RWRP, body=token, domain=next_wrapper
+
+// prefix store: tag=T_PSTORE, body=count, arg=list_head, domain=0
+pub fn t5_prefix_store_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_PSTORE); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn t5_recycle_token_create(content: i64, len: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, T_RTOK); heap_set_body(t, content); heap_set_arg(t, len); heap_set_domain(t, 1);
+    return t;
+}
+
+pub fn t5_token_ref_count(t: i64) -> i64  { return heap_get_domain(t); }
+pub fn t5_token_content(t: i64) -> i64    { return heap_get_body(t); }
+pub fn t5_token_len(t: i64) -> i64        { return heap_get_arg(t); }
+
+pub fn t5_token_retain(t: i64) {
+    heap_set_domain(t, heap_get_domain(t) + 1);
+}
+
+pub fn t5_token_release(t: i64) -> i64 {
+    let rc = heap_get_domain(t);
+    if rc > 0 { heap_set_domain(t, rc - 1); }
+    return heap_get_domain(t);
+}
+
+pub fn t5_prefix_store_add(s: i64, tok: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_RWRP); heap_set_body(w, tok); heap_set_domain(w, 0);
+    let h = heap_get_arg(s);
+    if h == 0 { heap_set_arg(s, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+
+pub fn t5_prefix_store_count(s: i64) -> i64 { return heap_get_body(s); }
+
+pub fn t5_prefix_store_get(s: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(s); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// shared store: tag=T_SSTORE, body=count, arg=list_head, domain=agent_count
+pub fn t5_shared_store_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, T_SSTORE); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn t5_shared_store_add(s: i64, tok: i64) {
+    t5_token_retain(tok);
+    let w = heap_alloc_term();
+    heap_set_tag(w, T_RWRP); heap_set_body(w, tok); heap_set_domain(w, 0);
+    let h = heap_get_arg(s);
+    if h == 0 { heap_set_arg(s, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+
+pub fn t5_shared_store_count(s: i64) -> i64 { return heap_get_body(s); }
+
+pub fn t5_shared_store_register_agent(s: i64) {
+    heap_set_domain(s, heap_get_domain(s) + 1);
+}
+
+pub fn t5_shared_store_agent_count(s: i64) -> i64 { return heap_get_domain(s); }
+
+pub fn t5_shared_store_get(s: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(s); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    // Prefix store
+    let ps = t5_prefix_store_create();
+    let tok1 = t5_recycle_token_create(10, 4);
+    let tok2 = t5_recycle_token_create(20, 2);
+    let tok3 = t5_recycle_token_create(30, 6);
+    t5_prefix_store_add(ps, tok1);
+    t5_prefix_store_add(ps, tok2);
+    t5_prefix_store_add(ps, tok3);
+    if t5_prefix_store_count(ps) != 3          { return 1; }
+    if t5_prefix_store_get(ps, 0) != tok1      { return 2; }
+    if t5_prefix_store_get(ps, 2) != tok3      { return 3; }
+    if t5_token_content(tok1) != 10            { return 4; }
+    if t5_token_len(tok2) != 2                 { return 5; }
+
+    // Ref counting
+    if t5_token_ref_count(tok1) != 1           { return 6; }
+    t5_token_retain(tok1);
+    if t5_token_ref_count(tok1) != 2           { return 7; }
+    let rc = t5_token_release(tok1);
+    if rc != 1                                 { return 8; }
+    if t5_token_ref_count(tok1) != 1           { return 9; }
+
+    // Shared store: retain increments ref count on add
+    let ss = t5_shared_store_create();
+    t5_shared_store_register_agent(ss);
+    t5_shared_store_register_agent(ss);
+    if t5_shared_store_agent_count(ss) != 2    { return 10; }
+    t5_shared_store_add(ss, tok2);
+    t5_shared_store_add(ss, tok3);
+    if t5_shared_store_count(ss) != 2          { return 11; }
+    // tok2 ref_count was 1, after add = 2
+    if t5_token_ref_count(tok2) != 2           { return 12; }
+    if t5_shared_store_get(ss, 0) != tok2      { return 13; }
+    if t5_shared_store_get(ss, 1) != tok3      { return 14; }
+
+    // Release from shared store
+    let rc2 = t5_token_release(tok2);
+    if rc2 != 1                                { return 15; }
+
+    return 111;
+}

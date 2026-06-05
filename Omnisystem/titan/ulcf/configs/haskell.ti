@@ -1,0 +1,91 @@
+// titan/ulcf/configs/haskell.ti
+// Haskell language configuration for the Universal Grammar Adapter.
+
+pub fn haskell_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("Int".to_string(), "i64".to_string());
+    type_map.insert("Integer".to_string(), "i64".to_string());
+    type_map.insert("Float".to_string(), "f32".to_string());
+    type_map.insert("Double".to_string(), "f64".to_string());
+    type_map.insert("Bool".to_string(), "bool".to_string());
+    type_map.insert("Char".to_string(), "u8".to_string());
+    type_map.insert("String".to_string(), "String".to_string());
+    type_map.insert("()".to_string(), "void".to_string());
+    type_map.insert("IO".to_string(), "io".to_string());
+    type_map.insert("[a]".to_string(), "Vec<Any>".to_string());
+    type_map.insert("Map".to_string(), "HashMap<Any,Any>".to_string());
+    type_map.insert("Maybe".to_string(), "Option<Any>".to_string());
+    type_map.insert("Either".to_string(), "Result<Any,Any>".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("mod".to_string(), "mod".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("/=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("&&".to_string(), "and".to_string());
+    operator_map.insert("||".to_string(), "or".to_string());
+    operator_map.insert("$".to_string(), "add".to_string());
+    operator_map.insert(".".to_string(), "add".to_string());
+    operator_map.insert("++".to_string(), "add".to_string());
+    operator_map.insert(":".to_string(), "add".to_string());
+
+    LanguageConfig {
+        name: "haskell".to_string(),
+        extensions: vec![".hs".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression".to_string(),
+            "declaration".to_string(),
+            "function_declaration".to_string(),
+            "variable_declaration".to_string(),
+            "data_declaration".to_string(),
+            "type_declaration".to_string(),
+            "if_expression".to_string(),
+            "case_expression".to_string(),
+            "let_expression".to_string(),
+            "where_clause".to_string(),
+            "do_expression".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "application".to_string(),
+            "variable".to_string(),
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "list_literal".to_string(),
+            "tuple_literal".to_string(),
+            "lambda_expression".to_string(),
+            "let_expression".to_string(),
+            "case_expression".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "floating_point_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "unit".to_string(),
+        ],
+        comment_nodes: vec![
+            "comment".to_string(),
+            "block_comment".to_string(),
+        ],
+        block_nodes: vec![
+            "do_expression".to_string(),
+            "let_expression".to_string(),
+            "where_clause".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "let_binding".to_string(),
+    }
+}

@@ -1,0 +1,11 @@
+// Test function calls and arithmetic
+pub fn main() -> i64 {
+    let a: i64 = get_one();
+    let b: i64 = get_two();
+    let c: i64 = get_three();
+    return a + b + c;
+}
+
+pub fn get_one() -> i64 { return 1; }
+pub fn get_two() -> i64 { return 2; }
+pub fn get_three() -> i64 { return 3; }

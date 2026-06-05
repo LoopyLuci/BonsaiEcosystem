@@ -1,0 +1,45 @@
+// tests/trinity_1_malicious_injection.ti — Trinity Test 1: Malicious Injection Detection
+// Proves: the AxiomSemanticPass rejects sys_wreg (HW_ACCESS) called from a Pure function.
+// Expected: pass_ctx_violations == 1, run_pass returns err, build is rejected.
+import "titan/compiler/axiom_semantic_pass.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    // Simulate codegen module declared as Pure calling sys_wreg (requires HW)
+    let ctx = pass_ctx_new(EFF_PURE);
+
+    // Inject: sys_write_register (INTR_WREG) without HW_ACCESS in effect row
+    let rejected = check_intrinsic_call(ctx, INTR_WREG);
+    if rejected == 0 {
+        // Correctly rejected — sandbox holds
+        score = score + 37;
+    }
+
+    // Violation count must be exactly 1
+    if pass_ctx_violations(ctx) == 1 {
+        score = score + 37;
+    }
+
+    // run_pass with the call list also returns err
+    let site = call_site_new(INTR_WREG, 0);
+    let ctx2 = pass_ctx_new(EFF_PURE);
+    let r = run_pass(ctx2, site);
+    if is_err(r) == 1 {
+        score = score + 37;
+    }
+
+    return score;
+}

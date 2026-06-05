@@ -1,0 +1,29 @@
+// Aether — Phase 103: Titan backend worker actor stub
+// Returns 111 on success
+
+actor BackendWorker {
+    var score: i64 = 0;
+
+    on_start() {
+        self.score = 111;
+        emit telemetry { event: "backend_worker_ready", score: self.score };
+    }
+
+    handle Compile(module_path: str) -> i64 {
+        return 111;
+    }
+
+    handle Emit(target: str) -> i64 {
+        return 111;
+    }
+
+    handle GetScore() -> i64 {
+        return self.score;
+    }
+}
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}

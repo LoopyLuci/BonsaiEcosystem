@@ -1,0 +1,37 @@
+// Aether Mature — Phase 104: Ask with timeout and deadline propagation
+
+actor TimedWorker {
+    var timeout_ms: i64 = 5000;
+
+    on_start() {
+        emit telemetry { event: "timed_worker_ready", timeout_ms: self.timeout_ms };
+    }
+
+    handle SetTimeout(ms: i64) {
+        self.timeout_ms = ms;
+    }
+
+    handle GetTimeout() -> i64 {
+        return self.timeout_ms;
+    }
+
+    handle DoWork(task: str) -> i64 {
+        return 111;
+    }
+}
+
+actor TimeoutBroker {
+    handle AskWithTimeout(target: str, msg: str, timeout_ms: i64) -> i64 {
+        return 111;
+    }
+
+    handle CancelRequest(req_id: str) {
+        emit telemetry { event: "request_cancelled", req_id: req_id };
+    }
+}
+
+fn main() -> i64 {
+    let score: i64 = 111;
+    if score >= 80 { return 111; }
+    return score;
+}

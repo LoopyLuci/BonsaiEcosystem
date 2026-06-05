@@ -1,0 +1,78 @@
+{
+  "version": "P2.5",
+  "python_codegen": "Z:\\Projects\\Omnisystem\\titan\\stage0\\codegen.py",
+  "titan_codegen": "Z:\\Projects\\Omnisystem\\titan\\stage3b\\codegen.ti",
+  "codegen_ti_compiled": {
+    "def_count": 137,
+    "hash": "5224d8633dd1a314",
+    "defs_sample": [
+      "CG_TY_UNIT",
+      "CG_TY_BOOL",
+      "CG_TY_INT",
+      "CG_TY_FLOAT",
+      "CG_TY_REF",
+      "CG_TY_PTR",
+      "CG_TY_ADT",
+      "CG_TY_FUN",
+      "CG_INS_ADD",
+      "CG_INS_SUB",
+      "CG_INS_MUL",
+      "CG_INS_DIV",
+      "CG_INS_AND",
+      "CG_INS_OR",
+      "CG_INS_XOR"
+    ]
+  },
+  "test_programs": {
+    "minimal_function": {
+      "ok": true,
+      "ir_lines": 12,
+      "hash": "439976ffeed9032fa1010b84f3d80274bf31cd827adf214a138b38dee711c1fb"
+    },
+    "function_with_params": {
+      "ok": true,
+      "ir_lines": 13,
+      "hash": "266ab76bcc5a330fe50fdfe11e7134414ca26952565764de5ad4250764a30282"
+    },
+    "let_and_operations": {
+      "ok": true,
+      "ir_lines": 14,
+      "hash": "a2a0f8927a1b38dbe23d40bfafe335c08759d3b821306f65e5b025ed60af4aca"
+    },
+    "control_flow": {
+      "ok": true,
+      "ir_lines": 17,
+      "hash": "8a93d6270bcae59f314845540df1199235f899ba37c17c007f33a1d0191c7b81"
+    },
+    "loop_construct": {
+      "ok": true,
+      "ir_lines": 17,
+      "hash": "46d1c2c7e0daad0dec488f62e5051f7126f5f8076bf23df2a7dbcc642ac247e6"
+    },
+    "struct_definition": {
+      "ok": true,
+      "ir_lines": 12,
+      "hash": "e6f41693079938250afa69f6ea84584bb2ad0f1d234862d3e18b1064a41600b1"
+    },
+    "struct_literal": {
+      "ok": true,
+      "ir_lines": 12,
+      "hash": "43efcf01441706c846ae8a7998da4299f8efe4d674c7840fcf743b33f968ce1d"
+    },
+    "complex_expressions": {
+      "ok": true,
+      "ir_lines": 15,
+      "hash": "b83d0c4aa7b309dbacc19957147ab40e1a815b39fe85505af7f8f5f83e1d1b2e"
+    },
+    "nested_calls": {
+      "ok": true,
+      "ir_lines": 18,
+      "hash": "dd21c5c788e0fb759cd59707fb363a360340aad4a192e01b835953be8ade863b"
+    },
+    "mutual_recursion": {
+      "ok": true,
+      "ir_lines": 19,
+      "hash": "6b5f01dc9c4b1017e9a1618de3748fab796adea9884fd32a46f0085acf29d349"
+    }
+  }
+}

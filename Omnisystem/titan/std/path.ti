@@ -1,0 +1,68 @@
+// OmniLib Path -- path utilities using integer path handles
+// Encoding used in this module:
+// - negative id => absolute path
+// - odd id => has extension
+// - multiple of 10 => ends with separator
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+}
+
+const TAG_PATH_JOIN: i64 = 7080;
+
+pub fn path_is_absolute(path: i64) -> bool {
+    return path < 0;
+}
+
+pub fn path_has_extension(path: i64) -> bool {
+    if path < 0 { return ((-path) % 2) == 1; }
+    return (path % 2) == 1;
+}
+
+pub fn path_ends_with_separator(path: i64) -> bool {
+    if path < 0 { return ((-path) % 10) == 0; }
+    return (path % 10) == 0;
+}
+
+pub fn path_is_directory_like(path: i64) -> bool {
+    return path_ends_with_separator(path);
+}
+
+// join is represented as heap node so two parts are preserved structurally
+pub fn path_join(left: i64, right: i64) -> i64 {
+    let n = heap_alloc_term();
+    heap_set_tag(n, TAG_PATH_JOIN);
+    heap_set_body(n, left);
+    heap_set_arg(n, right);
+    return n;
+}
+
+pub fn path_join_left(joined: i64) -> i64 {
+    return heap_get_body(joined);
+}
+
+pub fn path_join_right(joined: i64) -> i64 {
+    return heap_get_arg(joined);
+}
+
+pub fn main() -> i64 {
+    if path_is_absolute(0) { return 1; }
+    if !path_is_absolute(-12) { return 2; }
+
+    if path_has_extension(8) { return 3; }
+    if !path_has_extension(9) { return 4; }
+
+    if !path_ends_with_separator(20) { return 5; }
+    if path_ends_with_separator(21) { return 6; }
+    if !path_is_directory_like(30) { return 7; }
+
+    let joined = path_join(-100, 21);
+    if path_join_left(joined) != -100 { return 8; }
+    if path_join_right(joined) != 21 { return 9; }
+
+    return 111;
+}

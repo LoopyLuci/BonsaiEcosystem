@@ -1,0 +1,118 @@
+// tests/test_t1.ti — Phase T1 Token Importance Scorer Integration Test
+// All helpers inlined with tt1_ prefix. Self-contained.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TT1_T_TOK1: i64 = 21000;
+const TT1_T_SCR1: i64 = 21001;
+const TT1_T_WT1:  i64 = 21002;
+
+// ===== Token =====
+pub fn tt1_token_create(content: i64, len: i64) -> i64 {
+    let t = heap_alloc_term();
+    heap_set_tag(t, TT1_T_TOK1); heap_set_body(t, content); heap_set_arg(t, len); heap_set_domain(t, 0);
+    return t;
+}
+pub fn tt1_token_len(t: i64) -> i64     { return heap_get_arg(t); }
+pub fn tt1_token_content(t: i64) -> i64 { return heap_get_body(t); }
+
+// ===== Scorer =====
+pub fn tt1_scorer_create() -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TT1_T_SCR1); heap_set_body(s, 0); heap_set_arg(s, 0); heap_set_domain(s, 0);
+    return s;
+}
+pub fn tt1_scorer_add_token(s: i64, token: i64) {
+    let w = heap_alloc_term();
+    heap_set_tag(w, TT1_T_WT1); heap_set_body(w, token); heap_set_domain(w, 0);
+    let h = heap_get_arg(s);
+    if h == 0 { heap_set_arg(s, w); }
+    else {
+        let mut cur: i64 = h;
+        while heap_get_domain(cur) != 0 { cur = heap_get_domain(cur); }
+        heap_set_domain(cur, w);
+    }
+    heap_set_body(s, heap_get_body(s) + 1);
+}
+pub fn tt1_scorer_token_count(s: i64) -> i64 { return heap_get_body(s); }
+pub fn tt1_scorer_get_token(s: i64, idx: i64) -> i64 {
+    let mut w: i64 = heap_get_arg(s); let mut i: i64 = 0;
+    while w != 0 {
+        if i == idx { return heap_get_body(w); }
+        i = i + 1; w = heap_get_domain(w);
+    }
+    return 0;
+}
+
+// ===== Scoring =====
+pub fn tt1_score_token(token: i64) -> i64 {
+    let len = heap_get_arg(token);
+    if len > 3 { return 90; }
+    if len > 1 { return 70; }
+    return 50;
+}
+pub fn tt1_score_all(s: i64) -> i64 {
+    let n = heap_get_body(s);
+    let mut total: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let t = tt1_scorer_get_token(s, i);
+        if t != 0 { total = total + tt1_score_token(t); }
+        i = i + 1;
+    }
+    return total;
+}
+pub fn tt1_importance_above(s: i64, threshold: i64) -> i64 {
+    let n = heap_get_body(s);
+    let mut count: i64 = 0; let mut i: i64 = 0;
+    while i < n {
+        let t = tt1_scorer_get_token(s, i);
+        if t != 0 { if tt1_score_token(t) >= threshold { count = count + 1; } }
+        i = i + 1;
+    }
+    return count;
+}
+
+// ===== Integration test =====
+// Tokens: len4→90, len1→50, len7→90. Total=230.
+pub fn main() -> i64 {
+    let s = tt1_scorer_create();
+    tt1_scorer_add_token(s, tt1_token_create(1, 4));
+    tt1_scorer_add_token(s, tt1_token_create(2, 1));
+    tt1_scorer_add_token(s, tt1_token_create(3, 7));
+    if tt1_scorer_token_count(s) != 3    { return 1; }
+    if tt1_score_all(s) != 230           { return 2; }
+
+    // Individual scores
+    let t0 = tt1_scorer_get_token(s, 0);
+    if tt1_score_token(t0) != 90         { return 3; }
+    let t1 = tt1_scorer_get_token(s, 1);
+    if tt1_score_token(t1) != 50         { return 4; }
+
+    // Importance thresholds
+    if tt1_importance_above(s, 70) != 2  { return 5; }
+    if tt1_importance_above(s, 90) != 2  { return 6; }
+    if tt1_importance_above(s, 50) != 3  { return 7; }
+
+    // Token accessors
+    if tt1_token_content(t0) != 1        { return 8; }
+    if tt1_token_len(t0) != 4            { return 9; }
+
+    // Loop: add 5 tokens, all len=2 (score 70 each), total += 350
+    let s2 = tt1_scorer_create();
+    let mut i: i64 = 0;
+    while i < 5 { tt1_scorer_add_token(s2, tt1_token_create(i, 2)); i = i + 1; }
+    if tt1_scorer_token_count(s2) != 5   { return 10; }
+    if tt1_score_all(s2) != 350          { return 11; }
+
+    return 111;
+}

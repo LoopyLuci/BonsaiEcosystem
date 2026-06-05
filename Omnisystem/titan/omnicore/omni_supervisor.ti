@@ -1,0 +1,111 @@
+// titan/omnicore/omni_supervisor.ti — OTP-style lifecycle manager
+// Boots subsystems in dependency order. On fault, logs and restarts once.
+// All subsystem probe/boot results flow through the Result monad.
+import "titan/omnicore/capability.ti"
+import "titan/std/result.ti"
+import "titan/std/error.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+    fn repl_print_int(a: i64);
+    fn repl_print_newline();
+}
+
+const SYS_TOKEN:  i64 = 1;
+const SYS_ROUTER: i64 = 2;
+const SYS_BOT:    i64 = 3;
+const SYS_RENDER: i64 = 4;
+
+const TAG_SYS_STATE: i64 = 54000;
+
+// subsystem state cell: body=sys_id, arg=status(0=down,1=up), domain=restart_count
+pub fn sys_state_new(sys_id: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SYS_STATE);
+    heap_set_body(s, sys_id);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);
+    return s;
+}
+
+pub fn sys_state_up(s: i64) {
+    heap_set_arg(s, 1);
+}
+
+pub fn sys_state_down(s: i64) {
+    heap_set_arg(s, 0);
+    let rc = heap_get_domain(s);
+    heap_set_domain(s, rc + 1);
+}
+
+pub fn sys_is_up(s: i64) -> i64 {
+    return heap_get_arg(s);
+}
+
+pub fn sys_restart_count(s: i64) -> i64 {
+    return heap_get_domain(s);
+}
+
+// probe: returns ok(sys_id) for valid ids, err(ERR_BOUNDS) for invalid
+pub fn probe_subsystem(sys_id: i64) -> i64 {
+    if sys_id < 1 { return err(ERR_BOUNDS); }
+    if sys_id > 4 { return err(ERR_BOUNDS); }
+    return ok(sys_id);
+}
+
+// boot: probe then mark state; returns ok(1) or err(code)
+pub fn boot_subsystem(state: i64, sys_id: i64) -> i64 {
+    let probe_r = probe_subsystem(sys_id);
+    if is_err(probe_r) == 1 {
+        sys_state_down(state);
+        return probe_r;
+    }
+    sys_state_up(state);
+    repl_print_int(sys_id);
+    repl_print_newline();
+    return ok(1);
+}
+
+// supervisor_start: boot all subsystems in order; returns ok(4) or first err
+pub fn omni_supervisor_start() -> i64 {
+    let st1 = sys_state_new(SYS_TOKEN);
+    let st2 = sys_state_new(SYS_ROUTER);
+    let st3 = sys_state_new(SYS_BOT);
+    let st4 = sys_state_new(SYS_RENDER);
+
+    let r1 = boot_subsystem(st1, SYS_TOKEN);
+    if is_err(r1) == 1 { return r1; }
+
+    let r2 = boot_subsystem(st2, SYS_ROUTER);
+    if is_err(r2) == 1 { return r2; }
+
+    let r3 = boot_subsystem(st3, SYS_BOT);
+    if is_err(r3) == 1 { return r3; }
+
+    let r4 = boot_subsystem(st4, SYS_RENDER);
+    if is_err(r4) == 1 { return r4; }
+
+    // All 4 up — confirm with capability manifests
+    let cap = manifest_create(0, CAP_MEM | CAP_IO | CAP_NET);
+    if manifest_has(cap, CAP_MEM) != 1 { return err(ERR_PERM); }
+
+    return ok(4);
+}
+
+pub fn main() -> i64 {
+    let result = omni_supervisor_start();
+    if is_ok(result) == 1 {
+        if unwrap(result) == 4 {
+            return 111;
+        }
+    }
+    return 0;
+}

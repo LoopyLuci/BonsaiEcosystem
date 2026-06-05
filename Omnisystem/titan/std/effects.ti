@@ -1,0 +1,61 @@
+// titan/std/effects.ti — Effect row definitions and capability checking
+// Effects are bitmasks. A function's effect row is checked at call sites by
+// the AxiomSemanticPass: callee effects must be a subset of caller effects.
+// EFF_PURE (0) functions cannot call anything with a non-zero effect row.
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+const EFF_PURE: i64 = 0;
+const EFF_IO:   i64 = 1;
+const EFF_GPU:  i64 = 2;
+const EFF_MEM:  i64 = 4;
+const EFF_RACE: i64 = 8;
+const EFF_HW:   i64 = 16;
+
+// effect_allows: is `required` a subset of `ctx`?
+// Pure context (0) allows only Pure calls.
+// Any other context allows itself and Pure.
+pub fn effect_allows(ctx: i64, required: i64) -> i64 {
+    if required == EFF_PURE { return 1; }
+    if ctx == EFF_PURE { return 0; }
+    // ctx must have all bits required requests
+    let masked: i64 = ctx & required;
+    if masked == required { return 1; }
+    return 0;
+}
+
+pub fn effect_union(a: i64, b: i64) -> i64 {
+    return a | b;
+}
+
+pub fn effect_name(e: i64) -> i64 {
+    return e;
+}
+
+pub fn main() -> i64 {
+    // Pure context rejects IO
+    if effect_allows(EFF_PURE, EFF_IO) != 0 { return 1; }
+    // IO context allows IO
+    if effect_allows(EFF_IO, EFF_IO) != 1 { return 2; }
+    // IO context allows Pure
+    if effect_allows(EFF_IO, EFF_PURE) != 1 { return 3; }
+    // IO|MEM context allows MEM
+    let ctx: i64 = EFF_IO | EFF_MEM;
+    if effect_allows(ctx, EFF_MEM) != 1 { return 4; }
+    // IO|MEM context rejects HW
+    if effect_allows(ctx, EFF_HW) != 0 { return 5; }
+    // union test
+    if effect_union(EFF_IO, EFF_MEM) != ctx { return 6; }
+
+    return 111;
+}

@@ -1,0 +1,139 @@
+// Omnisystem Web Service Example
+// Demonstrates Aether actors handling HTTP requests with supervision
+
+actor HttpServer {
+    // Actor state: request count, active connections
+    let request_count: i64 = 0;
+    let active_connections: i64 = 0;
+    
+    on_start() {
+        print("HTTP server actor started");
+        emit telemetry { event: "server_start", timestamp: now() };
+    }
+    
+    on_message(msg) {
+        match msg {
+            HttpRequest { path, method, body } => {
+                this.request_count += 1;
+                this.active_connections += 1;
+                
+                emit telemetry {
+                    event: "http_request",
+                    method: method,
+                    path: path,
+                    timestamp: now()
+                };
+                
+                // Route to handler based on path
+                let response = handle_request(method, path, body);
+                
+                this.active_connections -= 1;
+                
+                // Send response back to client
+                send response;
+            }
+            Shutdown {} => {
+                print("Server shutting down");
+                emit telemetry { event: "server_shutdown", timestamp: now() };
+                stop();
+            }
+            _ => {
+                print("Unknown message type");
+            }
+        }
+    }
+    
+    on_stop() {
+        print("HTTP server stopped");
+        emit telemetry {
+            event: "server_stop",
+            total_requests: this.request_count,
+            timestamp: now()
+        };
+    }
+    
+    on_restart() {
+        print("HTTP server restarting after failure");
+        this.active_connections = 0;  // Reset state on restart
+    }
+}
+
+// Router actor to handle different request paths
+actor Router {
+    on_message(msg) {
+        match msg {
+            HttpRequest { path, method, body } => {
+                let response = route_to_handler(path, method, body);
+                send response;
+            }
+            _ => {}
+        }
+    }
+}
+
+// Example handler: compute-intensive task
+fn handle_request(method: String, path: String, body: Bytes) -> HttpResponse {
+    match (method, path) {
+        ("GET", "/health") => {
+            HttpResponse {
+                status: 200,
+                body: "OK",
+                headers: []
+            }
+        }
+        ("POST", "/compute") => {
+            // Call Titan function for heavy computation
+            let result = compute_task(body);
+            
+            HttpResponse {
+                status: 200,
+                body: result,
+                headers: [("Content-Type", "application/json")]
+            }
+        }
+        _ => {
+            HttpResponse {
+                status: 404,
+                body: "Not Found",
+                headers: []
+            }
+        }
+    }
+}
+
+// Supervisor for the web service
+fn start_web_service() {
+    // Create supervision tree
+    let supervisor = ActorNode::new(
+        supervision_strategy: ONE_FOR_ONE,
+        children: [
+            ActorSpec {
+                name: "http_server",
+                module: HttpServer,
+                restart_cooldown: 1000,  // 1 second
+            },
+            ActorSpec {
+                name: "router",
+                module: Router,
+                restart_cooldown: 1000,
+            }
+        ]
+    );
+    
+    // Start the supervisor
+    supervisor.start();
+    
+    print("Web service started with supervision tree");
+}
+
+// Entry point
+fn main() {
+    start_web_service();
+    
+    // In a real implementation, this would:
+    // 1. Listen on port 8080
+    // 2. Create new actor per HTTP request
+    // 3. Route through Router
+    // 4. Let supervisor restart failed handlers
+    // 5. Emit telemetry for monitoring
+}

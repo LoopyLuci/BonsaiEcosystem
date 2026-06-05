@@ -1,0 +1,165 @@
+// omniAudio.ti — Phase 5: audio via Win32 Beep (pure tone synthesis)
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn heap_set_domain(a:i64,b:i64);
+    fn heap_get_domain(a:i64)->i64;
+    fn audio_init()->i64;
+    fn audio_play(freq:i64,duration:i64);
+    fn audio_stop(sid:i64);
+    fn repl_print_int(v:i64);
+    fn repl_print_newline();
+}
+
+const T_NOTE:i64=32000;
+const T_CHORD:i64=32001;
+const T_SEQ:i64=32002;
+const T_TRACK:i64=32003;
+
+const NOTE_C4:i64=262;
+const NOTE_D4:i64=294;
+const NOTE_E4:i64=330;
+const NOTE_F4:i64=349;
+const NOTE_G4:i64=392;
+const NOTE_A4:i64=440;
+const NOTE_B4:i64=494;
+const NOTE_C5:i64=523;
+
+const DUR_WHOLE:i64=400;
+const DUR_HALF:i64=200;
+const DUR_QUARTER:i64=100;
+const DUR_EIGHTH:i64=50;
+
+const VOL_FULL:i64=1;
+const VOL_HALF:i64=0;
+
+pub fn oa_note(freq:i64,dur:i64)->i64{
+    let n:i64=heap_alloc_term();
+    heap_set_tag(n,T_NOTE);
+    heap_set_body(n,freq);
+    heap_set_arg(n,dur);
+    heap_set_domain(n,VOL_FULL);
+    return n;
+}
+
+pub fn oa_rest(dur:i64)->i64{
+    return oa_note(0,dur);
+}
+
+pub fn oa_play_note(note:i64){
+    let freq:i64=heap_get_body(note);
+    let dur:i64=heap_get_arg(note);
+    if freq>0{audio_play(freq,dur);}
+}
+
+pub fn oa_freq(note:i64)->i64{return heap_get_body(note);}
+pub fn oa_dur(note:i64)->i64{return heap_get_arg(note);}
+
+pub fn oa_make_track()->i64{
+    let t:i64=heap_alloc_term();
+    heap_set_tag(t,T_TRACK);
+    heap_set_body(t,0);
+    heap_set_arg(t,0);
+    heap_set_domain(t,0);
+    return t;
+}
+
+pub fn oa_track_bpm(track:i64,bpm:i64){
+    heap_set_arg(track,bpm);
+}
+
+pub fn oa_beat_ms(bpm:i64)->i64{
+    if bpm==0{return DUR_QUARTER;}
+    return 60000/bpm;
+}
+
+pub fn oa_play_seq_4(n1:i64,n2:i64,n3:i64,n4:i64){
+    oa_play_note(n1);
+    oa_play_note(n2);
+    oa_play_note(n3);
+    oa_play_note(n4);
+}
+
+pub fn oa_scale_c_major(){
+    let n1:i64=oa_note(NOTE_C4,DUR_QUARTER);
+    let n2:i64=oa_note(NOTE_D4,DUR_QUARTER);
+    let n3:i64=oa_note(NOTE_E4,DUR_QUARTER);
+    let n4:i64=oa_note(NOTE_F4,DUR_QUARTER);
+    let n5:i64=oa_note(NOTE_G4,DUR_QUARTER);
+    let n6:i64=oa_note(NOTE_A4,DUR_QUARTER);
+    let n7:i64=oa_note(NOTE_B4,DUR_QUARTER);
+    let n8:i64=oa_note(NOTE_C5,DUR_QUARTER);
+    oa_play_seq_4(n1,n2,n3,n4);
+    oa_play_seq_4(n5,n6,n7,n8);
+}
+
+pub fn oa_tone(freq:i64,dur:i64){
+    if freq>0{audio_play(freq,dur);}
+}
+
+pub fn oa_chord_major(root:i64,dur:i64){
+    let third:i64=root*5/4;
+    let fifth:i64=root*3/2;
+    oa_tone(root,dur);
+    oa_tone(third,dur);
+    oa_tone(fifth,dur);
+}
+
+pub fn test_audio_init()->i64{
+    let r:i64=audio_init();
+    if r==1{return 1;}
+    return 0;
+}
+
+pub fn test_note_create()->i64{
+    let n:i64=oa_note(NOTE_A4,DUR_QUARTER);
+    let f:i64=oa_freq(n);
+    let d:i64=oa_dur(n);
+    if f==NOTE_A4{
+        if d==DUR_QUARTER{return 1;}
+    }
+    return 0;
+}
+
+pub fn test_rest()->i64{
+    let r:i64=oa_rest(DUR_HALF);
+    let f:i64=oa_freq(r);
+    if f==0{return 1;}
+    return 0;
+}
+
+pub fn test_beat_calc()->i64{
+    let ms:i64=oa_beat_ms(120);
+    if ms==500{return 1;}
+    return 0;
+}
+
+pub fn test_track()->i64{
+    let t:i64=oa_make_track();
+    oa_track_bpm(t,120);
+    let bpm:i64=heap_get_arg(t);
+    if bpm==120{return 1;}
+    return 0;
+}
+
+pub fn main()->i64{
+    let ok:i64=audio_init();
+    if ok==0{return 0;}
+    let mut score:i64=0;
+    if test_audio_init()==1{score=score+1;}
+    if test_note_create()==1{score=score+1;}
+    if test_rest()==1{score=score+1;}
+    if test_beat_calc()==1{score=score+1;}
+    if test_track()==1{score=score+1;}
+    if score==5{
+        oa_tone(NOTE_A4,80);
+        oa_tone(NOTE_C5,80);
+        return 111;
+    }
+    return score;
+}

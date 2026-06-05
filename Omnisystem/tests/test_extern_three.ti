@@ -1,0 +1,12 @@
+extern "titan" {
+    fn bit_xor(a: i64, b: i64) -> i64;
+    fn bit_and(a: i64, b: i64) -> i64;
+}
+
+pub fn sha256_ch(x: i64, y: i64, z: i64) -> i64 {
+    bit_xor(bit_and(x, y), bit_and(bit_xor(x, 0xFFFFFFFF), z))
+}
+
+pub fn main() -> i64 {
+    return sha256_ch(1, 2, 3);
+}

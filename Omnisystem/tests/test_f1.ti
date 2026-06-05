@@ -1,0 +1,5 @@
+extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
+const tT_PT:i64=25000;const tT_CV:i64=25001;const tT_SF:i64=25002;const tT_WR:i64=25003;
+pub fn tf1_pt(x:i64,y:i64,z:i64)->i64{let p=heap_alloc_term();heap_set_tag(p,tT_PT);heap_set_body(p,x);heap_set_arg(p,y);heap_set_domain(p,z);return p;}
+pub fn tf1_pt_dist(a:i64,b:i64)->i64{let dx=heap_get_body(a)-heap_get_body(b);let dy=heap_get_arg(a)-heap_get_arg(b);let dz=heap_get_domain(a)-heap_get_domain(b);return dx*dx+dy*dy+dz*dz;}
+pub fn main()->i64{let a=tf1_pt(1,2,3);let b=tf1_pt(4,6,3);if tf1_pt_dist(a,b)!=25{return 1;}return 111;}

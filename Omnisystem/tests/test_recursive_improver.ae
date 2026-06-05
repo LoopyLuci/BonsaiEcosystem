@@ -1,0 +1,351 @@
+// tests/test_recursive_improver.ae
+// Test suite for RecursiveImprover — Tier 5 self-improvement
+
+test "recursive_improver_initialization" {
+    let cortex = mock_actor();
+    let lingua = mock_actor();
+    let verifier = mock_actor();
+    let compiler = mock_actor();
+    let dht = mock_actor();
+    
+    let improver = RecursiveImprover::init(cortex, lingua, verifier, compiler, dht);
+    
+    assert_eq!(improver.stats.analyses_completed, 0);
+    assert_eq!(improver.stats.improvements_validated, 0);
+    assert_eq!(improver.stats.improvements_rejected, 0);
+    assert_eq!(improver.stats.improvements_applied, 0);
+    assert_eq!(improver.stats.improvements_rolled_back, 0);
+    assert!(improver.target_modules.len() > 0);
+}
+
+test "target_modules_defined" {
+    let improver = create_test_improver();
+    
+    assert!(improver.target_modules.contains(&"aether/runtime.ae".to_string()));
+    assert!(improver.target_modules.contains(&"axiom/kernel.ax".to_string()));
+    assert!(improver.target_modules.contains(&"titan/parser.ti".to_string()));
+}
+
+test "analyze_codebase" {
+    let improver = create_test_improver();
+    
+    improver ! AnalyzeCodebase;
+    sleep(100);
+    
+    let stats = improver ! GetStats;
+    assert!(stats.analyses_completed > 0);
+}
+
+test "improvement_validation" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "Optimize hash function".to_string(),
+        diff: "--- a\n+++ b".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.15,
+        safety_impact: 0.05,
+    };
+    
+    improver ! ValidateImprovement(improvement);
+    sleep(100);
+    
+    let stats = improver ! GetStats;
+    // Validation is mocked to succeed
+    assert!(stats.improvements_validated >= 0);
+}
+
+test "improvement_compilation" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "test improvement".to_string(),
+        diff: "test diff".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    let compile_result = improver.compile_with_improvement(&improvement);
+    
+    assert!(compile_result.is_ok());
+}
+
+test "improvement_test_execution" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "test improvement".to_string(),
+        diff: "test diff".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    let test_result = improver.run_tests(&improvement);
+    
+    assert!(test_result.is_ok());
+}
+
+test "improvement_proof_verification" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "test improvement".to_string(),
+        diff: "test diff".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    let proof_result = improver.verify_with_proofs(&improvement);
+    
+    assert!(proof_result.is_ok());
+}
+
+test "improvement_publishing" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "test improvement".to_string(),
+        diff: "test diff".to_string(),
+        proof_hash: Some("proof_hash_123".to_string()),
+        validated: true,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    improver ! PublishImprovement(improvement);
+    sleep(100);
+    
+    // Improvement should be published to DHT
+    assert!(true);
+}
+
+test "safety_critical_improvement_auto_apply" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "critical safety fix".to_string(),
+        diff: "critical fix".to_string(),
+        proof_hash: Some("proof_hash_123".to_string()),
+        validated: true,
+        performance_impact: 0.05,
+        safety_impact: 0.9,  // High safety impact
+    };
+    
+    improver ! PublishImprovement(improvement.clone());
+    sleep(100);
+    
+    // Safety-critical improvements should trigger ApplyImprovement
+    assert!(improvement.safety_impact > 0.5);
+}
+
+test "improvement_application" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "test improvement".to_string(),
+        diff: "test diff".to_string(),
+        proof_hash: Some("proof_hash_123".to_string()),
+        validated: true,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    improver ! ApplyImprovement(improvement);
+    sleep(100);
+    
+    let stats = improver ! GetStats;
+    // May have applied or rolled back
+    assert!(stats.improvements_applied >= 0);
+    assert!(stats.improvements_rolled_back >= 0);
+}
+
+test "improvement_backup_and_restore" {
+    let improver = create_test_improver();
+    
+    let backup_result = improver.create_backup("test.ae");
+    assert!(backup_result.is_ok());
+    
+    let backup_path = backup_result.unwrap();
+    assert!(backup_path.contains("backup"));
+}
+
+test "improvement_rollback_on_compilation_failure" {
+    let improver = create_test_improver();
+    
+    let improvement = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "test improvement".to_string(),
+        diff: "test diff".to_string(),
+        proof_hash: Some("proof_hash_123".to_string()),
+        validated: true,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    // This would trigger rollback if compilation fails
+    improver ! ApplyImprovement(improvement);
+    sleep(100);
+    
+    let stats = improver ! GetStats;
+    // Either applied or rolled back
+    assert!(stats.improvements_applied + stats.improvements_rolled_back >= 0);
+}
+
+test "multiple_improvements_tracking" {
+    let improver = create_test_improver();
+    
+    for i in 0..5 {
+        let improvement = Improvement {
+            module_path: format!("module{}.ae", i),
+            description: format!("improvement {}", i),
+            diff: "diff".to_string(),
+            proof_hash: None,
+            validated: false,
+            performance_impact: 0.1,
+            safety_impact: 0.05,
+        };
+        
+        improver.improvements.push(improvement);
+    }
+    
+    assert_eq!(improver.improvements.len(), 5);
+}
+
+test "performance_impact_calculation" {
+    let imp1 = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "small optimization".to_string(),
+        diff: "diff".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.05,
+        safety_impact: 0.0,
+    };
+    
+    let imp2 = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "major optimization".to_string(),
+        diff: "diff".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.5,
+        safety_impact: 0.0,
+    };
+    
+    assert!(imp2.performance_impact > imp1.performance_impact);
+}
+
+test "safety_impact_determines_priority" {
+    let low_safety = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "cosmetic change".to_string(),
+        diff: "diff".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.0,
+        safety_impact: 0.1,
+    };
+    
+    let high_safety = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "security fix".to_string(),
+        diff: "diff".to_string(),
+        proof_hash: None,
+        validated: false,
+        performance_impact: 0.0,
+        safety_impact: 0.95,
+    };
+    
+    // High safety should be auto-applied
+    assert!(high_safety.safety_impact > 0.5);
+    assert!(low_safety.safety_impact <= 0.5);
+}
+
+test "analysis_cycle_scheduling" {
+    let improver = create_test_improver();
+    
+    improver ! AnalyzeCodebase;
+    sleep(100);
+    
+    let stats1 = improver ! GetStats;
+    let cycles1 = stats1.analyses_completed;
+    
+    sleep(100);
+    
+    let stats2 = improver ! GetStats;
+    let cycles2 = stats2.analyses_completed;
+    
+    // Should maintain state between checks
+    assert_eq!(cycles1, cycles2);
+}
+
+test "stats_accumulation" {
+    let improver = create_test_improver();
+    
+    let initial_stats = improver.stats;
+    assert_eq!(initial_stats.improvements_validated, 0);
+    
+    improver ! AnalyzeCodebase;
+    sleep(100);
+    
+    let updated_stats = improver ! GetStats;
+    assert!(updated_stats.analyses_completed > initial_stats.analyses_completed);
+}
+
+test "improvement_uniqueness_by_module_and_hash" {
+    let improver = create_test_improver();
+    
+    let imp1 = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "improvement 1".to_string(),
+        diff: "diff1".to_string(),
+        proof_hash: Some("h1".to_string()),
+        validated: true,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    let imp2 = Improvement {
+        module_path: "test.ae".to_string(),
+        description: "improvement 1 again".to_string(),
+        diff: "diff1".to_string(),
+        proof_hash: Some("h1".to_string()),
+        validated: true,
+        performance_impact: 0.1,
+        safety_impact: 0.05,
+    };
+    
+    improver.improvements.push(imp1);
+    improver.improvements.push(imp2);
+    
+    // Both would be stored (no dedup in this test)
+    assert_eq!(improver.improvements.len(), 2);
+}
+
+fn create_test_improver() -> RecursiveImprover {
+    RecursiveImprover::init(
+        mock_actor(),
+        mock_actor(),
+        mock_actor(),
+        mock_actor(),
+        mock_actor()
+    )
+}
+
+fn mock_actor() -> ActorId {
+    ActorId { id: "mock".to_string() }
+}

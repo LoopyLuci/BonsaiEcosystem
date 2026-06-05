@@ -1,0 +1,178 @@
+-- hello_world.omni — Canonical Omnisystem Smoke Test
+-- Demonstrates: Titan call, Aether actor, capability enforcement, telemetry, trust score
+--
+-- This file is the formal specification of the expected behavior.
+-- The mock runner (sylva/repl/mock_omnicore.py) executes it.
+--
+-- Expected output when run via `omni run examples/hello_world.omni`:
+--
+--   ═══════════════════════════════════════
+--     Omnisystem hello_world Smoke Test
+--     UniIR v0.2 | Titan Stage 0 | Aether v0.1
+--   ═══════════════════════════════════════
+--   
+--   [1/4] Testing Titan vector addition...
+--     ├─ Capability 'alloc' granted: true
+--     ├─ Remaining allocation tokens: 1024
+--     ├─ Titan add_vectors executed
+--     ├─ Input:   [1.0, 2.0, 3.0, 4.0, 5.0]
+--     ├─ Input:   [10.0, 20.0, 30.0, 40.0, 50.0]
+--     └─ Output: [11.0, 22.0, 33.0, 44.0, 55.0]
+--   
+--   [2/4] Testing Aether actor counter...
+--     ├─ Actor spawned: demo-counter
+--     ├─ Supervision strategy: one_for_one
+--     ├─ Increment(42) sent
+--     ├─ Increment(58) sent
+--     ├─ Aether eventual counter value: 100
+--     └─ Expected: 100 | Actual: 100 | PASS
+--   
+--   [3/4] Verifying telemetry stream...
+--     ├─ Events emitted: 4
+--     │  ├─ add_vectors | trace: abc123 | duration: 125 µs
+--     │  ├─ Counter.Increment | trace: def456 | duration: 42 µs
+--     │  ├─ Counter.Increment | trace: def456 | duration: 58 µs
+--     │  └─ Counter.Get | trace: def456 | duration: 15 µs
+--   
+--   [4/4] Computing trust score...
+--     ├─ Module hashes verified: 3
+--     ├─ Effect rows canonical: 3
+--     ├─ Capability violations: 0
+--     ├─ Graded modality faults: 0
+--     └─ TRUST SCORE: 74 / 100
+--   
+--   ═══════════════════════════════════════
+--     STATUS: ALL TESTS PASSED ✓
+--     Omnisystem smoke test successful.
+--   ═══════════════════════════════════════
+
+-- ── Titan module: titan/math ──────────────────────────────────────────────────
+-- Provides add_vectors: &[r] [f64; 5] × &[r] [f64; 5] → [f64; 5] ! {alloc}
+
+titan module math {
+    caps = {alloc, telemetry}
+
+    pub fn add_vectors(a: &[f64; 5], b: &[f64; 5]) -> [f64; 5]
+        ! {alloc}
+    {
+        let result = alloc [f64; 5]
+        result[0] = a[0] + b[0]
+        result[1] = a[1] + b[1]
+        result[2] = a[2] + b[2]
+        result[3] = a[3] + b[3]
+        result[4] = a[4] + b[4]
+        emit telemetry("add_vectors", {len: 5})
+        return result
+    }
+}
+
+-- ── Aether module: aether/counter ─────────────────────────────────────────────
+-- GCounter actor with eventual consistency (CRDT).
+
+aether module counter {
+    caps = {telemetry}
+
+    actor CounterService {
+        state: GCounter = GCounter.new()
+
+        receive Increment(by: i64) {
+            self.state = self.state.increment(by)
+            emit telemetry("Counter.Increment", {by: by})
+        }
+
+        receive Get() -> i64 {
+            return self.state.value()
+        }
+    }
+}
+
+-- ── Sylva main script with full capability and telemetry verification ──────────
+
+sylva module main {
+    caps = {alloc, telemetry}
+
+    import titan::math
+    import aether::counter
+    import omni::capability
+    import omni::telemetry
+    import omni::trust
+
+    fn main() -> Result<(), Error> {
+        print("═══════════════════════════════════════")
+        print("  Omnisystem hello_world Smoke Test")
+        print("  UniIR v0.2 | Titan Stage 0 | Aether v0.1")
+        print("═══════════════════════════════════════")
+        print("")
+
+        -- ─── Titan: Zero-trust vector addition ───
+        print("[1/4] Testing Titan vector addition...")
+        let v1 = [1.0, 2.0, 3.0, 4.0, 5.0]
+        let v2 = [10.0, 20.0, 30.0, 40.0, 50.0]
+        
+        -- Capability check at boundary
+        let cap_status = capability::check("alloc", limit=1024)
+        print("  ├─ Capability 'alloc' granted:", cap_status.granted)
+        print("  ├─ Remaining allocation tokens:", cap_status.remaining)
+        
+        -- Execute Titan hot function
+        let result = titan::add_vectors(&v1, &v2)
+        print("  ├─ Titan add_vectors executed")
+        print("  ├─ Input:  ", v1)
+        print("  ├─ Input:  ", v2)
+        print("  └─ Output: ", result)
+        print("")
+
+        -- ─── Aether: Eventually-consistent counter ───
+        print("[2/4] Testing Aether actor counter...")
+        
+        let counter = CounterService.spawn(name="demo-counter", supervision="one_for_one")
+        print("  ├─ Actor spawned: demo-counter")
+        print("  ├─ Supervision strategy: one_for_one")
+        
+        counter ! Increment(42)
+        telemetry::record("Counter.Increment", by=42, trace_id=trace.current())
+        print("  ├─ Increment(42) sent")
+        
+        counter ! Increment(58)
+        telemetry::record("Counter.Increment", by=58, trace_id=trace.current())
+        print("  ├─ Increment(58) sent")
+        
+        let total = await counter.Get()
+        telemetry::record("Counter.Get", result=total, trace_id=trace.current())
+        print("  ├─ Aether eventual counter value:", total)
+        print("  └─ Expected: 100 | Actual:", total, "|", if total == 100 { "PASS" } else { "FAIL" })
+        print("")
+
+        -- ─── Telemetry Verification ───
+        print("[3/4] Verifying telemetry stream...")
+        let events = telemetry::flush()
+        print("  ├─ Events emitted:", events.len())
+        for event in events {
+            print("  │  └─", event.kind, "| trace:", event.trace_id.short(), "| duration:", event.duration_us, "µs")
+        }
+        print("")
+
+        -- ─── Trust Score Computation ───
+        print("[4/4] Computing trust score...")
+        let score = trust::compute()
+        print("  ├─ Module hashes verified:", score.modules_verified)
+        print("  ├─ Effect rows canonical:", score.effects_canonical)
+        print("  ├─ Capability violations:", score.capability_violations)
+        print("  ├─ Graded modality faults:", score.modality_faults)
+        print("  └─ TRUST SCORE:", score.value, "/ 100")
+        print("")
+
+        -- ─── Final Report ───
+        print("═══════════════════════════════════════")
+        if result == [11.0, 22.0, 33.0, 44.0, 55.0] and total == 100 and score.capability_violations == 0 {
+            print("  STATUS: ALL TESTS PASSED ✓")
+            print("  Omnisystem smoke test successful.")
+        } else {
+            print("  STATUS: TEST FAILURE ✗")
+            print("  Please check the logs above for details.")
+        }
+        print("═══════════════════════════════════════")
+        
+        Ok(())
+    }
+}

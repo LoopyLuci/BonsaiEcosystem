@@ -1,0 +1,92 @@
+// axiom/crypto/bit_permute.ti
+// Bit permutation primitives used in block cipher S-boxes
+
+fn rotate_left(x: i64, n: i64, bits: i64) -> i64 {
+    let mask = bit_shl(1, bits) - 1;
+    let x_masked = bit_and(x, mask);
+    let left = bit_and(bit_shl(x_masked, n), mask);
+    let right = bit_shr(x_masked, bits - n);
+    return bit_or(left, right);
+}
+
+fn rotate_right(x: i64, n: i64, bits: i64) -> i64 {
+    let mask = bit_shl(1, bits) - 1;
+    let x_masked = bit_and(x, mask);
+    let right = bit_shr(x_masked, n);
+    let left = bit_and(bit_shl(x_masked, bits - n), mask);
+    return bit_or(left, right);
+}
+
+fn swap_nibbles(x: i64) -> i64 {
+    let lo = bit_and(x, 0x0F);
+    let hi = bit_and(x, 0xF0);
+    return bit_or(bit_shl(lo, 4), bit_shr(hi, 4));
+}
+
+fn verify_rotate() -> i64 {
+    let x = 0xAB;
+    let bits = 8;
+    let left4 = rotate_left(x, 4, bits);
+    let back = rotate_right(left4, 4, bits);
+    if back != x {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_swap_nibbles() -> i64 {
+    let x = 0xAB;
+    let swapped = swap_nibbles(x);
+    let back = swap_nibbles(swapped);
+    if back != x {
+        return 0;
+    }
+    let expected_swap = 0xBA;
+    if swapped != expected_swap {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_rotate_identity() -> i64 {
+    let x = 0xFF;
+    let bits = 8;
+    let r = rotate_left(x, 3, bits);
+    if r != 0xFF {
+        return 0;
+    }
+    return 1;
+}
+
+fn verify_bit_ops_hex() -> i64 {
+    let a = 0xDEAD;
+    let b = 0xBEEF;
+    let anded = bit_and(a, b);
+    let ored = bit_or(a, b);
+    let xored = bit_xor(a, b);
+    let check = bit_xor(bit_or(bit_and(a, b), bit_xor(a, b)), ored);
+    if check != 0 {
+        return 0;
+    }
+    return 1;
+}
+
+fn main() -> i64 {
+    let ok1 = verify_rotate();
+    if ok1 == 0 {
+        return 0;
+    }
+    let ok2 = verify_swap_nibbles();
+    if ok2 == 0 {
+        return 0;
+    }
+    let ok3 = verify_rotate_identity();
+    if ok3 == 0 {
+        return 0;
+    }
+    let ok4 = verify_bit_ops_hex();
+    if ok4 == 0 {
+        return 0;
+    }
+    return 111;
+}

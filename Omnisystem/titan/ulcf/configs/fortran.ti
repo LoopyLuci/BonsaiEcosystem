@@ -1,0 +1,92 @@
+// titan/ulcf/configs/fortran.ti
+// Fortran language configuration for the Universal Grammar Adapter.
+
+pub fn fortran_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("integer".to_string(), "i32".to_string());
+    type_map.insert("integer(4)".to_string(), "i32".to_string());
+    type_map.insert("integer(8)".to_string(), "i64".to_string());
+    type_map.insert("real".to_string(), "f32".to_string());
+    type_map.insert("real(4)".to_string(), "f32".to_string());
+    type_map.insert("real(8)".to_string(), "f64".to_string());
+    type_map.insert("double precision".to_string(), "f64".to_string());
+    type_map.insert("complex".to_string(), "Complex<f32>".to_string());
+    type_map.insert("logical".to_string(), "bool".to_string());
+    type_map.insert("character".to_string(), "String".to_string());
+    type_map.insert("dimension".to_string(), "Vec<Any>".to_string());
+    type_map.insert("allocatable".to_string(), "Vec<Any>".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("==".to_string(), "eq".to_string());
+    operator_map.insert("/=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert(".and.".to_string(), "and".to_string());
+    operator_map.insert(".or.".to_string(), "or".to_string());
+    operator_map.insert(".eq.".to_string(), "eq".to_string());
+    operator_map.insert(".ne.".to_string(), "neq".to_string());
+    operator_map.insert(".lt.".to_string(), "lt".to_string());
+    operator_map.insert(".gt.".to_string(), "gt".to_string());
+    operator_map.insert(".le.".to_string(), "le".to_string());
+    operator_map.insert(".ge.".to_string(), "ge".to_string());
+
+    LanguageConfig {
+        name: "fortran".to_string(),
+        extensions: vec![".f".to_string(), ".for".to_string(), ".f90".to_string(), ".f95".to_string(), ".f03".to_string(), ".f08".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "program".to_string(),
+            "subroutine".to_string(),
+            "function".to_string(),
+            "if_statement".to_string(),
+            "select_case_statement".to_string(),
+            "do_statement".to_string(),
+            "do_while_statement".to_string(),
+            "return_statement".to_string(),
+            "stop_statement".to_string(),
+            "allocate_statement".to_string(),
+            "deallocate_statement".to_string(),
+            "open_statement".to_string(),
+            "close_statement".to_string(),
+            "read_statement".to_string(),
+            "write_statement".to_string(),
+            "format_statement".to_string(),
+            "module".to_string(),
+            "use_statement".to_string(),
+            "contains_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "call_expression".to_string(),
+            "identifier".to_string(),
+            "integer_literal".to_string(),
+            "real_literal".to_string(),
+            "string_literal".to_string(),
+            "logical_literal".to_string(),
+            "array_constructor".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "real_literal".to_string(),
+            "string_literal".to_string(),
+            ".true.".to_string(),
+            ".false.".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec![
+            "block".to_string(),
+            "program".to_string(),
+            "subroutine".to_string(),
+            "function".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "type_first".to_string(),
+    }
+}

@@ -1,0 +1,108 @@
+// titan/studio/service_manager.ti — Background Service Lifecycle
+// Starts, monitors, and stops IDE background services (LSP, RAG, orchestrator, agent pool).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_SERVICE: i64 = 8710;
+
+// Service types
+const SVC_LSP:          i64 = 0;
+const SVC_RAG:          i64 = 1;
+const SVC_ORCHESTRATOR: i64 = 2;
+const SVC_AGENT_POOL:   i64 = 3;
+
+// Service states
+const SVC_STOPPED:  i64 = 0;
+const SVC_STARTING: i64 = 1;
+const SVC_RUNNING:  i64 = 2;
+const SVC_ERROR:    i64 = 3;
+
+// service: tag=TAG_SERVICE, body=svc_type, arg=state, domain=name_id
+
+pub fn service_create(svc_type: i64, name_id: i64) -> i64 {
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_SERVICE);
+    heap_set_body(s, svc_type);
+    heap_set_arg(s, SVC_STOPPED);
+    heap_set_domain(s, name_id);
+    return s;
+}
+
+pub fn service_start(svc: i64) -> bool {
+    heap_set_arg(svc, SVC_STARTING);
+    // All service types transition directly to RUNNING (simulation mode)
+    heap_set_arg(svc, SVC_RUNNING);
+    return heap_get_arg(svc) == SVC_RUNNING;
+}
+
+pub fn service_stop(svc: i64) { heap_set_arg(svc, SVC_STOPPED); }
+pub fn service_state(svc: i64) -> i64 { return heap_get_arg(svc); }
+pub fn service_type(svc: i64) -> i64  { return heap_get_body(svc); }
+
+static mut SERVICE_LIST:  i64 = 0;
+static mut SERVICE_COUNT: i64 = 0;
+
+pub fn svc_register(svc_type: i64, name_id: i64) -> i64 {
+    let s = service_create(svc_type, name_id);
+    heap_set_domain(s, SERVICE_LIST);
+    SERVICE_LIST = s;
+    SERVICE_COUNT = SERVICE_COUNT + 1;
+    return s;
+}
+
+pub fn svc_start_all() -> i64 {
+    let mut running: i64 = 0;
+    let mut curr = SERVICE_LIST;
+    while curr != 0 {
+        if service_start(curr) { running = running + 1; }
+        curr = heap_get_domain(curr);
+    }
+    return running;
+}
+
+pub fn svc_stop_all() {
+    let mut curr = SERVICE_LIST;
+    while curr != 0 { service_stop(curr); curr = heap_get_domain(curr); }
+}
+
+pub fn svc_count() -> i64 { return SERVICE_COUNT; }
+
+pub fn svc_running_count() -> i64 {
+    let mut count: i64 = 0;
+    let mut curr = SERVICE_LIST;
+    while curr != 0 {
+        if service_state(curr) == SVC_RUNNING { count = count + 1; }
+        curr = heap_get_domain(curr);
+    }
+    return count;
+}
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    SERVICE_LIST = 0; SERVICE_COUNT = 0;
+    svc_register(SVC_LSP,          heap_alloc_term());
+    svc_register(SVC_RAG,          heap_alloc_term());
+    svc_register(SVC_ORCHESTRATOR, heap_alloc_term());
+    svc_register(SVC_AGENT_POOL,   heap_alloc_term());
+    if svc_count() != 4          { return 1; }
+    if svc_running_count() != 0  { return 2; }
+
+    let started = svc_start_all();
+    if started != 4              { return 3; }
+    if svc_running_count() != 4  { return 4; }
+
+    svc_stop_all();
+    if svc_running_count() != 0  { return 5; }
+
+    return 111;
+}

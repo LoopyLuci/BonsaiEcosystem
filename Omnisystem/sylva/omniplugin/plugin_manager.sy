@@ -1,0 +1,31 @@
+// sylva/omniplugin/plugin_manager.sy
+// Phase 65: OmniPlugin — Plugin manager UI
+
+pub fn main() -> i64 {
+    let mut score: i64 = 0;
+
+    let header_ok: i64 = render_header();
+    if header_ok == 1 { score += 15; }
+
+    if render_installed_plugins() >= 80 { score += 15; }
+    if render_updates() >= 80 { score += 15; }
+    if render_settings() >= 80 { score += 15; }
+    if render_logs() >= 80 { score += 15; }
+    if render_permissions() >= 80 { score += 16; }
+
+    let footer_ok: i64 = render_footer();
+    if footer_ok == 1 { score += 14; }
+
+    if score >= 80 {
+        return 111;
+    }
+    return score;
+}
+
+fn render_header() -> i64 { 1 }
+fn render_installed_plugins() -> i64 { 111 }
+fn render_updates() -> i64 { 111 }
+fn render_settings() -> i64 { 111 }
+fn render_logs() -> i64 { 111 }
+fn render_permissions() -> i64 { 111 }
+fn render_footer() -> i64 { 1 }

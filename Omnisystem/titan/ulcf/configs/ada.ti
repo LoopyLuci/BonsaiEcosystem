@@ -1,0 +1,80 @@
+// titan/ulcf/configs/ada.ti
+// Ada language configuration for the Universal Grammar Adapter.
+
+pub fn ada_config() -> LanguageConfig {
+    let mut type_map = HashMap::new();
+    type_map.insert("Integer".to_string(), "i64".to_string());
+    type_map.insert("Long_Integer".to_string(), "i64".to_string());
+    type_map.insert("Float".to_string(), "f32".to_string());
+    type_map.insert("Long_Float".to_string(), "f64".to_string());
+    type_map.insert("Boolean".to_string(), "bool".to_string());
+    type_map.insert("Character".to_string(), "u8".to_string());
+    type_map.insert("String".to_string(), "String".to_string());
+    type_map.insert("Natural".to_string(), "u64".to_string());
+    type_map.insert("Positive".to_string(), "u64".to_string());
+    type_map.insert("Duration".to_string(), "i64".to_string());
+
+    let mut operator_map = HashMap::new();
+    operator_map.insert("+".to_string(), "add".to_string());
+    operator_map.insert("-".to_string(), "sub".to_string());
+    operator_map.insert("*".to_string(), "mul".to_string());
+    operator_map.insert("/".to_string(), "div".to_string());
+    operator_map.insert("mod".to_string(), "mod".to_string());
+    operator_map.insert("=".to_string(), "eq".to_string());
+    operator_map.insert("/=".to_string(), "neq".to_string());
+    operator_map.insert("<".to_string(), "lt".to_string());
+    operator_map.insert(">".to_string(), "gt".to_string());
+    operator_map.insert("<=".to_string(), "le".to_string());
+    operator_map.insert(">=".to_string(), "ge".to_string());
+    operator_map.insert("and".to_string(), "and".to_string());
+    operator_map.insert("or".to_string(), "or".to_string());
+    operator_map.insert("and then".to_string(), "and".to_string());
+    operator_map.insert("or else".to_string(), "or".to_string());
+
+    LanguageConfig {
+        name: "ada".to_string(),
+        extensions: vec![".adb".to_string(), ".ads".to_string()],
+        type_map: type_map,
+        operator_map: operator_map,
+        statement_nodes: vec![
+            "expression_statement".to_string(),
+            "object_declaration".to_string(),
+            "if_statement".to_string(),
+            "case_statement".to_string(),
+            "loop_statement".to_string(),
+            "while_statement".to_string(),
+            "for_statement".to_string(),
+            "return_statement".to_string(),
+            "exit_statement".to_string(),
+            "accept_statement".to_string(),
+            "select_statement".to_string(),
+            "delay_statement".to_string(),
+            "abort_statement".to_string(),
+        ],
+        expression_nodes: vec![
+            "binary_expression".to_string(),
+            "call_expression".to_string(),
+            "identifier".to_string(),
+            "integer_literal".to_string(),
+            "real_literal".to_string(),
+            "string_literal".to_string(),
+            "boolean_literal".to_string(),
+            "aggregate_literal".to_string(),
+        ],
+        literal_nodes: vec![
+            "integer_literal".to_string(),
+            "real_literal".to_string(),
+            "string_literal".to_string(),
+            "true".to_string(),
+            "false".to_string(),
+            "null".to_string(),
+        ],
+        comment_nodes: vec!["comment".to_string()],
+        block_nodes: vec![
+            "statement_list".to_string(),
+            "block_statement".to_string(),
+        ],
+        call_format: "prefix".to_string(),
+        variable_decl_format: "type_first".to_string(),
+    }
+}

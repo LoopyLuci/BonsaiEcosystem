@@ -1,0 +1,144 @@
+// titan/aion/aion_config.ti — Aion Pipeline Configuration
+// Defines the 8-stage pipeline with typed stages and order metadata.
+// Body-for-meta: stage.body=meta1, stage.domain=next_stage (safe for list).
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+// Pipeline stage types
+const STAGE_SPECIFICATION: i64 = 0;
+const STAGE_ARCHITECTURE:  i64 = 1;
+const STAGE_CODEGEN:       i64 = 2;
+const STAGE_TEST:          i64 = 3;
+const STAGE_VERIFY:        i64 = 4;
+const STAGE_PACKAGE:       i64 = 5;
+const STAGE_DEPLOY:        i64 = 6;
+const STAGE_MONITOR:       i64 = 7;
+
+const TAG_PIPELINE_STAGE: i64 = 8400;
+
+// Capability constants (from model registry)
+const CAP_COMPLETION:   i64 = 1;
+const CAP_CHAT:         i64 = 2;
+const CAP_REASONING:    i64 = 4;
+const CAP_PROOF_SEARCH: i64 = 8;
+const CAP_CODE_GEN:     i64 = 16;
+const CAP_EMBEDDING:    i64 = 32;
+
+// Project template types
+const TEMPLATE_REST_API:    i64 = 0;
+const TEMPLATE_WEB_APP:     i64 = 1;
+const TEMPLATE_CLI_TOOL:    i64 = 2;
+const TEMPLATE_LIBRARY:     i64 = 3;
+const TEMPLATE_ACTOR_SYSTEM: i64 = 4;
+
+// Stage cell layout:
+//   stage: tag=TAG_PIPELINE_STAGE, body=meta1, arg=0, domain=next_stage
+//   meta1: body=stage_type, arg=name_id, domain=meta2
+//   meta2: body=description_id, arg=order, domain=required_cap
+
+pub fn stage_create(stage_type: i64, name_id: i64, description_id: i64,
+                    order: i64, required_cap: i64) -> i64 {
+    let meta2 = heap_alloc_term();
+    heap_set_body(meta2, description_id);
+    heap_set_arg(meta2, order);
+    heap_set_domain(meta2, required_cap);
+    let meta1 = heap_alloc_term();
+    heap_set_body(meta1, stage_type);
+    heap_set_arg(meta1, name_id);
+    heap_set_domain(meta1, meta2);
+    let s = heap_alloc_term();
+    heap_set_tag(s, TAG_PIPELINE_STAGE);
+    heap_set_body(s, meta1);
+    heap_set_arg(s, 0);
+    heap_set_domain(s, 0);    // next_stage; safe for list link
+    return s;
+}
+
+pub fn stage_type(s: i64) -> i64 {
+    return heap_get_body(heap_get_body(s));                                     // meta1.body
+}
+pub fn stage_name(s: i64) -> i64 {
+    return heap_get_arg(heap_get_body(s));                                      // meta1.arg
+}
+pub fn stage_order(s: i64) -> i64 {
+    return heap_get_arg(heap_get_domain(heap_get_body(s)));                     // meta2.arg
+}
+pub fn stage_required_cap(s: i64) -> i64 {
+    return heap_get_domain(heap_get_domain(heap_get_body(s)));                  // meta2.domain
+}
+
+// Pipeline registry
+static mut PIPELINE_STAGES: i64 = 0;
+static mut PIPELINE_COUNT:  i64 = 0;
+
+pub fn pipeline_init() {
+    PIPELINE_STAGES = 0;
+    PIPELINE_COUNT  = 0;
+    // Prepend in reverse order so stage 0 is the list head
+    let s7 = stage_create(STAGE_MONITOR,       heap_alloc_term(), heap_alloc_term(), 7, CAP_CHAT);
+    heap_set_domain(s7, PIPELINE_STAGES); PIPELINE_STAGES = s7;
+    let s6 = stage_create(STAGE_DEPLOY,        heap_alloc_term(), heap_alloc_term(), 6, CAP_CHAT);
+    heap_set_domain(s6, PIPELINE_STAGES); PIPELINE_STAGES = s6;
+    let s5 = stage_create(STAGE_PACKAGE,       heap_alloc_term(), heap_alloc_term(), 5, CAP_CODE_GEN);
+    heap_set_domain(s5, PIPELINE_STAGES); PIPELINE_STAGES = s5;
+    let s4 = stage_create(STAGE_VERIFY,        heap_alloc_term(), heap_alloc_term(), 4, CAP_PROOF_SEARCH);
+    heap_set_domain(s4, PIPELINE_STAGES); PIPELINE_STAGES = s4;
+    let s3 = stage_create(STAGE_TEST,          heap_alloc_term(), heap_alloc_term(), 3, CAP_CODE_GEN);
+    heap_set_domain(s3, PIPELINE_STAGES); PIPELINE_STAGES = s3;
+    let s2 = stage_create(STAGE_CODEGEN,       heap_alloc_term(), heap_alloc_term(), 2, CAP_CODE_GEN);
+    heap_set_domain(s2, PIPELINE_STAGES); PIPELINE_STAGES = s2;
+    let s1 = stage_create(STAGE_ARCHITECTURE,  heap_alloc_term(), heap_alloc_term(), 1, CAP_REASONING);
+    heap_set_domain(s1, PIPELINE_STAGES); PIPELINE_STAGES = s1;
+    let s0 = stage_create(STAGE_SPECIFICATION, heap_alloc_term(), heap_alloc_term(), 0, CAP_CHAT);
+    heap_set_domain(s0, PIPELINE_STAGES); PIPELINE_STAGES = s0;
+    PIPELINE_COUNT = 8;
+}
+
+pub fn pipeline_stage_by_order(order: i64) -> i64 {
+    let mut curr = PIPELINE_STAGES;
+    while curr != 0 {
+        if stage_order(curr) == order { return curr; }
+        curr = heap_get_domain(curr);
+    }
+    return 0;
+}
+
+pub fn pipeline_count() -> i64 { return PIPELINE_COUNT; }
+
+// ===== Self-test =====
+pub fn main() -> i64 {
+    PIPELINE_STAGES = 0;
+    PIPELINE_COUNT  = 0;
+    pipeline_init();
+    if pipeline_count() != 8 { return 1; }
+
+    let s0 = pipeline_stage_by_order(0);
+    if s0 == 0                              { return 2; }
+    if stage_type(s0) != STAGE_SPECIFICATION { return 3; }
+    if stage_order(s0) != 0                 { return 4; }
+
+    let s7 = pipeline_stage_by_order(7);
+    if s7 == 0                              { return 5; }
+    if stage_type(s7) != STAGE_MONITOR      { return 6; }
+    if stage_order(s7) != 7                 { return 7; }
+
+    // All 8 stages accessible
+    let mut i: i64 = 0;
+    while i < 8 {
+        let s = pipeline_stage_by_order(i);
+        if s == 0 { return 8; }
+        i = i + 1;
+    }
+
+    return 111;
+}

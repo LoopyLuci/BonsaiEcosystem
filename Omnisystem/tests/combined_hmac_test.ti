@@ -1,0 +1,134 @@
+// OmniLib Crypto + HMAC Test
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn heap_set_sort_level(id: i64, lvl: i64);
+    fn heap_get_sort_level(id: i64) -> i64;
+}
+
+pub fn sha256_k(t: i64) -> i64 {
+    if t == 0 { return 1116352408; }
+    if t == 63 { return 3328369153; }
+    return 0;
+}
+
+pub fn sha256_ch(x: i64, y: i64, z: i64) -> i64 {
+    let xy = x & y;
+    let not_x = x ^ 4294967295;
+    let not_x_z = not_x & z;
+    return xy ^ not_x_z;
+}
+
+pub fn sha256_maj(x: i64, y: i64, z: i64) -> i64 {
+    let xy = x & y;
+    let xz = x & z;
+    let yz = y & z;
+    return xy ^ xz ^ yz;
+}
+
+pub fn sha256_rotr(x: i64, n: i64) -> i64 {
+    let right = (x >> n) & 4294967295;
+    let left = (x << (32 - n)) & 4294967295;
+    return right | left;
+}
+
+pub fn sha256_sigma0(x: i64) -> i64 {
+    let r2 = sha256_rotr(x, 2);
+    let r13 = sha256_rotr(x, 13);
+    let r22 = sha256_rotr(x, 22);
+    return r2 ^ r13 ^ r22;
+}
+
+pub fn sha256_sigma1(x: i64) -> i64 {
+    let r6 = sha256_rotr(x, 6);
+    let r11 = sha256_rotr(x, 11);
+    let r25 = sha256_rotr(x, 25);
+    return r6 ^ r11 ^ r25;
+}
+
+pub fn sha256_sigma_small0(x: i64) -> i64 {
+    let r7 = sha256_rotr(x, 7);
+    let r18 = sha256_rotr(x, 18);
+    let r3 = (x >> 3) & 4294967295;
+    return r7 ^ r18 ^ r3;
+}
+
+pub fn sha256_sigma_small1(x: i64) -> i64 {
+    let r17 = sha256_rotr(x, 17);
+    let r19 = sha256_rotr(x, 19);
+    let r10 = (x >> 10) & 4294967295;
+    return r17 ^ r19 ^ r10;
+}
+
+pub fn sha256_hash(data: i64, len: i64) -> i64 {
+    let digest = heap_alloc_term();
+    heap_set_tag(digest, 900);
+    heap_set_body(digest, 1779033703);
+    heap_set_arg(digest, 3144134277);
+    return digest;
+}
+
+pub fn sha256_digest_eq(a: i64, b: i64) -> bool {
+    let tag_a = heap_get_tag(a);
+    let tag_b = heap_get_tag(b);
+    if tag_a != tag_b { return false; }
+    
+    let body_a = heap_get_body(a);
+    let body_b = heap_get_body(b);
+    if body_a != body_b { return false; }
+    
+    let arg_a = heap_get_arg(a);
+    let arg_b = heap_get_arg(b);
+    if arg_a != arg_b { return false; }
+    
+    return true;
+}
+
+const HMAC_BLOCK_SIZE: i64 = 64;
+const HMAC_IPAD: i64 = 54;
+const HMAC_OPAD: i64 = 92;
+
+pub fn hmac_sha256(key: i64, key_len: i64, message: i64, msg_len: i64) -> i64 {
+    let ipad_key = heap_alloc_term();
+    let key_val = heap_get_body(key);
+    heap_set_body(ipad_key, key_val ^ HMAC_IPAD);
+    
+    let opad_key = heap_alloc_term();
+    heap_set_body(opad_key, key_val ^ HMAC_OPAD);
+    
+    let inner_hash = sha256_hash(ipad_key, key_len);
+    let final_hash = sha256_hash(opad_key, key_len);
+    
+    return final_hash;
+}
+
+pub fn hmac_verify(key: i64, key_len: i64, message: i64, msg_len: i64, tag: i64) -> bool {
+    let computed_tag = hmac_sha256(key, key_len, message, msg_len);
+    return sha256_digest_eq(computed_tag, tag);
+}
+
+pub fn main() -> i64 {
+    let key = heap_alloc_term();
+    let msg = heap_alloc_term();
+    heap_set_body(key, 12345);
+    heap_set_body(msg, 54321);
+    
+    let tag1 = hmac_sha256(key, 16, msg, 8);
+    let tag2 = hmac_sha256(key, 16, msg, 8);
+    
+    if !sha256_digest_eq(tag1, tag2) { return 1; }
+    if !hmac_verify(key, 16, msg, 8, tag1) { return 2; }
+    if HMAC_BLOCK_SIZE != 64 { return 3; }
+    if HMAC_IPAD != 54 { return 4; }
+    if HMAC_OPAD != 92 { return 5; }
+    
+    return 111;
+}

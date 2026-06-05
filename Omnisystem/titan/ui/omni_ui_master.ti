@@ -1,0 +1,113 @@
+// titan/ui/omni_ui_master.ti — Master Integration Shell
+// Imports every UI subsystem via two transitive roots:
+//   omni_shell.ti  → inspector, aether_map, proof_explorer, axiom_console, events
+//   command_palette.ti → inspector (deduplicated by import system)
+import "titan/ui/omni_shell.ti"
+import "titan/ui/command_palette.ti"
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(a: i64, b: i64);
+    fn heap_get_tag(a: i64) -> i64;
+    fn heap_set_body(a: i64, b: i64);
+    fn heap_get_body(a: i64) -> i64;
+    fn heap_set_arg(a: i64, b: i64);
+    fn heap_get_arg(a: i64) -> i64;
+    fn heap_set_domain(a: i64, b: i64);
+    fn heap_get_domain(a: i64) -> i64;
+}
+
+// Master state cell: body=tick_count, arg=shell_handle, domain=palette_handle
+pub fn ui_master_init() -> i64 {
+    let m = heap_alloc_term();
+    let sh = shell_create();
+    let p  = cp_palette_create();
+    cp_seed_defaults(p);
+    heap_set_body(m, 0);
+    heap_set_arg(m, sh);
+    heap_set_domain(m, p);
+    return m;
+}
+
+pub fn ui_master_tick(m: i64) -> i64 {
+    let tick = heap_get_body(m);
+    heap_set_body(m, tick + 1);
+
+    let sh = heap_get_arg(m);
+    let p  = heap_get_domain(m);
+
+    // Build topology for this tick
+    let g = am_build_topology();
+    if tg_graph_node_count(g) != 9 { return 1; }
+
+    // Build proof tree with two verified theorems
+    let pe = pe_tree_create();
+    pe_tree_add_thm(pe, pe_thm_create(1, 0, 1));
+    pe_tree_add_thm(pe, pe_thm_create(2, 0, 1));
+    if pe_verified_count(pe) != 2 { return 2; }
+
+    // Build axiom stack with one goal
+    let ac = ac_stack_create();
+    ac_push(ac, ac_goal_create(0, 0));
+    if ac_stack_size(ac) != 1 { return 3; }
+
+    // Advance shell tick (side-effects: pulse decay, topology animation)
+    shell_tick(sh, g, pe, ac, tick);
+
+    // Verify inspector lens on fresh inspector
+    let i = insp_create();
+    insp_set_lens(i, LENS_PROPS);
+    if insp_lens(i) != LENS_PROPS { return 4; }
+
+    // Palette has 11 defaults
+    if cp_count(p) != 11 { return 5; }
+
+    // Command palette search finds all 9 OPEN_SUBSYS entries
+    let res = cp_search(p, CMD_OPEN_SUBSYS);
+    if res == 0 { return 6; }
+
+    // Validated write-back still works end-to-end
+    let evt = shell_writeback(sh, 2, 0, 99);
+    if evt == 0 { return 7; }
+    if evt_type(evt) != EVT_CONFIG_CHANGE { return 8; }
+
+    return 111;
+}
+
+// Live tick: drains rb, records faults in eb, runs full UI stack check
+pub fn ui_master_tick_live(m: i64, rb: i64, eb: i64) -> i64 {
+    let tick = heap_get_body(m);
+    heap_set_body(m, tick + 1);
+
+    // Drain the event ring buffer; fault events are registered in the error boundary
+    let mut evt_count: i64 = 0;
+    while rb_size(rb) > 0 {
+        let evt = rb_pop(rb);
+        if evt_type(evt) == EVT_FAULT {
+            eb_record_fault(eb, evt_source(evt), 0);
+        }
+        evt_count = evt_count + 1;
+    }
+    if evt_count == 0 { return 0; }
+
+    // Topology must have 9 nodes
+    let g = am_build_topology();
+    if tg_graph_node_count(g) != 9 { return 0; }
+
+    // Inspector must cycle to LENS_PROOF correctly
+    let i = insp_create();
+    insp_set_lens(i, LENS_PROOF);
+    if insp_lens(i) != LENS_PROOF { return 0; }
+
+    // Palette must seed 11 defaults
+    let p = cp_palette_create();
+    cp_seed_defaults(p);
+    if cp_count(p) != 11 { return 0; }
+
+    return 111;
+}
+
+pub fn main() -> i64 {
+    let m = ui_master_init();
+    return ui_master_tick(m);
+}

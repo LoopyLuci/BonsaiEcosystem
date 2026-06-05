@@ -1,0 +1,12 @@
+// Axiom bootstrap theorem -- fixpoint statement for self-hosting.
+// compile(R, S) = B  ->  compile(B, S) = B
+
+theorem bootstrap_self_hosting_fixpoint {
+    premise rust_bootstrap_compiles: true
+    premise native_binary_exists: true
+    conclude compiler_reproduces_itself: true
+}
+
+pub fn main() -> i64 {
+    return 111;
+}

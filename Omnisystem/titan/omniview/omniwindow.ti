@@ -1,0 +1,123 @@
+// omniwindow.ti — OmniWindow: native Win32 window management layer
+extern "titan" {
+    fn heap_alloc_term()->i64;
+    fn heap_set_tag(a:i64,b:i64);
+    fn heap_get_tag(a:i64)->i64;
+    fn heap_set_body(a:i64,b:i64);
+    fn heap_get_body(a:i64)->i64;
+    fn heap_set_arg(a:i64,b:i64);
+    fn heap_get_arg(a:i64)->i64;
+    fn window_create(w:i64,h:i64,x:i64,y:i64)->i64;
+    fn window_show(wid:i64);
+    fn window_set_title(wid:i64,title:i64);
+    fn window_poll_event(wid:i64)->i64;
+    fn window_destroy(wid:i64);
+    fn surface_create(wid:i64,w:i64,h:i64)->i64;
+    fn surface_clear(sid:i64,color:i64);
+    fn surface_draw_rect(sid:i64,x:i64,y:i64,w:i64,h:i64,color:i64);
+    fn surface_draw_text(sid:i64,x:i64,y:i64,text:i64,color:i64);
+    fn surface_present(sid:i64);
+    fn repl_print_int(v:i64);
+    fn repl_print_newline();
+}
+
+const T_OW_WIN:i64=29000;
+const T_OW_SURF:i64=29001;
+const T_OW_APP:i64=29002;
+const OW_DEFAULT_W:i64=800;
+const OW_DEFAULT_H:i64=600;
+const OW_DEFAULT_X:i64=100;
+const OW_DEFAULT_Y:i64=100;
+const OW_EV_NONE:i64=0;
+const OW_EV_QUIT:i64=-1;
+
+pub fn ow_make(w:i64,h:i64)->i64{
+    let term:i64=heap_alloc_term();
+    let wid:i64=window_create(w,h,OW_DEFAULT_X,OW_DEFAULT_Y);
+    heap_set_tag(term,T_OW_WIN);
+    heap_set_body(term,wid);
+    heap_set_arg(term,w);
+    heap_set_domain(term,h);
+    return term;
+}
+
+pub fn ow_make_default()->i64{
+    return ow_make(OW_DEFAULT_W,OW_DEFAULT_H);
+}
+
+pub fn ow_show(win:i64){
+    let wid:i64=heap_get_body(win);
+    window_show(wid);
+}
+
+pub fn ow_title(win:i64,title:i64){
+    let wid:i64=heap_get_body(win);
+    window_set_title(wid,title);
+}
+
+pub fn ow_poll(win:i64)->i64{
+    let wid:i64=heap_get_body(win);
+    return window_poll_event(wid);
+}
+
+pub fn ow_close(win:i64){
+    let wid:i64=heap_get_body(win);
+    window_destroy(wid);
+}
+
+pub fn ow_make_surface(win:i64)->i64{
+    let wid:i64=heap_get_body(win);
+    let sw:i64=heap_get_arg(win);
+    let sh:i64=heap_get_domain(win);
+    let term:i64=heap_alloc_term();
+    let sid:i64=surface_create(wid,sw,sh);
+    heap_set_tag(term,T_OW_SURF);
+    heap_set_body(term,sid);
+    heap_set_arg(term,sw);
+    heap_set_domain(term,sh);
+    return term;
+}
+
+pub fn ow_clear(surf:i64,color:i64){
+    let sid:i64=heap_get_body(surf);
+    surface_clear(sid,color);
+}
+
+pub fn ow_rect(surf:i64,x:i64,y:i64,w:i64,h:i64,color:i64){
+    let sid:i64=heap_get_body(surf);
+    surface_draw_rect(sid,x,y,w,h,color);
+}
+
+pub fn ow_text(surf:i64,x:i64,y:i64,label:i64,color:i64){
+    let sid:i64=heap_get_body(surf);
+    surface_draw_text(sid,x,y,label,color);
+}
+
+pub fn ow_present(surf:i64){
+    let sid:i64=heap_get_body(surf);
+    surface_present(sid);
+}
+
+pub fn ow_run_n(win:i64,surf:i64,n:i64)->i64{
+    let mut i:i64=0;
+    let mut ev:i64=0;
+    while i<n{
+        ow_clear(surf,1184274);
+        ow_rect(surf,20,20,760,560,986895);
+        ow_present(surf);
+        ev=ow_poll(win);
+        if ev==OW_EV_QUIT{return ev;}
+        i=i+1;
+    }
+    return ev;
+}
+
+pub fn main()->i64{
+    let win:i64=ow_make_default();
+    ow_show(win);
+    ow_title(win,1);
+    let surf:i64=ow_make_surface(win);
+    ow_run_n(win,surf,8);
+    ow_close(win);
+    return 111;
+}
