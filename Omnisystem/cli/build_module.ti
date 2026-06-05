@@ -1,0 +1,209 @@
+// cli/build_module.ti – Build CLI extensions for Universal Module System
+// Commands: build module publish, build module install, build module list
+
+module build_module
+
+use ums::{Module, ModuleManifest}
+use serde_json::json
+
+/// `build module publish ./path/to/module` – publish a module to the registry
+pub async fn cmd_module_publish(path: &str) {
+    // 1. Read module directory
+    let manifest = read_manifest(&format!("{}/manifest.yaml", path));
+
+    // 2. Compile native binaries for all architectures
+    let binaries = compile_native_binaries(path).await;
+
+    // 3. Compile Omni-IR bytecode (universal)
+    let omniir = compile_omniir(path).await;
+
+    // 4. Collect resources
+    let resources = collect_resources(&format!("{}/resources", path));
+
+    // 5. Sign manifest with developer's council key
+    let signature = sign_manifest_with_council_key(&manifest);
+
+    // 6. Create module archive
+    let module = Module {
+        manifest: manifest.clone(),
+        native_binaries: binaries,
+        omniir_bytecode: omniir,
+        resources,
+        signature,
+    };
+
+    // 7. Compute hash
+    let hash = blake3::hash(&serde_json::to_vec(&module.manifest).unwrap());
+
+    // 8. Upload to registry (via module_registry actor)
+    publish_to_registry(module, hash).await;
+
+    println!("Published module '{}' with hash sha3-{}", manifest.name, hash);
+}
+
+/// `build module install http-server` – install module from registry
+pub async fn cmd_module_install(name: &str) {
+    // 1. Query registry for latest hash (via p2p gossip)
+    let hash = resolve_module_from_registry(name, "latest").await;
+
+    if hash.is_none() {
+        eprintln!("Module '{}' not found in registry", name);
+        return;
+    }
+
+    let hash = hash.unwrap();
+
+    // 2. Fetch module from mesh (via TransferDaemon)
+    let module = fetch_module_from_peers(&hash).await;
+
+    // 3. Verify signature
+    if !verify_module_signature(&module) {
+        eprintln!("Module signature verification failed");
+        return;
+    }
+
+    // 4. Install to local CAS
+    install_to_local_cas(&module, &hash).await;
+
+    println!("Installed module '{}' ({})", name, hash);
+}
+
+/// `build module list` – list all published modules
+pub async fn cmd_module_list() {
+    // Query registry for all modules
+    let modules = get_all_modules_from_registry().await;
+
+    println!("Published modules:");
+    for (name, entry) in modules {
+        println!("  {} (latest: {})", name, entry.latest_hash);
+        for (version, _) in &entry.all_versions {
+            println!("    - {}", version);
+        }
+    }
+}
+
+/// `build module load module-name` – load module into current environment
+pub async fn cmd_module_load(name: &str) {
+    // 1. Resolve hash from registry
+    let hash = resolve_module_from_registry(name, "latest").await;
+
+    // 2. Fetch from local CAS or peers
+    let module = fetch_module(&hash).await;
+
+    // 3. Check capability manifest against current process capabilities
+    check_capabilities(&module.manifest).await;
+
+    // 4. Call UOSC module_load syscall
+    let handle = syscall_module_load(&hash).await;
+
+    println!("Loaded module '{}' (handle: {:?})", name, handle);
+}
+
+/// `build module call module-name export-name [args]` – call exported function
+pub async fn cmd_module_call(name: &str, export: &str, args: &[&str]) {
+    // 1. Load module
+    let handle = cmd_module_load(name).await;
+
+    // 2. Serialize args
+    let serialized_args = serde_json::json!(args).to_vec().unwrap();
+
+    // 3. Call UOSC module_call syscall
+    let result = syscall_module_call(&handle, export, serialized_args).await;
+
+    // 4. Deserialize and print result
+    if let Ok(output) = result {
+        println!("Result: {}", String::from_utf8(output).unwrap_or_default());
+    } else {
+        eprintln!("Call failed");
+    }
+}
+
+// Helpers
+fn read_manifest(path: &str) -> ModuleManifest {
+    let content = std::fs::read_to_string(path).unwrap();
+    serde_yaml::from_str(&content).unwrap()
+}
+
+async fn compile_native_binaries(path: &str) -> Vec<(String, Vec<u8>)> {
+    // Compile for x86_64-linux, aarch64-linux, x86_64-macos, aarch64-macos, etc.
+    // Returns list of (arch, binary)
+    vec![]  // placeholder
+}
+
+async fn compile_omniir(path: &str) -> Vec<u8> {
+    // Compile source to Omni-IR bytecode via BPLIS/LAIR pipeline
+    vec![]  // placeholder
+}
+
+fn collect_resources(path: &str) -> Vec<(String, Vec<u8>)> {
+    // Collect static assets (config files, etc.)
+    vec![]  // placeholder
+}
+
+fn sign_manifest_with_council_key(manifest: &ModuleManifest) -> Vec<u8> {
+    // Sign with BLS key (from ~/.bonsai/council.key or kernel keyring)
+    vec![]  // placeholder
+}
+
+async fn publish_to_registry(module: Module, hash: Hash) {
+    // Send RegistryMessage::Publish to module_registry actor via p2p
+}
+
+async fn resolve_module_from_registry(name: &str, version: &str) -> Option<Hash> {
+    // Query module_registry actor
+    None  // placeholder
+}
+
+async fn fetch_module_from_peers(hash: &str) -> Module {
+    // Fetch via TransferDaemon p2p mesh (multi-path, FEC)
+    Module {
+        manifest: ModuleManifest { /* ... */ },
+        native_binaries: vec![],
+        omniir_bytecode: vec![],
+        resources: vec![],
+        signature: vec![],
+    }
+}
+
+fn verify_module_signature(module: &Module) -> bool {
+    // Verify BLS signature against council keys
+    true  // placeholder
+}
+
+async fn install_to_local_cas(module: &Module, hash: &str) {
+    // Store in local CAS (storage service)
+}
+
+async fn get_all_modules_from_registry() -> std::collections::HashMap<String, ModuleEntry> {
+    // Query all entries from CRDT
+    std::collections::HashMap::new()  // placeholder
+}
+
+async fn fetch_module(hash: &str) -> Module {
+    // Fetch from local CAS, or from peers
+    Module {
+        manifest: ModuleManifest { /* ... */ },
+        native_binaries: vec![],
+        omniir_bytecode: vec![],
+        resources: vec![],
+        signature: vec![],
+    }
+}
+
+async fn check_capabilities(manifest: &ModuleManifest) {
+    // Verify process has required capabilities
+    // If not, throw error
+}
+
+async fn syscall_module_load(hash: &str) -> ModuleHandle {
+    // Call UOSC kernel syscall: module_load
+    ModuleHandle {
+        module_id: hash.to_string(),
+        capability: Capability { /* ... */ },
+    }
+}
+
+async fn syscall_module_call(handle: &ModuleHandle, export: &str, args: Vec<u8>) -> Result<Vec<u8>, Error> {
+    // Call UOSC kernel syscall: module_call
+    Ok(vec![])
+}
