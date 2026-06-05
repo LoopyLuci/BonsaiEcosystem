@@ -1,0 +1,108 @@
+// lib/virtio/mod.ti – Virtio queue infrastructure for guest/host communication
+// Provides generic virtio queue implementation used by console, vault, and other devices
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn mmio_read64(addr: i64) -> i64;
+    fn mmio_write64(addr: i64, val: i64);
+    fn mmio_read32(addr: i64) -> i64;
+    fn mmio_write32(addr: i64, val: i64);
+}
+
+const TAG_VIRT_QUEUE: i64 = 9500;
+const TAG_VIRT_DESC: i64 = 9501;
+const TAG_VIRT_AVAIL: i64 = 9502;
+const TAG_VIRT_USED: i64 = 9503;
+
+const QUEUE_SIZE: i64 = 256;
+const DESC_SIZE: i64 = 16; // per descriptor
+
+// VirtQueue descriptor (16 bytes: addr[8], len[4], flags[2], next[2])
+pub fn desc_set_addr(desc_ptr: i64, idx: i64, addr: i64) {
+    mmio_write64(desc_ptr + idx * DESC_SIZE, addr);
+}
+
+pub fn desc_set_len(desc_ptr: i64, idx: i64, len: i64) {
+    mmio_write32(desc_ptr + idx * DESC_SIZE + 8, len);
+}
+
+pub fn desc_set_flags(desc_ptr: i64, idx: i64, flags: i64) {
+    mmio_write32(desc_ptr + idx * DESC_SIZE + 12, flags);
+}
+
+pub fn desc_set_next(desc_ptr: i64, idx: i64, next: i64) {
+    mmio_write32(desc_ptr + idx * DESC_SIZE + 14, next);
+}
+
+// VirtQueue: represents a single virtio queue
+pub fn virt_queue_new(base: i64, queue_size: i64) -> i64 {
+    let q = heap_alloc_term();
+    heap_set_tag(q, TAG_VIRT_QUEUE);
+    heap_set_body(q, base);        // MMIO base address
+    heap_set_arg(q, queue_size);   // queue size
+    heap_set_domain(q, 0);         // next available index
+    return q;
+}
+
+pub fn virt_queue_base(q: i64) -> i64 { return heap_get_body(q); }
+pub fn virt_queue_size(q: i64) -> i64 { return heap_get_arg(q); }
+pub fn virt_queue_avail_idx(q: i64) -> i64 { return heap_get_domain(q); }
+
+// Add a single buffer to the queue (one descriptor)
+pub fn virt_queue_add_buf(q: i64, buf_addr: i64, buf_len: i64, flags: i64) -> i64 {
+    let base = virt_queue_base(q);
+    let size = virt_queue_size(q);
+    let idx = virt_queue_avail_idx(q);
+
+    // Calculate descriptor table offset (0 in typical device)
+    let desc_base = base;
+
+    // Set up descriptor
+    desc_set_addr(desc_base, idx, buf_addr);
+    desc_set_len(desc_base, idx, buf_len);
+    desc_set_flags(desc_base, idx, flags);
+    desc_set_next(desc_base, idx, 0);
+
+    // Increment available ring index
+    let avail_ring_offset = size * DESC_SIZE;
+    let next_idx = idx + 1;
+    if next_idx >= size {
+        heap_set_domain(q, 0);
+    } else {
+        heap_set_domain(q, next_idx);
+    }
+
+    return idx;
+}
+
+// Kick device (notify it there are new buffers available)
+pub fn virt_queue_kick(q: i64) {
+    let base = virt_queue_base(q);
+    // Write to device notification register (typically at offset 0xE0)
+    mmio_write64(base + 0xE0, 0);
+}
+
+// Wait for used buffers from device
+pub fn virt_queue_get_used(q: i64) -> i64 {
+    let base = virt_queue_base(q);
+    // Poll used ring (offset typically at size*16 + size*2 + 4)
+    // Simplified: read first used element
+    let used_offset = (virt_queue_size(q) * DESC_SIZE) +
+                      (virt_queue_size(q) * 2) + 4;
+    let used_elem = mmio_read32(base + used_offset);
+    return used_elem;
+}
+
+// Convenience: add buffer and kick in one call
+pub fn virt_queue_put(q: i64, buf_addr: i64, buf_len: i64, flags: i64) {
+    virt_queue_add_buf(q, buf_addr, buf_len, flags);
+    virt_queue_kick(q);
+}

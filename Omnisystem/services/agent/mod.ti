@@ -1,0 +1,207 @@
+// services/agent/mod.ti – Guest agent for nested Bonsai instances
+// Handles virtio-control commands from the host, enables live management
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+}
+
+const TAG_CTRL_REQ: i64 = 9900;
+const TAG_CTRL_REPLY: i64 = 9901;
+const TAG_CMD_OUTPUT: i64 = 9902;
+const TAG_METRICS: i64 = 9903;
+
+const OP_RUN_CMD: i64 = 1;
+const OP_TRANSFER_FILE: i64 = 2;
+const OP_GET_METRICS: i64 = 3;
+const OP_HOT_RELOAD: i64 = 4;
+
+// Control request: generic container for commands from host
+pub fn control_request_run_cmd(cmd: i64) -> i64 {
+    let req = heap_alloc_term();
+    heap_set_tag(req, TAG_CTRL_REQ);
+    heap_set_body(req, OP_RUN_CMD);
+    heap_set_arg(req, cmd); // command string
+    return req;
+}
+
+pub fn control_request_transfer_file(path: i64, data: i64) -> i64 {
+    let req = heap_alloc_term();
+    heap_set_tag(req, TAG_CTRL_REQ);
+    heap_set_body(req, OP_TRANSFER_FILE);
+    heap_set_arg(req, path);
+    heap_set_domain(req, data);
+    return req;
+}
+
+pub fn control_request_get_metrics() -> i64 {
+    let req = heap_alloc_term();
+    heap_set_tag(req, TAG_CTRL_REQ);
+    heap_set_body(req, OP_GET_METRICS);
+    return req;
+}
+
+pub fn control_request_hot_reload(module: i64, hash: i64) -> i64 {
+    let req = heap_alloc_term();
+    heap_set_tag(req, TAG_CTRL_REQ);
+    heap_set_body(req, OP_HOT_RELOAD);
+    heap_set_arg(req, module);
+    heap_set_domain(req, hash);
+    return req;
+}
+
+// Command output result
+pub fn command_output_new(stdout: i64, stderr: i64, exit_code: i64) -> i64 {
+    let out = heap_alloc_term();
+    heap_set_tag(out, TAG_CMD_OUTPUT);
+    heap_set_body(out, stdout);
+    heap_set_arg(out, stderr);
+    heap_set_domain(out, exit_code);
+    return out;
+}
+
+// Metrics response
+pub fn metrics_new(mem_used: i64, cpu_usage: i64, uptime: i64) -> i64 {
+    let m = heap_alloc_term();
+    heap_set_tag(m, TAG_METRICS);
+    heap_set_body(m, mem_used);
+    heap_set_arg(m, cpu_usage);
+    heap_set_domain(m, uptime);
+    return m;
+}
+
+// Control reply (can contain different payload types)
+pub fn control_reply_success(payload: i64) -> i64 {
+    let reply = heap_alloc_term();
+    heap_set_tag(reply, TAG_CTRL_REPLY);
+    heap_set_body(reply, 1); // success = true
+    heap_set_arg(reply, payload);
+    return reply;
+}
+
+pub fn control_reply_error(error_msg: i64) -> i64 {
+    let reply = heap_alloc_term();
+    heap_set_tag(reply, TAG_CTRL_REPLY);
+    heap_set_body(reply, 0); // success = false
+    heap_set_arg(reply, error_msg);
+    return reply;
+}
+
+// Handle incoming control request
+pub fn handle_control_request(req: i64) -> i64 {
+    let op = heap_get_body(req);
+
+    if op == OP_RUN_CMD {
+        let cmd = heap_get_arg(req);
+        let output = execute_command(cmd);
+        return control_reply_success(output);
+    } else if op == OP_TRANSFER_FILE {
+        let path = heap_get_arg(req);
+        let data = heap_get_domain(req);
+        if write_file(path, data) {
+            let reply = heap_alloc_term();
+            heap_set_tag(reply, TAG_CTRL_REPLY);
+            heap_set_body(reply, 1);
+            return reply;
+        } else {
+            return control_reply_error(0);
+        }
+    } else if op == OP_GET_METRICS {
+        let mem = get_used_memory();
+        let cpu = get_cpu_usage();
+        let uptime = get_uptime();
+        let metrics = metrics_new(mem, cpu, uptime);
+        return control_reply_success(metrics);
+    } else if op == OP_HOT_RELOAD {
+        let module = heap_get_arg(req);
+        let hash = heap_get_domain(req);
+        if hot_reload_module(module, hash) {
+            let reply = heap_alloc_term();
+            heap_set_tag(reply, TAG_CTRL_REPLY);
+            heap_set_body(reply, 1);
+            return reply;
+        } else {
+            return control_reply_error(0);
+        }
+    }
+
+    return control_reply_error(0);
+}
+
+// Execute a command in a sandboxed subprocess
+fn execute_command(cmd: i64) -> i64 {
+    // Simplified: would invoke a subprocess with sandbox
+    // For now, return dummy output
+    let stdout = 0; // empty
+    let stderr = 0;
+    let exit_code = 0;
+    return command_output_new(stdout, stderr, exit_code);
+}
+
+// Write data to file
+fn write_file(path: i64, data: i64) -> i64 {
+    // Simplified: would write to sandboxed filesystem
+    // Return true (1) on success
+    return 1;
+}
+
+// Get current memory usage
+fn get_used_memory() -> i64 {
+    // Would query kernel's memory accounting
+    return 0;
+}
+
+// Get CPU usage percentage
+fn get_cpu_usage() -> i64 {
+    // Would query scheduler statistics
+    return 0;
+}
+
+// Get uptime in seconds
+fn get_uptime() -> i64 {
+    // Would query kernel's uptime counter
+    return 0;
+}
+
+// Hot-reload a module (atomically replace binary)
+fn hot_reload_module(module: i64, hash: i64) -> i64 {
+    // Would:
+    // 1. Fetch new binary from CAS using hash
+    // 2. Verify signature
+    // 3. Pause service
+    // 4. Swap binary
+    // 5. Resume service
+    // Return true (1) on success
+    return 1;
+}
+
+// Main guest agent service loop
+pub fn guest_agent_main() {
+    loop {
+        // Poll for incoming control requests from virtio-control queue
+        let req = receive_control_request();
+        if req == 0 { break; }
+
+        // Handle the request
+        let reply = handle_control_request(req);
+
+        // Send reply back to host
+        send_control_reply(reply);
+    }
+}
+
+// Placeholder I/O functions
+fn receive_control_request() -> i64 {
+    return 0; // would poll virtio-control queue
+}
+
+fn send_control_reply(reply: i64) {
+    // would write to virtio-control reply queue
+}

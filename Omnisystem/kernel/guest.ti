@@ -1,0 +1,165 @@
+// kernel/guest.ti – Guest mode detection and virtio device initialization
+// Enables running the kernel as a library OS inside a Sanctum vault
+
+extern "titan" {
+    fn heap_alloc_term() -> i64;
+    fn heap_set_tag(id: i64, tag: i64);
+    fn heap_get_tag(id: i64) -> i64;
+    fn heap_set_body(id: i64, body: i64);
+    fn heap_get_body(id: i64) -> i64;
+    fn heap_set_arg(id: i64, arg: i64);
+    fn heap_get_arg(id: i64) -> i64;
+    fn heap_set_domain(id: i64, dom: i64);
+    fn heap_get_domain(id: i64) -> i64;
+    fn mmio_read64(addr: i64) -> i64;
+    fn mmio_write64(addr: i64, val: i64);
+}
+
+const TAG_BOOT_INFO: i64 = 9600;
+const TAG_VIRTIO_CONSOLE: i64 = 9601;
+const TAG_VIRTIO_VAULT: i64 = 9602;
+
+// Guest boot information (populated by bootloader/host)
+pub struct GuestBootInfo {
+    is_guest: i64,
+    memory_size: i64,
+    virtio_control_addr: i64,
+    virtio_console_addr: i64,
+    virtio_vault_addr: i64,  // optional, 0 if not present
+}
+
+static mut GUEST_MODE: i64 = 0;
+static mut VIRTIO_CONSOLE_DEVICE: i64 = 0;
+static mut VIRTIO_VAULT_DEVICE: i64 = 0;
+
+// Detect whether we're running as a guest
+pub fn detect_guest() -> i64 {
+    // Bootloader places GuestBootInfo at well-known address (0x1000)
+    let info_addr = 0x1000i64;
+    let is_guest = mmio_read64(info_addr);
+
+    unsafe {
+        GUEST_MODE = is_guest;
+    }
+
+    if is_guest > 0 {
+        // Initialize virtio devices
+        let console_addr = mmio_read64(info_addr + 16); // +16 bytes from base
+        let vault_addr = mmio_read64(info_addr + 24);
+
+        if console_addr > 0 {
+            unsafe {
+                VIRTIO_CONSOLE_DEVICE = virtio_console_init(console_addr);
+            }
+        }
+
+        if vault_addr > 0 {
+            unsafe {
+                VIRTIO_VAULT_DEVICE = virtio_vault_init(vault_addr);
+            }
+        }
+    }
+
+    return is_guest;
+}
+
+pub fn is_guest() -> i64 {
+    unsafe { return GUEST_MODE; }
+}
+
+// Virtio console device (guest side)
+fn virtio_console_init(base: i64) -> i64 {
+    let dev = heap_alloc_term();
+    heap_set_tag(dev, TAG_VIRTIO_CONSOLE);
+    heap_set_body(dev, base); // MMIO base address
+    heap_set_arg(dev, 0);     // output position
+    return dev;
+}
+
+pub fn virtio_console_write_byte(byte: i64) {
+    unsafe {
+        let dev = VIRTIO_CONSOLE_DEVICE;
+        if dev == 0 { return; }
+        let base = heap_get_body(dev);
+        // Write to data register at offset 0x100
+        mmio_write64(base + 0x100, byte);
+    }
+}
+
+pub fn virtio_console_write_str(str_ptr: i64, len: i64) {
+    let i = 0i64;
+    while i < len {
+        // Read byte from string (simplified: assume byte array)
+        let byte = 0i64; // would read from memory
+        virtio_console_write_byte(byte);
+        // i = i + 1 (in real impl)
+    }
+}
+
+// Virtio vault device (guest side)
+fn virtio_vault_init(base: i64) -> i64 {
+    let dev = heap_alloc_term();
+    heap_set_tag(dev, TAG_VIRTIO_VAULT);
+    heap_set_body(dev, base); // MMIO base address
+    return dev;
+}
+
+// Create a nested vault via hypercall
+pub fn vault_create_nested(mem_mb: i64, cpu_quota: i64) -> i64 {
+    unsafe {
+        let dev = VIRTIO_VAULT_DEVICE;
+        if dev == 0 { return -1; } // no vault device
+        let base = heap_get_body(dev);
+
+        // Write request to queue
+        // Request format: [mem_mb at offset 0, cpu_quota at offset 8]
+        mmio_write64(base + 0, mem_mb);
+        mmio_write64(base + 8, cpu_quota);
+        mmio_write64(base + 16, 1); // op=Create
+
+        // Kick device
+        mmio_write64(base + 0xE0, 0); // notification register
+
+        // Poll for reply (simplified: immediate read)
+        // Reply at offset 256+
+        let reply = mmio_read64(base + 256);
+        return reply;
+    }
+}
+
+// Destroy a nested vault via hypercall
+pub fn vault_destroy_nested(cap_id: i64) -> i64 {
+    unsafe {
+        let dev = VIRTIO_VAULT_DEVICE;
+        if dev == 0 { return -1; }
+        let base = heap_get_body(dev);
+
+        // Write destroy request
+        mmio_write64(base + 0, cap_id);
+        mmio_write64(base + 16, 2); // op=Destroy
+
+        // Kick device
+        mmio_write64(base + 0xE0, 0);
+
+        // Poll for success
+        let reply = mmio_read64(base + 256);
+        return reply;
+    }
+}
+
+// Capability passthrough: inherit parent capability
+pub fn get_parent_capability() -> i64 {
+    // Passed in by bootloader at a known address
+    // For now, return a dummy root capability
+    return 0x100i64;
+}
+
+// Early boot: call this from kernel entry
+pub fn guest_boot_init() {
+    let is_guest = detect_guest();
+    if is_guest > 0 {
+        // Running as guest in Sanctum vault
+        // Initialize any guest-specific features
+        virtio_console_write_str(0, 0); // initialize console (dummy)
+    }
+}

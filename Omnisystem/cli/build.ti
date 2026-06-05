@@ -1,0 +1,162 @@
+// cli/build.ti – Extended build tool with VM management for nested Bonsai instances
+// Provides `build vm` subcommands for creating, managing, and monitoring nested vaults
+
+use services::vault::mod
+use services::agent::mod
+
+extern "titan" {
+    fn system_argc() -> i64;
+    fn system_argv(idx: i64) -> i64;
+    fn strlen(s: i64) -> i64;
+    fn strcmp(a: i64, b: i64) -> i64;
+    fn stdout_write(s: i64, len: i64);
+}
+
+const MAX_VAULTS: i64 = 256;
+
+// Global vault manager instance
+static mut VAULT_MGR: i64 = 0;
+
+fn print_str(s: &str) {
+    // Convert &str to C-style pointer and length
+    // (Simplified: would require actual string representation)
+}
+
+fn print_usage() {
+    print_str("Usage: build vm <command> [options]\n");
+    print_str("  build vm create --name <name> --image <path> [--memory 1024] [--cpus 2]\n");
+    print_str("  build vm exec <name> -- <command>\n");
+    print_str("  build vm destroy <name>\n");
+    print_str("  build vm list\n");
+}
+
+// Initialize vault manager
+fn init_vault_manager() {
+    unsafe {
+        if VAULT_MGR == 0 {
+            // Create quota tracker: 8GB RAM, 8 CPUs
+            let quota = mod::quota_new(8589934592i64, 8);
+            // Create vault manager
+            VAULT_MGR = mod::vault_manager_new(quota);
+        }
+    }
+}
+
+// Create a new vault
+fn cmd_vm_create(args: i64, argc: i64) -> i64 {
+    let mut name = 0i64;
+    let mut image = 0i64;
+    let mut mem_mb = 1024i64;
+    let mut cpu_quota = 2i64;
+
+    // Parse arguments: --name <name> --image <path> [--memory MB] [--cpus N]
+    let i = 0i64;
+    while i < argc {
+        // Simplified: would parse actual arguments
+        // In real impl: check arg type, extract values
+    }
+
+    if name == 0 || image == 0 {
+        print_str("Error: --name and --image required\n");
+        return 1;
+    }
+
+    init_vault_manager();
+
+    unsafe {
+        let cap_id = mod::vault_manager_create(VAULT_MGR, mem_mb, cpu_quota, 0);
+        if cap_id < 0 {
+            print_str("Error: Failed to create vault (resource exhausted?)\n");
+            return 1;
+        } else {
+            print_str("Vault created successfully\n");
+            // Would print cap_id
+            return 0;
+        }
+    }
+}
+
+// Execute a command inside a vault
+fn cmd_vm_exec(name: i64, cmd: i64) -> i64 {
+    init_vault_manager();
+
+    unsafe {
+        // Find vault by name (simplified)
+        let list = mod::vault_manager_list(VAULT_MGR);
+        if list == 0 {
+            print_str("Error: No vaults found\n");
+            return 1;
+        }
+
+        // Send command to guest agent via control channel
+        // Would create a ControlRequest and send to virtio-control queue
+        let req = mod::control_request_run_cmd(cmd);
+        let reply = mod::handle_control_request(req);
+
+        // Would check reply.success and print output
+        return 0;
+    }
+}
+
+// Destroy a vault
+fn cmd_vm_destroy(name: i64) -> i64 {
+    init_vault_manager();
+
+    unsafe {
+        // Find vault by name and get cap_id (simplified)
+        let cap_id = 0i64; // would find from vault list
+
+        let result = mod::vault_manager_destroy(VAULT_MGR, cap_id);
+        if result > 0 {
+            print_str("Vault destroyed\n");
+            return 0;
+        } else {
+            print_str("Error: Failed to destroy vault\n");
+            return 1;
+        }
+    }
+}
+
+// List all vaults
+fn cmd_vm_list() -> i64 {
+    init_vault_manager();
+
+    unsafe {
+        let list = mod::vault_manager_list(VAULT_MGR);
+        if list == 0 {
+            print_str("No vaults running\n");
+            return 0;
+        }
+
+        // Iterate vault list and print each one
+        // Would traverse linked list of vaults
+        print_str("Active vaults:\n");
+        // ...traverse and print...
+
+        return 0;
+    }
+}
+
+// Main CLI entry point
+pub fn main() {
+    let argc = system_argc();
+    if argc < 2 {
+        print_usage();
+        return;
+    }
+
+    // Get first argument (should be "vm")
+    let cmd = system_argv(1);
+    // Simplified: actual code would parse string
+
+    // For now, hardcode vm subcommand handling
+    if argc >= 3 {
+        // Second argument is vm subcommand
+        let subcmd = system_argv(2);
+        // Simplified: would match subcmd
+        // if subcmd == "create" { cmd_vm_create(...); }
+        // if subcmd == "exec" { cmd_vm_exec(...); }
+        // if subcmd == "destroy" { cmd_vm_destroy(...); }
+        // if subcmd == "list" { cmd_vm_list(); }
+    }
+}
