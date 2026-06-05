@@ -1,0 +1,79 @@
+{
+  "name": "wasm",
+  "version": "2.0",
+  "created": 1546300800,
+  "author": "W3C WebAssembly Community Group",
+  "syntax": {
+    "keywords": ["module", "func", "param", "result", "local", "global", "memory", "table", "type", "import", "export", "data", "elem", "start", "offset", "align", "volatile", "if", "then", "else", "block", "loop", "br", "br_if", "br_table", "call", "call_indirect", "return", "unreachable", "nop", "drop", "select", "local.get", "local.set", "local.tee", "global.get", "global.set", "i32.const", "i64.const", "f32.const", "f64.const", "i32.load", "i64.load", "f32.load", "f64.load", "i32.load8_s", "i32.load8_u", "i32.load16_s", "i32.load16_u", "i64.load8_s", "i64.load8_u", "i64.load16_s", "i64.load16_u", "i64.load32_s", "i64.load32_u", "i32.store", "i64.store", "f32.store", "f64.store", "i32.store8", "i32.store16", "i64.store8", "i64.store16", "i64.store32", "memory.size", "memory.grow"],
+    "operators": [
+      {"symbol": "i32.add", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.sub", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.mul", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.div_s", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.div_u", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.rem_s", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.rem_u", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.and", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.or", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.xor", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.shl", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.shr_s", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.shr_u", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.eq", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.ne", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.lt_s", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.lt_u", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.gt_s", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.gt_u", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.le_s", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.le_u", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.ge_s", "precedence": 0, "associativity": "Left"},
+      {"symbol": "i32.ge_u", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": ";;",
+      "block_comment_start": "(;",
+      "block_comment_end": ";)"
+    },
+    "string_delimiters": ["\""],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Numeric Types", "Function Types"],
+    "nominal": true,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "None",
+    "memory_management": "Manual"
+  },
+  "tooling": {
+    "extensions": [".wasm", ".wat"],
+    "shebang": null,
+    "lsp_command": "wasm-language-server",
+    "compiler": {
+      "command": "wasm-as",
+      "targets": ["wasm"],
+      "optimization_levels": ["-O0", "-O1", "-O2", "-O3"],
+      "cross_compilation": false
+    },
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Imperative"],
+    "influences": ["x86", "ARM"],
+    "dialects": ["WAT (Text Format)", "WASM (Binary)"],
+    "standards": ["W3C Level 1", "W3C Level 2"],
+    "tags": ["low-level", "bytecode", "browser", "edge-computing", "portable", "sandboxed"],
+    "urls": {
+      "homepage": "https://webassembly.org",
+      "docs": "https://webassembly.org/getting-started/developers-guide/",
+      "repo": "https://github.com/WebAssembly"
+    }
+  }
+}

@@ -24,14 +24,14 @@ All code in the Omnisystem follows strict naming conventions and architectural p
 - **Pattern**: `omni::{service_name}` (snake_case)
 - **Examples**: `omni::p2p`, `omni::compress`, `omni::container`
 
-### USOS Kernel Structures
-- **Pattern**: `usos_{component}_{subcomponent}`
+### UOSC Kernel Structures
+- **Pattern**: `UOSC_{component}_{subcomponent}`
 - **Examples**: 
-  - `usos_process`
-  - `usos_memory_region`
-  - `usos_capability_token`
-  - `usos_ipc_channel`
-  - `usos_scheduler`
+  - `UOSC_process`
+  - `UOSC_memory_region`
+  - `UOSC_capability_token`
+  - `UOSC_ipc_channel`
+  - `UOSC_scheduler`
 
 ### Configuration Files
 - **Pattern**: `omni.toml` at workspace root
@@ -60,7 +60,7 @@ All code in the Omnisystem follows strict naming conventions and architectural p
 - Deterministic execution (no garbage collector; all cleanup is compile-time)
 
 **Primary Uses**:
-- USOS kernel
+- UOSC kernel
 - omni-p2p (crypto core)
 - omni-compress
 - omni-container
@@ -148,47 +148,47 @@ sylva::repl               # Interactive development
 - Integrated into UBVM
 
 **Primary Uses**:
-- USOS kernel verification (memory safety, scheduler correctness)
+- UOSC kernel verification (memory safety, scheduler correctness)
 - Protocol verification (omni-p2p handshake, etc.)
 - Data structure proofs (no overflow, correct invariants)
 - Constraint verification (omni-ai safety properties)
 
 ---
 
-## USOS Core Architecture
+## UOSC Core Architecture
 
-The USOS kernel is minimal (< 5000 lines of Titan), providing only essential primitives.
+The UOSC kernel is minimal (< 5000 lines of Titan), providing only essential primitives.
 
 ### Kernel Components
 
-1. **Memory Manager** (`usos_memory`)
+1. **Memory Manager** (`UOSC_memory`)
    - Physical memory allocation (frame allocator)
    - Virtual memory with paging
    - Copy-on-write
    - Capability-based regions
 
-2. **Scheduler** (`usos_scheduler`)
+2. **Scheduler** (`UOSC_scheduler`)
    - Preemptive multitasking
    - Priority queues
    - EDF (Earliest Deadline First) for real-time
    - Deterministic scheduling order
 
-3. **IPC** (`usos_ipc`)
+3. **IPC** (`UOSC_ipc`)
    - Synchronous message passing (rendezvous)
    - Asynchronous message passing (buffered)
    - Both use capabilities for authorization
 
-4. **Capabilities** (`usos_capability`)
+4. **Capabilities** (`UOSC_capability`)
    - Unforgeable tokens for all resources
    - Fine-grained: separate caps for read/write/execute
    - Revocable and delegable
 
-5. **Boot & Service Manager** (`usos_boot`)
+5. **Boot & Service Manager** (`UOSC_boot`)
    - Load initial userspace image from CAS
    - Start omni-service-manager
    - Initialize logging and audit
 
-### What Is NOT in USOS Core
+### What Is NOT in UOSC Core
 
 - Filesystems (userspace service)
 - Networking stack (userspace omni-p2p)
@@ -234,7 +234,7 @@ The `omni` binary (written in Titan) provides:
 ```
 omni build [target]      # Build specific service or entire system
 omni test [suite]        # Run UBVM tests
-omni run [service]       # Run service or USOS kernel
+omni run [service]       # Run service or UOSC kernel
 omni package [name]      # Create deployment package
 omni repl [lang]         # Start REPL (Sylva/Titan)
 omni verify [component]  # Run Axiom proofs
@@ -261,7 +261,7 @@ omni status              # Show build status
 
 ## Implementation Notes
 
-The USOS kernel (`kernel/capability.ti`, `kernel/memory.ti`, `kernel/scheduler.ti`)
+The UOSC kernel (`kernel/capability.ti`, `kernel/memory.ti`, `kernel/scheduler.ti`)
 and all ten platform services (`services/omni-*/`) are fully implemented in Titan and
 pass their test suites. The build tool is `titan-bootstrap/output/titan-compiler.exe`.
 

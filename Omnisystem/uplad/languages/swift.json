@@ -1,0 +1,84 @@
+{
+  "name": "swift",
+  "version": "5.10",
+  "created": 1404086400,
+  "author": "Chris Lattner",
+  "syntax": {
+    "keywords": ["any", "as", "associatedtype", "async", "await", "break", "case", "catch", "class", "continue", "defer", "default", "deinit", "do", "dynamic", "else", "enum", "extension", "fallthrough", "false", "fileprivate", "for", "func", "get", "guard", "if", "import", "in", "infix", "init", "inout", "internal", "is", "isolated", "let", "mutating", "nil", "nonisolated", "nonmutating", "open", "operator", "postfix", "precedence", "prefix", "private", "protocol", "public", "required", "rethrows", "return", "self", "Self", "set", "static", "struct", "subscript", "super", "switch", "throwing", "try", "true", "typealias", "unowned", "var", "weak", "where", "while", "willSet"],
+    "operators": [
+      {"symbol": "+", "precedence": 12, "associativity": "Left"},
+      {"symbol": "-", "precedence": 12, "associativity": "Left"},
+      {"symbol": "*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "/", "precedence": 13, "associativity": "Left"},
+      {"symbol": "%", "precedence": 13, "associativity": "Left"},
+      {"symbol": "==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 9, "associativity": "Left"},
+      {"symbol": "===", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "<", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 10, "associativity": "Left"},
+      {"symbol": "&&", "precedence": 5, "associativity": "Left"},
+      {"symbol": "||", "precedence": 4, "associativity": "Left"},
+      {"symbol": "??", "precedence": 3, "associativity": "Right"},
+      {"symbol": "!", "precedence": 15, "associativity": "Right"},
+      {"symbol": "&", "precedence": 8, "associativity": "Left"},
+      {"symbol": "|", "precedence": 6, "associativity": "Left"},
+      {"symbol": "^", "precedence": 7, "associativity": "Left"},
+      {"symbol": "<<", "precedence": 11, "associativity": "Left"},
+      {"symbol": ">>", "precedence": 11, "associativity": "Left"},
+      {"symbol": "=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "+=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "-=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "*=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "/=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "->", "precedence": 2, "associativity": "Right"}
+    ],
+    "comments": {
+      "line_comment": "//",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\""],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Generics", "Variants", "Records", "Protocols", "Tuples"],
+    "nominal": true,
+    "polymorphism": "Parametric",
+    "inference": true,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Async",
+    "memory_management": "ReferenceCountingAuto"
+  },
+  "tooling": {
+    "extensions": [".swift"],
+    "shebang": "#!/usr/bin/swift",
+    "lsp_command": "sourcekit-lsp",
+    "compiler": {
+      "command": "swiftc",
+      "targets": ["native", "wasm"],
+      "optimization_levels": ["-Onone", "-O", "-Osize"],
+      "cross_compilation": true
+    },
+    "interpreter": null,
+    "package_manager": "SPM"
+  },
+  "metadata": {
+    "paradigms": ["Imperative", "ObjectOriented", "Functional"],
+    "influences": ["Objective-C", "Haskell", "Rust"],
+    "dialects": [],
+    "standards": ["Swift 1.0 through Swift 5.10"],
+    "tags": ["apple-ecosystem", "ios", "macos", "compiled", "static-typing"],
+    "urls": {
+      "homepage": "https://www.swift.org",
+      "docs": "https://www.swift.org/documentation/",
+      "repo": "https://github.com/apple/swift"
+    }
+  }
+}

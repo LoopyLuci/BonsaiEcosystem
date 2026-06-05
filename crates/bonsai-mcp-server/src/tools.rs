@@ -548,7 +548,7 @@ pub fn list_tools() -> Vec<McpTool> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "target": {"type": "string", "enum": ["windows", "android", "macos", "usos", "extension", "marketplace"]},
+                    "target": {"type": "string", "enum": ["windows", "android", "macos", "UOSC", "extension", "marketplace"]},
                     "input": {"type": "string"},
                     "output": {"type": "string"}
                 },

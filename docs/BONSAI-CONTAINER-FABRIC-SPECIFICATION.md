@@ -1,6 +1,6 @@
 # 🚀 Bonsai Container Fabric (BCF) – Complete Specification
 
-**A sovereign, next-generation replacement for Docker & Kubernetes, deeply integrated into USOS, Sentinel Core, and the Bonsai Distributed Systems Fabric.**
+**A sovereign, next-generation replacement for Docker & Kubernetes, deeply integrated into UOSC, Sentinel Core, and the Bonsai Distributed Systems Fabric.**
 
 ---
 
@@ -23,7 +23,7 @@
 
 | Problem | Docker/Kubernetes | BCF Solution |
 |---------|------------------|-------------|
-| **Architecture** | Separate daemon (dockerd), control plane (API server, etcd, scheduler), worker node agents. Complexity ~1000+ components. | Single integrated system running inside USOS. All orchestration is a kernel capability. ~50 Weave components. |
+| **Architecture** | Separate daemon (dockerd), control plane (API server, etcd, scheduler), worker node agents. Complexity ~1000+ components. | Single integrated system running inside UOSC. All orchestration is a kernel capability. ~50 Weave components. |
 | **Security Model** | Containers share host kernel. Pod Security Policies (complex, hard to enforce). Privileged containers are a security nightmare. | Every container is a Sanctum vault—hardware-isolated, capability-enforced, formally verified. No privilege escalation possible. |
 | **Isolation Boundary** | Namespace + cgroup (software enforcement, kernel shared). A kernel exploit = all containers compromised. | Hardware isolation (Sentinel Core VM or CHERI compartment). Escape impossible without breaking hardware. |
 | **Image Distribution** | Central Docker Hub + private registries. Single point of failure, censorship, and slowness. | P2P via Echo fabric + CAS. Images are Crystal (immutable, signed, deduplicated). Pull from nearest peer; no single point of control. |
@@ -92,7 +92,7 @@
 │  │  • Capability-based access control (mTLS optional)             │    │
 │  └────────────────────────────────────────────────────────────────┘    │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                        KERNEL LAYER (USOS)                               │
+│                        KERNEL LAYER (UOSC)                               │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
 │  │ SENTINEL CORE    │  │ SANCTUM          │  │ ECHO FABRIC      │      │
 │  │ Resource caps,   │  │ Hardware vaults, │  │ P2P networking,  │      │
@@ -382,7 +382,7 @@ bonsai_integration:
 
 ### 3.2 Pulse Scheduler – Real-Time, Distributed, Energy-Aware
 
-**Pulse** extends USOS's kernel scheduler to manage containers as first-class scheduling entities.
+**Pulse** extends UOSC's kernel scheduler to manage containers as first-class scheduling entities.
 
 ```rust
 // crates/bonsai-bcf/src/scheduler/mod.rs
@@ -1430,7 +1430,7 @@ image.verify_signature()?;
 // Public key distributed via:
 // - Blueprint metadata
 // - Echo fabric service registry
-// - USOS Weave component definition
+// - UOSC Weave component definition
 ```
 
 ---

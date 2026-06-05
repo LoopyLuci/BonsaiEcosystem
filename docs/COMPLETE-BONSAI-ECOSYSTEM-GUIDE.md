@@ -91,7 +91,7 @@ bonsai container logs --service web-service --tail 100
 │  ├─ Security (SBOM, encryption, scanning)   │
 │  └─ Optimization (lock-free, SIMD)          │
 ├─────────────────────────────────────────────┤
-│  USOS (Bonsai Microkernel)                  │
+│  UOSC (Bonsai Microkernel)                  │
 │  ├─ Sentinel Core (resource enforcement)    │
 │  ├─ Sanctum (hardware isolation)            │
 │  ├─ Echo Fabric (P2P networking)            │

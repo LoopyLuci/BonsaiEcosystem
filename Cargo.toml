@@ -34,8 +34,11 @@ members = [
     # ========== BUEB (Universal Execution Backend) ==========
     "crates/bonsai-backend",           # Hardware abstraction & device allocation
 
-    # ========== USOS Bare-Metal Kernel ==========
-    # "crates/usos-kernel",              # USOS Co-OS x86_64 bare-metal kernel (disabled: x86_64 crate has unstable features)
+    # ========== UDC (Universal Driver Compiler) ==========
+    "crates/bonsai-udc",               # Driver code generation for macOS, Linux, UOSC
+
+    # ========== UOSC Bare-Metal Kernel ==========
+    # "crates/UOSC-kernel",              # UOSC Co-OS x86_64 bare-metal kernel (disabled: x86_64 crate has unstable features)
 
     # ========== Legacy Foundation (keep for compatibility) ==========
     "bonsai-runtime",

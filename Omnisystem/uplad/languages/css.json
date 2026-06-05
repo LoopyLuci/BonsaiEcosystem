@@ -1,0 +1,67 @@
+{
+  "name": "css",
+  "version": "CSS 3",
+  "created": 1179130800,
+  "author": "W3C",
+  "syntax": {
+    "keywords": ["import", "media", "font-face", "keyframes", "supports", "namespace", "document", "page", "viewport", "counter-style", "font-feature-values", "property"],
+    "operators": [
+      {"symbol": ":", "precedence": 0, "associativity": "Right"},
+      {"symbol": ";", "precedence": 0, "associativity": "Left"},
+      {"symbol": "{", "precedence": 0, "associativity": "Left"},
+      {"symbol": "}", "precedence": 0, "associativity": "Left"},
+      {"symbol": ",", "precedence": 0, "associativity": "Left"},
+      {"symbol": "(", "precedence": 0, "associativity": "Left"},
+      {"symbol": ")", "precedence": 0, "associativity": "Left"},
+      {"symbol": "[", "precedence": 0, "associativity": "Left"},
+      {"symbol": "]", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "+", "precedence": 0, "associativity": "Left"},
+      {"symbol": "~", "precedence": 0, "associativity": "Left"},
+      {"symbol": ".", "precedence": 0, "associativity": "Left"},
+      {"symbol": "#", "precedence": 0, "associativity": "Left"},
+      {"symbol": "::", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": null,
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": false
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Properties", "Selectors", "Values"],
+    "nominal": true,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Styling",
+    "concurrency": "None",
+    "memory_management": "Managed"
+  },
+  "tooling": {
+    "extensions": [".css"],
+    "shebang": null,
+    "lsp_command": "css-language-server",
+    "compiler": null,
+    "interpreter": null,
+    "package_manager": "npm"
+  },
+  "metadata": {
+    "paradigms": ["Styling", "Declarative"],
+    "influences": [],
+    "dialects": ["SCSS", "LESS", "Stylus", "PostCSS"],
+    "standards": ["CSS 3", "CSS 2.1", "CSS Level 4"],
+    "tags": ["styling", "web", "presentation", "layout", "responsive"],
+    "urls": {
+      "homepage": "https://www.w3.org/Style/CSS/",
+      "docs": "https://www.w3.org/TR/css/",
+      "repo": "https://github.com/w3c/csswg-drafts"
+    }
+  }
+}

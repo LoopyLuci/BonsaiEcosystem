@@ -1,0 +1,63 @@
+{
+  "name": "yaml",
+  "version": "1.2",
+  "created": 1178505600,
+  "author": "Clark Evans, Oren Ben-Kiki, Brian Ingerson",
+  "syntax": {
+    "keywords": ["true", "false", "null", "yes", "no", "on", "off"],
+    "operators": [
+      {"symbol": ":", "precedence": 0, "associativity": "Right"},
+      {"symbol": "-", "precedence": 0, "associativity": "Left"},
+      {"symbol": "?", "precedence": 0, "associativity": "Left"},
+      {"symbol": ",", "precedence": 0, "associativity": "Left"},
+      {"symbol": "[", "precedence": 0, "associativity": "Left"},
+      {"symbol": "]", "precedence": 0, "associativity": "Left"},
+      {"symbol": "{", "precedence": 0, "associativity": "Left"},
+      {"symbol": "}", "precedence": 0, "associativity": "Left"},
+      {"symbol": "|", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "&", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "#",
+      "block_comment_start": null,
+      "block_comment_end": null
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": ["Maps", "Sequences"],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Data",
+    "concurrency": "None",
+    "memory_management": "Managed"
+  },
+  "tooling": {
+    "extensions": [".yaml", ".yml"],
+    "shebang": null,
+    "lsp_command": "yaml-language-server",
+    "compiler": null,
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Data Format"],
+    "influences": ["Python", "XML", "JSON"],
+    "dialects": [],
+    "standards": ["YAML 1.2", "YAML 1.1"],
+    "tags": ["configuration", "data-interchange", "human-readable", "indentation-sensitive"],
+    "urls": {
+      "homepage": "https://yaml.org",
+      "docs": "https://yaml.org/spec/1.2/spec.html",
+      "repo": null
+    }
+  }
+}

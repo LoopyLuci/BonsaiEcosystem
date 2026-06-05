@@ -1,0 +1,71 @@
+{
+  "name": "tsql",
+  "version": "SQL Server 2022",
+  "created": 1171497600,
+  "author": "Microsoft",
+  "syntax": {
+    "keywords": ["SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "FROM", "WHERE", "GROUP", "HAVING", "ORDER", "TOP", "OFFSET", "FETCH", "JOIN", "CROSS", "INNER", "LEFT", "RIGHT", "FULL", "ON", "USING", "UNION", "EXCEPT", "INTERSECT", "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "CONVERT", "AS", "BETWEEN", "IN", "LIKE", "IS", "NULL", "AND", "OR", "NOT", "EXISTS", "INTO", "VALUES", "DEFAULT", "DECLARE", "SET", "IF", "ELSE", "WHILE", "BEGIN", "BREAK", "CONTINUE", "RETURN", "THROW", "TRY", "CATCH", "GO", "PRINT", "RAISERROR", "EXEC", "EXECUTE", "PROCEDURE", "FUNCTION", "TRIGGER", "VIEW", "INDEX", "TABLE", "SCHEMA", "DATABASE", "USER", "ROLE", "GRANT", "REVOKE"],
+    "operators": [
+      {"symbol": "=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<>", "precedence": 0, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "+=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "-=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "*=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "/=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "%=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "&=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "|=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "^=", "precedence": 0, "associativity": "Right"},
+      {"symbol": "+", "precedence": 0, "associativity": "Left"},
+      {"symbol": "-", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"},
+      {"symbol": "/", "precedence": 0, "associativity": "Left"},
+      {"symbol": "%", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "--",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["'"],
+    "case_sensitive": false
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Numeric", "String", "Date/Time", "XML", "JSON"],
+    "nominal": true,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Declarative",
+    "concurrency": "MVCC",
+    "memory_management": "Manual"
+  },
+  "tooling": {
+    "extensions": [".sql"],
+    "shebang": null,
+    "lsp_command": "sql-language-server",
+    "compiler": null,
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Declarative", "Relational"],
+    "influences": ["SQL:2023", "ANSI SQL", "Transact-SQL"],
+    "dialects": ["Azure SQL", "SQL Server Express"],
+    "standards": ["SQL:2023"],
+    "tags": ["database", "relational", "enterprise", "xml-support", "json-support"],
+    "urls": {
+      "homepage": "https://learn.microsoft.com/en-us/sql/t-sql/language-reference",
+      "docs": "https://learn.microsoft.com/en-us/sql/",
+      "repo": "https://github.com/microsoft/mssql-server"
+    }
+  }
+}

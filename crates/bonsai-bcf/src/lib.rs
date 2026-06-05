@@ -1,7 +1,7 @@
 //! Bonsai Container Fabric (BCF) – Next-Generation Container Platform
 //!
 //! A sovereign, hardware-isolated, self-healing container platform that replaces
-//! Docker & Kubernetes with deep integration into USOS, Sentinel Core, and Echo fabric.
+//! Docker & Kubernetes with deep integration into UOSC, Sentinel Core, and Echo fabric.
 //!
 //! # Core Components
 //!

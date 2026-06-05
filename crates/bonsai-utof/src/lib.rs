@@ -1,7 +1,7 @@
 //! Universal Test Orchestration Fabric (UTOF)
 //!
 //! A deterministic, polyglot, AI-optional test harness for validating the entire Bonsai Ecosystem
-//! and USOS. UTOF orchestrates tests across 750+ languages with perfect fidelity, integrating:
+//! and UOSC. UTOF orchestrates tests across 750+ languages with perfect fidelity, integrating:
 //!
 //! - Bonsai Enclave: runtime provisioning
 //! - Sanctum: sandboxed execution

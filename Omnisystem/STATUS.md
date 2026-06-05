@@ -39,7 +39,7 @@
 |------|----------|--------|
 | `self_host_verify.ti` | Bootstrap determinism, stage-1/stage-2 agreement, fixed-point, hash collision resistance, bootstrap elimination | ✅ 111 |
 
-### USOS Kernel (`kernel/`)
+### UOSC Kernel (`kernel/`)
 
 | File | Description | LOC | Status |
 |------|-------------|-----|--------|
@@ -162,7 +162,7 @@ titan-bootstrap/output/titan-compiler.exe
 | Domain | Rule | Examples |
 |--------|------|---------|
 | Project | `Omnisystem` | Repo, docs, brand |
-| Kernel | `USOS` or `kernel` | `kernel/capability.ti` |
+| Kernel | `UOSC` or `kernel` | `kernel/capability.ti` |
 | Languages | `Titan`, `Sylva`, `Aether`, `Axiom` | Compiler, runtime, stdlib dirs |
 | Services | Single functional word | `p2p`, `compress`, `storage`, `auth` |
 | Libraries | Functional name, no prefix | `crdt`, `ir`, `effect`, `mesh` |

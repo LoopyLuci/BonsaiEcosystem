@@ -82,7 +82,7 @@ lang:
 
 test: all
 	@echo.
-	@echo === USOS Kernel ===
+	@echo === UOSC Kernel ===
 	@kernel\capability.exe      && echo   capability      PASS || echo   capability      FAIL
 	@kernel\memory.exe           && echo   memory          PASS || echo   memory          FAIL
 	@kernel\scheduler.exe        && echo   scheduler       PASS || echo   scheduler       FAIL

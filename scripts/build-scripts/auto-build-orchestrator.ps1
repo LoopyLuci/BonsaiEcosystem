@@ -90,7 +90,7 @@ Write-Host "══════════════════════�
 Write-Host @"
 WHAT HAPPENS NEXT:
 
-1️⃣  PHASE 1: Build USOS Kernel (5 min)
+1️⃣  PHASE 1: Build UOSC Kernel (5 min)
     └─ Compiles bare-metal x86_64 kernel
 
 2️⃣  PHASE 2: Build Bonsai IDE (15 min)
@@ -172,7 +172,7 @@ Write-Host @"
 
 BUILD LOGS:
    Full output: $workspace\full-build.log
-   Kernel:     $workspace\usos-build.log
+   Kernel:     $workspace\UOSC-build.log
    Rust:       $workspace\rust-build.log
    Data:       $workspace\prepare-data.log
    Training:   $workspace\training.log

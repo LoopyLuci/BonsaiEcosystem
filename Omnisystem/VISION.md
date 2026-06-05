@@ -21,7 +21,7 @@ This fragmentation creates:
 
 ## The Solution: Omni-Languages
 
-We rebuild the **entire Bonsai Ecosystem and USOS** using just **four carefully designed languages**:
+We rebuild the **entire Bonsai Ecosystem and UOSC** using just **four carefully designed languages**:
 
 | Language | Domain | Replaces |
 |----------|--------|----------|
@@ -37,7 +37,7 @@ Each is **production-grade, formally verified, and designed for excellence in it
 ## Core Principles
 
 ### 1. **Minimalism**
-The USOS kernel is **under 5000 lines** of code. It provides only:
+The UOSC kernel is **under 5000 lines** of code. It provides only:
 - Memory management (physical and virtual)
 - Process scheduling (EDF for real-time)
 - Inter-process communication (message passing)
@@ -60,7 +60,7 @@ All I/O and randomness is **tracked via the effect system**. This ensures:
 
 ### 3. **Formal Verification**
 Critical code is accompanied by **Axiom proofs**:
-- USOS kernel: memory safety, scheduler correctness, capability enforcement
+- UOSC kernel: memory safety, scheduler correctness, capability enforcement
 - Services: protocol security, data structure invariants, safety properties
 - Standard library: no memory leaks, no data races
 
@@ -108,7 +108,7 @@ All use the same effect types: `io`, `alloc`, `net`, `fail`, `async`. Cross-lang
 ├─────────────────────────────────────────────────┤
 │  Standard Library (titan::*, sylva::*, etc.)    │
 ├─────────────────────────────────────────────────┤
-│  USOS Kernel (memory, scheduler, IPC, caps)     │
+│  UOSC Kernel (memory, scheduler, IPC, caps)     │
 ├─────────────────────────────────────────────────┤
 │  Hardware (x86, ARM, RISC-V, GPU, WASM)         │
 └─────────────────────────────────────────────────┘
@@ -233,7 +233,7 @@ By the end of 2026, the Omnisystem will have:
 | Date | Milestone | Status |
 |------|-----------|--------|
 | **2026-Q1** | Phase 0: Language enhancements complete | 🚧 In progress |
-| **2026-Q2** | Phase 1-2: USOS core + core services | 📋 Planned |
+| **2026-Q2** | Phase 1-2: UOSC core + core services | 📋 Planned |
 | **2026-Q3** | Phase 3: All services running | 📋 Planned |
 | **2026-Q4** | Phase 4-5: Verification & self-hosting | 📋 Planned |
 | **2027-Q1** | Production release: Omnisystem 1.0 | 📋 Planned |

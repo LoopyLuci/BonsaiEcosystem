@@ -59,7 +59,7 @@
 │ Layer 1: Operating System & Hardware Abstraction       │
 │  Watchdog | Survival Engine | File System | Devices    │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │ USOS (Unnamed Sovereign Operating System)        │  │
+│  │ UOSC (Unnamed Sovereign Operating System)        │  │
 │  │ Replaces OS dependencies, Phase 0-6 replacement  │  │
 │  └──────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
@@ -270,7 +270,7 @@ Each numbered doc covers one major system:
 - **07-COLLABORATION.md** - TransferDaemon, sharing
 - **08-COMPUTE-FABRIC.md** - Distributed compute
 - **09-MOBILE.md** - Android apps, USB Lab
-- **10-SOVEREIGNTY.md** - USOS phases, roadmap
+- **10-SOVEREIGNTY.md** - UOSC phases, roadmap
 - **11-SECURITY.md** - Encryption, threats, audit
 - **12-DEVELOPER.md** - Build, contribute, testing
 - **13-TROUBLESHOOTING.md** - Common issues & fixes
@@ -836,7 +836,7 @@ crates/bonsai-crypto
   ├─ depends on: curve25519-dalek
   └─ no external random (uses bonsai-rng)
 
-USOS Phase 1 Crates:
+UOSC Phase 1 Crates:
   ├─ bonsai-error (custom error types)
   ├─ bonsai-log (logging framework)
   ├─ bonsai-rng (random numbers)

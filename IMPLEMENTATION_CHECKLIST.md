@@ -218,9 +218,9 @@
   - [ ] AI: learned codec selector
   - [ ] Adapt from example code
 
-### USOS Kernel (Memory + Scheduler) - Q3 2026
+### UOSC Kernel (Memory + Scheduler) - Q3 2026
 
-- [ ] **crates/bonsai-usos-kernel/**
+- [ ] **crates/bonsai-UOSC-kernel/**
   - [ ] Memory compression (zram + AI prediction)
   - [ ] Scheduler (CFS + EDF + AI tuning)
   - [ ] I/O scheduling (mq-deadline + AI prefetch)
@@ -447,7 +447,7 @@ let config = ArbiterConfig {
 - [x] 3 example implementations
 - [x] Specification documents
 - [ ] **TODO**: BUCE integration (3-4 weeks)
-- [ ] **TODO**: USOS kernel integration (4-6 weeks)
+- [ ] **TODO**: UOSC kernel integration (4-6 weeks)
 - [ ] **TODO**: Echo/P2P integration (4-6 weeks)
 - [ ] **TODO**: Formal verification with Axiom
 - [ ] **TODO**: Shadow-mode tooling & dashboards
@@ -512,7 +512,7 @@ let config = ArbiterConfig {
 ### Medium-term (Next 10-12 weeks)
 
 1. **Integrate Remaining Subsystems**
-   - USOS kernel (scheduler + memory)
+   - UOSC kernel (scheduler + memory)
    - Echo (P2P messaging)
    - BCF (container fabric)
 
@@ -561,7 +561,7 @@ let config = ArbiterConfig {
 The Bonsai AI-Optional Ecosystem framework is **production-ready** as of 2026-06-04. The core patterns have been implemented, documented, and validated through three concrete examples. TransferDaemon v2 demonstrates the patterns on a real network subsystem.
 
 The framework is ready for:
-- ✅ Integration into other Bonsai subsystems (BUCE, USOS, Echo, etc.)
+- ✅ Integration into other Bonsai subsystems (BUCE, UOSC, Echo, etc.)
 - ✅ Shadow-mode deployment and validation
 - ✅ Council-governed capability ramp-up
 - ✅ Production deployment with safety guarantees

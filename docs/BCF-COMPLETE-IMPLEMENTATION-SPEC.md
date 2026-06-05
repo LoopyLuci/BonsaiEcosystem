@@ -24,7 +24,7 @@ Layer 3: Runtime
 ├─ CAS Image Manager (pull/push, deduplication)
 └─ Volume Manager (CRDT sync, snapshots)
 
-Layer 2: Kernel Services (USOS)
+Layer 2: Kernel Services (UOSC)
 ├─ Sentinel Core (resource enforcement)
 ├─ Sanctum (hardware isolation)
 ├─ Echo Fabric (P2P, mDNS)

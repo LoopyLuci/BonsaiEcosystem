@@ -5,7 +5,7 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Bonsai Container Fabric – Next-generation Docker & Kubernetes replacement, integrated with USOS, Sentinel Core, and Echo fabric"
+description = "Bonsai Container Fabric – Next-generation Docker & Kubernetes replacement, integrated with UOSC, Sentinel Core, and Echo fabric"
 
 [dependencies]
 tokio.workspace = true

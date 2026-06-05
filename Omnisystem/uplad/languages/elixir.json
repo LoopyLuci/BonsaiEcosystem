@@ -1,0 +1,79 @@
+{
+  "name": "elixir",
+  "version": "1.16",
+  "created": 1404086400,
+  "author": "José Valim",
+  "syntax": {
+    "keywords": ["after", "and", "case", "catch", "cond", "def", "defdelegate", "defguard", "defguardp", "defimpl", "defmacro", "defmacrop", "defmodule", "defoverridable", "defp", "defprotocol", "defstruct", "do", "else", "end", "false", "fn", "for", "if", "import", "in", "is", "nil", "not", "or", "quote", "raise", "receive", "require", "rescue", "true", "try", "unless", "unquote", "unquote_splicing", "use", "when", "with"],
+    "operators": [
+      {"symbol": "+", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "-", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "*", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "/", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "==", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "!=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "===", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "!==", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "<", "precedence": 700, "associativity": "xfx"},
+      {"symbol": ">", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "<=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": ">=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "and", "precedence": 1050, "associativity": "xfy"},
+      {"symbol": "or", "precedence": 1100, "associativity": "xfy"},
+      {"symbol": "not", "precedence": 900, "associativity": "fy"},
+      {"symbol": "++", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "--", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "<>", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "|>", "precedence": 1, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "#",
+      "block_comment_start": null,
+      "block_comment_end": null
+    },
+    "string_delimiters": ["\""],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": [],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Processes",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".ex", ".exs"],
+    "shebang": "#!/usr/bin/env elixir",
+    "lsp_command": "elixir-ls",
+    "compiler": {
+      "command": "elixirc",
+      "targets": ["beam"],
+      "optimization_levels": [],
+      "cross_compilation": false
+    },
+    "interpreter": {
+      "command": "elixir",
+      "jit_available": true,
+      "tracing": true
+    },
+    "package_manager": "mix"
+  },
+  "metadata": {
+    "paradigms": ["Functional", "Concurrent", "Distributed"],
+    "influences": ["Erlang", "Ruby", "Clojure"],
+    "dialects": [],
+    "standards": [],
+    "tags": ["beam-vm", "concurrent", "distributed", "fault-tolerant", "scalable"],
+    "urls": {
+      "homepage": "https://elixir-lang.org",
+      "docs": "https://elixir-lang.org/docs.html",
+      "repo": "https://github.com/elixir-lang/elixir"
+    }
+  }
+}

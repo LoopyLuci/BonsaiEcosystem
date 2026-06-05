@@ -1,0 +1,78 @@
+{
+  "name": "lua",
+  "version": "5.4",
+  "created": 1064073600,
+  "author": "Roberto Ierusalimschy, Waldemar Celes, Luiz Henrique de Figueiredo",
+  "syntax": {
+    "keywords": ["and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"],
+    "operators": [
+      {"symbol": "+", "precedence": 100, "associativity": "Left"},
+      {"symbol": "-", "precedence": 100, "associativity": "Left"},
+      {"symbol": "*", "precedence": 110, "associativity": "Left"},
+      {"symbol": "/", "precedence": 110, "associativity": "Left"},
+      {"symbol": "//", "precedence": 110, "associativity": "Left"},
+      {"symbol": "%", "precedence": 110, "associativity": "Left"},
+      {"symbol": "^", "precedence": 120, "associativity": "Right"},
+      {"symbol": "..", "precedence": 95, "associativity": "Right"},
+      {"symbol": "==", "precedence": 60, "associativity": "Left"},
+      {"symbol": "~=", "precedence": 60, "associativity": "Left"},
+      {"symbol": "<", "precedence": 70, "associativity": "Left"},
+      {"symbol": ">", "precedence": 70, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 70, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 70, "associativity": "Left"},
+      {"symbol": "and", "precedence": 40, "associativity": "Left"},
+      {"symbol": "or", "precedence": 30, "associativity": "Left"},
+      {"symbol": "not", "precedence": 80, "associativity": "Right"},
+      {"symbol": "#", "precedence": 80, "associativity": "Right"},
+      {"symbol": "&", "precedence": 80, "associativity": "Left"},
+      {"symbol": "|", "precedence": 80, "associativity": "Left"},
+      {"symbol": "~", "precedence": 80, "associativity": "Left"},
+      {"symbol": "<<", "precedence": 80, "associativity": "Left"},
+      {"symbol": ">>", "precedence": 80, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "--",
+      "block_comment_start": "--[[",
+      "block_comment_end": "]]"
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": [],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "None",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".lua"],
+    "shebang": "#!/usr/bin/env lua",
+    "lsp_command": "lua-language-server",
+    "compiler": null,
+    "interpreter": {
+      "command": "lua",
+      "jit_available": true,
+      "tracing": true
+    },
+    "package_manager": "luarocks"
+  },
+  "metadata": {
+    "paradigms": ["Imperative", "Functional"],
+    "influences": ["Scheme", "Python"],
+    "dialects": [],
+    "standards": ["Lua 5.1 through 5.4"],
+    "tags": ["embedded", "scripting", "lightweight", "game-development", "configuration"],
+    "urls": {
+      "homepage": "https://www.lua.org",
+      "docs": "https://www.lua.org/docs.html",
+      "repo": "https://github.com/lua/lua"
+    }
+  }
+}

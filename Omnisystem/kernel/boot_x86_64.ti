@@ -1,4 +1,4 @@
-// kernel/boot_x86_64.ti — USOS bare-metal x86-64 bootloader interface
+// kernel/boot_x86_64.ti — UOSC bare-metal x86-64 bootloader interface
 // Models the transition from bootloader to kernel initialization.
 // In production: assembled from boot.asm; here: pure Titan simulation
 // of the boot sequence with GDT init, paging, and first process spawn.

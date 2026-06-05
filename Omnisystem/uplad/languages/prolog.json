@@ -1,0 +1,84 @@
+{
+  "name": "prolog",
+  "version": "ISO Prolog",
+  "created": 336700800,
+  "author": "Alain Colmerauer",
+  "syntax": {
+    "keywords": ["abolish", "arg", "assert", "asserta", "assertz", "atom", "atomic", "bagof", "call", "char_code", "clause", "compare", "compound", "copy_term", "current_op", "current_predicate", "fail", "findall", "float", "functor", "get", "get_char", "get_code", "halt", "integer", "is", "keysort", "length", "member", "name", "nl", "nonvar", "not", "notrace", "number", "number_chars", "number_codes", "op", "peek", "peek_char", "peek_code", "put", "put_char", "put_code", "read", "read_term", "retract", "retractall", "see", "seeing", "seen", "setof", "sort", "statistics", "succ", "tab", "tell", "telling", "told", "trace", "true", "unify_with_occurs_check", "var", "write", "write_canonical", "write_term", "writeq"],
+    "operators": [
+      {"symbol": ":-", "precedence": 1200, "associativity": "xfx"},
+      {"symbol": "-->", "precedence": 1200, "associativity": "xfx"},
+      {"symbol": ";", "precedence": 1100, "associativity": "xfy"},
+      {"symbol": ",", "precedence": 1000, "associativity": "xfy"},
+      {"symbol": "\\+", "precedence": 900, "associativity": "fy"},
+      {"symbol": "=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "\\=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "==", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "\\==", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "@<", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "@=<", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "@>", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "@>=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=..", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "is", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=:=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=\\=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "<", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=<", "precedence": 700, "associativity": "xfx"},
+      {"symbol": ">", "precedence": 700, "associativity": "xfx"},
+      {"symbol": ">=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "+", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "-", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "*", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "/", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "//", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "mod", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "**", "precedence": 200, "associativity": "xfx"},
+      {"symbol": "^", "precedence": 200, "associativity": "xfy"}
+    ],
+    "comments": {
+      "line_comment": "%",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": [],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Lazy",
+    "concurrency": "None",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".pl", ".pro"],
+    "shebang": "#!/usr/bin/env swipl",
+    "lsp_command": "prolog-language-server",
+    "compiler": null,
+    "interpreter": {
+      "command": "swipl",
+      "jit_available": true,
+      "tracing": true
+    },
+    "package_manager": "pack"
+  },
+  "metadata": {
+    "paradigms": ["Logic", "Declarative"],
+    "influences": ["Herbrand", "Resolution"],
+    "dialects": ["SWI-Prolog", "GNU Prolog", "Ciao Prolog"],
+    "standards": ["ISO Prolog"],
+    "tags": ["logic", "declarative", "unification", "backtracking", "knowledge-representation"],
+    "urls": {
+      "homepage": "https://www.swi-prolog.org",
+      "docs": "https://www.swi-prolog.org/pldoc/doc_for?object=manual",
+      "repo": "https://github.com/SWI-Prolog/swipl-devel"
+    }
+  }
+}

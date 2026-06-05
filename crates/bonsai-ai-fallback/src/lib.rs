@@ -1,7 +1,7 @@
 //! Bonsai AI Fallback Framework
 //!
 //! Universal, `no_std`-compatible foundation for building AI-optional, deterministic-first systems
-//! across the entire Bonsai Ecosystem and USOS.
+//! across the entire Bonsai Ecosystem and UOSC.
 //!
 //! # Core Principle
 //!

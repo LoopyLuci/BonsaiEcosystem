@@ -1,0 +1,70 @@
+{
+  "name": "cobol",
+  "version": "2014",
+  "created": 252460800,
+  "author": "Grace Hopper",
+  "syntax": {
+    "keywords": ["ACCEPT", "ACCESS", "ADD", "AFTER", "ALL", "ALPHABET", "ALPHABETIC", "ALPHABETIC-LOWER", "ALPHABETIC-UPPER", "ALPHANUMERIC", "ALPHANUMERIC-EDITED", "ALSO", "ALTER", "ALTERNATE", "AND", "ANY", "APPLY", "AREA", "AREAS", "ARE", "ARGUMENT", "ARGUMENTS", "AS", "ASCENDING", "ASSIGN", "AT", "ATTRIBUTE", "AUTHOR", "AUTO", "AUTOMATIC", "B-AND", "B-NOT", "B-OR", "B-XOR", "BASED", "BEFORE", "BEGIN", "BINARY", "BLANK", "BLOCK", "BODY", "BOTTOM", "BY", "CALL", "CALLED", "CANCEL", "CHARACTER", "CHARACTERS", "CLASS", "CLASSIFICATION", "CLOSE", "COBOL", "CODE", "CODE-ID", "COLLATING", "COLUMN", "COM-REG", "COMMA", "COMMENT", "COMMON", "COMMUNICATION", "COMP", "COMP-1", "COMP-2", "COMP-3", "COMP-4", "COMP-5", "COMP-X", "COMPUTATIONAL", "COMPUTATIONAL-1", "COMPUTATIONAL-2", "COMPUTATIONAL-3", "COMPUTATIONAL-4", "COMPUTATIONAL-5", "COMPUTATIONAL-X", "COMPUTE", "CONDITION", "CONFIGURATION", "CONSTANT", "CONTAINS", "CONTENT", "CONTINUE", "CONTROL", "CONTROLS", "CONVENTION", "CONVERTING", "COPY", "CORR", "CORRESPONDING", "COUNT", "CURRENCY", "CURRENT", "CURSOR", "DATA", "DATA-POINTER", "DATABASE", "DATE", "DATE-COMPILED", "DATE-WRITTEN", "DAY", "DAY-OF-WEEK", "DBCS", "DE", "DEBUG", "DEBUGGING", "DECIMAL", "DECIMAL-POINT", "DECLARATIVES", "DECLARE", "DEFAULT", "DELETE", "DELIMITED", "DELIMITER", "DELIMITERS", "DEPENDING", "DEPTH", "DESCENDING", "DESCRIPTION", "DESTINATION", "DETAIL", "DFLT", "DISABLE", "DISPLAY", "DISPLAY-1", "DIVIDE", "DIVISION", "DONTCARE", "DOUBLE", "DOWN", "DRAW", "DUPLICATE", "DUPLICATES", "DYNAMIC", "EBCDIC", "ECHO", "ELSE", "ELSEIF", "EMI", "EMPTY", "ENABLE", "ENCODING", "END", "END-ACCEPT", "END-ADD", "END-CALL", "END-CHAIN", "END-CLOSE", "END-COMPUTE", "END-DELETE", "END-DISPLAY", "END-DIVIDE", "END-EVALUATE", "END-EXEC", "END-IF", "END-MOVE", "END-MULTIPLY", "END-OF-PAGE", "END-PERFORM", "END-READ", "END-RECEIVE", "END-RETURN", "END-REWRITE", "END-SEARCH", "END-SEND", "END-START", "END-STRING", "END-SUBTRACT", "END-UNSTRING", "END-WRITE", "ENDING", "ENDPROGRAM", "ENTER", "ENTRY", "ENVIRONMENT", "EOP", "EOT", "EQUAL", "EQUALS", "ERASE", "ERROR", "ESCAPE", "ESCAPES", "EVALUATE", "EVALUATION", "EVENT", "EVERY", "EXCEPTION", "EXCEPTION-OBJECT", "EXCEPTIONS", "EXCLUSIVE", "EXEC", "EXECUTE", "EXHIBIT", "EXIT", "EXTEND", "EXTENDS", "EXTERNAL", "EXTERNALLY", "EXTRA", "EXTREMELY", "FACTORY", "FALSE", "FCB", "FETCH", "FIELD", "FIELDS", "FILE", "FILE-CONTROL", "FILE-ID", "FILE-POS", "FILE-POSITION", "FILENAME", "FILL", "FILL-IN", "FILLED", "FINAL", "FIND", "FINISH", "FIRST", "FLAG", "FLAGS", "FLAT", "FLATTENED", "FLOAT", "FLOAT-LONG", "FLOAT-SHORT", "FLUSHED", "FOOTING", "FOR", "FOREGROUND", "FOREIGN", "FOREVER", "FORMAT", "FORMATTED", "FORMING", "FORWARD", "FOUND", "FRACTION", "FROM", "FRONT", "FULL", "FULLY", "FUNCTION", "FUNCTION-ID", "FUNCTION-POINTER", "FUNCTIONALLY", "FUNCTIONS", "FUNCTIONAL-AREA", "FUND-AREA", "FUTURE", "GARBAGE", "GARBAGE-COLLECTION", "GENERATE", "GENERATED", "GENERATES", "GENERIC", "GIVING", "GLOBAL", "GO", "GOAL", "GOBACK", "GOING", "GONE", "GRAPHIC", "GREATER", "GROUP", "GROUP-USAGE", "GROUPED", "GROUPING", "GROUPS", "GROWING", "GUARD", "GUARDED", "GUARDING", "GUEST", "GUIDE", "HANDLER", "HANDLING", "HANDSHAKE", "HAVE", "HAVING", "HEADER", "HEADING", "HEADINGS", "HEAVY", "HEIGHT", "HIDDEN", "HIDE", "HIGH", "HIGH-VALUE", "HIGH-VALUES", "HIGHLIGHT", "HIGHLIGHTS", "HISTORY", "HOLD", "HOLDING", "HOLDS", "HOT", "HOUR", "HOURS", "HTML", "HTTP", "HUGE", "HUMANITIES", "HUNG", "IDENTIFIER", "IDENTIFIERS", "IDENTIFY", "IDENTIFYING", "ID-NUMBER", "IGNORE", "IGNORES", "IGNORING", "IL", "ILL", "ILLEGAL", "IMAGE", "IMAGEBASE", "IMAGES", "IMMEDIATE", "IMMEDIATELY", "IMMOBILE", "IMPACT", "IMPACTED", "IMPACTING", "IMPACTS", "IMPLEMENTATION", "IMPLEMENTED", "IMPLEMENTER", "IMPLEMENTING", "IMPLEMENTS", "IMPLIED", "IMPLICIT", "IMPLICITLY", "IMPLIES", "IMPORT", "IMPORTANCE", "IMPORTANT", "IMPORTED", "IMPORTING", "IMPORTS", "IMPOSABLE", "IMPOSABLE-ON", "IMPOSE", "IMPOSED", "IMPOSES", "IMPOSSIBLE", "IMPOST", "IMPRESS", "IMPRESSED", "IMPRESSIVE", "IMPRINT", "IMPRINTED", "IMPRINTING", "IMPRINTS", "IMPROBABLE", "IMPROPER", "IMPROPRIETY", "IMPROVE", "IMPROVED", "IMPROVEMENT", "IMPROVEMENTS", "IMPROVES", "IMPROVING", "IMPROVISED", "IMPROVISES", "IN", "INACCURACY", "INACCURATE", "INACCURATELY", "INACTION", "INACTIVATED", "INACTIVATES", "INACTIVATING", "INACTIVE", "INACTIVITY", "INADEQUACY", "INADEQUATE", "INADEQUATELY", "INADMISSIBLE", "INADVERTENCE", "INADVERTENCY", "INADVERTENT", "INADVERTENTLY", "INADVISABILITY", "INADVISABLE", "INALIENABLE", "INANE", "INANENESS", "INANITION", "INANITY", "INANITION", "INANITY"],
+    "operators": [
+      {"symbol": "+", "precedence": 0, "associativity": "Left"},
+      {"symbol": "-", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"},
+      {"symbol": "/", "precedence": 0, "associativity": "Left"},
+      {"symbol": "**", "precedence": 0, "associativity": "Right"},
+      {"symbol": "=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "NOT =", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "AND", "precedence": 0, "associativity": "Left"},
+      {"symbol": "OR", "precedence": 0, "associativity": "Left"},
+      {"symbol": "NOT", "precedence": 0, "associativity": "Right"}
+    ],
+    "comments": {
+      "line_comment": "*>",
+      "block_comment_start": null,
+      "block_comment_end": null
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": false
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Records", "Numeric Edited"],
+    "nominal": true,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "None",
+    "memory_management": "Manual"
+  },
+  "tooling": {
+    "extensions": [".cob", ".cobol", ".cbl"],
+    "shebang": null,
+    "lsp_command": "cobol-language-server",
+    "compiler": {
+      "command": "cobc",
+      "targets": ["native"],
+      "optimization_levels": ["0", "1", "2"],
+      "cross_compilation": false
+    },
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Imperative", "Procedural"],
+    "influences": [],
+    "dialects": ["GnuCOBOL", "IBM COBOL"],
+    "standards": ["COBOL85", "COBOL2002", "COBOL2014"],
+    "tags": ["legacy", "business", "finance", "mainframe", "record-based"],
+    "urls": {
+      "homepage": "https://en.wikipedia.org/wiki/COBOL",
+      "docs": "https://www.gnu.org/software/gnucobol/",
+      "repo": "https://github.com/gnutools/GnuCOBOL"
+    }
+  }
+}

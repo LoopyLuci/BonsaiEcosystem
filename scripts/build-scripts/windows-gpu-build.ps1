@@ -71,24 +71,24 @@ if (-not $pythonCheck) {
 Write-Host "✅ Python ready`n" -ForegroundColor Green
 
 # ============================================================================
-# PHASE 1: USOS Kernel
+# PHASE 1: UOSC Kernel
 # ============================================================================
 
 if (-not $SkipKernel) {
-    Write-Phase 1 "Build USOS Kernel" "5 min"
+    Write-Phase 1 "Build UOSC Kernel" "5 min"
 
     Write-Step "Compiling bare-metal x86_64 kernel..."
 
-    Push-Location "$workspace\crates\usos-kernel"
+    Push-Location "$workspace\crates\UOSC-kernel"
 
     # Ensure target is installed
     rustup target add x86_64-unknown-none 2>&1 | Out-Null
 
     # Build with output visible
-    cargo build --release --target x86_64-unknown-none 2>&1 | Tee-Object -FilePath "$workspace\usos-build.log"
+    cargo build --release --target x86_64-unknown-none 2>&1 | Tee-Object -FilePath "$workspace\UOSC-build.log"
 
     if ($LASTEXITCODE -eq 0) {
-        $kernel = "$workspace\crates\usos-kernel\target\x86_64-unknown-none\release\usos-kernel"
+        $kernel = "$workspace\crates\UOSC-kernel\target\x86_64-unknown-none\release\UOSC-kernel"
         if (Test-Path $kernel) {
             $size = (Get-Item $kernel).Length
             Write-Host "✅ Kernel built ($size bytes)" -ForegroundColor Green
@@ -327,7 +327,7 @@ Option 2: Via API (CLI)
 ═════════════════════════════════════════════════════════════════════════════════
 
 BUILD LOGS:
-  Kernel:        $workspace\usos-build.log
+  Kernel:        $workspace\UOSC-build.log
   IDE:           $workspace\rust-build.log
   Data Prep:     $workspace\prepare-data.log
   GPU Training:  $workspace\training.log

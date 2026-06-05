@@ -285,7 +285,7 @@
       "component": "nexus-governance",
       "severity": "high",
       "title": "crystal_swap No Fallback",
-      "symptom": "Upgrade fails without explanation if nexus-update or usos-verify missing",
+      "symptom": "Upgrade fails without explanation if nexus-update or UOSC-verify missing",
       "cause": "External binary called without existence check or fallback",
       "fix": "Added existence check with `which`, implemented local BLAKE3 hash fallback, added error logging",
       "pattern_regex": "Command::new.*crystal_swap.*no fallback",

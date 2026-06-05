@@ -1,0 +1,71 @@
+{
+  "name": "sql",
+  "version": "SQL:2023",
+  "created": 697324800,
+  "author": "ISO/IEC Working Group",
+  "syntax": {
+    "keywords": ["ABSOLUTE", "ACTION", "ADD", "AFTER", "ALL", "ALLOCATE", "ALTER", "AND", "ANY", "ARE", "ARRAY", "AS", "ASC", "ASENSITIVE", "ASSERTION", "ASYMMETRIC", "AT", "ATOMIC", "AUTHORIZATION", "AVG", "BEFORE", "BEGIN", "BETWEEN", "BIGINT", "BINARY", "BIT", "BLOB", "BOOLEAN", "BOTH", "BREADTH", "BY", "CALL", "CALLED", "CASCADE", "CASCADED", "CASE", "CAST", "CATALOG", "CHAR", "CHARACTER", "CHECK", "CLOB", "CLOSE", "COALESCE", "COLLATE", "COLLATION", "COLUMN", "COMMIT", "CONDITION", "CONNECT", "CONNECTION", "CONSTRAINT", "CONSTRAINTS", "CONSTRUCTOR", "CONTAINS", "CONTINUE", "CONVERT", "CORRESPONDING", "COUNT", "CREATE", "CROSS", "CUBE", "CURRENT", "CURRENT_CATALOG", "CURRENT_DATE", "CURRENT_DEFAULT_TRANSFORM_GROUP", "CURRENT_PATH", "CURRENT_ROLE", "CURRENT_SCHEMA", "CURRENT_TIME", "CURRENT_TIMESTAMP", "CURRENT_TRANSFORM_GROUP_FOR_TYPE", "CURRENT_USER", "CURSOR", "CYCLE", "DATA", "DATABASE", "DATE", "DATETIME", "DAY", "DEALLOCATE", "DEC", "DECIMAL", "DECLARE", "DEFAULT", "DEFERRABLE", "DEFERRED", "DELETE", "DEPTH", "DEREF", "DESC", "DESCRIBE", "DESCRIPTOR", "DETERMINISTIC", "DIAGNOSTICS", "DISABLE", "DISCONNECT", "DISTINCT", "DISTINCTROW", "DIV", "DO", "DOCUMENT", "DOMAIN", "DOUBLE", "DROP", "DUAL", "DYNAMIC", "EACH", "ELEMENT", "ELSE", "ELSEIF", "ENABLE", "ENCLOSED", "END", "END-EXEC", "EQUALS", "ESCAPE", "ESCAPED", "EXCEPT", "EXCEPTION", "EXCLUDE", "EXCLUDING", "EXCLUSIVE", "EXEC", "EXECUTE", "EXISTS", "EXIT", "EXTERNAL", "EXTRACT", "FALSE", "FETCH", "FIELDS", "FILE", "FILTER", "FINAL", "FIRST", "FLOAT", "FOLLOWING", "FOR", "FORCE", "FOREIGN", "FREEZE", "FROM", "FULL", "FUNCTION", "GENERAL", "GENERATED", "GET", "GLOBAL", "GRANT", "GRANTED", "GROUP", "GROUPING", "GROUPS", "HANDLER", "HAVING", "HEADER", "HOLD", "HOUR", "IDENTITY", "IF", "IGNORE", "ILIKE", "IMMEDIATE", "IMMUTABLE", "IMPACT", "IMPORT", "IN", "INCLUDE", "INCLUDING", "INCREMENT", "INDEX", "INDICATOR", "INITIALLY", "INNER", "INOUT", "INPUT", "INSENSITIVE", "INSERT", "INT", "INTEGER", "INTERSECT", "INTERVAL", "INTO", "INVOKER", "IS", "ISNULL", "ISOLATION", "ITERATE", "JOIN", "KEY", "KILL", "LANGUAGE", "LARGE", "LAST", "LATERAL", "LEADING", "LEAVE", "LEFT", "LEVEL", "LIKE", "LIMIT", "LINEAR", "LINES", "LOAD", "LOCAL", "LOCALTIME", "LOCALTIMESTAMP", "LOCATOR", "LOCK", "LONG", "LOOP", "LOW_PRIORITY", "LOWER", "MATCH", "MAXVALUE", "MEMBER", "MERGE", "METHOD", "MICROSECOND", "MINUTE", "MINVALUE", "MOD", "MODIFIES", "MODULE", "MONTH", "MULTISET", "MUST", "NATURAL", "NCHAR", "NCLOB", "NEW", "NEXT", "NO", "NOCHECK", "NOCOPY", "NODEGROUP", "NOINLINE", "NONE", "NORMALIZE", "NOT", "NOTNULL", "NOWAIT", "NULL", "NULLIF", "NULLS", "NUMBER", "NUMERIC", "NVARCHAR", "OBJECT", "OFFSET", "OLD", "ON", "ONLY", "OPEN", "OPTION", "OPTIONS", "OR", "ORDER", "ORDINALITY", "OTHER", "OTHERS", "OUT", "OUTER", "OUTPUT", "OVER", "OVERLAPS", "OVERLAY", "OVERRIDING", "OVER_ROLLING", "PACKAGE", "PAD", "PARAMETER", "PARAMETER_SPECIFIC_CATALOG", "PARAMETER_SPECIFIC_NAME", "PARAMETER_SPECIFIC_SCHEMA", "PARTIAL", "PARTITION", "PASSING", "PASSTHROUGH", "PASSWORD", "PATH", "PCTFREE", "PERCENT", "PERCENT_RANK", "PERCENTILE_CONT", "PERCENTILE_DISC", "PERIOD", "PERMISSION", "PLACING", "PLAN", "POSITION", "PRECISION", "PRECEDING", "PREPARE", "PRESERVE", "PRESERVE_ROW_FORMAT", "PREV", "PRIMARY", "PRIOR", "PRIVILEGES", "PROC", "PROCEDURE", "PROFILE", "PURGE", "QUALIFY", "QUARTER", "QUERY", "QUICK", "RANGE", "RANK", "READ", "READS", "READONLY", "READTEXT", "REAL", "RECHECK", "RECURSIVE", "RECYCLE", "REF", "REFERENCES", "REFERENCING", "REFRESH", "REGCLASS", "REGEXP", "REGION", "REGISTER", "REINDEX", "RELATIVE", "RELEASE", "RENAME", "REPEAT", "REPLACE", "REPLACING", "REQUIRING", "RESET", "RESIGNAL", "RESOURCE", "RESTRICT", "RESULT", "RETURN", "RETURNING", "RETURNS", "REVOKE", "RIGHT", "RLIKE", "ROLE", "ROLLBACK", "ROLLUP", "ROW", "ROW_COUNT", "ROW_FORMAT", "ROW_NUMBER", "ROWS", "ROWTYPE", "ROUTINE", "ROUTINE_CATALOG", "ROUTINE_NAME", "ROUTINE_SCHEMA", "ROW_NUMBER", "ROWID", "ROWNUM", "ROWTYPE", "RULE", "SAFE", "SAVEPOINT", "SCHEMA", "SCHEMA_NAME", "SCOPE", "SCOPE_IDENTITY", "SCROLL", "SEARCH", "SECOND", "SECTION", "SECURITY", "SEEK", "SELECT", "SELECTIVELY", "SEMANTICS", "SENSITIVE", "SEPARATOR", "SEQUENCE", "SESSION", "SESSION_USER", "SET", "SETOF", "SETS", "SHARE", "SHOW", "SHUTDOWN", "SIGNAL", "SIMILAR", "SIMPLE", "SKIP", "SMALLINT", "SNAPSHOT", "SOME", "SOURCE", "SPACE", "SPECIFIC", "SPECIFICTYPE", "SPECIFICS", "SQL", "SQLCODE", "SQLEXCEPTION", "SQLSTATE", "SQLWARNING", "SQL_BIG_RESULT", "SQL_CALC_FOUND_ROWS", "SQL_SMALL_RESULT", "STABLE", "STANDALONE", "START", "STARTING", "STATE", "STATEMENT", "STATIC", "STATISTICS", "STATUS", "STDDEV_POP", "STDDEV_SAMP", "STORAGE", "STRAIGHT_JOIN", "STRICT", "STRING_AGG", "STRUCTURE", "STYLE", "SUBCLASS_ORIGIN", "SUBMULTISET", "SUBSTRING", "SUBSTITUTE", "SUBSTRING_REGEX", "SUCCEEDS", "SUM", "SYMBOL", "SYMMETRIC", "SYNONYM", "SYSDATE", "SYSTEM", "SYSTEM_TIME", "SYSTEM_USER", "TABLE", "TABLESAMPLE", "TABLESPACE", "TEMP", "TEMPLATE", "TEMPORAL", "TERMINATE", "TEXT", "TEXTSIZE", "THAN", "THEN", "TIES", "TIME", "TIMESTAMP", "TIMEZONE_HOUR", "TIMEZONE_MINUTE", "TINYINT", "TO", "TOAST", "TOKEN", "TOP", "TOUCH", "TRAILING", "TRANSACTION", "TRANSACTION_ACTIVE", "TRANSACTIONS_COMMITTED", "TRANSACTIONS_ROLLED_BACK", "TRANSFORM", "TRANSFORMS", "TRANSLATE", "TRANSLATE_REGEX", "TRANSLATION", "TREAT", "TRIGGER", "TRIGGER_CATALOG", "TRIGGER_NAME", "TRIGGER_SCHEMA", "TRIM", "TRIM_ARRAY", "TRUE", "TRUNCATE", "TRUSTED", "TRY_CAST", "TRY_CONVERT", "TYPE", "TYPES", "UESCAPE", "UNBOUNDED", "UNCOMMITTED", "UNDER", "UNDO", "UNION", "UNIQUE", "UNKNOWN", "UNLINK", "UNLISTEN", "UNLOCK", "UNLOGGED", "UNMATCHED", "UNNAMED", "UNNEST", "UNQUALIFIED", "UNSIGNED", "UPDATE", "UPDATETEXT", "UPPER", "USAGE", "USE", "USER", "USER_DEFINED_TYPE_CATALOG", "USER_DEFINED_TYPE_CODE", "USER_DEFINED_TYPE_NAME", "USER_DEFINED_TYPE_SCHEMA", "USING", "VACUUM", "VALID", "VALIDATE", "VALIDATION", "VALUE", "VALUES", "VARBINARY", "VARCHAR", "VARCHAR2", "VARIADIC", "VARYING", "VAR_POP", "VAR_SAMP", "VERBOSE", "VERIFY", "VERSION", "VERSIONING", "VIEW", "VOLATILE", "WAIT", "WAITING", "WHEN", "WHENEVER", "WHERE", "WHILE", "WHITESPACE", "WINDOW", "WITH", "WITHIN", "WITHOUT", "WORK", "WRAPPER", "WRITE", "WRITETEXT", "YEAR", "YEAR_MONTH", "ZONE"],
+    "operators": [
+      {"symbol": "+", "precedence": 0, "associativity": "Left"},
+      {"symbol": "-", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"},
+      {"symbol": "/", "precedence": 0, "associativity": "Left"},
+      {"symbol": "%", "precedence": 0, "associativity": "Left"},
+      {"symbol": "=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<>", "precedence": 0, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "AND", "precedence": 0, "associativity": "Left"},
+      {"symbol": "OR", "precedence": 0, "associativity": "Left"},
+      {"symbol": "NOT", "precedence": 0, "associativity": "Right"},
+      {"symbol": "LIKE", "precedence": 0, "associativity": "Left"},
+      {"symbol": "IN", "precedence": 0, "associativity": "Left"},
+      {"symbol": "BETWEEN", "precedence": 0, "associativity": "Left"},
+      {"symbol": "IS", "precedence": 0, "associativity": "Left"},
+      {"symbol": "||", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "--",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["'"],
+    "case_sensitive": false
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Records", "Arrays", "JSON"],
+    "nominal": true,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Declarative",
+    "concurrency": "ACID",
+    "memory_management": "Manual"
+  },
+  "tooling": {
+    "extensions": [".sql"],
+    "shebang": null,
+    "lsp_command": "sql-language-server",
+    "compiler": null,
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Declarative", "Relational"],
+    "influences": [],
+    "dialects": ["PostgreSQL", "MySQL", "T-SQL", "Oracle", "SQLite"],
+    "standards": ["SQL:2023", "SQL:2016", "SQL:2011"],
+    "tags": ["database", "query", "relational", "declarative", "data-manipulation"],
+    "urls": {
+      "homepage": "https://en.wikipedia.org/wiki/SQL",
+      "docs": "https://sql.org/",
+      "repo": null
+    }
+  }
+}

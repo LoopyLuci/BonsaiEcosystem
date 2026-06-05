@@ -1,4 +1,4 @@
-# System Architecture – Bonsai Ecosystem & USOS
+# System Architecture – Bonsai Ecosystem & UOSC
 
 **Version**: 3.0 | **Date**: 2026-06-04 | **Status**: Production-Ready
 
@@ -39,7 +39,7 @@
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│         USOS Kernel (Unnamed Sovereign OS)                      │
+│         UOSC Kernel (Unnamed Sovereign OS)                      │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
 │  │  Scheduler   │  │     IPC      │  │   File System        │ │
 │  │  (Preempt.)  │  │  (Unix sock) │  │  (VFS abstraction)   │ │
@@ -81,7 +81,7 @@
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                   Operating System                              │
 │            Linux | macOS | Windows (via WSL) | NixOS           │
-│         (with USOS co-OS systemd services)                      │
+│         (with UOSC co-OS systemd services)                      │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
@@ -138,7 +138,7 @@ pub trait SovereignService {
 
 ---
 
-### Layer 3: USOS Kernel
+### Layer 3: UOSC Kernel
 
 The **core operating system** (replaces kernel responsibilities):
 
@@ -239,7 +239,7 @@ Auto-detection and fallback chain:
 
 ```
 bonsai-ecosystem/
-├── bonsai-kernel/                      # USOS kernel (30 crates)
+├── bonsai-kernel/                      # UOSC kernel (30 crates)
 │   ├── bonsai-process/                 # Process management
 │   ├── bonsai-ipc/                     # Inter-process communication
 │   ├── bonsai-vfs/                     # Virtual file system
@@ -325,7 +325,7 @@ Input validation (is query valid?)
 [Tool Calling]
 Capability check: does user have "shell:execute" token?
     ↓
-[USOS Kernel]
+[UOSC Kernel]
 IPC → bonsai-shell service
     ↓
 Execute: "ls /home"
@@ -443,7 +443,7 @@ Level 5 (All):
 └────────────────────────────────────────────────┘
            ↓ (capability token boundary)
 ┌────────────────────────────────────────────────┐
-│ Trust Domain: USOS Kernel                      │
+│ Trust Domain: UOSC Kernel                      │
 │ ├─ Enforces: capability token verification   │
 │ ├─ Manages: process isolation (via Sanctum)  │
 │ └─ Audits: all syscalls (to Universe)        │

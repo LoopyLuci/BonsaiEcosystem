@@ -1,0 +1,512 @@
+/// UDC Rule Quality Scoring System
+/// Evaluates rule confidence based on verification tier, usage history, and author reputation
+
+use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Author reputation score
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AuthorReputation {
+    CoreTeam,      // Official Bonsai team members
+    Verified,      // Verified community contributor
+    Community,     // Regular community member
+    Unknown,       // Unknown or new author
+}
+
+impl AuthorReputation {
+    pub fn multiplier(&self) -> f32 {
+        match self {
+            AuthorReputation::CoreTeam => 1.0,
+            AuthorReputation::Verified => 0.95,
+            AuthorReputation::Community => 0.85,
+            AuthorReputation::Unknown => 0.7,
+        }
+    }
+}
+
+/// Usage history for a rule
+#[derive(Clone, Debug)]
+pub struct UsageHistory {
+    pub total_uses: u64,
+    pub successful_uses: u64,
+    pub failed_uses: u64,
+    pub last_used: Option<SystemTime>,
+    pub first_reported: Option<SystemTime>,
+}
+
+impl UsageHistory {
+    pub fn new() -> Self {
+        UsageHistory {
+            total_uses: 0,
+            successful_uses: 0,
+            failed_uses: 0,
+            last_used: None,
+            first_reported: None,
+        }
+    }
+
+    pub fn success_rate(&self) -> f32 {
+        if self.total_uses == 0 {
+            return 0.5; // Default confidence for untested rules
+        }
+        self.successful_uses as f32 / self.total_uses as f32
+    }
+
+    pub fn maturity_score(&self) -> f32 {
+        // Score based on number of uses
+        let uses = self.total_uses as f32;
+        if uses >= 1000.0 {
+            1.0
+        } else if uses >= 100.0 {
+            0.95
+        } else if uses >= 10.0 {
+            0.8
+        } else if uses >= 1.0 {
+            0.6
+        } else {
+            0.3
+        }
+    }
+
+    pub fn is_recently_used(&self) -> bool {
+        if let Some(last_use) = self.last_used {
+            if let Ok(duration) = last_use.elapsed() {
+                // Less than 30 days
+                return duration.as_secs() < 30 * 24 * 60 * 60;
+            }
+        }
+        false
+    }
+}
+
+/// Verification tier contribution to confidence
+#[derive(Clone, Copy, Debug)]
+pub enum VerificationTier {
+    NoCheck = 0,
+    Tier1TypeCheck = 1,
+    Tier2Smt = 2,
+    Tier3Axiom = 3,
+}
+
+impl VerificationTier {
+    pub fn base_confidence(&self) -> f32 {
+        match self {
+            VerificationTier::NoCheck => 0.0,
+            VerificationTier::Tier1TypeCheck => 0.6,
+            VerificationTier::Tier2Smt => 0.85,
+            VerificationTier::Tier3Axiom => 0.99,
+        }
+    }
+
+    pub fn requires_review(&self) -> bool {
+        matches!(self, VerificationTier::NoCheck | VerificationTier::Tier1TypeCheck)
+    }
+}
+
+/// Complete rule quality assessment
+#[derive(Clone, Debug)]
+pub struct RuleQuality {
+    pub rule_id: String,
+    pub verification_tier: VerificationTier,
+    pub author: AuthorReputation,
+    pub usage_history: UsageHistory,
+    pub confidence: f32,
+    pub is_safe_to_use: bool,
+    pub review_required: bool,
+    pub breakdown: ConfidenceBreakdown,
+}
+
+/// Detailed breakdown of confidence score
+#[derive(Clone, Debug)]
+pub struct ConfidenceBreakdown {
+    pub verification_contribution: f32,
+    pub usage_history_contribution: f32,
+    pub author_reputation_contribution: f32,
+    pub maturity_contribution: f32,
+}
+
+/// Rule quality scoring engine
+pub struct RuleQualityScorer {
+    min_safe_confidence: f32,
+    core_team_members: HashSet<String>,
+    verified_contributors: HashSet<String>,
+}
+
+use std::collections::HashSet;
+
+impl RuleQualityScorer {
+    pub fn new() -> Self {
+        let mut core_team_members = HashSet::new();
+        core_team_members.insert("bonsai-team".to_string());
+        core_team_members.insert("core".to_string());
+        core_team_members.insert("official".to_string());
+
+        let mut verified_contributors = HashSet::new();
+        verified_contributors.insert("verified".to_string());
+
+        RuleQualityScorer {
+            min_safe_confidence: 0.95,
+            core_team_members,
+            verified_contributors,
+        }
+    }
+
+    /// Determine author reputation from username
+    pub fn get_author_reputation(&self, author: &str) -> AuthorReputation {
+        if self.core_team_members.contains(author) {
+            AuthorReputation::CoreTeam
+        } else if self.verified_contributors.contains(author) {
+            AuthorReputation::Verified
+        } else if !author.is_empty() {
+            AuthorReputation::Community
+        } else {
+            AuthorReputation::Unknown
+        }
+    }
+
+    /// Register core team member
+    pub fn register_core_member(&mut self, author: &str) {
+        self.core_team_members.insert(author.to_string());
+    }
+
+    /// Register verified contributor
+    pub fn register_verified(&mut self, author: &str) {
+        self.verified_contributors.insert(author.to_string());
+    }
+
+    /// Score a single rule
+    pub fn score_rule(
+        &self,
+        rule_id: &str,
+        verification_tier: VerificationTier,
+        author: &str,
+        usage_history: &UsageHistory,
+    ) -> RuleQuality {
+        let author_rep = self.get_author_reputation(author);
+
+        // Component scores (0.0 - 1.0 each)
+        let verification_score = verification_tier.base_confidence();
+        let history_score = usage_history.success_rate() * usage_history.maturity_score();
+        let author_score = author_rep.multiplier();
+        let maturity_score = usage_history.maturity_score();
+
+        // Weighted combination (weights sum to 1.0)
+        let confidence = (verification_score * 0.40) // Verification is primary
+            + (history_score * 0.35) // Usage history is important
+            + (author_score * 0.15) // Author reputation helps
+            + (maturity_score * 0.10); // Time-in-use is secondary
+
+        // Clamp to [0.0, 1.0]
+        let confidence = confidence.max(0.0).min(1.0);
+
+        let is_safe_to_use = confidence >= self.min_safe_confidence;
+        let review_required = verification_tier.requires_review()
+            || !usage_history.is_recently_used()
+            || usage_history.total_uses < 5;
+
+        let breakdown = ConfidenceBreakdown {
+            verification_contribution: verification_score * 0.40,
+            usage_history_contribution: history_score * 0.35,
+            author_reputation_contribution: author_score * 0.15,
+            maturity_contribution: maturity_score * 0.10,
+        };
+
+        RuleQuality {
+            rule_id: rule_id.to_string(),
+            verification_tier,
+            author: author_rep,
+            usage_history: usage_history.clone(),
+            confidence,
+            is_safe_to_use,
+            review_required,
+            breakdown,
+        }
+    }
+
+    /// Score multiple rules and generate report
+    pub fn score_rules(
+        &self,
+        rules: &[(String, VerificationTier, String, UsageHistory)],
+    ) -> RuleQualityReport {
+        let mut scores = Vec::new();
+        let mut safe_rules = 0;
+        let mut review_required = 0;
+        let mut total_confidence = 0.0;
+
+        for (rule_id, tier, author, history) in rules {
+            let score = self.score_rule(rule_id, *tier, author, history);
+            if score.is_safe_to_use {
+                safe_rules += 1;
+            }
+            if score.review_required {
+                review_required += 1;
+            }
+            total_confidence += score.confidence as f64;
+            scores.push(score);
+        }
+
+        let avg_confidence = if scores.is_empty() {
+            0.0
+        } else {
+            total_confidence / scores.len() as f64
+        };
+
+        RuleQualityReport {
+            total_rules: scores.len(),
+            safe_rules,
+            review_required,
+            average_confidence: avg_confidence as f32,
+            scores,
+        }
+    }
+
+    /// Get recommendations for a rule
+    pub fn get_recommendations(&self, quality: &RuleQuality) -> Vec<String> {
+        let mut recommendations = Vec::new();
+
+        if quality.confidence < self.min_safe_confidence {
+            recommendations.push("Rule confidence below safety threshold (0.95)".to_string());
+
+            match quality.verification_tier {
+                VerificationTier::NoCheck => {
+                    recommendations.push(
+                        "No type checking performed - recommend manual review".to_string(),
+                    );
+                }
+                VerificationTier::Tier1TypeCheck => {
+                    recommendations.push("Only basic type checking performed - recommend formal verification".to_string());
+                }
+                _ => {}
+            }
+
+            match quality.author {
+                AuthorReputation::Unknown => {
+                    recommendations.push("Author reputation unknown - recommend code review".to_string());
+                }
+                _ => {}
+            }
+
+            if quality.usage_history.total_uses < 5 {
+                recommendations.push(format!(
+                    "Limited usage history ({} uses) - recommend testing",
+                    quality.usage_history.total_uses
+                ));
+            }
+        }
+
+        if quality.usage_history.failed_uses > 0 {
+            let fail_rate = quality.usage_history.failed_uses as f32
+                / quality.usage_history.total_uses as f32;
+            if fail_rate > 0.01 {
+                recommendations.push(format!(
+                    "Failure rate {:.2}% - recommend debugging",
+                    fail_rate * 100.0
+                ));
+            }
+        }
+
+        if quality.review_required && quality.verification_tier <= VerificationTier::Tier1TypeCheck {
+            recommendations.push("Manual review required before production use".to_string());
+        }
+
+        if recommendations.is_empty() {
+            recommendations.push("Rule meets safety standards".to_string());
+        }
+
+        recommendations
+    }
+}
+
+/// Complete rule quality report
+#[derive(Clone, Debug)]
+pub struct RuleQualityReport {
+    pub total_rules: usize,
+    pub safe_rules: usize,
+    pub review_required: usize,
+    pub average_confidence: f32,
+    pub scores: Vec<RuleQuality>,
+}
+
+impl RuleQualityReport {
+    /// Get summary statistics
+    pub fn summary(&self) -> String {
+        format!(
+            "Rule Quality Report: {}/{} rules safe for use, {} require review, avg confidence: {:.2}%",
+            self.safe_rules,
+            self.total_rules,
+            self.review_required,
+            self.average_confidence * 100.0
+        )
+    }
+
+    /// Get unsafe rules
+    pub fn unsafe_rules(&self) -> Vec<&RuleQuality> {
+        self.scores.iter().filter(|r| !r.is_safe_to_use).collect()
+    }
+
+    /// Get rules requiring review
+    pub fn rules_needing_review(&self) -> Vec<&RuleQuality> {
+        self.scores.iter().filter(|r| r.review_required).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_author_reputation_multipliers() {
+        assert_eq!(AuthorReputation::CoreTeam.multiplier(), 1.0);
+        assert_eq!(AuthorReputation::Verified.multiplier(), 0.95);
+        assert_eq!(AuthorReputation::Community.multiplier(), 0.85);
+        assert_eq!(AuthorReputation::Unknown.multiplier(), 0.7);
+    }
+
+    #[test]
+    fn test_verification_tier_base_confidence() {
+        assert_eq!(VerificationTier::NoCheck.base_confidence(), 0.0);
+        assert_eq!(VerificationTier::Tier1TypeCheck.base_confidence(), 0.6);
+        assert_eq!(VerificationTier::Tier2Smt.base_confidence(), 0.85);
+        assert_eq!(VerificationTier::Tier3Axiom.base_confidence(), 0.99);
+    }
+
+    #[test]
+    fn test_usage_history_success_rate() {
+        let mut history = UsageHistory::new();
+        history.total_uses = 100;
+        history.successful_uses = 95;
+        history.failed_uses = 5;
+
+        assert_eq!(history.success_rate(), 0.95);
+    }
+
+    #[test]
+    fn test_usage_history_maturity() {
+        let mut h1 = UsageHistory::new();
+        h1.total_uses = 1500;
+        assert_eq!(h1.maturity_score(), 1.0);
+
+        let mut h2 = UsageHistory::new();
+        h2.total_uses = 150;
+        assert_eq!(h2.maturity_score(), 0.95);
+
+        let mut h3 = UsageHistory::new();
+        h3.total_uses = 15;
+        assert_eq!(h3.maturity_score(), 0.8);
+
+        let mut h4 = UsageHistory::new();
+        h4.total_uses = 0;
+        assert_eq!(h4.maturity_score(), 0.3);
+    }
+
+    #[test]
+    fn test_rule_quality_core_team_high_confidence() {
+        let scorer = RuleQualityScorer::new();
+
+        let history = UsageHistory {
+            total_uses: 500,
+            successful_uses: 495,
+            failed_uses: 5,
+            last_used: None,
+            first_reported: None,
+        };
+
+        let quality = scorer.score_rule(
+            "test-rule-1",
+            VerificationTier::Tier3Axiom,
+            "bonsai-team",
+            &history,
+        );
+
+        assert!(quality.is_safe_to_use);
+        assert!(quality.confidence >= 0.95);
+    }
+
+    #[test]
+    fn test_rule_quality_unknown_author_lower_confidence() {
+        let scorer = RuleQualityScorer::new();
+
+        let mut history = UsageHistory::new();
+        history.total_uses = 50;
+        history.successful_uses = 45;
+
+        let quality = scorer.score_rule(
+            "test-rule-2",
+            VerificationTier::Tier2Smt,
+            "unknown-author",
+            &history,
+        );
+
+        assert!(!quality.is_safe_to_use);
+        assert!(quality.review_required);
+    }
+
+    #[test]
+    fn test_rule_quality_untested_rule() {
+        let scorer = RuleQualityScorer::new();
+
+        let history = UsageHistory::new();
+
+        let quality = scorer.score_rule(
+            "untested-rule",
+            VerificationTier::Tier1TypeCheck,
+            "bonsai-team",
+            &history,
+        );
+
+        assert!(!quality.is_safe_to_use);
+        assert!(quality.review_required);
+    }
+
+    #[test]
+    fn test_rule_quality_report() {
+        let scorer = RuleQualityScorer::new();
+
+        let mut history1 = UsageHistory::new();
+        history1.total_uses = 1000;
+        history1.successful_uses = 999;
+
+        let mut history2 = UsageHistory::new();
+        history2.total_uses = 10;
+        history2.successful_uses = 8;
+
+        let rules = vec![
+            (
+                "rule-1".to_string(),
+                VerificationTier::Tier3Axiom,
+                "bonsai-team".to_string(),
+                history1,
+            ),
+            (
+                "rule-2".to_string(),
+                VerificationTier::Tier1TypeCheck,
+                "unknown".to_string(),
+                history2,
+            ),
+        ];
+
+        let report = scorer.score_rules(&rules);
+
+        assert_eq!(report.total_rules, 2);
+        assert!(report.safe_rules >= 1);
+        assert!(report.review_required >= 1);
+    }
+
+    #[test]
+    fn test_recommendations_for_unsafe_rule() {
+        let scorer = RuleQualityScorer::new();
+
+        let history = UsageHistory::new();
+
+        let quality = scorer.score_rule(
+            "unsafe-rule",
+            VerificationTier::NoCheck,
+            "unknown",
+            &history,
+        );
+
+        let recommendations = scorer.get_recommendations(&quality);
+        assert!(!recommendations.is_empty());
+        assert!(recommendations.iter().any(|r| r.contains("safety threshold")));
+    }
+}

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The Bonsai Ecosystem and USOS have been architected as a **deterministic-first, AI-optional, formally-verified system** where:
+The Bonsai Ecosystem and UOSC have been architected as a **deterministic-first, AI-optional, formally-verified system** where:
 
 - ✅ **Every subsystem operates correctly without any AI/ML component**
 - ✅ **AI enhancements are purely advisory, never required**
@@ -139,7 +139,7 @@ pub struct AiCapabilityPolicy {
 
 | Subsystem | Core | Heuristic | AI | Status |
 |-----------|------|-----------|-----|--------|
-| **USOS Kernel** | CFS/EDF scheduler | Static priorities | Dynamic tuning | In progress |
+| **UOSC Kernel** | CFS/EDF scheduler | Static priorities | Dynamic tuning | In progress |
 | **Echo** (P2P) | Kademlia DHT | Latency-based routing | Node prediction | Planned |
 | **BCF** (Containers) | OCI/overlayfs | Static affinity | ML placement | Planned |
 | **BMN** (Media) | AV1/H.264 encoding | Fixed preset | Content-aware quality | Planned |
@@ -516,7 +516,7 @@ Proven by policy check in critical path.
 
 ### 10.2 Short-term (Q4 2026)
 
-- [ ] Integrate USOS kernel (scheduler + I/O)
+- [ ] Integrate UOSC kernel (scheduler + I/O)
 - [ ] Create Adaptive Deterministic Circuits (ADC) compiler
 - [ ] Implement Sanctum TEE isolation for Advisory Domain
 - [ ] Build Universe audit log export pipeline

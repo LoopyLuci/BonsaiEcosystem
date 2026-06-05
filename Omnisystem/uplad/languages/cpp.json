@@ -1,0 +1,85 @@
+{
+  "name": "cpp",
+  "version": "C++23",
+  "created": 907200000,
+  "author": "Bjarne Stroustrup",
+  "syntax": {
+    "keywords": ["alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool", "break", "case", "catch", "char", "char8_t", "char16_t", "char32_t", "class", "compl", "concept", "const", "consteval", "constexpr", "constinit", "const_cast", "continue", "co_await", "co_return", "co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast", "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator", "or", "or_eq", "private", "protected", "public", "register", "reinterpret_cast", "requires", "return", "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch", "template", "this", "thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"],
+    "operators": [
+      {"symbol": "+", "precedence": 12, "associativity": "Left"},
+      {"symbol": "-", "precedence": 12, "associativity": "Left"},
+      {"symbol": "*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "/", "precedence": 13, "associativity": "Left"},
+      {"symbol": "%", "precedence": 13, "associativity": "Left"},
+      {"symbol": ".*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "->*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "<<", "precedence": 11, "associativity": "Left"},
+      {"symbol": ">>", "precedence": 11, "associativity": "Left"},
+      {"symbol": "<=>", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 10, "associativity": "Left"},
+      {"symbol": "==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 9, "associativity": "Left"},
+      {"symbol": "&", "precedence": 8, "associativity": "Left"},
+      {"symbol": "^", "precedence": 7, "associativity": "Left"},
+      {"symbol": "|", "precedence": 6, "associativity": "Left"},
+      {"symbol": "&&", "precedence": 5, "associativity": "Left"},
+      {"symbol": "||", "precedence": 4, "associativity": "Left"},
+      {"symbol": "?:", "precedence": 3, "associativity": "Right"},
+      {"symbol": "=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "+=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "-=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "*=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "/=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "->", "precedence": 2, "associativity": "Right"},
+      {"symbol": "::", "precedence": 16, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "//",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Generics", "Variants", "Records", "Tuples", "Templates"],
+    "nominal": true,
+    "polymorphism": "Parametric",
+    "inference": true,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Threads",
+    "memory_management": "Manual"
+  },
+  "tooling": {
+    "extensions": [".cpp", ".cc", ".cxx", ".h", ".hpp"],
+    "shebang": null,
+    "lsp_command": "clangd",
+    "compiler": {
+      "command": "clang++",
+      "targets": ["native", "wasm"],
+      "optimization_levels": ["0", "1", "2", "3", "s", "z"],
+      "cross_compilation": true
+    },
+    "interpreter": null,
+    "package_manager": "conan"
+  },
+  "metadata": {
+    "paradigms": ["Imperative", "ObjectOriented", "Functional", "Procedural", "Systems"],
+    "influences": ["C", "Simula", "ML"],
+    "dialects": [],
+    "standards": ["C++98", "C++11", "C++14", "C++17", "C++20", "C++23"],
+    "tags": ["systems", "performance", "compiled", "manual-memory", "generic"],
+    "urls": {
+      "homepage": "https://isocpp.org",
+      "docs": "https://en.cppreference.com/w/cpp",
+      "repo": null
+    }
+  }
+}

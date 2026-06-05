@@ -31,7 +31,7 @@ The **Bonsai Ecosystem** is a comprehensive, sovereignty-first computing platfor
 2. **BonsaiBot** - Multi-platform messaging bot (Discord, Telegram, Email, Matrix)
 3. **Bonsai Buddy** - Mobile AI assistant for Android
 4. **Bonsai Network** - Peer-to-peer collaboration and data sync
-5. **USOS** (Unnamed Sovereign Operating System) - Long-term vision for full OS replacement
+5. **UOSC** (Unnamed Sovereign Operating System) - Long-term vision for full OS replacement
 
 ### Core Value Propositions
 
@@ -61,7 +61,7 @@ The **Bonsai Ecosystem** is a comprehensive, sovereignty-first computing platfor
 
 **Goal**: Zero external dependencies for core functionality.
 
-A complete replacement strategy (USOS phases 0-6) is underway to replace every dependency with custom bonsai-* crates:
+A complete replacement strategy (UOSC phases 0-6) is underway to replace every dependency with custom bonsai-* crates:
 
 - ✅ **Phase 0** (Complete): Vendor all dependencies, offline CI
 - 🔄 **Phase 1** (In Progress): Error handling, logging, RNG, IDs
@@ -133,7 +133,7 @@ A complete replacement strategy (USOS phases 0-6) is underway to replace every d
 ┌──────────────────▼───────────────────────────────────────┐
 │        Operating System & Hardware Abstraction           │
 │  Watchdog | Survival Engine | Hardware Discovery        │
-│           USOS (Long-term target)                       │
+│           UOSC (Long-term target)                       │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -493,7 +493,7 @@ Each major component is documented in `docs/NN-*.md`. Here's what's covered:
 - `bonsai-workspace/src/MobileViewer.svelte` - Screen mirror UI
 
 #### [10-SOVEREIGNTY.md](docs/10-SOVEREIGNTY.md)
-- USOS concept & roadmap
+- UOSC concept & roadmap
 - Dependency replacement phases
 - bonsai-* crate directory
 - Progress tracking
@@ -1008,17 +1008,17 @@ See [LICENSE.md](LICENSE.md) for full terms.
 ## Roadmap
 
 ### Q3 2026
-- [ ] USOS Phase 2: Cryptography replacement
+- [ ] UOSC Phase 2: Cryptography replacement
 - [ ] Advanced KDB with semantic search
 - [ ] Web-based model serving
 
 ### Q4 2026
-- [ ] USOS Phase 3: Database replacement
+- [ ] UOSC Phase 3: Database replacement
 - [ ] Full app store integration
 - [ ] Performance optimizations (40% faster)
 
 ### 2027
-- [ ] USOS Phase 4-6: Complete OS replacement
+- [ ] UOSC Phase 4-6: Complete OS replacement
 - [ ] Custom silicon support
 - [ ] Enterprise deployment guide
 

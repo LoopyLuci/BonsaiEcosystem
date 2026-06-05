@@ -1706,6 +1706,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonsai-udc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "bonsai-ui-orchestrator"
 version = "0.1.0"
 dependencies = [

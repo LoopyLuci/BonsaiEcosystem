@@ -1,0 +1,83 @@
+{
+  "name": "php",
+  "version": "8.3",
+  "created": 1081296000,
+  "author": "Rasmus Lerdorf",
+  "syntax": {
+    "keywords": ["abstract", "and", "array", "as", "break", "callable", "case", "catch", "class", "clone", "const", "continue", "declare", "default", "die", "do", "echo", "else", "elseif", "empty", "enddeclare", "endfor", "endforeach", "endif", "endswitch", "endwhile", "eval", "exit", "extends", "false", "final", "finally", "fn", "for", "foreach", "from", "function", "global", "goto", "if", "implements", "include", "include_once", "instanceof", "insteadof", "interface", "isset", "list", "match", "namespace", "new", "or", "print", "private", "protected", "public", "readonly", "require", "require_once", "return", "static", "switch", "throw", "trait", "true", "try", "unset", "use", "var", "while", "xor", "yield"],
+    "operators": [
+      {"symbol": "+", "precedence": 12, "associativity": "Left"},
+      {"symbol": "-", "precedence": 12, "associativity": "Left"},
+      {"symbol": "*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "/", "precedence": 13, "associativity": "Left"},
+      {"symbol": "%", "precedence": 13, "associativity": "Left"},
+      {"symbol": "**", "precedence": 14, "associativity": "Right"},
+      {"symbol": ".", "precedence": 11, "associativity": "Left"},
+      {"symbol": "==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "===", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "<", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<=>", "precedence": 10, "associativity": "Left"},
+      {"symbol": "&&", "precedence": 5, "associativity": "Left"},
+      {"symbol": "||", "precedence": 4, "associativity": "Left"},
+      {"symbol": "!", "precedence": 15, "associativity": "Right"},
+      {"symbol": "&", "precedence": 8, "associativity": "Left"},
+      {"symbol": "|", "precedence": 6, "associativity": "Left"},
+      {"symbol": "^", "precedence": 7, "associativity": "Left"},
+      {"symbol": "<<", "precedence": 11, "associativity": "Left"},
+      {"symbol": ">>", "precedence": 11, "associativity": "Left"},
+      {"symbol": "=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "=>", "precedence": 2, "associativity": "Right"},
+      {"symbol": "?:", "precedence": 3, "associativity": "Right"},
+      {"symbol": "??", "precedence": 3, "associativity": "Right"}
+    ],
+    "comments": {
+      "line_comment": "//",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": [],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "None",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".php", ".phps", ".phtml"],
+    "shebang": "#!/usr/bin/env php",
+    "lsp_command": "intelephense",
+    "compiler": null,
+    "interpreter": {
+      "command": "php",
+      "jit_available": true,
+      "tracing": true
+    },
+    "package_manager": "composer"
+  },
+  "metadata": {
+    "paradigms": ["Imperative", "ObjectOriented", "Functional"],
+    "influences": ["C", "Java", "Perl"],
+    "dialects": [],
+    "standards": ["PHP 8.3"],
+    "tags": ["web", "server-side", "scripting", "dynamic-typing", "interpreter"],
+    "urls": {
+      "homepage": "https://www.php.net",
+      "docs": "https://www.php.net/docs.php",
+      "repo": "https://github.com/php/php-src"
+    }
+  }
+}

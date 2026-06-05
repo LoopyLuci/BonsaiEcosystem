@@ -4,7 +4,7 @@
 name = "omnisystem"
 version = "0.1.0"
 edition = "2026"
-description = "Bonsai Ecosystem & USOS rebuilt in the Omni-languages"
+description = "Bonsai Ecosystem & UOSC rebuilt in the Omni-languages"
 authors = ["The Bonsai Team"]
 license = "Apache-2.0"
 

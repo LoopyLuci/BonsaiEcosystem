@@ -19,8 +19,8 @@ python --version
 Write-Host ""
 
 # Phase 1: Kernel
-Write-Host "PHASE 1: Building USOS Kernel" -ForegroundColor Green
-Push-Location "$workspace\crates\usos-kernel"
+Write-Host "PHASE 1: Building UOSC Kernel" -ForegroundColor Green
+Push-Location "$workspace\crates\UOSC-kernel"
 rustup target add x86_64-unknown-none
 cargo build --release --target x86_64-unknown-none 2>&1 | Tee-Object -FilePath "$workspace\phase1.log"
 Pop-Location

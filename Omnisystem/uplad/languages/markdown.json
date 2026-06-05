@@ -1,0 +1,65 @@
+{
+  "name": "markdown",
+  "version": "CommonMark 0.30",
+  "created": 1349568000,
+  "author": "John Gruber",
+  "syntax": {
+    "keywords": ["markdown", "emphasis", "strong", "code", "link", "image", "list", "blockquote", "heading"],
+    "operators": [
+      {"symbol": "#", "precedence": 0, "associativity": "Left"},
+      {"symbol": "-", "precedence": 0, "associativity": "Left"},
+      {"symbol": "+", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "`", "precedence": 0, "associativity": "Left"},
+      {"symbol": "[", "precedence": 0, "associativity": "Left"},
+      {"symbol": "]", "precedence": 0, "associativity": "Left"},
+      {"symbol": "(", "precedence": 0, "associativity": "Left"},
+      {"symbol": ")", "precedence": 0, "associativity": "Left"},
+      {"symbol": "!", "precedence": 0, "associativity": "Left"},
+      {"symbol": "_", "precedence": 0, "associativity": "Left"},
+      {"symbol": "~", "precedence": 0, "associativity": "Left"},
+      {"symbol": "=", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": null,
+      "block_comment_start": null,
+      "block_comment_end": null
+    },
+    "string_delimiters": ["`"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": ["Blocks", "Inlines"],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Rendering",
+    "concurrency": "None",
+    "memory_management": "Managed"
+  },
+  "tooling": {
+    "extensions": [".md", ".markdown"],
+    "shebang": null,
+    "lsp_command": "markdown-language-server",
+    "compiler": null,
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Markup", "Document Format"],
+    "influences": ["Plain text", "reStructuredText"],
+    "dialects": ["GitHub Flavored Markdown", "Pandoc Markdown"],
+    "standards": ["CommonMark 0.30"],
+    "tags": ["markup", "documentation", "lightweight", "human-readable", "convertible"],
+    "urls": {
+      "homepage": "https://commonmark.org",
+      "docs": "https://commonmark.org/help/",
+      "repo": "https://github.com/commonmark/commonmark-spec"
+    }
+  }
+}

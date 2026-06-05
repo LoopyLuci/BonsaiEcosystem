@@ -1,0 +1,314 @@
+// uplad/frontend_loader.ti – Frontend generation and loading from language specs
+// Generates Omni-IR parsers from language specifications and compiles them to native code
+// This is the critical piece that makes any language natively executable on Omnisystem
+
+module uplad::frontend_loader
+
+use uplad::schema::{LanguageSpec, GrammarSpec, Production, Symbol}
+use uplad::inference::{generate_parser_ir, generate_ast_types}
+use uplad::registry_client::RegistryClient
+use core::vec::Vec
+use core::string::String
+use core::option::Option
+use core::result::Result
+
+/// A compiled language frontend ready for execution
+#[derive(Clone)]
+pub struct CompiledFrontend {
+    pub language: String,
+    pub version: String,
+    pub parser_fn: FrontendFunction,
+    pub ast_types: Vec<String>,
+    pub compiled_at: u64,
+    pub code_hash: String,
+}
+
+/// A language frontend function (parser entry point)
+#[derive(Clone)]
+pub struct FrontendFunction {
+    pub name: String,
+    pub entry_point: u64, // Memory address of compiled parser
+    pub signature: FunctionSignature,
+}
+
+/// Function signature for parser
+#[derive(Clone, Debug)]
+pub struct FunctionSignature {
+    pub input_type: String,   // e.g., "Vec<u8>" for source code
+    pub output_type: String,  // e.g., "AstNode" for parsed AST
+    pub error_type: String,   // e.g., "ParseError"
+}
+
+/// Frontend loader orchestrates compilation and loading
+pub struct FrontendLoader {
+    registry: RegistryClient,
+    compiled_cache: Vec<(String, CompiledFrontend)>,
+}
+
+impl FrontendLoader {
+    /// Create a new frontend loader
+    pub fn new(registry_addr: &str) -> Result<Self, String> {
+        let registry = RegistryClient::new(registry_addr)?;
+        Ok(Self {
+            registry,
+            compiled_cache: Vec::new(),
+        })
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // FRONTEND LOADING PIPELINE
+    // ────────────────────────────────────────────────────────────────
+
+    /// Load and compile a frontend for a language
+    /// Step 1: Fetch spec from registry
+    /// Step 2: Generate Omni-IR from grammar
+    /// Step 3: Compile IR to native code via BACE
+    /// Step 4: Cache and return compiled frontend
+    pub fn load_frontend(&mut self, language_name: &str) -> Result<CompiledFrontend, String> {
+        // Check cache first
+        if let Some(cached) = self.get_cached(language_name) {
+            return Ok(cached.clone());
+        }
+
+        // Step 1: Fetch language spec
+        let spec = self.registry.lookup(language_name)?
+            .ok_or_else(|| format!("Language '{}' not found in registry", language_name))?;
+
+        // Step 2: Generate Omni-IR from grammar
+        let parser_ir = self.generate_parser_ir(&spec)?;
+        let ast_ir = self.generate_ast_types(&spec)?;
+
+        // Step 3: Compile IR to native code
+        let compiled_code = self.compile_ir_to_native(&spec, &parser_ir, &ast_ir)?;
+
+        // Step 4: Create frontend object
+        let frontend = CompiledFrontend {
+            language: spec.name.clone(),
+            version: spec.version.clone(),
+            parser_fn: FrontendFunction {
+                name: format!("parse_{}", spec.name),
+                entry_point: compiled_code.entry_point,
+                signature: FunctionSignature {
+                    input_type: "Vec<u8>".to_string(),
+                    output_type: format!("{}::Ast", spec.name),
+                    error_type: format!("{}::ParseError", spec.name),
+                },
+            },
+            ast_types: ast_ir,
+            compiled_at: current_timestamp(),
+            code_hash: hash_code(&compiled_code.bytes),
+        };
+
+        // Cache it
+        self.compiled_cache.push((language_name.to_string(), frontend.clone()));
+
+        Ok(frontend)
+    }
+
+    /// Load multiple frontends in batch
+    pub fn load_batch(&mut self, language_names: &[String]) -> Result<Vec<CompiledFrontend>, String> {
+        let mut frontends = Vec::new();
+
+        for name in language_names {
+            match self.load_frontend(name) {
+                Ok(fe) => frontends.push(fe),
+                Err(e) => return Err(format!("Failed to load {}: {}", name, e)),
+            }
+        }
+
+        Ok(frontends)
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // IR GENERATION
+    // ────────────────────────────────────────────────────────────────
+
+    fn generate_parser_ir(&self, spec: &LanguageSpec) -> Result<String, String> {
+        // Convert grammar to Omni-IR parser representation
+        // This would normally call generate_parser_ir from inference.ti
+        // For now: placeholder returning IR skeleton
+
+        let ir = format!(
+            "// Omni-IR Parser for {}\n\
+             (omni:parser\n\
+               (language \"{}\")\n\
+               (version \"{}\")\n\
+               (start-symbol \"{}\")\n\
+               (productions (count {}))\n\
+             )",
+            spec.name,
+            spec.name,
+            spec.version,
+            spec.grammar.start_symbol,
+            spec.grammar.productions.len()
+        );
+
+        Ok(ir)
+    }
+
+    fn generate_ast_types(&self, spec: &LanguageSpec) -> Result<Vec<String>, String> {
+        // Generate AST type definitions for the language
+        let mut types = Vec::new();
+
+        types.push(format!(
+            "pub struct {}Ast {{\n  root: {}Node,\n}}",
+            spec.name, spec.name
+        ));
+
+        types.push(format!(
+            "pub enum {}Node {{\n  // Generated from grammar productions\n}}",
+            spec.name
+        ));
+
+        types.push(format!(
+            "pub struct {}ParseError {{\n  message: String,\n  line: u32,\n  column: u32,\n}}",
+            spec.name
+        ));
+
+        Ok(types)
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // COMPILATION TO NATIVE CODE
+    // ────────────────────────────────────────────────────────────────
+
+    fn compile_ir_to_native(
+        &self,
+        spec: &LanguageSpec,
+        parser_ir: &str,
+        ast_ir: &[String],
+    ) -> Result<CompiledCode, String> {
+        // Use BACE (Bonsai Atomic Compilation Engine) for fast, incremental compilation
+        // In real implementation:
+        // 1. Feed parser_ir + ast_ir to BACE
+        // 2. Get back position-independent native code
+        // 3. Load into memory
+        // 4. Return compiled code with entry point
+
+        // For now: placeholder returning mock compiled code
+        let compiled_bytes = Vec::new();
+
+        Ok(CompiledCode {
+            language: spec.name.clone(),
+            bytes: compiled_bytes,
+            entry_point: 0x4000_0000, // Placeholder address
+            relocations: Vec::new(),
+        })
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // CACHING AND PERSISTENCE
+    // ────────────────────────────────────────────────────────────────
+
+    fn get_cached(&self, language_name: &str) -> Option<CompiledFrontend> {
+        self.compiled_cache.iter()
+            .find(|(name, _)| name == language_name)
+            .map(|(_, fe)| fe.clone())
+    }
+
+    /// Clear the frontend cache
+    pub fn clear_cache(&mut self) {
+        self.compiled_cache.clear();
+    }
+
+    /// Get cache statistics
+    pub fn cache_stats(&self) -> CacheStats {
+        CacheStats {
+            cached_languages: self.compiled_cache.len(),
+            total_size_bytes: self.compiled_cache.iter()
+                .map(|(_, fe)| fe.code_hash.len())
+                .sum(),
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // HOT RELOAD SUPPORT
+    // ────────────────────────────────────────────────────────────────
+
+    /// Reload a frontend (for hot-reload scenario)
+    /// Used by HotReloadManager to update a language's parser without restart
+    pub fn reload_frontend(&mut self, language_name: &str) -> Result<CompiledFrontend, String> {
+        // Remove from cache first (force recompilation)
+        self.compiled_cache.retain(|(name, _)| name != language_name);
+
+        // Recompile
+        self.load_frontend(language_name)
+    }
+
+    /// Check if a frontend needs recompilation
+    /// Returns true if spec hash differs from cached version
+    pub fn is_stale(&self, language_name: &str, spec: &LanguageSpec) -> bool {
+        if let Some(cached) = self.get_cached(language_name) {
+            cached.version != spec.version
+        } else {
+            true
+        }
+    }
+}
+
+/// Compiled native code representation
+struct CompiledCode {
+    language: String,
+    bytes: Vec<u8>,
+    entry_point: u64,
+    relocations: Vec<Relocation>,
+}
+
+/// Relocation entry for position-independent code
+struct Relocation {
+    offset: u64,
+    kind: RelocationKind,
+    symbol: String,
+}
+
+enum RelocationKind {
+    Absolute,
+    Relative,
+    Relative32,
+}
+
+/// Cache statistics
+#[derive(Clone, Debug)]
+pub struct CacheStats {
+    pub cached_languages: usize,
+    pub total_size_bytes: usize,
+}
+
+// Utility functions
+fn hash_code(bytes: &[u8]) -> String {
+    // In real implementation: BLAKE3 hash
+    "hash".to_string()
+}
+
+fn current_timestamp() -> u64 {
+    // In real implementation: system time
+    0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_frontend_loader_new() {
+        let loader = FrontendLoader::new("aether://language-registry").unwrap();
+        assert_eq!(loader.compiled_cache.len(), 0);
+    }
+
+    #[test]
+    fn test_cache_stats() {
+        let loader = FrontendLoader::new("aether://language-registry").unwrap();
+        let stats = loader.cache_stats();
+        assert_eq!(stats.cached_languages, 0);
+    }
+
+    #[test]
+    fn test_function_signature() {
+        let sig = FunctionSignature {
+            input_type: "Vec<u8>".to_string(),
+            output_type: "Ast".to_string(),
+            error_type: "ParseError".to_string(),
+        };
+        assert_eq!(sig.input_type, "Vec<u8>");
+    }
+}

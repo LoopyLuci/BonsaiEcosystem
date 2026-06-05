@@ -1,0 +1,80 @@
+{
+  "name": "csharp",
+  "version": "12",
+  "created": 1103587200,
+  "author": "Microsoft",
+  "syntax": {
+    "keywords": ["abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked", "class", "const", "continue", "decimal", "default", "delegate", "do", "double", "else", "enum", "event", "explicit", "extern", "false", "finally", "fixed", "float", "for", "foreach", "from", "goto", "group", "if", "implicit", "in", "int", "interface", "internal", "into", "is", "lock", "long", "namespace", "new", "null", "object", "operator", "orderby", "out", "override", "params", "private", "protected", "public", "readonly", "ref", "return", "sbyte", "sealed", "select", "short", "sizeof", "stackalloc", "static", "string", "struct", "switch", "this", "throw", "true", "try", "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using", "var", "virtual", "void", "volatile", "where", "while", "yield"],
+    "operators": [
+      {"symbol": "+", "precedence": 12, "associativity": "Left"},
+      {"symbol": "-", "precedence": 12, "associativity": "Left"},
+      {"symbol": "*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "/", "precedence": 13, "associativity": "Left"},
+      {"symbol": "%", "precedence": 13, "associativity": "Left"},
+      {"symbol": "==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 9, "associativity": "Left"},
+      {"symbol": "<", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 10, "associativity": "Left"},
+      {"symbol": "&&", "precedence": 5, "associativity": "Left"},
+      {"symbol": "||", "precedence": 4, "associativity": "Left"},
+      {"symbol": "!", "precedence": 15, "associativity": "Right"},
+      {"symbol": "&", "precedence": 8, "associativity": "Left"},
+      {"symbol": "|", "precedence": 6, "associativity": "Left"},
+      {"symbol": "^", "precedence": 7, "associativity": "Left"},
+      {"symbol": "<<", "precedence": 11, "associativity": "Left"},
+      {"symbol": ">>", "precedence": 11, "associativity": "Left"},
+      {"symbol": "=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "=>", "precedence": 2, "associativity": "Right"},
+      {"symbol": "?:", "precedence": 3, "associativity": "Right"},
+      {"symbol": "??", "precedence": 4, "associativity": "Left"},
+      {"symbol": "?..", "precedence": 16, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "//",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\""],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Generics", "Variants", "Records", "Classes", "Tuples"],
+    "nominal": true,
+    "polymorphism": "Parametric",
+    "inference": true,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Threads",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".cs"],
+    "shebang": null,
+    "lsp_command": "omnisharp",
+    "compiler": {
+      "command": "dotnet",
+      "targets": ["clr", "native"],
+      "optimization_levels": [],
+      "cross_compilation": true
+    },
+    "interpreter": null,
+    "package_manager": "nuget"
+  },
+  "metadata": {
+    "paradigms": ["ObjectOriented", "Imperative", "Functional"],
+    "influences": ["Java", "C++", "Delphi"],
+    "dialects": [],
+    "standards": [".NET Standard", ".NET Core"],
+    "tags": ["clr", "dotnet", "static-typing", "compiled", "cross-platform"],
+    "urls": {
+      "homepage": "https://docs.microsoft.com/en-us/dotnet/csharp/",
+      "docs": "https://learn.microsoft.com/en-us/dotnet/csharp/",
+      "repo": "https://github.com/dotnet/roslyn"
+    }
+  }
+}

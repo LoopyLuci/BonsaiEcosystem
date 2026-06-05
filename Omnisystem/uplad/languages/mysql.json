@@ -1,0 +1,67 @@
+{
+  "name": "mysql",
+  "version": "8.0",
+  "created": 1081382400,
+  "author": "Oracle Corporation",
+  "syntax": {
+    "keywords": ["SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "FROM", "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT", "OFFSET", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "USING", "UNION", "DISTINCT", "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "AS", "BETWEEN", "IN", "LIKE", "IS", "NULL", "NOT", "AND", "OR", "EXISTS", "INTO", "VALUES", "DEFAULT", "KEY", "PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "INDEX", "VIEW", "DATABASE", "TABLE", "SCHEMA", "USER", "GRANT", "REVOKE", "TRIGGER", "PROCEDURE", "FUNCTION", "CALL", "DECLARE", "SET", "IF", "THEN", "ELSE", "ELSEIF", "END", "WHILE", "FOR", "LOOP", "ITERATE", "LEAVE", "REPEAT", "UNTIL"],
+    "operators": [
+      {"symbol": "=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<>", "precedence": 0, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "LIKE", "precedence": 0, "associativity": "Left"},
+      {"symbol": "IN", "precedence": 0, "associativity": "Left"},
+      {"symbol": "BETWEEN", "precedence": 0, "associativity": "Left"},
+      {"symbol": "IS", "precedence": 0, "associativity": "Left"},
+      {"symbol": "+", "precedence": 0, "associativity": "Left"},
+      {"symbol": "-", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"},
+      {"symbol": "/", "precedence": 0, "associativity": "Left"},
+      {"symbol": "%", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "--",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["'"],
+    "case_sensitive": false
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Numeric", "String", "Date/Time", "JSON"],
+    "nominal": true,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Declarative",
+    "concurrency": "MVCC",
+    "memory_management": "Manual"
+  },
+  "tooling": {
+    "extensions": [".sql"],
+    "shebang": null,
+    "lsp_command": "sql-language-server",
+    "compiler": null,
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Declarative", "Relational"],
+    "influences": ["SQL:2023", "ANSI SQL"],
+    "dialects": ["InnoDB SQL", "MyISAM SQL"],
+    "standards": ["SQL:2023"],
+    "tags": ["database", "relational", "web-databases", "json-support", "scalability"],
+    "urls": {
+      "homepage": "https://www.mysql.com",
+      "docs": "https://dev.mysql.com/doc/",
+      "repo": "https://github.com/mysql/mysql-server"
+    }
+  }
+}

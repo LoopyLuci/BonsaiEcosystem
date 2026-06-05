@@ -243,7 +243,7 @@ Pure Titan Core (45 tests) → Effect System → External Bindings (4 tests) →
 ## 2026-06-04 — Repository Cleanup & Pure-Titan Transition
 
 ### Added
-- `kernel/capability.ti` — USOS capability system in Titan (152 LOC, 14 assertions)
+- `kernel/capability.ti` — UOSC capability system in Titan (152 LOC, 14 assertions)
 - `kernel/memory.ti` — Physical + virtual memory manager in Titan (204 LOC)
 - `kernel/scheduler.ti` — EDF + CFS scheduler with preemption in Titan (270 LOC)
 - `services/omni-p2p/p2p.ti` — P2P networking service

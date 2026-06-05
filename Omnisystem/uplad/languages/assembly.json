@@ -1,0 +1,71 @@
+{
+  "name": "assembly",
+  "version": "x86-64",
+  "created": 0,
+  "author": "Intel/AMD",
+  "syntax": {
+    "keywords": ["mov", "movsx", "movzx", "lea", "add", "sub", "mul", "imul", "div", "idiv", "and", "or", "xor", "not", "shl", "shr", "sar", "sal", "ror", "rol", "cmp", "test", "jmp", "je", "jne", "jz", "jnz", "jl", "jg", "jle", "jge", "ja", "jb", "jae", "jbe", "call", "ret", "push", "pop", "inc", "dec", "neg", "nop", "hlt", "syscall", "sysret", "lgdt", "lidt", "ltr", "lds", "les", "lfs", "lgs", "lss", "lldt", "cli", "sti", "clc", "stc", "cmc", "cld", "std", "lock"],
+    "operators": [
+      {"symbol": "mov", "precedence": 0, "associativity": "Right"},
+      {"symbol": "add", "precedence": 0, "associativity": "Right"},
+      {"symbol": "sub", "precedence": 0, "associativity": "Right"},
+      {"symbol": "mul", "precedence": 0, "associativity": "Right"},
+      {"symbol": "div", "precedence": 0, "associativity": "Right"},
+      {"symbol": "and", "precedence": 0, "associativity": "Right"},
+      {"symbol": "or", "precedence": 0, "associativity": "Right"},
+      {"symbol": "xor", "precedence": 0, "associativity": "Right"},
+      {"symbol": "shl", "precedence": 0, "associativity": "Right"},
+      {"symbol": "shr", "precedence": 0, "associativity": "Right"},
+      {"symbol": "jmp", "precedence": 0, "associativity": "Left"},
+      {"symbol": "call", "precedence": 0, "associativity": "Left"},
+      {"symbol": "ret", "precedence": 0, "associativity": "Left"},
+      {"symbol": "push", "precedence": 0, "associativity": "Left"},
+      {"symbol": "pop", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": ";",
+      "block_comment_start": null,
+      "block_comment_end": null
+    },
+    "string_delimiters": ["'", "\""],
+    "case_sensitive": false
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Registers", "Memory Addressing"],
+    "nominal": true,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Imperative",
+    "concurrency": "None",
+    "memory_management": "Manual"
+  },
+  "tooling": {
+    "extensions": [".asm", ".s"],
+    "shebang": null,
+    "lsp_command": "asm-language-server",
+    "compiler": {
+      "command": "as",
+      "targets": ["native"],
+      "optimization_levels": [],
+      "cross_compilation": true
+    },
+    "interpreter": null,
+    "package_manager": null
+  },
+  "metadata": {
+    "paradigms": ["Imperative", "Procedural"],
+    "influences": [],
+    "dialects": ["x86-64", "ARM64", "MIPS", "RISC-V"],
+    "standards": ["x86-64 ISA", "ARM64 ISA"],
+    "tags": ["low-level", "machine-code", "systems-programming", "performance", "architecture-specific"],
+    "urls": {
+      "homepage": "https://en.wikipedia.org/wiki/X86",
+      "docs": "https://www.intel.com/content/dam/develop/external/us/en/documents/manuals/64-ia-32-architectures-software-developer-manual-combined-volumes-1-2a-2b-2c-2d-3a-3b-3c-3d-4.pdf",
+      "repo": null
+    }
+  }
+}

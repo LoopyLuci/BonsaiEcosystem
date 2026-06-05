@@ -1,0 +1,120 @@
+{
+  "device": {
+    "device_name": "Brother FAX 2840",
+    "vendor_id": 4170,
+    "product_id": 6418,
+    "device_class": 255,
+    "device_subclass": 0,
+    "device_protocol": 0,
+    "endpoints": [
+      {
+        "endpoint_number": 1,
+        "direction": "Out",
+        "transfer_type": "Bulk",
+        "max_packet_size": 64,
+        "interval": 0
+      },
+      {
+        "endpoint_number": 129,
+        "direction": "In",
+        "transfer_type": "Bulk",
+        "max_packet_size": 64,
+        "interval": 0
+      },
+      {
+        "endpoint_number": 2,
+        "direction": "In",
+        "transfer_type": "Interrupt",
+        "max_packet_size": 16,
+        "interval": 10
+      }
+    ],
+    "mmio_regions": [
+      {
+        "name": "control_registers",
+        "base_address": 0xf0000000,
+        "size": 4096,
+        "access_type": "ReadWrite"
+      },
+      {
+        "name": "data_buffer",
+        "base_address": 0xf0001000,
+        "size": 65536,
+        "access_type": "ReadWrite"
+      }
+    ],
+    "interrupts": [
+      {
+        "irq_number": 45,
+        "interrupt_type": "Level",
+        "handler_name": "fax_irq_handler"
+      }
+    ],
+    "capabilities": {
+      "supports_dma": true,
+      "supports_interrupts": true,
+      "supports_power_management": true,
+      "max_concurrent_transfers": 4,
+      "alignment_requirement": 4
+    },
+    "platform_options": {},
+    "description": "Brother FAX 2840 USB multifunction printer",
+    "version": "1.0.0"
+  },
+  "instructions": [
+    {
+      "type": "Comment",
+      "text": "Initialize FAX device"
+    },
+    {
+      "type": "Delay",
+      "milliseconds": 100
+    },
+    {
+      "type": "USBControlWrite",
+      "request_type": 64,
+      "request": 64,
+      "value": 0,
+      "index": 0,
+      "length": 0,
+      "timeout_ms": 1000
+    },
+    {
+      "type": "Comment",
+      "text": "Set up bulk endpoints"
+    },
+    {
+      "type": "USBBulkWrite",
+      "endpoint": 1,
+      "buffer_size": 512,
+      "timeout_ms": 5000
+    },
+    {
+      "type": "USBBulkRead",
+      "endpoint": 129,
+      "buffer_size": 4096,
+      "timeout_ms": 5000
+    },
+    {
+      "type": "Comment",
+      "text": "Setup interrupt handler"
+    },
+    {
+      "type": "SetupInterrupt",
+      "irq_number": 45,
+      "handler_name": "fax_irq_handler"
+    },
+    {
+      "type": "EnableInterrupt",
+      "irq_number": 45
+    },
+    {
+      "type": "Delay",
+      "milliseconds": 50
+    },
+    {
+      "type": "Comment",
+      "text": "Driver initialization complete"
+    }
+  ]
+}

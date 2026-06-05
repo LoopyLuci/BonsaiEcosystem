@@ -1,0 +1,84 @@
+{
+  "name": "groovy",
+  "version": "4.0",
+  "created": 1196467200,
+  "author": "Apache Software Foundation",
+  "syntax": {
+    "keywords": ["abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "def", "default", "do", "double", "else", "enum", "extends", "false", "final", "finally", "float", "for", "goto", "if", "implements", "import", "in", "instanceof", "int", "interface", "long", "native", "new", "null", "package", "private", "protected", "public", "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "true", "try", "void", "volatile", "while", "trait", "it"],
+    "operators": [
+      {"symbol": "+", "precedence": 12, "associativity": "Left"},
+      {"symbol": "-", "precedence": 12, "associativity": "Left"},
+      {"symbol": "*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "/", "precedence": 13, "associativity": "Left"},
+      {"symbol": "%", "precedence": 13, "associativity": "Left"},
+      {"symbol": "**", "precedence": 14, "associativity": "Right"},
+      {"symbol": "==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 9, "associativity": "Left"},
+      {"symbol": "<", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 10, "associativity": "Left"},
+      {"symbol": "&&", "precedence": 5, "associativity": "Left"},
+      {"symbol": "||", "precedence": 4, "associativity": "Left"},
+      {"symbol": "!", "precedence": 15, "associativity": "Right"},
+      {"symbol": "&", "precedence": 8, "associativity": "Left"},
+      {"symbol": "|", "precedence": 6, "associativity": "Left"},
+      {"symbol": "^", "precedence": 7, "associativity": "Left"},
+      {"symbol": "<<", "precedence": 11, "associativity": "Left"},
+      {"symbol": ">>", "precedence": 11, "associativity": "Left"},
+      {"symbol": "=", "precedence": 2, "associativity": "Right"},
+      {"symbol": "?:", "precedence": 3, "associativity": "Right"},
+      {"symbol": ".", "precedence": 16, "associativity": "Left"},
+      {"symbol": "?..", "precedence": 16, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": "//",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\"", "'"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": ["Generics", "Closures"],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Threads",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".groovy", ".gradle"],
+    "shebang": "#!/usr/bin/env groovy",
+    "lsp_command": "groovy-language-server",
+    "compiler": {
+      "command": "groovyc",
+      "targets": ["jvm"],
+      "optimization_levels": [],
+      "cross_compilation": false
+    },
+    "interpreter": {
+      "command": "groovy",
+      "jit_available": true,
+      "tracing": true
+    },
+    "package_manager": "gradle"
+  },
+  "metadata": {
+    "paradigms": ["ObjectOriented", "Functional", "Scripting"],
+    "influences": ["Java", "Python", "Ruby"],
+    "dialects": ["Gradle DSL"],
+    "standards": [],
+    "tags": ["jvm", "dynamic", "scripting", "dsl", "gradle-build"],
+    "urls": {
+      "homepage": "https://groovy-lang.org",
+      "docs": "https://groovy-lang.org/documentation.html",
+      "repo": "https://github.com/apache/groovy"
+    }
+  }
+}

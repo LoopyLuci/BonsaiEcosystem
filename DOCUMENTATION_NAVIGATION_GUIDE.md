@@ -70,7 +70,7 @@
 | **[ARCHITECTURE_COMPLETE_GUIDE.md](ARCHITECTURE_COMPLETE_GUIDE.md)** | Full system architecture | 30 min | Architects |
 | **[API_REFERENCE_GUIDE.md](API_REFERENCE_GUIDE.md)** | All APIs, commands, types | 40 min | Backend devs |
 | **[docs/12-DEVELOPER.md](docs/12-DEVELOPER.md)** | Build, test, contribute | 30 min | Contributors |
-| **[docs/10-SOVEREIGNTY.md](docs/10-SOVEREIGNTY.md)** | USOS phases, roadmap | 20 min | Core team |
+| **[docs/10-SOVEREIGNTY.md](docs/10-SOVEREIGNTY.md)** | UOSC phases, roadmap | 20 min | Core team |
 
 ### Reference Documentation
 
@@ -142,7 +142,7 @@
 - **API Reference**: [API_REFERENCE_GUIDE.md](API_REFERENCE_GUIDE.md) § "BonsaiBot API"
 - **Implementation**: [bonsai-bot/](bonsai-bot/) - Source code
 
-### Sovereignty & USOS
+### Sovereignty & UOSC
 - **Roadmap**: [docs/10-SOVEREIGNTY.md](docs/10-SOVEREIGNTY.md)
 - **Philosophy**: [ECOSYSTEM_README.md](ECOSYSTEM_README.md) § "Three Pillars" → "Sovereignty by Design"
 - **Progress**: [docs/10-SOVEREIGNTY.md](docs/10-SOVEREIGNTY.md) § "Phase Status"
@@ -243,7 +243,7 @@ A: See [docs/11-SECURITY.md](docs/11-SECURITY.md) § "Encryption" - 10 min read
 **Q: How do I report a bug?**  
 A: See [docs/13-TROUBLESHOOTING.md](docs/13-TROUBLESHOOTING.md) § "Reporting Issues" - 5 min read
 
-**Q: What's the USOS roadmap?**  
+**Q: What's the UOSC roadmap?**  
 A: See [docs/10-SOVEREIGNTY.md](docs/10-SOVEREIGNTY.md) - 20 min read
 
 **Q: How do I build from source?**  

@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The **Universal Bonsai Validation Mesh (UBVM)** is the ultimate validation framework for the Bonsai Ecosystem and USOS. It is a single, deterministic, AI-optional system that:
+The **Universal Bonsai Validation Mesh (UBVM)** is the ultimate validation framework for the Bonsai Ecosystem and UOSC. It is a single, deterministic, AI-optional system that:
 
 1. **Proves correctness** of every Bonsai subsystem through polyglot testing
 2. **Scales infinitely** from developer laptops to planet-scale mesh without architectural changes
@@ -85,7 +85,7 @@ Every Bonsai component is validated by a dedicated test suite:
 | Containers | BCF Images | 🟡 Ready for implementation |
 | Security | Sanctum + Crypto | 🟡 Ready for implementation |
 | Storage | AriaDB + CAS | 🟡 Ready for implementation |
-| Kernel | USOS + BIR | 🟡 Ready for implementation |
+| Kernel | UOSC + BIR | 🟡 Ready for implementation |
 | Resilience | Chaos + Recovery | 🟡 Ready for implementation |
 | Omnisystem | Sylva, Titan, Aether, Axiom | 🟡 Ready for implementation |
 
@@ -376,9 +376,9 @@ Each suite validates one critical Bonsai component. Each suite includes:
 
 ### 4.7 Kernel Suite
 
-**What:** USOS scheduler real-time guarantees, memory migration, BIR cross-compilation  
+**What:** UOSC scheduler real-time guarantees, memory migration, BIR cross-compilation  
 **Status:** 🟡 **READY FOR IMPLEMENTATION**  
-**Dependencies:** USOS crate, BIR crate
+**Dependencies:** UOSC crate, BIR crate
 
 **Test Cases:**
 - RT scheduling (deadline-driven tasks complete by deadline)
@@ -623,7 +623,7 @@ Upon test failure, an optional AI agent examines the diff and logs probable caus
 - AI-Optional suite (BonsAI V2)
 - Security suite (Sanctum + crypto)
 - Storage suite (AriaDB + CAS)
-- Kernel suite (USOS + BIR)
+- Kernel suite (UOSC + BIR)
 - Resilience suite (Survival System)
 
 ### Phase 4: Formal Verification (🟡 PLANNED)
@@ -656,7 +656,7 @@ Upon test failure, an optional AI agent examines the diff and logs probable caus
 
 ## Part 9: The Ultimate Vision
 
-The UBVM is not just a test framework; it is the **living proof** that the Bonsai Ecosystem and USOS are:
+The UBVM is not just a test framework; it is the **living proof** that the Bonsai Ecosystem and UOSC are:
 
 - **Sovereign** — No dependency on third parties or proprietary systems
 - **Deterministic** — Identical results every time, everywhere

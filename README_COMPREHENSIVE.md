@@ -1,4 +1,4 @@
-# 🌳 Bonsai Ecosystem & USOS – Complete System Documentation
+# 🌳 Bonsai Ecosystem & UOSC – Complete System Documentation
 
 **Version**: 3.0 | **Status**: 🟢 Production-Ready | **Last Updated**: 2026-06-04
 
@@ -19,7 +19,7 @@
 
 ## Project Overview
 
-**Bonsai Ecosystem & USOS** is a sovereign, AI-optional, formally verified, polyglot platform for building next-generation applications—from edge devices to global distributed systems.
+**Bonsai Ecosystem & UOSC** is a sovereign, AI-optional, formally verified, polyglot platform for building next-generation applications—from edge devices to global distributed systems.
 
 ### What Makes It Different?
 
@@ -230,7 +230,7 @@ cargo build --release --workspace
 | Document | Purpose | Read Time |
 |----------|---------|-----------|
 | **[BUILD.md](BUILD.md)** | Building from source, feature flags, cross-compilation | 20 min |
-| **[DEPLOYMENT.md](DEPLOYMENT.md)** | Deploying USOS, BCF, Echo, services (NixOS, Docker, cloud) | 30 min |
+| **[DEPLOYMENT.md](DEPLOYMENT.md)** | Deploying UOSC, BCF, Echo, services (NixOS, Docker, cloud) | 30 min |
 | **[COMPRESSION.md](COMPRESSION.md)** | BUCE algorithms, hardware acceleration, API reference | 25 min |
 
 ### Networking & Distributed Systems
@@ -283,7 +283,7 @@ cargo build --release --workspace
 └─────────────────────────┬────────────────────────────────┘
                           │
 ┌─────────────────────────▼────────────────────────────────┐
-│          USOS Kernel + System Services                    │
+│          UOSC Kernel + System Services                    │
 │   Scheduler | IPC | File System | Hardware Abstraction    │
 └─────────────────────────┬────────────────────────────────┘
                           │
@@ -306,7 +306,7 @@ cargo build --release --workspace
 
 **Deterministic Core** (always included):
 ```
-bonsai-kernel/               # USOS kernel
+bonsai-kernel/               # UOSC kernel
 bonsai-ai-fallback/          # SovereignService trait & Arbiter
 bonsai-transfer/             # TransferDaemon v2
 bonsai-compression/          # BUCE compression engine
@@ -512,7 +512,7 @@ If your change affects core deterministic logic:
 
 ### Future (Q4 2026+)
 
-- 🔮 USOS as minimal co-OS
+- 🔮 UOSC as minimal co-OS
 - 🔮 Bonsai Workspace v2 (native, no Electron)
 - 🔮 Hardware acceleration for all CPUs/GPUs
 - 🔮 Full formal verification suite (Coq)

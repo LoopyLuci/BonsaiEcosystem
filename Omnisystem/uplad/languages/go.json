@@ -1,0 +1,78 @@
+{
+  "name": "go",
+  "version": "1.22",
+  "created": 1283894400,
+  "author": "Robert Griesemer, Rob Pike, Ken Thompson",
+  "syntax": {
+    "keywords": ["break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough", "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return", "select", "struct", "switch", "type", "var"],
+    "operators": [
+      {"symbol": "+", "precedence": 12, "associativity": "Left"},
+      {"symbol": "-", "precedence": 12, "associativity": "Left"},
+      {"symbol": "*", "precedence": 13, "associativity": "Left"},
+      {"symbol": "/", "precedence": 13, "associativity": "Left"},
+      {"symbol": "%", "precedence": 13, "associativity": "Left"},
+      {"symbol": "&", "precedence": 8, "associativity": "Left"},
+      {"symbol": "|", "precedence": 6, "associativity": "Left"},
+      {"symbol": "^", "precedence": 7, "associativity": "Left"},
+      {"symbol": "<<", "precedence": 11, "associativity": "Left"},
+      {"symbol": ">>", "precedence": 11, "associativity": "Left"},
+      {"symbol": "&^", "precedence": 8, "associativity": "Left"},
+      {"symbol": "==", "precedence": 9, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 9, "associativity": "Left"},
+      {"symbol": "<", "precedence": 10, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">", "precedence": 10, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 10, "associativity": "Left"},
+      {"symbol": "&&", "precedence": 5, "associativity": "Left"},
+      {"symbol": "||", "precedence": 4, "associativity": "Left"},
+      {"symbol": "!", "precedence": 15, "associativity": "Right"},
+      {"symbol": ":=", "precedence": 1, "associativity": "Right"},
+      {"symbol": "<-", "precedence": 2, "associativity": "Right"}
+    ],
+    "comments": {
+      "line_comment": "//",
+      "block_comment_start": "/*",
+      "block_comment_end": "*/"
+    },
+    "string_delimiters": ["\"", "`"],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Static",
+    "features": ["Generics", "Variants", "Records", "Tuples", "Unions"],
+    "nominal": true,
+    "polymorphism": "Parametric",
+    "inference": true,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Threads",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".go"],
+    "shebang": null,
+    "lsp_command": "gopls",
+    "compiler": {
+      "command": "go build",
+      "targets": ["native", "wasm"],
+      "optimization_levels": [],
+      "cross_compilation": true
+    },
+    "interpreter": null,
+    "package_manager": "go mod"
+  },
+  "metadata": {
+    "paradigms": ["Imperative", "Systems", "Concurrent"],
+    "influences": ["C", "Pascal", "Oberon"],
+    "dialects": [],
+    "standards": [],
+    "tags": ["systems", "concurrent", "compiled", "simplicity"],
+    "urls": {
+      "homepage": "https://go.dev",
+      "docs": "https://go.dev/doc",
+      "repo": "https://github.com/golang/go"
+    }
+  }
+}

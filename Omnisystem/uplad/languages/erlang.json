@@ -1,0 +1,83 @@
+{
+  "name": "erlang",
+  "version": "26",
+  "created": 1000000000,
+  "author": "Joe Armstrong",
+  "syntax": {
+    "keywords": ["after", "and", "andalso", "band", "begin", "bnot", "bor", "bsl", "bsr", "bxor", "case", "catch", "cond", "div", "end", "exit", "false", "fun", "hd", "if", "is_list", "is_tuple", "mod", "node", "not", "of", "or", "orelse", "rem", "self", "throw", "true", "try", "tl", "when", "xor"],
+    "operators": [
+      {"symbol": "+", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "-", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "++", "precedence": 500, "associativity": "yfx"},
+      {"symbol": "*", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "/", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "//", "precedence": 400, "associativity": "yfx"},
+      {"symbol": "=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "==", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=/=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "\\=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "<", "precedence": 700, "associativity": "xfx"},
+      {"symbol": ">", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=<", "precedence": 700, "associativity": "xfx"},
+      {"symbol": ">=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=:=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "=\\=", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "is", "precedence": 700, "associativity": "xfx"},
+      {"symbol": "andalso", "precedence": 1100, "associativity": "xfy"},
+      {"symbol": "orelse", "precedence": 1100, "associativity": "xfy"},
+      {"symbol": ",", "precedence": 1000, "associativity": "xfy"},
+      {"symbol": ";", "precedence": 1100, "associativity": "xfy"},
+      {"symbol": "->", "precedence": 1050, "associativity": "xfy"},
+      {"symbol": "!", "precedence": 650, "associativity": "xfx"}
+    ],
+    "comments": {
+      "line_comment": "%",
+      "block_comment_start": null,
+      "block_comment_end": null
+    },
+    "string_delimiters": ["\""],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": [],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Processes",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".erl"],
+    "shebang": "#!/usr/bin/env escript",
+    "lsp_command": "erlang-ls",
+    "compiler": {
+      "command": "erlc",
+      "targets": ["beam"],
+      "optimization_levels": [],
+      "cross_compilation": false
+    },
+    "interpreter": {
+      "command": "erl",
+      "jit_available": true,
+      "tracing": true
+    },
+    "package_manager": "rebar3"
+  },
+  "metadata": {
+    "paradigms": ["Concurrent", "Functional", "Distributed"],
+    "influences": ["Prolog", "Lisp"],
+    "dialects": ["Elixir"],
+    "standards": [],
+    "tags": ["concurrent", "distributed", "fault-tolerant", "soft-realtime", "beam-vm"],
+    "urls": {
+      "homepage": "https://www.erlang.org",
+      "docs": "https://www.erlang.org/docs",
+      "repo": "https://github.com/erlang/otp"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Implementation Phases
 
-This document outlines the complete roadmap for rebuilding the Bonsai Ecosystem and USOS as the Omnisystem, written exclusively in the four Omni-languages (Titan, Sylva, Aether, Axiom).
+This document outlines the complete roadmap for rebuilding the Bonsai Ecosystem and UOSC as the Omnisystem, written exclusively in the four Omni-languages (Titan, Sylva, Aether, Axiom).
 
 ---
 
@@ -182,43 +182,43 @@ Bring each Omni-language to production grade, capable of outperforming all other
 
 ---
 
-## Phase 1: USOS Core & Build Infrastructure (Weeks 7-8)
+## Phase 1: UOSC Core & Build Infrastructure (Weeks 7-8)
 
 ### Objective
-Implement the minimal USOS kernel and the `omni` build tool.
+Implement the minimal UOSC kernel and the `omni` build tool.
 
-### 1.1 USOS Kernel (Titan) - Week 7
+### 1.1 UOSC Kernel (Titan) - Week 7
 
 **Deliverables:**
-1. **Memory Manager** (`usos_memory.ti`)
+1. **Memory Manager** (`UOSC_memory.ti`)
    - Physical memory allocator (page-frame allocator)
    - Virtual memory with paging
    - Copy-on-write shared memory
    - Capability-based memory regions (Sanctum replacement)
    - Total: ~1000 lines
 
-2. **Scheduler** (`usos_scheduler.ti`)
+2. **Scheduler** (`UOSC_scheduler.ti`)
    - Process and thread data structures
    - Priority queue with round-robin within priority
    - EDF (Earliest Deadline First) for real-time tasks
    - Preemption timer
    - Total: ~800 lines
 
-3. **IPC** (`usos_ipc.ti`)
+3. **IPC** (`UOSC_ipc.ti`)
    - Message queue per process
    - Synchronous rendezvous (send/receive blocking)
    - Asynchronous buffered messaging
    - Capability-based authorization
    - Total: ~600 lines
 
-4. **Capabilities** (`usos_capability.ti`)
+4. **Capabilities** (`UOSC_capability.ti`)
    - Capability token structure (unforgeable)
    - Capability space per process
    - Rights: read, write, execute, delegate, revoke
    - Delegation and revocation
    - Total: ~500 lines
 
-5. **Boot & Service Manager** (`usos_boot.ti`)
+5. **Boot & Service Manager** (`UOSC_boot.ti`)
    - Boot sequence
    - Load initial userspace image from CAS
    - Start omni-service-manager
@@ -232,7 +232,7 @@ Implement the minimal USOS kernel and the `omni` build tool.
 
 **Total Kernel Size**: ~4000 lines of Titan code
 
-**Deliverable**: `omni-kernel.elf` (standalone executable that boots to USOS shell)
+**Deliverable**: `omni-kernel.elf` (standalone executable that boots to UOSC shell)
 
 ---
 
@@ -242,7 +242,7 @@ Implement the minimal USOS kernel and the `omni` build tool.
 1. **`omni` Command** (Titan, bootstrapped from Rust initially)
    - `omni build [target]` – build services or entire system
    - `omni test [suite]` – run UBVM tests
-   - `omni run [service]` – run service or USOS
+   - `omni run [service]` – run service or UOSC
    - `omni package [name]` – create deployment package
    - `omni repl [lang]` – start REPL (Sylva/Titan)
    - `omni verify [component]` – run Axiom proofs
@@ -308,7 +308,7 @@ Rebuild the four most critical Bonsai services in Omni-languages.
    - Latency: < 1ms (local), < 100ms (WAN)
    - Throughput: > 1Gbps (local), > 100Mbps (WAN)
 
-**Deliverable**: `omni-p2p` service (as USOS process)
+**Deliverable**: `omni-p2p` service (as UOSC process)
 
 ---
 
@@ -348,7 +348,7 @@ Rebuild the four most critical Bonsai services in Omni-languages.
 
 **Deliverables:**
 1. **Process Isolation**
-   - USOS capability-based sandboxing
+   - UOSC capability-based sandboxing
    - Resource limits (memory, CPU, I/O)
    - Effect restrictions (disable network, file I/O, etc.)
 
@@ -380,7 +380,7 @@ Rebuild the four most critical Bonsai services in Omni-languages.
    - Immutable log (via CAS)
    - Tamper-evident (cryptographic chaining)
    - Queryable (by capability, action, timestamp)
-   - Integration with USOS kernel (kernel-assisted logging)
+   - Integration with UOSC kernel (kernel-assisted logging)
 
 2. **Time-Series Database**
    - Metrics: latency, throughput, resource usage
@@ -430,7 +430,7 @@ Each service follows the same pattern:
 Prove critical properties of all services using Axiom.
 
 **Deliverables:**
-1. **USOS Kernel Proofs**
+1. **UOSC Kernel Proofs**
    - Memory safety (no use-after-free, no buffer overflow)
    - Scheduler correctness (EDF meets deadlines)
    - Capability enforcement (unforgeable, no elevation)
@@ -521,7 +521,7 @@ Provide a smooth transition path for legacy code.
 | Phase | Metric | Target |
 |-------|--------|--------|
 | **0** | All four languages production-grade | ✅ 100+ tests per language passing |
-| **1** | USOS kernel minimal and verifiable | ✅ < 5000 lines; kernel proofs done |
+| **1** | UOSC kernel minimal and verifiable | ✅ < 5000 lines; kernel proofs done |
 | **2** | Core services running | ✅ 4 services with 40+ tests each |
 | **3** | Complete service ecosystem | ✅ 12 services fully functional |
 | **4** | Formally verified | ✅ 100+ Axiom proofs, all critical code covered |
@@ -536,7 +536,7 @@ These must complete on schedule or subsequent phases slip:
 
 1. **Titan effect system** (Phase 0.1) – blocker for all other languages
 2. **Axiom extraction** (Phase 0.4) – needed to verify code generation
-3. **USOS kernel** (Phase 1.1) – foundation for services
+3. **UOSC kernel** (Phase 1.1) – foundation for services
 4. **omni build tool** (Phase 1.2) – required to compile services
 5. **omni-p2p** (Phase 2.1) – most services depend on networking
 

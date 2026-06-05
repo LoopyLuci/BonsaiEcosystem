@@ -594,7 +594,7 @@ A: No. Randomness breaks determinism. Use deterministic PRNGs seeded with input 
 A: Run with `min_confidence: 1.5` (impossible threshold) and verify behavior is identical to AI disabled.
 
 **Q: Do I need Axiom proofs?**  
-A: Required for TransferDaemon, Scheduler, USOS kernel. Recommended for others. Sketch is acceptable initially.
+A: Required for TransferDaemon, Scheduler, UOSC kernel. Recommended for others. Sketch is acceptable initially.
 
 ---
 

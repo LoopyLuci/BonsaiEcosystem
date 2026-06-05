@@ -1,0 +1,80 @@
+{
+  "name": "clojure",
+  "version": "1.11",
+  "created": 1220400000,
+  "author": "Rich Hickey",
+  "syntax": {
+    "keywords": ["and", "assert", "binding", "comment", "cond", "defmacro", "defmethod", "defn", "defprotocol", "defrecord", "defstruct", "deftype", "doseq", "do", "dotimes", "extend-protocol", "extend-type", "false", "fn", "for", "go", "if", "if-let", "if-not", "isa?", "let", "letfn", "locking", "loop", "macro", "nil", "not", "ns", "or", "proxy", "quote", "refer", "require", "sync", "this", "throw", "true", "try", "use", "var", "when", "when-first", "when-let", "when-not"],
+    "operators": [
+      {"symbol": "+", "precedence": 0, "associativity": "Left"},
+      {"symbol": "-", "precedence": 0, "associativity": "Left"},
+      {"symbol": "*", "precedence": 0, "associativity": "Left"},
+      {"symbol": "/", "precedence": 0, "associativity": "Left"},
+      {"symbol": "=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "==", "precedence": 0, "associativity": "Left"},
+      {"symbol": "!=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">", "precedence": 0, "associativity": "Left"},
+      {"symbol": "<=", "precedence": 0, "associativity": "Left"},
+      {"symbol": ">=", "precedence": 0, "associativity": "Left"},
+      {"symbol": "and", "precedence": 0, "associativity": "Left"},
+      {"symbol": "or", "precedence": 0, "associativity": "Left"},
+      {"symbol": "not", "precedence": 0, "associativity": "Left"},
+      {"symbol": "conj", "precedence": 0, "associativity": "Left"},
+      {"symbol": "cons", "precedence": 0, "associativity": "Left"},
+      {"symbol": "first", "precedence": 0, "associativity": "Left"},
+      {"symbol": "rest", "precedence": 0, "associativity": "Left"},
+      {"symbol": "assoc", "precedence": 0, "associativity": "Left"},
+      {"symbol": "dissoc", "precedence": 0, "associativity": "Left"}
+    ],
+    "comments": {
+      "line_comment": ";",
+      "block_comment_start": null,
+      "block_comment_end": null
+    },
+    "string_delimiters": ["\""],
+    "case_sensitive": true
+  },
+  "type_system": {
+    "kind": "Dynamic",
+    "features": [],
+    "nominal": false,
+    "polymorphism": "None",
+    "inference": false,
+    "dependent": false
+  },
+  "evaluation": {
+    "model": "Eager",
+    "concurrency": "Threads",
+    "memory_management": "GarbageCollection"
+  },
+  "tooling": {
+    "extensions": [".clj", ".cljs", ".cljc"],
+    "shebang": "#!/usr/bin/env clj",
+    "lsp_command": "clojure-lsp",
+    "compiler": {
+      "command": "clojure",
+      "targets": ["jvm", "js"],
+      "optimization_levels": [],
+      "cross_compilation": true
+    },
+    "interpreter": {
+      "command": "clj",
+      "jit_available": true,
+      "tracing": true
+    },
+    "package_manager": "deps.edn"
+  },
+  "metadata": {
+    "paradigms": ["Functional", "Imperative", "Concurrent"],
+    "influences": ["Lisp", "Haskell", "Prolog"],
+    "dialects": ["ClojureScript"],
+    "standards": [],
+    "tags": ["jvm", "functional", "lisp-dialect", "data-driven", "immutable-data"],
+    "urls": {
+      "homepage": "https://clojure.org",
+      "docs": "https://clojure.org/api/cheatsheet",
+      "repo": "https://github.com/clojure/clojure"
+    }
+  }
+}
