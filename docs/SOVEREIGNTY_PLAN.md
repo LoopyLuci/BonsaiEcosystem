@@ -79,17 +79,17 @@ Internal `bonsai-*` crates are excluded — they are already ours.
 #### Cryptography
 | Crate | Used By | Replacement Crate |
 |-------|---------|-------------------|
-| `aes-gcm` | `bonsai-transfer-crypto`, `bonsai-transfer-store`, `bonsai-workspace` | `bonsai-crypto` |
-| `argon2` | `bonsai-transfer-crypto`, `bonsai-transfer-store` | `bonsai-crypto` |
+| `aes-gcm` | `p2p-crypto`, `bonsai-transfer-store`, `bonsai-workspace` | `bonsai-crypto` |
+| `argon2` | `p2p-crypto`, `bonsai-transfer-store` | `bonsai-crypto` |
 | `blake3` | 9 crates | `bonsai-crypto` |
-| `ed25519-dalek` | `bonsai-transfer-crypto` | `bonsai-crypto` |
-| `x25519-dalek` | `bonsai-transfer-crypto` | `bonsai-crypto` |
+| `ed25519-dalek` | `p2p-crypto` | `bonsai-crypto` |
+| `x25519-dalek` | `p2p-crypto` | `bonsai-crypto` |
 | `hmac` | `bonsai-workspace` | `bonsai-crypto` |
 | `sha2` | 3 crates | `bonsai-crypto` |
 | `zeroize` | 2 crates | `bonsai-crypto` (zero-on-drop wrapper) |
-| `bip39` | `bonsai-transfer-crypto` | `bonsai-crypto` (wordlist + entropy) |
+| `bip39` | `p2p-crypto` | `bonsai-crypto` (wordlist + entropy) |
 | `rand` | 10 crates | `bonsai-rand` |
-| `rand_core` | `bonsai-transfer-crypto` | `bonsai-rand` |
+| `rand_core` | `p2p-crypto` | `bonsai-rand` |
 | `rand_distr` | `bonsai-go-nn` | `bonsai-rand` |
 | `ssh-key` | `bonsai-workspace` | `bonsai-crypto` (Ed25519 SSH wire format) |
 | `zxcvbn` | `bonsai-workspace` | `bonsai-crypto` (password strength heuristic) |
@@ -737,7 +737,7 @@ With BonsAI-assisted code generation, the AI writes the initial implementation f
 1. **`cargo vendor`** — run, commit, verify offline build
 2. **`bonsai-error`** — first crate to build; unblocks logging and all other crates
 3. **`bonsai-log`** — replace `tracing` in `eternal-workshop` as the first migration
-4. **`bonsai-rand`** — replaces `rand` in `bonsai-transfer-crypto` first
+4. **`bonsai-rand`** — replaces `rand` in `p2p-crypto` first
 5. **`bonsai-id`** — replaces `uuid` in `eternal-workshop` as the first migration
 6. **Write specs** for Phase 2 crates (`bonsai-crypto`, `bonsai-db`, `bonsai-http`) in `docs/specs/`
 

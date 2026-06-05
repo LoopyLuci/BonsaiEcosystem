@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The Bonsai Ecosystem and UOSC have been architected as a **deterministic-first, AI-optional, formally-verified system** where:
+The Bonsai Ecosystem and USOS have been architected as a **deterministic-first, AI-optional, formally-verified system** where:
 
 - ✅ **Every subsystem operates correctly without any AI/ML component**
 - ✅ **AI enhancements are purely advisory, never required**
@@ -17,9 +17,9 @@ This represents a **next-generation approach** to AI integration: not "AI-first"
 
 ## Part I: Foundational Framework
 
-### 1.1 Core Crate: `bonsai-ai-fallback` (v1.0.0)
+### 1.1 Core Crate: `ai-advisor` (v1.0.0)
 
-**Location**: `crates/bonsai-ai-fallback/`
+**Location**: `crates/ai-advisor/`
 
 **Purpose**: Universal framework for AI-optional service design.
 
@@ -67,7 +67,7 @@ Tier 4: Safe Stub        [mandatory, minimal, never fails]
 ```toml
 [features]
 default = ["deterministic-core"]
-ai-enhancements = ["dep:bonsai-ai-fallback"]
+ai-enhancements = ["dep:ai-advisor"]
 ```
 
 **Pattern 3: Safety Envelopes**
@@ -102,12 +102,12 @@ pub struct AiCapabilityPolicy {
 - **Safe Stub**: Use first available path with minimal window
 
 **Files**:
-- `crates/bonsai-transfer-identity/` (v2.0.0)
-- `crates/bonsai-transfer-crypto/` (v2.0.0)
-- `crates/bonsai-transfer-core/` (v2.0.0)
+- `crates/p2p-identity/` (v2.0.0)
+- `crates/p2p-crypto/` (v2.0.0)
+- `crates/p2p-core/` (v2.0.0)
 - `crates/bonsai-transfer-ai/` (v2.0.0, optional)
 
-**Example**: `crates/bonsai-ai-fallback/examples/transfer_daemon_example.rs`
+**Example**: `crates/ai-advisor/examples/transfer_daemon_example.rs`
 
 ### 2.2 BUCE (Compression Engine)
 
@@ -121,7 +121,7 @@ pub struct AiCapabilityPolicy {
 
 **Performance**: 95%+ of learned model with zero ML latency (via Adaptive Deterministic Circuits).
 
-**Example**: `crates/bonsai-ai-fallback/examples/buce_example.rs`
+**Example**: `crates/ai-advisor/examples/buce_example.rs`
 
 ### 2.3 Survival System (Self-Healing)
 
@@ -133,13 +133,13 @@ pub struct AiCapabilityPolicy {
 - **AI Advisory**: Predictive failure detection, anomaly scoring
 - **Safe Stub**: Monitor-only (zero risk)
 
-**Example**: `crates/bonsai-ai-fallback/examples/survival_system_example.rs`
+**Example**: `crates/ai-advisor/examples/survival_system_example.rs`
 
 ### 2.4 Future Integrations
 
 | Subsystem | Core | Heuristic | AI | Status |
 |-----------|------|-----------|-----|--------|
-| **UOSC Kernel** | CFS/EDF scheduler | Static priorities | Dynamic tuning | In progress |
+| **USOS Kernel** | CFS/EDF scheduler | Static priorities | Dynamic tuning | In progress |
 | **Echo** (P2P) | Kademlia DHT | Latency-based routing | Node prediction | Planned |
 | **BCF** (Containers) | OCI/overlayfs | Static affinity | ML placement | Planned |
 | **BMN** (Media) | AV1/H.264 encoding | Fixed preset | Content-aware quality | Planned |
@@ -159,7 +159,7 @@ pub struct AiCapabilityPolicy {
 For all AI advice x:
   Arbiter.clamp(x) ∈ [min_bound, max_bound]
 ```
-Verified by Axiom SMT solver on `bonsai-ai-fallback/src/arbiter.rs`.
+Verified by Axiom SMT solver on `ai-advisor/src/arbiter.rs`.
 
 **Property 2: Degradation Completeness**
 ```
@@ -462,7 +462,7 @@ cargo run --example survival_system_example
 | [BONSAI_AI_OPTIONAL_BACKBONE.md](BONSAI_AI_OPTIONAL_BACKBONE.md) | System-wide architecture |
 | [INTEGRATION_GUIDE_AI_OPTIONAL.md](INTEGRATION_GUIDE_AI_OPTIONAL.md) | Step-by-step integration |
 | [TRUSTED_ARBITER_SPECIFICATION.md](TRUSTED_ARBITER_SPECIFICATION.md) | Arbiter internals + governance |
-| [API Docs](crates/bonsai-ai-fallback/src/lib.rs) | In-code documentation |
+| [API Docs](crates/ai-advisor/src/lib.rs) | In-code documentation |
 
 ---
 
@@ -516,7 +516,7 @@ Proven by policy check in critical path.
 
 ### 10.2 Short-term (Q4 2026)
 
-- [ ] Integrate UOSC kernel (scheduler + I/O)
+- [ ] Integrate USOS kernel (scheduler + I/O)
 - [ ] Create Adaptive Deterministic Circuits (ADC) compiler
 - [ ] Implement Sanctum TEE isolation for Advisory Domain
 - [ ] Build Universe audit log export pipeline

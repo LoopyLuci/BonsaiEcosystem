@@ -12,7 +12,7 @@
 
 ### Foundation Crate
 
-- [x] **crates/bonsai-ai-fallback/** (v1.0.0)
+- [x] **crates/ai-advisor/** (v1.0.0)
   - [x] `Cargo.toml` (dependencies, features)
   - [x] `src/lib.rs` (public API exports)
   - [x] `src/error.rs` (error types, Result wrapper)
@@ -78,7 +78,7 @@
 
 ### Example 1: TransferDaemon v2
 
-- [x] **crates/bonsai-ai-fallback/examples/transfer_daemon_example.rs**
+- [x] **crates/ai-advisor/examples/transfer_daemon_example.rs**
   - [x] Service struct (TransferDaemonService)
   - [x] Implements SovereignService trait
     - [x] deterministic_core() → CUBIC congestion control + lowest-RTT path
@@ -94,7 +94,7 @@
 
 ### Example 2: BUCE Compression Engine
 
-- [x] **crates/bonsai-ai-fallback/examples/buce_example.rs**
+- [x] **crates/ai-advisor/examples/buce_example.rs**
   - [x] Service struct (BuceService)
   - [x] Data type detection (JSON, text, image, audio, video, binary)
   - [x] Implements SovereignService trait
@@ -111,7 +111,7 @@
 
 ### Example 3: Survival System (Self-Healing)
 
-- [x] **crates/bonsai-ai-fallback/examples/survival_system_example.rs**
+- [x] **crates/ai-advisor/examples/survival_system_example.rs**
   - [x] Service struct (SurvivalService)
   - [x] Crash event tracking
   - [x] System metrics struct (CPU, memory, I/O, disk)
@@ -153,7 +153,7 @@
 
 ### Identity Layer (Complete)
 
-- [x] **crates/bonsai-transfer-identity/** (v2.0.0)
+- [x] **crates/p2p-identity/** (v2.0.0)
   - [x] Cargo.toml
   - [x] src/lib.rs (public API)
   - [x] src/node_id.rs (self-certifying NodeId with Ed25519)
@@ -165,7 +165,7 @@
 
 ### Crypto Layer (Complete)
 
-- [x] **crates/bonsai-transfer-crypto/** (v2.0.0)
+- [x] **crates/p2p-crypto/** (v2.0.0)
   - [x] Cargo.toml (updated to v2.0.0)
   - [x] Supports hybrid post-quantum (X25519 + ML-KEM-768)
   - [x] Dependencies: x25519-dalek, ml-kem, ed25519-dalek, aes-gcm, blake3
@@ -174,10 +174,10 @@
 
 ### Core Messaging Layer (Complete)
 
-- [x] **crates/bonsai-transfer-core/** (v2.0.0)
+- [x] **crates/p2p-core/** (v2.0.0)
   - [x] Cargo.toml
   - [x] Feature flags: `deterministic-core` (default), `ai-enhancements` (optional)
-  - [x] Depends on bonsai-transfer-identity, bonsai-transfer-crypto
+  - [x] Depends on p2p-identity, p2p-crypto
   - [x] Optionally depends on bonsai-transfer-ai (feature-gated)
 
 **Status**: Complete and tested
@@ -218,23 +218,23 @@
   - [ ] AI: learned codec selector
   - [ ] Adapt from example code
 
-### UOSC Kernel (Memory + Scheduler) - Q3 2026
+### USOS Kernel (Memory + Scheduler) - Q3 2026
 
-- [ ] **crates/bonsai-UOSC-kernel/**
+- [ ] **crates/bonsai-kernel/**
   - [ ] Memory compression (zram + AI prediction)
   - [ ] Scheduler (CFS + EDF + AI tuning)
   - [ ] I/O scheduling (mq-deadline + AI prefetch)
 
 ### Echo (P2P Fabric) - Q4 2026
 
-- [ ] **crates/bonsai-echo/** (v2.0.0)
+- [ ] **crates/discovery/** (v2.0.0)
   - [ ] Kademlia DHT (deterministic core)
   - [ ] GossipSub (heuristic)
   - [ ] ML prediction (optional advisory)
 
 ### BCF (Container Fabric) - Q4 2026
 
-- [ ] **crates/bonsai-bcf/** (v2.0.0)
+- [ ] **crates/container/** (v2.0.0)
   - [ ] OCI format (deterministic)
   - [ ] Static affinity (heuristic)
   - [ ] ML placement (advisory)
@@ -255,7 +255,7 @@
 
 ### BACE (Compiler) - 2027
 
-- [ ] **crates/bonsai-bace/** (v2.0.0)
+- [ ] **crates/inc-compile/** (v2.0.0)
   - [ ] Standard compilation pipeline (deterministic)
   - [ ] O2 optimization (heuristic)
   - [ ] ML auto-tuning (advisory)
@@ -274,7 +274,7 @@
 ### Framework Code (7 files, ~1,500 LOC)
 
 ```
-crates/bonsai-ai-fallback/
+crates/ai-advisor/
 ├── Cargo.toml
 ├── src/
 │   ├── lib.rs
@@ -303,9 +303,9 @@ crates/bonsai-ai-fallback/
 
 ```
 crates/
-├── bonsai-transfer-identity/
-├── bonsai-transfer-crypto/
-├── bonsai-transfer-core/
+├── p2p-identity/
+├── p2p-crypto/
+├── p2p-core/
 └── bonsai-transfer-ai/
 ```
 
@@ -321,7 +321,7 @@ IMPLEMENTATION_CHECKLIST.md (this file)
 ## Testing Status
 
 ### Unit Tests ✅
-- [x] Framework tests (bonsai-ai-fallback): 20+ tests
+- [x] Framework tests (ai-advisor): 20+ tests
 - [x] Example tests: 15+ tests across 3 examples
 - [x] TransferDaemon v2 tests: 15+ tests
 
@@ -388,7 +388,7 @@ $ cargo run --example survival_system_example
 # Cargo.toml (default, AI disabled)
 [features]
 default = ["deterministic-core"]
-ai-enhancements = ["dep:bonsai-ai-fallback"]
+ai-enhancements = ["dep:ai-advisor"]
 ```
 
 ```rust
@@ -420,7 +420,7 @@ let config = ArbiterConfig {
 
 ## Known Limitations & TODO
 
-### Framework (bonsai-ai-fallback)
+### Framework (ai-advisor)
 
 - [x] Core trait and orchestration
 - [x] Safety envelope validation
@@ -447,7 +447,7 @@ let config = ArbiterConfig {
 - [x] 3 example implementations
 - [x] Specification documents
 - [ ] **TODO**: BUCE integration (3-4 weeks)
-- [ ] **TODO**: UOSC kernel integration (4-6 weeks)
+- [ ] **TODO**: USOS kernel integration (4-6 weeks)
 - [ ] **TODO**: Echo/P2P integration (4-6 weeks)
 - [ ] **TODO**: Formal verification with Axiom
 - [ ] **TODO**: Shadow-mode tooling & dashboards
@@ -512,7 +512,7 @@ let config = ArbiterConfig {
 ### Medium-term (Next 10-12 weeks)
 
 1. **Integrate Remaining Subsystems**
-   - UOSC kernel (scheduler + memory)
+   - USOS kernel (scheduler + memory)
    - Echo (P2P messaging)
    - BCF (container fabric)
 
@@ -561,7 +561,7 @@ let config = ArbiterConfig {
 The Bonsai AI-Optional Ecosystem framework is **production-ready** as of 2026-06-04. The core patterns have been implemented, documented, and validated through three concrete examples. TransferDaemon v2 demonstrates the patterns on a real network subsystem.
 
 The framework is ready for:
-- ✅ Integration into other Bonsai subsystems (BUCE, UOSC, Echo, etc.)
+- ✅ Integration into other Bonsai subsystems (BUCE, USOS, Echo, etc.)
 - ✅ Shadow-mode deployment and validation
 - ✅ Council-governed capability ramp-up
 - ✅ Production deployment with safety guarantees

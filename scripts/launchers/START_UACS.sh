@@ -16,8 +16,8 @@ if ! command -v cargo &> /dev/null; then
 fi
 
 echo ""
-echo "🔨 Building bonsai-mcp-server..."
-cargo build -p bonsai-mcp-server --release 2>&1 | tail -10
+echo "🔨 Building mcp-server..."
+cargo build -p mcp-server --release 2>&1 | tail -10
 
 if [ ${PIPESTATUS[0]} -ne 0 ]; then
     echo "❌ Build failed!"
@@ -36,8 +36,8 @@ echo "   3️⃣  Terminal 3: Browser (http://localhost:5173)"
 # Terminal 1: UACS Server
 echo ""
 echo "[Terminal 1] Starting UACS Server..."
-gnome-terminal -- bash -c "cd '$BONSAI_DIR'; cargo run -p bonsai-mcp-server -- visual --hitl-categories destructive,network --port 11426; exec bash" 2>/dev/null || \
-xterm -hold -e "cd '$BONSAI_DIR'; cargo run -p bonsai-mcp-server -- visual --hitl-categories destructive,network --port 11426" &
+gnome-terminal -- bash -c "cd '$BONSAI_DIR'; cargo run -p mcp-server -- visual --hitl-categories destructive,network --port 11426; exec bash" 2>/dev/null || \
+xterm -hold -e "cd '$BONSAI_DIR'; cargo run -p mcp-server -- visual --hitl-categories destructive,network --port 11426" &
 
 # Give the server a moment to start
 sleep 3

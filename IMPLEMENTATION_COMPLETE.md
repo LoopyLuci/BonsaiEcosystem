@@ -163,7 +163,7 @@ Templates ready in:
 
 ## Integration with Bonsai Ecosystem
 
-✅ **Fully Integrated with `bonsai-ai-fallback`**
+✅ **Fully Integrated with `ai-advisor`**
 - Orchestrator implements `SovereignService`
 - Sandbox implements `SovereignService`
 - Both use `Arbiter` for graceful degradation
@@ -266,7 +266,7 @@ None. All core features implemented, tested, and production-ready.
 Blockers for future phases:
 - ZK proofs require Winterfell crate (dependency management)
 - TEE requires SGX SDK (platform-specific)
-- Universe integration requires bonsai-universe crate
+- Universe integration requires audit-log crate
 
 ---
 

@@ -63,7 +63,7 @@ crates/
 │  │  └─ decoder.rs                      (existing: video decoder)
 │  └─ Cargo.toml                         (updated: add uuid, lazy_static)
 │
-bonsai-buddy-android/
+android-runtime/
 └─ library-bonsai-shared/
    ├─ src/main/
    │  ├─ java/ai/bonsai/shared/
@@ -381,7 +381,7 @@ cargo build --target aarch64-linux-android --release
 
 # Copy to Android project
 cp target/aarch64-linux-android/release/libbonsai_android_llm.so \
-   ../../bonsai-buddy-android/library-bonsai-shared/src/main/jniLibs/arm64-v8a/
+   ../../android-runtime/library-bonsai-shared/src/main/jniLibs/arm64-v8a/
 
 # For Android emulator (x86_64)
 cargo build --target x86_64-linux-android --release

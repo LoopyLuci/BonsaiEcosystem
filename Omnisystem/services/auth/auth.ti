@@ -1,4 +1,4 @@
-// services/omni-auth/auth.ti — Authentication and authorization with capability integration
+// services/build-auth/auth.ti — Authentication and authorization with capability integration
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

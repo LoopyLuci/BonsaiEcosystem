@@ -1,7 +1,7 @@
 // aether/mesh.ti — Aether cluster mesh: distributed actor registry and routing
 // Actors are addressed by a URI: node_id * 1_000_000 + local_id
 // The mesh maintains a routing table (actor_uri → node_id) and forwards
-// messages across nodes using the omni-p2p transport layer (simulated here).
+// messages across nodes using the build-p2p transport layer (simulated here).
 // Work stealing is cluster-aware: pull from the busiest remote node.
 
 extern "titan" {fn heap_alloc_term()->i64;fn heap_set_tag(a:i64,b:i64);fn heap_get_tag(a:i64)->i64;fn heap_set_body(a:i64,b:i64);fn heap_get_body(a:i64)->i64;fn heap_set_arg(a:i64,b:i64);fn heap_get_arg(a:i64)->i64;fn heap_set_domain(a:i64,b:i64);fn heap_get_domain(a:i64)->i64;}
@@ -145,7 +145,7 @@ pub fn cluster_send(from_uri:i64, to_uri:i64, payload:i64) -> i64 {
     let dn = cluster_find_node(dest_node);
     if dn >= 0 { node_inc_load(dn); }
 
-    // In production: omni-p2p sends the serialized message to dest_node
+    // In production: build-p2p sends the serialized message to dest_node
     // Here we model it as delivered
     let ln=heap_alloc_term(); heap_set_tag(ln,TAG_LIST);
     heap_set_body(ln,msg); heap_set_arg(ln,g_msg_head);

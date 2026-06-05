@@ -19,16 +19,16 @@ KERNEL := \
 
 # ── Platform services ─────────────────────────────────────────────────────
 SERVICES := \
-    services\omni-p2p\p2p.ti \
-    services\omni-compress\compress.ti \
-    services\omni-container\container.ti \
-    services\omni-observability\observability.ti \
-    services\omni-storage\storage.ti \
-    services\omni-cache\cache.ti \
-    services\omni-queue\queue.ti \
-    services\omni-rpc\rpc.ti \
-    services\omni-auth\auth.ti \
-    services\omni-crypto\crypto.ti
+    services\build-p2p\p2p.ti \
+    services\build-compress\compress.ti \
+    services\build-container\container.ti \
+    services\build-observability\observability.ti \
+    services\build-storage\storage.ti \
+    services\build-cache\cache.ti \
+    services\build-queue\queue.ti \
+    services\build-rpc\rpc.ti \
+    services\build-auth\auth.ti \
+    services\build-crypto\crypto.ti
 
 # ── Axiom proof libraries ─────────────────────────────────────────────────
 PROOFS := \
@@ -82,22 +82,22 @@ lang:
 
 test: all
 	@echo.
-	@echo === UOSC Kernel ===
+	@echo === USOS Kernel ===
 	@kernel\capability.exe      && echo   capability      PASS || echo   capability      FAIL
 	@kernel\memory.exe           && echo   memory          PASS || echo   memory          FAIL
 	@kernel\scheduler.exe        && echo   scheduler       PASS || echo   scheduler       FAIL
 	@echo.
 	@echo === Platform Services ===
-	@services\omni-p2p\p2p.exe                           && echo   p2p             PASS || echo   p2p             FAIL
-	@services\omni-compress\compress.exe                 && echo   compress        PASS || echo   compress        FAIL
-	@services\omni-container\container.exe               && echo   container       PASS || echo   container       FAIL
-	@services\omni-observability\observability.exe       && echo   observability   PASS || echo   observability   FAIL
-	@services\omni-storage\storage.exe                   && echo   storage         PASS || echo   storage         FAIL
-	@services\omni-cache\cache.exe                       && echo   cache           PASS || echo   cache           FAIL
-	@services\omni-queue\queue.exe                       && echo   queue           PASS || echo   queue           FAIL
-	@services\omni-rpc\rpc.exe                           && echo   rpc             PASS || echo   rpc             FAIL
-	@services\omni-auth\auth.exe                         && echo   auth            PASS || echo   auth            FAIL
-	@services\omni-crypto\crypto.exe                     && echo   crypto          PASS || echo   crypto          FAIL
+	@services\build-p2p\p2p.exe                           && echo   p2p             PASS || echo   p2p             FAIL
+	@services\build-compress\compress.exe                 && echo   compress        PASS || echo   compress        FAIL
+	@services\build-container\container.exe               && echo   container       PASS || echo   container       FAIL
+	@services\build-observability\observability.exe       && echo   observability   PASS || echo   observability   FAIL
+	@services\build-storage\storage.exe                   && echo   storage         PASS || echo   storage         FAIL
+	@services\build-cache\cache.exe                       && echo   cache           PASS || echo   cache           FAIL
+	@services\build-queue\queue.exe                       && echo   queue           PASS || echo   queue           FAIL
+	@services\build-rpc\rpc.exe                           && echo   rpc             PASS || echo   rpc             FAIL
+	@services\build-auth\auth.exe                         && echo   auth            PASS || echo   auth            FAIL
+	@services\build-crypto\crypto.exe                     && echo   crypto          PASS || echo   crypto          FAIL
 	@echo.
 	@echo === Axiom Proofs ===
 	@titan\axlib\ax6_kernel.exe      && echo   ax6_kernel      PASS || echo   ax6_kernel      FAIL
@@ -119,16 +119,16 @@ test: all
 
 clean:
 	@del /Q kernel\*.exe 2>nul
-	@del /Q services\omni-p2p\*.exe 2>nul
-	@del /Q services\omni-compress\*.exe 2>nul
-	@del /Q services\omni-container\*.exe 2>nul
-	@del /Q services\omni-observability\*.exe 2>nul
-	@del /Q services\omni-storage\*.exe 2>nul
-	@del /Q services\omni-cache\*.exe 2>nul
-	@del /Q services\omni-queue\*.exe 2>nul
-	@del /Q services\omni-rpc\*.exe 2>nul
-	@del /Q services\omni-auth\*.exe 2>nul
-	@del /Q services\omni-crypto\*.exe 2>nul
+	@del /Q services\build-p2p\*.exe 2>nul
+	@del /Q services\build-compress\*.exe 2>nul
+	@del /Q services\build-container\*.exe 2>nul
+	@del /Q services\build-observability\*.exe 2>nul
+	@del /Q services\build-storage\*.exe 2>nul
+	@del /Q services\build-cache\*.exe 2>nul
+	@del /Q services\build-queue\*.exe 2>nul
+	@del /Q services\build-rpc\*.exe 2>nul
+	@del /Q services\build-auth\*.exe 2>nul
+	@del /Q services\build-crypto\*.exe 2>nul
 	@del /Q titan\axlib\*.exe 2>nul
 	@del /Q sylva\*.exe 2>nul
 	@del /Q aether\*.exe 2>nul

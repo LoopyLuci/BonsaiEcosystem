@@ -14,7 +14,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 # Cryptography & Security
-bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
+p2p-crypto = { path = "../p2p-crypto" }
 bonsai-capability-registry = { path = "../bonsai-capability-registry" }
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
@@ -27,7 +27,7 @@ zeroize = { version = "1", features = ["derive"] }
 bonsai-cas = { path = "../bonsai-cas" }
 
 # Event logging & observability
-bonsai-universe = { path = "../bonsai-universe" }
+audit-log = { path = "../audit-log" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
 

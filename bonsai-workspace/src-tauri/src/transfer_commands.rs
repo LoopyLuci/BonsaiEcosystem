@@ -1,9 +1,9 @@
 //! Tauri commands — Bonsai transfer, identity, and mailbox integration.
 //!
 //! These commands bridge the frontend to the five transfer crates:
-//!   bonsai-transfer-crypto  (identity, key derivation, encryption)
+//!   p2p-crypto  (identity, key derivation, encryption)
 //!   bonsai-transfer-store   (encrypted at-rest persistence)
-//!   bonsai-transfer-core    (ECF-RG chunked send, transfer status)
+//!   p2p-core    (ECF-RG chunked send, transfer status)
 //!   bonsai-mailbox          (agent-to-agent signed message delivery)
 
 use serde::{Deserialize, Serialize};

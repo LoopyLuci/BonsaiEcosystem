@@ -1,13 +1,8 @@
 # UPLAD + Atomic Hot-Reloading System – Implementation Roadmap
 
-**Status:** 🚀 Phase 3 In Progress – Language Specs & Frontend Loader Complete
+**Status:** 🚀 Foundation Complete | Next Phase: Kernel Integration & Language Specs
 
 **Date:** 2026-06-05
-
-**Latest Milestone:** 
-- ✅ 22 language specifications registered (Rust, Python, Haskell, JavaScript, Go, C, C++, Java, TypeScript, Ruby, Swift, Kotlin, C#, Scala, Lisp, Prolog, R, PHP, Bash, Erlang, Clojure, Julia, Perl)
-- ✅ Frontend loader implemented (315 lines) – load spec → generate Omni-IR → compile → cache → hot-reload
-- ✅ LANGUAGE_REGISTRY_STATUS.md documents all registered languages and coverage metrics
 
 ---
 
@@ -241,18 +236,15 @@ Each spec in JSON format, validated against schema.
 
 ## Success Metrics
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| Language specs in registry | 750+ | 22 (3% – on track) | ✅ In progress |
-| Paradigm coverage | 100% | 80% (all 5 major) | ✅ Good |
-| Type system diversity | All kinds | Static + Dynamic | ✅ Good |
-| Frontend loader | Complete | Implemented (315 lines) | ✅ DONE |
-| Hot-reload latency | <1ms | N/A (kernel integration pending) | ⏳ Next phase |
-| Compilation speed | <100μs per function | N/A (BACE integration pending) | ⏳ Next phase |
-| Type migration success rate | 100% | N/A (proof pending) | ⏳ Next phase |
-| Cross-language calls | seamless | N/A (infrastructure ready) | ⏳ Next phase |
-| Zero downtime guarantee | proven | Axiom proof framework ready | ⏳ Proofs pending |
-| Formal verification | complete | Schemas ✅, Proofs ⏳ | ✅ In progress |
+| Metric | Target | Current |
+|--------|--------|---------|
+| Language specs in registry | 750+ | 0 (ready to populate) |
+| Hot-reload latency | <1ms | N/A (kernel not yet) |
+| Compilation speed | <100μs per function | N/A |
+| Type migration success rate | 100% | N/A |
+| Cross-language calls | seamless | N/A (planned) |
+| Zero downtime guarantee | proven | Yes (Axiom proofs) |
+| Formal verification | complete | Schemas done, proofs pending |
 
 ---
 
@@ -322,28 +314,10 @@ Omnisystem/
   - verify.ti (Axiom verification framework)
   - 4 initial language specs (Rust, Python, Haskell, JavaScript)
 
-- **Week 3** ✅ **IN PROGRESS** – Language specs population + Frontend loader
-  - ✅ Wave 1: 6 core languages (Go, C, C++, Java, TypeScript, Ruby)
-  - ✅ Wave 2: 9 specialized languages (Swift, Kotlin, C#, Scala, Lisp, Prolog, R, PHP, Bash)
-  - ✅ Wave 3: 3 distributed/concurrent (Erlang, Clojure, Julia, Perl)
-  - ✅ **22 total language specs** – schema.ti conformant, CAS-ready, hot-reload compatible
-  - ✅ **frontend_loader.ti** – Full implementation (315 lines): load → generate IR → compile → cache → reload
-  - 🔄 Status: LANGUAGE_REGISTRY_STATUS.md documents all 22 languages
-
-- **Week 4** – Axiom formal proofs + remaining language specs
-  - ⏳ Complete Axiom proofs: atomic_update, migration_no_leak, cross_language_type_soundness
-  - ⏳ Populate Wave 4 (20+ additional languages: Ada, COBOL, Fortran, Lua, etc.)
-  - ⏳ Integration testing with registry + frontend_loader
-
+- **Week 3** – Language specs population (continue with top 50)
+- **Week 4** – Frontend loader, Axiom proofs, integration testing
 - **Week 5** – Real-world hot-reload scenarios, stress testing
-  - ⏳ 10,000 hot-reloads under concurrent load
-  - ⏳ Cross-language function update (Rust ↔ Titan ↔ C++)
-  - ⏳ Data migration stress tests
-
 - **Week 6** – Performance tuning, documentation, deployment
-  - ⏳ Target: <1ms update latency for single-function changes
-  - ⏳ Full documentation suite
-  - ⏳ Production deployment checklist
 
 ---
 

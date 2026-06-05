@@ -104,7 +104,7 @@ $ cargo check -p bonsai-bug-hunt
 ## 🔄 CLOSED-LOOP SELF-HEALING FLOW
 
 STEP 1: DETECT CRASH
-  └─ Survival System detects panic in bonsai-mcp-server
+  └─ Survival System detects panic in mcp-server
   └─ Extracts: component name, error message, stack trace
 
 STEP 2: TARGETED SCAN
@@ -241,9 +241,9 @@ False positive rate        <5%            ✅ ML classifier (ETL)
 
 Timeline: Component crashes → Automatic self-healing in <10s
 
-T=0.0s   [CRASH] bonsai-mcp-server panics: "called `Option::unwrap()` on `None`"
+T=0.0s   [CRASH] mcp-server panics: "called `Option::unwrap()` on `None`"
 T=0.1s   [SURVIVAL] Survival System detects crash, extracts stack trace
-T=0.2s   [SCAN] Bug Hunt scans bonsai-mcp-server/src (130 files)
+T=0.2s   [SCAN] Bug Hunt scans mcp-server/src (130 files)
 T=2.3s   [ANALYZE] Static lint finds: E0308 @ request.rs:42 (unwrap on None)
 T=2.5s   [KDB] Knowledge DB returns known fix: "use `?` operator"
 T=2.6s   [ENRICH] Suggestion + diff attached, confidence boosted to 0.94
@@ -315,7 +315,7 @@ All tools ready for Copilot, Claude, and other MCP-compatible agents.
 ║  • Ready for immediate deployment to production                          ║
 ║                                                                           ║
 ║  Next Steps:                                                              ║
-║  1. Wire MCP tools into bonsai-mcp-server                                ║
+║  1. Wire MCP tools into mcp-server                                ║
 ║  2. Enable Survival System to call scan_on_crash()                       ║
 ║  3. Test end-to-end on real crash scenario                               ║
 ║  4. Monitor feedback loop through EternalTrainingLoop                    ║

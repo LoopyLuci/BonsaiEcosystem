@@ -5,7 +5,7 @@ pub fn main() -> i64 {
     let mut score: i64 = 0;
 
     // Stage 1 — Create CLI
-    let create_ok: i64 = create_cli("omni", "Omnisystem CLI");
+    let create_ok: i64 = create_cli("build", "Omnisystem CLI");
     if create_ok >= 80 { score += 14; }
 
     // Stage 2 — Add command

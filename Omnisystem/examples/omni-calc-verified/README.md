@@ -24,7 +24,7 @@
 ## Project Structure
 
 ```
-examples/omni-calc-verified/
+examples/build-calc-verified/
 ├── titan/
 │   └── calc_core.ti          ✅ Verified arithmetic (500+ lines)
 ├── aether/
@@ -58,7 +58,7 @@ This works because in two's complement, overflow causes the MSB (sign bit) of th
 
 **Can be used independently:**
 ```bash
-$ omni build examples/omni-calc-verified/titan/calc_core.ti
+$ build build examples/build-calc-verified/titan/calc_core.ti
 $ # Produces a linkable Titan library with safe arithmetic functions
 ```
 
@@ -81,7 +81,7 @@ $ # Produces a linkable Titan library with safe arithmetic functions
 
 **Can be used independently:**
 ```bash
-$ omni run examples/omni-calc-verified/aether/calc_service.ae
+$ build run examples/build-calc-verified/aether/calc_service.ae
 # Actor starts, listens for messages from any client
 # (In practice, would be contacted by Sylva or another Aether node)
 ```
@@ -100,7 +100,7 @@ $ omni run examples/omni-calc-verified/aether/calc_service.ae
 
 **Can be used independently:**
 ```bash
-$ omni run examples/omni-calc-verified/sylva/main.sy
+$ build run examples/build-calc-verified/sylva/main.sy
 # Executes the entire demo without any other components
 ```
 
@@ -124,7 +124,7 @@ $ omni run examples/omni-calc-verified/sylva/main.sy
 
 **Can be used independently:**
 ```bash
-$ omni prove examples/omni-calc-verified/axiom/calc_proof.ax
+$ build prove examples/build-calc-verified/axiom/calc_proof.ax
 # Axiom kernel verifies all theorems and properties
 # Output: "✅ All proofs verified"
 ```
@@ -136,10 +136,10 @@ $ omni prove examples/omni-calc-verified/axiom/calc_proof.ax
 ### Option 1: Run the Full Demo (Recommended)
 
 ```bash
-cd examples/omni-calc-verified
+cd examples/build-calc-verified
 
 # Orchestrate everything through Sylva
-$ omni run sylva/main.sy
+$ build run sylva/main.sy
 
 # Expected output:
 # ──────────────────────────────────────
@@ -183,26 +183,26 @@ $ omni run sylva/main.sy
 
 **Titan only** (compile and link):
 ```bash
-$ omni build titan/calc_core.ti
+$ build build titan/calc_core.ti
 ```
 
 **Aether only** (start the actor service):
 ```bash
-$ omni run aether/calc_service.ae &
+$ build run aether/calc_service.ae &
 # In another terminal, send messages to it
-$ omni send aether::calc_service::CalcService.Compute(0, 10, 20)
+$ build send aether::calc_service::CalcService.Compute(0, 10, 20)
 ```
 
 **Sylva only** (interactive REPL):
 ```bash
-$ omni sylva
+$ build sylva
 sylva> import "sylva/main.sy"
 sylva> main()
 ```
 
 **Axiom only** (verify proofs):
 ```bash
-$ omni prove axiom/calc_proof.ax
+$ build prove axiom/calc_proof.ax
 ```
 
 ### Option 3: Notebook (Sylva Interactive)
@@ -266,7 +266,7 @@ To prove each language is independent:
 
 ```bash
 # Titan: compile to library
-$ omni build titan/calc_core.ti
+$ build build titan/calc_core.ti
 $ file calc_core.o  # => ELF object file (or equivalent)
 
 # Aether: no dependencies on Sylva/Axiom
@@ -274,13 +274,13 @@ $ grep -r "import.*sylva" aether/  # => no results
 $ grep -r "import.*axiom" aether/  # => no results
 
 # Sylva: can import Titan and Aether independently
-$ omni sylva
+$ build sylva
 sylva> import "titan/calc_core.ti"
 sylva> eval_binary(0, 10, 20)
 => Ok(30)
 
 # Axiom: can be verified without running other languages
-$ omni prove axiom/calc_proof.ax --no-runtime
+$ build prove axiom/calc_proof.ax --no-runtime
 => ✅ Verified (no Aether/Sylva needed)
 ```
 
@@ -378,7 +378,7 @@ The Omnisystem is not a promise; it is a reality. All four roots are deep, all f
 ---
 
 **Status:** ✅ Complete and verified  
-**Build:** `omni run sylva/main.sy`  
+**Build:** `build run sylva/main.sy`  
 **Test:** All four languages execute successfully  
 **Trust:** Formal proofs attached  
 **Interop:** Fully integrated  

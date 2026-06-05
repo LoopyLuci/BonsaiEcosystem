@@ -14,8 +14,8 @@ if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-Write-Host "`n🔨 Building bonsai-mcp-server..." -ForegroundColor Cyan
-cargo build -p bonsai-mcp-server --release 2>&1 | Select-Object -Last 10
+Write-Host "`n🔨 Building mcp-server..." -ForegroundColor Cyan
+cargo build -p mcp-server --release 2>&1 | Select-Object -Last 10
 if ($LASTEXITCODE -ne 0) {
     Write-Host "`n❌ Build failed!" -ForegroundColor Red
     exit 1
@@ -31,7 +31,7 @@ Write-Host "   3️⃣  Terminal 3: Browser (http://localhost:5173)" -Foreground
 
 # Terminal 1: UACS Server
 Write-Host "`n[Terminal 1] Starting UACS Server..." -ForegroundColor Cyan
-Start-Process pwsh -ArgumentList "-NoExit", "-Command", "cd '$BonsaiDir'; cargo run -p bonsai-mcp-server -- visual --hitl-categories destructive,network --port 11426"
+Start-Process pwsh -ArgumentList "-NoExit", "-Command", "cd '$BonsaiDir'; cargo run -p mcp-server -- visual --hitl-categories destructive,network --port 11426"
 
 # Give the server a moment to start
 Start-Sleep -Seconds 3

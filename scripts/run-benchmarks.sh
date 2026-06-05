@@ -158,7 +158,7 @@ benchmark_network() {
 
     RESULTS_FILE="$RESULTS_DIR/network-performance.json"
 
-    cargo test --release -p bonsai-mcp-server --test integration_tests \
+    cargo test --release -p mcp-server --test integration_tests \
         -- --nocapture 2>&1 | tee "$RESULTS_FILE"
 
     echo "  ✓ Network tests completed"

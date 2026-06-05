@@ -1,4 +1,4 @@
-// services/omni-container/container.ti — Lightweight sandboxed process containers
+// services/build-container/container.ti — Lightweight sandboxed process containers
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

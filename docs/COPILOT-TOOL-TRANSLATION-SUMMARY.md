@@ -24,7 +24,7 @@ A complete, **production-ready design** for the **Copilot Tool Translation Engin
    - Versioning & compatibility strategy
    - 13 appendices with glossary and references
 
-2. **`crates/bonsai-mcp-server/tool-schema-registry.yaml`** (42 tools)
+2. **`crates/mcp-server/tool-schema-registry.yaml`** (42 tools)
    - Complete registry of all Copilot tools
    - Copilot schema definitions
    - Bonsai mapping strategies (direct/bridge/cloud)
@@ -212,7 +212,7 @@ All measurable:
 | File | Purpose | Lines | Status |
 |---|---|---|---|
 | `docs/25-COPILOT-TOOL-TRANSLATION-ENGINE.md` | Main design doc | 4000+ | Complete |
-| `crates/bonsai-mcp-server/tool-schema-registry.yaml` | Tool registry | 1000+ | Complete |
+| `crates/mcp-server/tool-schema-registry.yaml` | Tool registry | 1000+ | Complete |
 | `docs/26-COPILOT-IMPLEMENTATION-QUICKSTART.md` | Code templates | 1000+ | Complete |
 | `docs/COPILOT-TOOL-TRANSLATION-SUMMARY.md` | This file | 300+ | Complete |
 

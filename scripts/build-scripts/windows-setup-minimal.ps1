@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     Minimal Bonsai Ecosystem Setup (without GPU training)
-    Builds UOSC kernel, Bonsai Workspace IDE, and prepares training infrastructure
+    Builds USOS kernel, Bonsai Workspace IDE, and prepares training infrastructure
     (Python training skipped if not installed)
 #>
 
@@ -26,22 +26,22 @@ function Write-Step {
 Write-Header "BONSAI ECOSYSTEM — WINDOWS 10 LOCAL BUILD (Minimal)"
 
 # ============================================================================
-# PHASE 1: Build UOSC Kernel
+# PHASE 1: Build USOS Kernel
 # ============================================================================
 
 if (-not $SkipKernelBuild) {
-    Write-Header "PHASE 1: BUILD UOSC KERNEL"
-    Write-Step "Building UOSC kernel (bare-metal x86_64)..."
+    Write-Header "PHASE 1: BUILD USOS KERNEL"
+    Write-Step "Building USOS kernel (bare-metal x86_64)..."
 
-    Push-Location "$workspace\crates\UOSC-kernel"
+    Push-Location "$workspace\crates\kernel"
 
     # Ensure x86_64-unknown-none target is installed
     rustup target add x86_64-unknown-none 2>&1 | Out-Null
 
-    cargo build --release --target x86_64-unknown-none 2>&1 | Tee-Object -FilePath "$workspace\UOSC-build.log"
+    cargo build --release --target x86_64-unknown-none 2>&1 | Tee-Object -FilePath "$workspace\usos-build.log"
 
     if ($LASTEXITCODE -eq 0) {
-        $kernel_path = "$workspace\crates\UOSC-kernel\target\x86_64-unknown-none\release\UOSC-kernel"
+        $kernel_path = "$workspace\crates\kernel\target\x86_64-unknown-none\release\kernel"
         Write-Host "✅ Kernel built: $kernel_path" -ForegroundColor Green
         Write-Host "   Size: $((Get-Item $kernel_path).Length / 1KB) KB" -ForegroundColor Cyan
     } else {
@@ -141,8 +141,8 @@ Write-Host @"
 
 ✅ BONSAI WORKSPACE COMPONENTS BUILT:
 
-1. UOSC Kernel (bare-metal x86_64)
-   Location: crates/UOSC-kernel/target/x86_64-unknown-none/release/UOSC-kernel
+1. USOS Kernel (bare-metal x86_64)
+   Location: crates/kernel/target/x86_64-unknown-none/release/kernel
 
 2. Bonsai Workspace IDE (Tauri desktop app)
    Location: bonsai-workspace/src-tauri/target/release/bonsai-workspace.exe

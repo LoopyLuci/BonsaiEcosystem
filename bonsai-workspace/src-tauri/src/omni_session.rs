@@ -154,7 +154,7 @@ impl OmniSession {
         state.is_locked = false;
 
         info!(
-            "[omni-session] login: user={} session={}",
+            "[build-session] login: user={} session={}",
             user_id, state.active_session_id
         );
 
@@ -166,7 +166,7 @@ impl OmniSession {
                     if let Ok(snap) = serde_json::from_slice::<SessionSnapshot>(&bytes) {
                         state.open_apps = snap.open_apps;
                         state.shell_sessions = snap.shell_sessions;
-                        info!("[omni-session] restored snapshot from {}", key_hex);
+                        info!("[build-session] restored snapshot from {}", key_hex);
                     }
                 }
             }
@@ -182,7 +182,7 @@ impl OmniSession {
         let snap_key = self.save_snapshot().await?;
         let mut state = self.state.write().await;
         state.is_locked = true;
-        info!("[omni-session] logout: user={}", state.user_id);
+        info!("[build-session] logout: user={}", state.user_id);
         Ok(snap_key)
     }
 
@@ -202,12 +202,12 @@ impl OmniSession {
         let bytes = serde_json::to_vec(&snap).map_err(|e| e.to_string())?;
         let key = self
             .cas
-            .put(&bytes, "application/x-omni-session")
+            .put(&bytes, "application/x-build-session")
             .await
             .map_err(|e| e.to_string())?;
         let hex = key.hex();
         *self.last_snapshot_key.write().await = Some(hex.clone());
-        info!("[omni-session] snapshot saved: {}", hex);
+        info!("[build-session] snapshot saved: {}", hex);
         Ok(hex)
     }
 

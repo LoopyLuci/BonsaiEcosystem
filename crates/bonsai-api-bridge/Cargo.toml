@@ -28,9 +28,9 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
 bonsai-relay = { path = "../bonsai-relay" }
-bonsai-transfer-core = { path = "../bonsai-transfer-core" }
+p2p-core = { path = "../p2p-core" }
 bonsai-transfer-client = { path = "../bonsai-transfer-client" }
-bonsai-universe = { path = "../bonsai-universe" }
+audit-log = { path = "../audit-log" }
 
 [build-dependencies]
 tonic-build = "0.12"

@@ -439,7 +439,7 @@ let metrics = advisor.predict_performance("python", "3.12.4");
 
 ```bash
 # Build
-cargo build -p bonsai-enclave --bin enclave --release
+cargo build -p sandbox --bin enclave --release
 
 # Run 10×10 test matrix
 cd polyglot-pong

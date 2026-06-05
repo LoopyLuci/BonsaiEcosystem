@@ -20,10 +20,10 @@ Built a **universal, deterministic, next-generation replacement** for:
 
 ## 📦 What Was Built
 
-### Core Architecture (Rust Crate: `bonsai-enclave`)
+### Core Architecture (Rust Crate: `sandbox`)
 
 ```
-crates/bonsai-enclave/
+crates/sandbox/
 ├── Cargo.toml                   # 45 lines - production dependencies
 ├── src/
 │   ├── lib.rs                   # 200+ lines - main Enclave API
@@ -86,7 +86,7 @@ enclave cache stats|clean       # Cache management
 ✅ Binary size: ~8.5 MB (release build)
 ✅ Compile time: 31.31 seconds (complete rebuild)
 
-Build: cargo build -p bonsai-enclave --bin enclave --release
+Build: cargo build -p sandbox --bin enclave --release
 Status: Finished `release` profile [optimized + debuginfo]
 ```
 
@@ -190,7 +190,7 @@ Extensible plugin system for 740+ additional languages
 ## 📂 Files Created
 
 ```
-crates/bonsai-enclave/
+crates/sandbox/
 ├── Cargo.toml                          # Workspace integration
 ├── src/
 │   ├── lib.rs                          # 200+ lines - Core API
@@ -213,7 +213,7 @@ crates/bonsai-enclave/
 
 ```bash
 # Build the binary
-cargo build -p bonsai-enclave --bin enclave --release
+cargo build -p sandbox --bin enclave --release
 
 # Initialize a project
 ./target/release/enclave init

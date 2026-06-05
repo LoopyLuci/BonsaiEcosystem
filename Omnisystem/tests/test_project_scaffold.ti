@@ -21,8 +21,8 @@ pub fn main() -> i64 {
     let axiom_file: i64 = generate_project_file("proofs.ax", "theorem simple: forall (a b: i64), add(a, b) = add(b, a)");
     if axiom_file >= 10 { scaffold_score += 1; }
 
-    // Test 5 — Generate omni.toml config
-    let config_file: i64 = generate_project_file("omni.toml", "[project]\nname = \"test\"\nversion = \"0.1.0\"");
+    // Test 5 — Generate build.toml config
+    let config_file: i64 = generate_project_file("build.toml", "[project]\nname = \"test\"\nversion = \"0.1.0\"");
     if config_file >= 10 { scaffold_score += 1; }
 
     // Test 6 — Generate test file

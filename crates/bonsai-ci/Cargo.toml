@@ -19,6 +19,6 @@ log = "0.4"
 bonsai-capability-registry = { path = "../bonsai-capability-registry" }
 bonsai-actors = { path = "../bonsai-actors" }
 bonsai-cas = { path = "../bonsai-cas" }
-bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
+p2p-crypto = { path = "../p2p-crypto" }
 hex = "0.4"
 walkdir = "2"

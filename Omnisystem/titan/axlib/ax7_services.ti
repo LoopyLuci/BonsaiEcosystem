@@ -124,7 +124,7 @@ pub fn thm_p2p_message_ordering() -> i64 {
 //  COMPRESSION SERVICE PROOFS
 // ═══════════════════════════════════════════════════════════════════════════
 
-// RLE codec (matches services/omni-compress/compress.ti)
+// RLE codec (matches services/build-compress/compress.ti)
 pub fn rle_encode(input:i64) -> i64 {
     let out=buf_new(); let n=buf_len(input); let i=0;
     while i<n {

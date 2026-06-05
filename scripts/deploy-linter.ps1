@@ -101,7 +101,7 @@ Write-Status "Checking workspace structure..."
 $workspaceRoot = Get-Location
 $requiredDirs = @(
     "crates/bonsai-lint",
-    "crates/bonsai-mcp-server",
+    "crates/mcp-server",
     "crates/bonsai-lint-treesitter-titan",
     "crates/bonsai-lint-treesitter-aether",
     "crates/bonsai-lint-treesitter-sylva",
@@ -123,7 +123,7 @@ Write-Status "Checking Cargo.toml files..."
 $cargoFiles = @(
     "Cargo.toml",
     "crates/bonsai-lint/Cargo.toml",
-    "crates/bonsai-mcp-server/Cargo.toml",
+    "crates/mcp-server/Cargo.toml",
     "crates/bonsai-lint-treesitter-titan/Cargo.toml"
 )
 
@@ -148,7 +148,7 @@ if (-not $SkipBuild) {
         "bonsai-lint-treesitter-aether",
         "bonsai-lint-treesitter-sylva",
         "bonsai-lint-treesitter-axiom",
-        "bonsai-mcp-server"
+        "mcp-server"
     )
 
     foreach ($crate in $crates) {
@@ -194,10 +194,10 @@ if (-not $SkipTests) {
 
     Write-Status "Running MCP server linting tests..." "Info"
     if ($DryRun) {
-        Write-Status "DRY RUN: cargo test -p bonsai-mcp-server lint" "Warning"
+        Write-Status "DRY RUN: cargo test -p mcp-server lint" "Warning"
     } else {
         try {
-            cargo test -p bonsai-mcp-server lint --release 2>&1 | Out-Null
+            cargo test -p mcp-server lint --release 2>&1 | Out-Null
             Write-Success "MCP linting tests passed"
         } catch {
             Write-Error-Custom "MCP tests failed"
@@ -219,7 +219,7 @@ if (-not (Test-Path $artifactDir)) {
 Write-Status "Copying build artifacts..."
 $artifacts = @(
     @{src = "target/release/bonsai-lint"; dst = "bonsai-lint.exe"},
-    @{src = "target/release/bonsai-mcp-server"; dst = "bonsai-mcp-server.exe"}
+    @{src = "target/release/mcp-server"; dst = "mcp-server.exe"}
 )
 
 foreach ($artifact in $artifacts) {
@@ -314,7 +314,7 @@ if (-not (Test-Path $configPath)) {
 Write-Header "DEPLOYMENT PHASE 7: Integration Verification"
 
 Write-Status "Verifying MCP tool registration..."
-$toolsFile = Join-Path $workspaceRoot "crates/bonsai-mcp-server/src/tools.rs"
+$toolsFile = Join-Path $workspaceRoot "crates/mcp-server/src/tools.rs"
 $toolsContent = Get-Content $toolsFile -Raw
 
 $expectedTools = @(
@@ -376,7 +376,7 @@ if (Test-Path $lockFile) {
 Write-Status "Verifying no uncommitted critical files..."
 $criticalFiles = @(
     "crates/bonsai-lint/src/lib.rs",
-    "crates/bonsai-mcp-server/src/lint_commands.rs",
+    "crates/mcp-server/src/lint_commands.rs",
     "bonsai-workspace/src/lib/components/LintPanel.svelte"
 )
 
@@ -427,7 +427,7 @@ Write-Host "
 🚀 DEPLOYMENT STATUS: READY FOR PRODUCTION
 
 📝 NEXT STEPS:
-  1. Start MCP server: cargo run -p bonsai-mcp-server
+  1. Start MCP server: cargo run -p mcp-server
   2. Load IDE plugin: bonsai-workspace/src/lib/components/LintPanel.svelte
   3. Configure Bug Hunt: .bonsai/lint.toml
   4. Start Hunspell LSP: cargo run --bin hunspell-lsp-server

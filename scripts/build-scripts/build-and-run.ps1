@@ -77,7 +77,7 @@ if (-not $OnlyDesktop -and -not $SkipAndroid) {
     Write-Host "📱 Building Bonsai Android APK..." -ForegroundColor Yellow
     Write-Host "===============================================" -ForegroundColor Yellow
 
-    $ANDROID_DIR = "$ROOT\bonsai-buddy-android"
+    $ANDROID_DIR = "$ROOT\android-runtime"
 
     if (Test-Path $ANDROID_DIR) {
         Set-Location $ANDROID_DIR

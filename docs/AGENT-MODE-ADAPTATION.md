@@ -473,7 +473,7 @@ conversation_history:
 **Example: `submit_issue` Implementation**
 
 ```rust
-// crates/bonsai-mcp-server/src/tools/issues.rs
+// crates/mcp-server/src/tools/issues.rs
 
 pub async fn submit_issue(
     title: String,
@@ -814,7 +814,7 @@ Agent:     [Proceeds with refactoring]
 **HITL Modal Specification:**
 
 ```rust
-// crates/bonsai-mcp-server/src/hitl.rs
+// crates/mcp-server/src/hitl.rs
 
 pub struct HITLRequest {
     pub request_id: String,
@@ -1827,7 +1827,7 @@ To ship an MVP as fast as possible:
 ### 13.1 Built-In Agent: Security Auditor
 
 ```yaml
-# crates/bonsai-mcp-server/agents/security-auditor.agent.yaml
+# crates/mcp-server/agents/security-auditor.agent.yaml
 
 id: security-auditor-v1
 name: Security Auditor
@@ -1956,7 +1956,7 @@ on_completion:
 │                            │ JSON-RPC                                │
 │                            ▼                                         │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  bonsai-mcp-server (port 11426)                              │   │
+│  │  mcp-server (port 11426)                              │   │
 │  │  ├─ Tool Router (read_file, write_file, ...)                 │   │
 │  │  ├─ Capability Enforcer                                      │   │
 │  │  ├─ HITL Event Broadcaster (WebSocket)                       │   │

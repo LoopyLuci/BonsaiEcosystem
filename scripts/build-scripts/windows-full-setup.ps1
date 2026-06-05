@@ -2,12 +2,12 @@
 <#
 .SYNOPSIS
     Complete Bonsai Ecosystem Setup for Windows 10
-    Builds UOSC kernel, Bonsai Workspace, and trains Psychopathy Octopus
+    Builds USOS kernel, Bonsai Workspace, and trains Psychopathy Octopus
 
 .DESCRIPTION
     One-stop script to:
     1. Set up dependencies (Rust, Python, Node.js)
-    2. Build UOSC bare-metal kernel
+    2. Build USOS bare-metal kernel
     3. Build Bonsai Workspace IDE
     4. Prepare training data
     5. Train Psychopathy Octopus on GPU (RX 7900 XTX)
@@ -15,7 +15,7 @@
     7. Launch complete local stack
 
 .PARAMETER SkipKernelBuild
-    Skip UOSC kernel compilation
+    Skip USOS kernel compilation
 
 .PARAMETER SkipTraining
     Skip model training (use existing LoRA adapter if available)
@@ -103,21 +103,21 @@ if ($gpu) {
 }
 
 # ============================================================================
-# PHASE 2: Build UOSC Kernel
+# PHASE 2: Build USOS Kernel
 # ============================================================================
 
 if (-not $SkipKernelBuild) {
-    Write-Header "PHASE 2: BUILD UOSC KERNEL"
+    Write-Header "PHASE 2: BUILD USOS KERNEL"
 
-    Write-Step "Building UOSC kernel (bare-metal x86_64)..."
+    Write-Step "Building USOS kernel (bare-metal x86_64)..."
 
-    Push-Location "$workspace\crates\UOSC-kernel"
+    Push-Location "$workspace\crates\kernel"
 
     # Add x86_64-unknown-none target
-    cargo build --release --target x86_64-unknown-none 2>&1 | Tee-Object -FilePath "$workspace\UOSC-build.log"
+    cargo build --release --target x86_64-unknown-none 2>&1 | Tee-Object -FilePath "$workspace\usos-build.log"
 
     if ($LASTEXITCODE -eq 0) {
-        $kernel_path = "$workspace\crates\UOSC-kernel\target\x86_64-unknown-none\release\UOSC-kernel"
+        $kernel_path = "$workspace\crates\kernel\target\x86_64-unknown-none\release\kernel"
         Write-Host "  ✅ Kernel built: $kernel_path" -ForegroundColor Green
 
         Write-Step "Testing kernel with QEMU..."
@@ -280,7 +280,7 @@ GPU Model:        RX 7900 XTX (24 GB)
 CPU:              Ryzen 9 5900X (12C/24T)
 RAM:              64 GB
 Training Data:    1.6M examples
-Kernel:           UOSC x86_64 bare-metal
+Kernel:           USOS x86_64 bare-metal
 Model:            Psychopathy Octopus (TinyLlama 1.1B LoRA)
 IDE:              Tauri (native Windows app)
 
@@ -329,7 +329,7 @@ Or run manually anytime to fine-tune from feedback.
 ═══════════════════════════════════════════════════════════════════════════════
 
 📊 BUILD LOGS:
-  Kernel:       $workspace\UOSC-build.log
+  Kernel:       $workspace\usos-build.log
   Rust crates:  $workspace\rust-build.log
   Frontend:     $workspace\frontend-build.log
   Training:     $workspace\training.log

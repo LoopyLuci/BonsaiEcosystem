@@ -102,7 +102,7 @@ Recovery: Update workspace members list and validate with cargo check
 **Type**: Invalid Dependency  
 
 **Description**:
-Multiple Cargo.toml files referenced `bonsai-ai-fallback = "0.2"` which does not exist on crates.io:
+Multiple Cargo.toml files referenced `ai-advisor = "0.2"` which does not exist on crates.io:
 - polyglot-pong/orchestrator/Cargo.toml
 - polyglot-pong/sandbox/Cargo.toml
 - polyglot-pong/Cargo.toml (workspace)

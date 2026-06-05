@@ -55,10 +55,10 @@ The long-term goal is a software stack with zero external dependencies — every
                             │ IPC / WebSocket
 ┌───────────────────────────▼─────────────────────────────────────┐
 │                       Core Crates (Rust)                        │
-│  bonsai-transfer-core  bonsai-mailbox  bonsai-crdt              │
+│  p2p-core  bonsai-mailbox  bonsai-crdt              │
 │  bonsai-hnsw           bonsai-kdb      bonsai-package           │
 │  bonsai-cas            bonsai-actors   bonsai-p2p               │
-│  bonsai-transfer-crypto bonsai-relay   bonsai-error             │
+│  p2p-crypto bonsai-relay   bonsai-error             │
 └───────────────────────────┬─────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────┐

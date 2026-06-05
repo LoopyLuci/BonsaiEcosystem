@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 polyglot-pong-common = { path = "../common" }
-# bonsai-ai-fallback = { version = "0.2" } # Will be available in production
+# ai-advisor = { version = "0.2" } # Will be available in production
 async-trait = "0.1"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

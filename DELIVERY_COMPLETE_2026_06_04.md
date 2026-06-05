@@ -214,7 +214,7 @@ Modified:
 
 | Subsystem | Role | Status |
 |-----------|------|--------|
-| bonsai-ai-fallback | Arbiter for optional AI | ✅ Ready |
+| ai-advisor | Arbiter for optional AI | ✅ Ready |
 | TransferDaemon v2 | P2P distribution | 🔄 Phase 2 |
 | bonsai-cas | Content-addressed storage | 🔄 Phase 2 |
 | AriaDB | Metadata store | 🔄 Phase 2 |

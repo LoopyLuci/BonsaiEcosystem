@@ -1,4 +1,4 @@
-// services/omni-p2p/p2p.ti — Peer-to-peer networking mesh
+// services/build-p2p/p2p.ti — Peer-to-peer networking mesh
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

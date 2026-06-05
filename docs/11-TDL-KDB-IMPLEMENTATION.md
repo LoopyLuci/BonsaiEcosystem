@@ -89,8 +89,8 @@ This document describes the complete implementation of two production-grade syst
 ### Android
 
 - **Kotlin Clients**:
-  - `bonsai-buddy-android/app/src/main/java/ai/bonsai/buddy/data/tdl/BonsaiTdlClient.kt`
-  - `bonsai-buddy-android/app/src/main/java/ai/bonsai/buddy/data/kdb/BonsaiKdbClient.kt`
+  - `android-runtime/app/src/main/java/ai/bonsai/buddy/data/tdl/BonsaiTdlClient.kt`
+  - `android-runtime/app/src/main/java/ai/bonsai/buddy/data/kdb/BonsaiKdbClient.kt`
 
 ## Implementation Details
 

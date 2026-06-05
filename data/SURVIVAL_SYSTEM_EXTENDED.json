@@ -285,7 +285,7 @@
       "component": "nexus-governance",
       "severity": "high",
       "title": "crystal_swap No Fallback",
-      "symptom": "Upgrade fails without explanation if nexus-update or UOSC-verify missing",
+      "symptom": "Upgrade fails without explanation if nexus-update or usos-verify missing",
       "cause": "External binary called without existence check or fallback",
       "fix": "Added existence check with `which`, implemented local BLAKE3 hash fallback, added error logging",
       "pattern_regex": "Command::new.*crystal_swap.*no fallback",
@@ -537,7 +537,7 @@
     },
     {
       "id": "BUG-036",
-      "component": "bonsai-mcp-server",
+      "component": "mcp-server",
       "severity": "critical",
       "title": "Tools Not Registered in Dispatcher",
       "symptom": "MCP tools bug_hunt_tools.rs and lint_tools.rs don't appear in tool list",
@@ -552,7 +552,7 @@
     },
     {
       "id": "BUG-037",
-      "component": "bonsai-mcp-server",
+      "component": "mcp-server",
       "severity": "critical",
       "title": "Tool Routing Falls Through",
       "symptom": "New tools not callable; calls fall through to CLI",
@@ -702,7 +702,7 @@
     },
     {
       "id": "BUG-047",
-      "component": "bonsai-buddy-android",
+      "component": "android-runtime",
       "severity": "high",
       "title": "Android White Screen",
       "symptom": "App launches but shows only white screen (no UI)",
@@ -717,7 +717,7 @@
     },
     {
       "id": "BUG-048",
-      "component": "bonsai-buddy-android",
+      "component": "android-runtime",
       "severity": "medium",
       "title": "Missing RemoteDesktopScreen",
       "symptom": "RemoteDesktopScreen not integrated in navigation",
@@ -732,7 +732,7 @@
     },
     {
       "id": "BUG-049",
-      "component": "bonsai-mcp-server",
+      "component": "mcp-server",
       "severity": "critical",
       "title": "Hand-Edited tools.rs Malformed",
       "symptom": "MCP server tools have duplicates, broken JSON schemas",
@@ -822,7 +822,7 @@
     },
     {
       "id": "BUG-055",
-      "component": "bonsai-mcp-server",
+      "component": "mcp-server",
       "severity": "critical",
       "title": "Tool Definition Generation",
       "symptom": "tools.rs hand-edited; duplicates and schema errors",

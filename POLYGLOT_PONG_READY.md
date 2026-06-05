@@ -39,7 +39,7 @@
 ```bash
 cd z:\Projects\BonsaiWorkspace
 
-cargo build -p bonsai-enclave --bin enclave --release
+cargo build -p sandbox --bin enclave --release
 ```
 
 **Expected output:**
@@ -238,7 +238,7 @@ orchestrator_enclave.py
 
 Before running, verify:
 
-- [x] `cargo build -p bonsai-enclave` compiles ✓
+- [x] `cargo build -p sandbox` compiles ✓
 - [x] `target/release/enclave` binary exists ✓
 - [x] `polyglot-pong/languages/` directory has runners ✓
 - [x] `polyglot-pong/orchestrator_enclave.py` exists ✓
@@ -266,7 +266,7 @@ Before running, verify:
 **Solution:** Use orchestrator which auto-provisions via Enclave
 
 ### "Enclave binary not found"
-**Solution:** Build it first: `cargo build -p bonsai-enclave --bin enclave --release`
+**Solution:** Build it first: `cargo build -p sandbox --bin enclave --release`
 
 ### "Runtime installation failed"
 **Solution:** Check internet connection, verify manifest URLs in `enclave-runtimes.toml`

@@ -500,9 +500,9 @@ cargo tarpaulin --out Html
 - `aes-gcm` - Encryption
 
 ### Integration
-- `bonsai-transfer-crypto` - Noise protocol
+- `p2p-crypto` - Noise protocol
 - `bonsai-capability-registry` - Capability model
-- `bonsai-universe` - Event logging
+- `audit-log` - Event logging
 - `bonsai-cas` - Content addressing
 
 ## License

@@ -2,7 +2,7 @@
 
 **Status:** ✅ **ARCHITECTURE COMPLETE - READY FOR FULL IMPLEMENTATION**  
 **Date:** 2026-06-04  
-**Scope:** Complete validation framework for entire Bonsai Ecosystem and UOSC  
+**Scope:** Complete validation framework for entire Bonsai Ecosystem and USOS  
 **Language Support:** 750+ languages  
 **Scale:** From unit tests to 1,000,000+ test cases  
 **Determinism:** Perfect reproducibility with formal verification  
@@ -101,7 +101,7 @@ The **Universal Bonsai Validation Mesh (UBVM)** is a next-generation, production
 - Generate immutable audit trail (Universe)
 - Trigger Survival System actions on critical failures
 
-**Implementation:** Rust crate `bonsai-utof` (Sovereign Service pattern)
+**Implementation:** Rust crate `test-orchestrator` (Sovereign Service pattern)
 
 **Key Interfaces:**
 ```rust

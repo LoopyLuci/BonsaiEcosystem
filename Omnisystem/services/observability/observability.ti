@@ -1,4 +1,4 @@
-// services/omni-observability/observability.ti — Distributed tracing and metrics
+// services/build-observability/observability.ti — Distributed tracing and metrics
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

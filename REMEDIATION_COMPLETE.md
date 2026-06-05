@@ -23,7 +23,7 @@
 
 **Fixed**: Updated polyglot-pong/Cargo.toml
 - Added all 8 member crates (previously missing 4)
-- Commented out non-existent bonsai-ai-fallback dependency
+- Commented out non-existent ai-advisor dependency
 
 ---
 
@@ -139,7 +139,7 @@ cargo check --workspace
 ### What Could Be Better
 - 🟡 Minor unused imports (auto-fixable)
 - 🟡 Some warnings in tests
-- 🟡 bonsai-ai-fallback not yet implemented (by design)
+- 🟡 ai-advisor not yet implemented (by design)
 
 ---
 
@@ -157,7 +157,7 @@ cargo check --workspace
    ```
 
 3. **Production**:
-   - Create the `bonsai-ai-fallback` crate
+   - Create the `ai-advisor` crate
    - Implement remaining features
    - Deploy to production
 

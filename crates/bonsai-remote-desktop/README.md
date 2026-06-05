@@ -37,7 +37,7 @@ BRDF is a complete replacement for commercial remote desktop solutions like Rust
 - **Bidirectional Sync**: File synchronization between peers
 
 ### Telemetry & Monitoring
-- **Universe Integration**: Deep integration with bonsai-universe for event logging
+- **Universe Integration**: Deep integration with audit-log for event logging
 - **10 Event Types**: Peer discovery, session lifecycle, network stats, security events
 - **Real-Time Monitoring**: Live session metrics (FPS, bitrate, latency, packet loss)
 - **Historical Replay**: All events stored for debugging and auditing

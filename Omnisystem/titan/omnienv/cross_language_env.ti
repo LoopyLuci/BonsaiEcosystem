@@ -4,7 +4,7 @@
 // Manages SVEP communication between language-specific sandboxes.
 
 pub fn main() -> i64 {
-    let project_name: String = "omni-fullstack-app";
+    let project_name: String = "build-fullstack-app";
     let result: i64 = create_cross_language_environment(project_name);
     return result;
 }

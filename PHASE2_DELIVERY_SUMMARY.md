@@ -221,7 +221,7 @@ All enhancement crates are scaffolded and feature-gated:
    - Status: Specifications ready
 
 4. **Universe Archive** (2-3 days)
-   - Use: bonsai-universe crate
+   - Use: audit-log crate
    - For: Immutable result storage
    - Feature: `archive`
    - Status: Specifications ready

@@ -5,11 +5,11 @@ pub fn main() -> i64 {
     let mut score: i64 = 0;
 
     // Stage 1 — Create VPC
-    let vpc_ok: i64 = create_vpc("omni-vpc", "10.0.0.0/16");
+    let vpc_ok: i64 = create_vpc("build-vpc", "10.0.0.0/16");
     if vpc_ok >= 80 { score += 14; }
 
     // Stage 2 — Create subnet
-    let subnet_ok: i64 = create_subnet("omni-subnet", "omni-vpc", "10.0.1.0/24");
+    let subnet_ok: i64 = create_subnet("build-subnet", "build-vpc", "10.0.1.0/24");
     if subnet_ok >= 80 { score += 14; }
 
     // Stage 3 — Define policy

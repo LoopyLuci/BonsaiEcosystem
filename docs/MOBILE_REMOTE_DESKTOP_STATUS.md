@@ -23,7 +23,7 @@ The Bonsai Mobile Remote Desktop ecosystem has been successfully implemented as 
 
 ### ✅ 1. MCP Tools Implementation
 
-All mobile remote desktop MCP tools have been implemented in `crates/bonsai-mcp-server/src/tools.rs`:
+All mobile remote desktop MCP tools have been implemented in `crates/mcp-server/src/tools.rs`:
 
 ```
 Tool Name                        | Parameters        | Return Type
@@ -36,7 +36,7 @@ mobile_get_session_stats        | session_id        | SessionStats
 mobile_list_available_peers     | filter_status     | Vec<PeerInfo>
 ```
 
-**Location**: `crates/bonsai-mcp-server/src/tools.rs` (Lines 51-211)
+**Location**: `crates/mcp-server/src/tools.rs` (Lines 51-211)
 
 **Features**:
 - Complete JSON schema definitions for all parameters
@@ -52,7 +52,7 @@ mobile_list_available_peers     | filter_status     | Vec<PeerInfo>
 
 Comprehensive session registry and state management implemented.
 
-**Location**: `crates/bonsai-mcp-server/src/mobile_session.rs` (300+ lines)
+**Location**: `crates/mcp-server/src/mobile_session.rs` (300+ lines)
 
 **Components**:
 - `SessionRegistry`: In-memory session storage
@@ -81,7 +81,7 @@ Comprehensive session registry and state management implemented.
 
 Enhanced Universal Agent Control System with mobile-specific events and HITL modals.
 
-**Location**: `crates/bonsai-mcp-server/src/uacs.rs`
+**Location**: `crates/mcp-server/src/uacs.rs`
 
 **Mobile Event Types Added**:
 ```rust
@@ -127,7 +127,7 @@ RemoteSessionStats {
 
 Complete Bonsai Terminal Interface (BTI) command set for mobile operations.
 
-**Location**: `crates/bonsai-mcp-server/src/bti_commands.rs` (250+ lines)
+**Location**: `crates/mcp-server/src/bti_commands.rs` (250+ lines)
 
 **Commands Implemented**:
 ```
@@ -222,7 +222,7 @@ Complete Bonsai Terminal Interface (BTI) command set for mobile operations.
 
 ### ✅ 6. Integration Tests (400+ lines)
 
-**Location**: `crates/bonsai-mcp-server/tests/integration_tests.rs`
+**Location**: `crates/mcp-server/tests/integration_tests.rs`
 
 **Test Suites**:
 1. Session Management Tests (7 tests)
@@ -257,8 +257,8 @@ Complete Bonsai Terminal Interface (BTI) command set for mobile operations.
 
 **Command to Run**:
 ```bash
-cargo test -p bonsai-mcp-server --lib mobile_session -- --nocapture
-cargo test -p bonsai-mcp-server --test integration_tests -- --nocapture
+cargo test -p mcp-server --lib mobile_session -- --nocapture
+cargo test -p mcp-server --test integration_tests -- --nocapture
 ```
 
 ---
@@ -412,9 +412,9 @@ Four production-ready use cases documented:
 
 ```
 New Files:
-├─ crates/bonsai-mcp-server/src/mobile_session.rs (280 lines)
-├─ crates/bonsai-mcp-server/src/bti_commands.rs (270 lines)
-├─ crates/bonsai-mcp-server/tests/integration_tests.rs (400 lines)
+├─ crates/mcp-server/src/mobile_session.rs (280 lines)
+├─ crates/mcp-server/src/bti_commands.rs (270 lines)
+├─ crates/mcp-server/tests/integration_tests.rs (400 lines)
 ├─ docs/MOBILE_REMOTE_DESKTOP.md (1,200 lines)
 ├─ docs/REDMI_SETUP_GUIDE.md (600 lines)
 ├─ docs/INTEGRATION_CHECKLIST.md (500 lines)
@@ -428,9 +428,9 @@ New Files:
 Total: 12 files, 5,180 lines
 
 Files Modified:
-├─ crates/bonsai-mcp-server/src/lib.rs (+2 lines)
-├─ crates/bonsai-mcp-server/src/tools.rs (+160 lines)
-└─ crates/bonsai-mcp-server/src/uacs.rs (+100 lines)
+├─ crates/mcp-server/src/lib.rs (+2 lines)
+├─ crates/mcp-server/src/tools.rs (+160 lines)
+└─ crates/mcp-server/src/uacs.rs (+100 lines)
 
 Total: 3 files, 262 lines
 ```
@@ -472,10 +472,10 @@ Security:
 
 ```bash
 # 1. Build the daemon
-cargo build --release -p bonsai-mcp-server
+cargo build --release -p mcp-server
 
 # 2. Run the daemon
-./target/release/bonsai-mcp-server --enable-remote-desktop
+./target/release/mcp-server --enable-remote-desktop
 
 # 3. Build the APK
 ./scripts/build-apk.sh release
@@ -525,7 +525,7 @@ Before deployment, verify:
 ### Test Execution Results
 
 ```
-$ cargo test -p bonsai-mcp-server
+$ cargo test -p mcp-server
     Finished test [unoptimized + debuginfo] target(s)
 
 running 23 tests

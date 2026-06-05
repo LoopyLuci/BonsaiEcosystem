@@ -106,10 +106,10 @@ Sylva, Titan, Aether, Axiom (Python-based interpreters)
 
 ## 📈 File Manifest
 
-### Core Crate (bonsai-enclave)
+### Core Crate (sandbox)
 
 ```
-crates/bonsai-enclave/
+crates/sandbox/
 ├── Cargo.toml                    # Dependencies: tokio, serde, blake3, reqwest, xz2, tar, etc.
 ├── src/
 │   ├── lib.rs                    # Main exports (10 public types)
@@ -192,7 +192,7 @@ The system enables Polyglot Pong to run complete language matrices with:
 
 ```bash
 # Build Enclave
-cargo build -p bonsai-enclave --bin enclave --release
+cargo build -p sandbox --bin enclave --release
 
 # Run 10×10 matrix
 cd polyglot-pong
@@ -296,7 +296,7 @@ After: Automatic recommendation + prediction
 ### 1. Build Binary
 ```bash
 cd z:\Projects\BonsaiWorkspace
-cargo build -p bonsai-enclave --bin enclave --release
+cargo build -p sandbox --bin enclave --release
 # Binary: target/release/enclave (Windows) or target/release/enclave (Unix)
 ```
 
@@ -436,7 +436,7 @@ python orchestrator_enclave.py --matrix 10x10
 **Quick Start:** [POLYGLOT_PONG_READY.md](POLYGLOT_PONG_READY.md)  
 **Integration Guide:** [ENCLAVE_RUNTIME_DOWNLOADER_GUIDE.md](ENCLAVE_RUNTIME_DOWNLOADER_GUIDE.md)  
 **CLI Help:** `enclave --help` and `enclave runtime --help`  
-**Source Code:** [crates/bonsai-enclave/](crates/bonsai-enclave/)  
+**Source Code:** [crates/sandbox/](crates/sandbox/)  
 
 ---
 

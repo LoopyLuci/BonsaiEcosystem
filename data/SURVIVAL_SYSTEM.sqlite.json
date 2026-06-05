@@ -28,7 +28,7 @@
         "bonsai-query",
         "bonsai-credits",
         "bonsai-failure-finder",
-        "bonsai-universe",
+        "audit-log",
         "bonsai-kdb",
         "bonsai-android-bridge"
       ],
@@ -40,7 +40,7 @@
           "Update bonsai-query: 0.32 → 0.37",
           "Update bonsai-credits: 0.32 → 0.37",
           "Update bonsai-failure-finder: 0.32 → 0.37",
-          "Update bonsai-universe: 0.32 → 0.37",
+          "Update audit-log: 0.32 → 0.37",
           "Update bonsai-kdb: 0.32 → 0.37",
           "Verify workspace.dependencies libsqlite3-sys = 0.37"
         ],
@@ -187,7 +187,7 @@
       "build_iteration_history": [
         {
           "iteration": 1,
-          "action": "Build bonsai-mcp-server",
+          "action": "Build mcp-server",
           "error": "ERR-001 in bonsai-query, bonsai-credits, bonsai-failure-finder",
           "crates_found": 3,
           "duration_minutes": 15
@@ -195,7 +195,7 @@
         {
           "iteration": 2,
           "action": "Fix 3 crates, rebuild",
-          "error": "ERR-001 in bonsai-universe, bonsai-kdb",
+          "error": "ERR-001 in audit-log, bonsai-kdb",
           "crates_found": 2,
           "duration_minutes": 15
         },

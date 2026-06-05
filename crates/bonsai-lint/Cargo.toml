@@ -37,8 +37,8 @@ blake3 = "1"
 crossbeam = "0.8"
 
 bonsai-error = { path = "../bonsai-error" }
-bonsai-universe = { path = "../bonsai-universe" }
-bonsai-mcp-server = { path = "../bonsai-mcp-server", optional = true }
+audit-log = { path = "../audit-log" }
+mcp-server = { path = "../mcp-server", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
@@ -47,7 +47,7 @@ criterion = "0.5"
 [features]
 default = ["omnisystem"]
 omnisystem = []
-mcp-integration = ["bonsai-mcp-server"]
+mcp-integration = ["mcp-server"]
 
 [lib]
 name = "bonsai_lint"

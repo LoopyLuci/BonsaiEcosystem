@@ -161,8 +161,8 @@ Pure Titan Core (45 tests) → Effect System → External Bindings (4 tests) →
 
 ## 2026-06-04 — Naming Discipline, UVM, JIT, CRDTs, Effect Library
 
-### Renamed (naming discipline — no `omni-` prefix on services or libraries)
-- `services/omni-{name}/` → `services/{name}/` (all 10 services)
+### Renamed (naming discipline — no `build-` prefix on services or libraries)
+- `services/build-{name}/` → `services/{name}/` (all 10 services)
 - `build/omni_ir/` → `build/ir/`
 - `build/omni_build/` → `build/build/`
 - "Omni Validation Mesh" → **Universal Validation Mesh (UVM)**
@@ -188,7 +188,7 @@ Pure Titan Core (45 tests) → Effect System → External Bindings (4 tests) →
   naming conventions, design principles
 - `STATUS.md` — Added new component sections; updated test summary to 28/28;
   added naming conventions table; updated gap analysis
-- `Makefile` — Updated all service paths to drop `omni-` prefix; added uvm,
+- `Makefile` — Updated all service paths to drop `build-` prefix; added uvm,
   effect, and new lang targets
 - `scripts/test-all.ps1` — Updated paths to match renamed services
 
@@ -211,7 +211,7 @@ Pure Titan Core (45 tests) → Effect System → External Bindings (4 tests) →
 - `aether/mesh.ti` — Aether cluster mesh: URI-based actor addressing
   (`node_id * 1_000_000 + local_id`), distributed actor registry, local/remote message
   routing, load-tracked nodes, work stealing (busiest-remote), consistent hashing for
-  actor placement. Connects actor runtime to `omni-p2p` transport.
+  actor placement. Connects actor runtime to `build-p2p` transport.
 - `titan/axlib/ax7_services.ti` — 9 service correctness theorems:
   P2P (3-way handshake, invalid-transition rejection, message ordering),
   Compression (round-trip identity, determinism, size bound for compressible data),
@@ -243,25 +243,25 @@ Pure Titan Core (45 tests) → Effect System → External Bindings (4 tests) →
 ## 2026-06-04 — Repository Cleanup & Pure-Titan Transition
 
 ### Added
-- `kernel/capability.ti` — UOSC capability system in Titan (152 LOC, 14 assertions)
+- `kernel/capability.ti` — USOS capability system in Titan (152 LOC, 14 assertions)
 - `kernel/memory.ti` — Physical + virtual memory manager in Titan (204 LOC)
 - `kernel/scheduler.ti` — EDF + CFS scheduler with preemption in Titan (270 LOC)
-- `services/omni-p2p/p2p.ti` — P2P networking service
-- `services/omni-compress/compress.ti` — Deterministic compression
-- `services/omni-container/container.ti` — Process sandboxing
-- `services/omni-observability/observability.ti` — Distributed tracing and metrics
-- `services/omni-storage/storage.ti` — Content-addressed storage
-- `services/omni-cache/cache.ti` — TTL-based distributed cache
-- `services/omni-queue/queue.ti` — Priority message queue
-- `services/omni-rpc/rpc.ti` — Remote procedure call framework
-- `services/omni-auth/auth.ti` — Authentication and authorization
-- `services/omni-crypto/crypto.ti` — Cryptographic key management
+- `services/build-p2p/p2p.ti` — P2P networking service
+- `services/build-compress/compress.ti` — Deterministic compression
+- `services/build-container/container.ti` — Process sandboxing
+- `services/build-observability/observability.ti` — Distributed tracing and metrics
+- `services/build-storage/storage.ti` — Content-addressed storage
+- `services/build-cache/cache.ti` — TTL-based distributed cache
+- `services/build-queue/queue.ti` — Priority message queue
+- `services/build-rpc/rpc.ti` — Remote procedure call framework
+- `services/build-auth/auth.ti` — Authentication and authorization
+- `services/build-crypto/crypto.ti` — Cryptographic key management
 - `scripts/test-all.ps1` — Unified test runner for all Titan sources
 - `Makefile` — GNU make targets: `all`, `kernel`, `services`, `test`, `clean`
 
 ### Removed
-- All Rust `.rs` source files from `kernel/src/` and `services/omni-*/src/`
-- Rust `Cargo.toml` files from `kernel/` and all `services/omni-*/`
+- All Rust `.rs` source files from `kernel/src/` and `services/build-*/src/`
+- Rust `Cargo.toml` files from `kernel/` and all `services/build-*/`
 - `languages/` directory (Rust stubs superseded by `titan/` implementations)
 - Stale service directories: `ai`, `blockchain`, `bot`, `compiler`, `compression`,
   `containers`, `enclave`, `knowledge`, `media`, `observability`, `p2p`, `qa`

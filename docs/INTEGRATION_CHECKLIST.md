@@ -33,7 +33,7 @@ curl -X POST http://localhost:8000/mcp/tools/list \
 
 **Test Command**:
 ```bash
-cargo test -p bonsai-mcp-server --lib mobile_session -- --nocapture
+cargo test -p mcp-server --lib mobile_session -- --nocapture
 # All tests should PASS
 ```
 
@@ -496,7 +496,7 @@ curl 'http://localhost:8000/api/remote/peers?status=online' | jq '.peers'
 - [ ] Documentation complete (all pub functions documented)
 
 ### [ ] Build Artifacts
-- [ ] Linux daemon builds: `cargo build --release -p bonsai-mcp-server`
+- [ ] Linux daemon builds: `cargo build --release -p mcp-server`
 - [ ] APK builds: `./build-apk.sh --release`
 - [ ] APK size reasonable (<50 MB)
 - [ ] No debug symbols in release build
@@ -505,8 +505,8 @@ curl 'http://localhost:8000/api/remote/peers?status=online' | jq '.peers'
 **Build Verification**:
 ```bash
 # Build release daemon
-cargo build --release -p bonsai-mcp-server
-ls -lh target/release/bonsai-mcp-server
+cargo build --release -p mcp-server
+ls -lh target/release/mcp-server
 # Expected: < 10 MB (after strip)
 
 # Check APK size

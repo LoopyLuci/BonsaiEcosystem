@@ -354,7 +354,7 @@ curl http://localhost:3000/metrics/agents
 ### Step 1: Start MCP Server
 ```bash
 cd Z:\Projects\BonsaiWorkspace
-cargo run --package bonsai-mcp-server --release
+cargo run --package mcp-server --release
 ```
 
 ### Step 2: Verify Server is Running

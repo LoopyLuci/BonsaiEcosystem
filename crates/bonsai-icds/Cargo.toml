@@ -36,14 +36,14 @@ blake3 = "1"
 cas = { path = "../bonsai-cas", optional = true }  # placeholder
 
 # Distributed coordination
-echo = { path = "../bonsai-echo", optional = true }  # P2P mesh
-transfer-daemon = { path = "../bonsai-transfer-core", optional = true }
+echo = { path = "../discovery", optional = true }  # P2P mesh
+transfer-daemon = { path = "../p2p-core", optional = true }
 
 # Database for metadata
 aridb = { path = "../bonsai-aridb", optional = true }  # placeholder
 
 # AI-optional fallback
-bonsai-ai-fallback = { path = "../bonsai-ai-fallback", optional = true }
+ai-advisor = { path = "../ai-advisor", optional = true }
 
 # Logging & observability
 tracing = "0.1"
@@ -66,7 +66,7 @@ criterion = "0.5"
 [features]
 default = ["deterministic-core"]
 deterministic-core = []
-ai-enhancements = ["bonsai-ai-fallback"]
+ai-enhancements = ["ai-advisor"]
 distributed = ["echo", "transfer-daemon"]
 cas-integration = ["cas"]
 compression-integration = ["buce"]

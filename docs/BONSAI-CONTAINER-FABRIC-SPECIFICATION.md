@@ -1,6 +1,6 @@
 # 🚀 Bonsai Container Fabric (BCF) – Complete Specification
 
-**A sovereign, next-generation replacement for Docker & Kubernetes, deeply integrated into UOSC, Sentinel Core, and the Bonsai Distributed Systems Fabric.**
+**A sovereign, next-generation replacement for Docker & Kubernetes, deeply integrated into USOS, Sentinel Core, and the Bonsai Distributed Systems Fabric.**
 
 ---
 
@@ -23,7 +23,7 @@
 
 | Problem | Docker/Kubernetes | BCF Solution |
 |---------|------------------|-------------|
-| **Architecture** | Separate daemon (dockerd), control plane (API server, etcd, scheduler), worker node agents. Complexity ~1000+ components. | Single integrated system running inside UOSC. All orchestration is a kernel capability. ~50 Weave components. |
+| **Architecture** | Separate daemon (dockerd), control plane (API server, etcd, scheduler), worker node agents. Complexity ~1000+ components. | Single integrated system running inside USOS. All orchestration is a kernel capability. ~50 Weave components. |
 | **Security Model** | Containers share host kernel. Pod Security Policies (complex, hard to enforce). Privileged containers are a security nightmare. | Every container is a Sanctum vault—hardware-isolated, capability-enforced, formally verified. No privilege escalation possible. |
 | **Isolation Boundary** | Namespace + cgroup (software enforcement, kernel shared). A kernel exploit = all containers compromised. | Hardware isolation (Sentinel Core VM or CHERI compartment). Escape impossible without breaking hardware. |
 | **Image Distribution** | Central Docker Hub + private registries. Single point of failure, censorship, and slowness. | P2P via Echo fabric + CAS. Images are Crystal (immutable, signed, deduplicated). Pull from nearest peer; no single point of control. |
@@ -92,7 +92,7 @@
 │  │  • Capability-based access control (mTLS optional)             │    │
 │  └────────────────────────────────────────────────────────────────┘    │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                        KERNEL LAYER (UOSC)                               │
+│                        KERNEL LAYER (USOS)                               │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐      │
 │  │ SENTINEL CORE    │  │ SANCTUM          │  │ ECHO FABRIC      │      │
 │  │ Resource caps,   │  │ Hardware vaults, │  │ P2P networking,  │      │
@@ -382,10 +382,10 @@ bonsai_integration:
 
 ### 3.2 Pulse Scheduler – Real-Time, Distributed, Energy-Aware
 
-**Pulse** extends UOSC's kernel scheduler to manage containers as first-class scheduling entities.
+**Pulse** extends USOS's kernel scheduler to manage containers as first-class scheduling entities.
 
 ```rust
-// crates/bonsai-bcf/src/scheduler/mod.rs
+// crates/container/src/scheduler/mod.rs
 
 pub struct PulseScheduler {
     nodes: Arc<RwLock<BTreeMap<NodeId, NodeInfo>>>,
@@ -542,7 +542,7 @@ impl NodeInfo {
 Each container is a **Sanctum vault** with hardware isolation.
 
 ```rust
-// crates/bonsai-bcf/src/vault/mod.rs
+// crates/container/src/vault/mod.rs
 
 pub struct ContainerVault {
     pub vault_id: ContainerId,
@@ -731,7 +731,7 @@ impl ContainerVault {
 No iptables, no CNI, no sidecars. Pure P2P routing via Echo fabric.
 
 ```rust
-// crates/bonsai-bcf/src/mesh/mod.rs
+// crates/container/src/mesh/mod.rs
 
 pub struct ServiceMesh {
     services: Arc<RwLock<BTreeMap<ServiceName, Service>>>,
@@ -929,7 +929,7 @@ impl ServiceMesh {
 Images are stored as **Crystal images** in the Content-Addressed Store (CAS).
 
 ```rust
-// crates/bonsai-bcf/src/image/mod.rs
+// crates/container/src/image/mod.rs
 
 pub struct CrystalImage {
     pub manifest: ImageManifest,
@@ -1047,7 +1047,7 @@ Total CAS usage:
 Automatic detection and recovery from failures.
 
 ```rust
-// crates/bonsai-bcf/src/healing/mod.rs
+// crates/container/src/healing/mod.rs
 
 pub struct SurvivalSystem {
     containers: Arc<RwLock<BTreeMap<ContainerId, ContainerHealth>>>,
@@ -1361,7 +1361,7 @@ bonsai container stats --service api --watch
 ### Rust API
 
 ```rust
-// crates/bonsai-bcf/src/lib.rs
+// crates/container/src/lib.rs
 
 pub struct BcfClient {
     // ...
@@ -1430,7 +1430,7 @@ image.verify_signature()?;
 // Public key distributed via:
 // - Blueprint metadata
 // - Echo fabric service registry
-// - UOSC Weave component definition
+// - USOS Weave component definition
 ```
 
 ---

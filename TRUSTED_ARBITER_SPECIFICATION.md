@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Trusted Arbiter** is the central orchestration engine that coordinates all AI decision-making across the Bonsai Ecosystem and UOSC. It enforces three core principles:
+The **Trusted Arbiter** is the central orchestration engine that coordinates all AI decision-making across the Bonsai Ecosystem and USOS. It enforces three core principles:
 
 1. **AI is Always Optional**: Never required for correct system operation
 2. **Safety is Hardened**: All AI suggestions validated against formally-verified safety envelopes

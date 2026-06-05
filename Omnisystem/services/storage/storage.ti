@@ -1,4 +1,4 @@
-// services/omni-storage/storage.ti — Content-addressed persistent storage (CAS)
+// services/build-storage/storage.ti — Content-addressed persistent storage (CAS)
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

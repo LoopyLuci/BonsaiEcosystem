@@ -2,9 +2,9 @@
 set -euo pipefail
 
 echo "Deploy Android placeholder script"
-if [ -d "bonsai-buddy-android" ]; then
-  (cd bonsai-buddy-android && ./gradlew assembleRelease)
+if [ -d "android-runtime" ]; then
+  (cd android-runtime && ./gradlew assembleRelease)
 else
-  echo "bonsai-buddy-android not found"
+  echo "android-runtime not found"
   exit 1
 fi

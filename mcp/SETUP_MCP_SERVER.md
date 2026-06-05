@@ -19,7 +19,7 @@ Add this to `.vscode/settings.json`:
       "args": [
         "run",
         "--manifest-path",
-        "Z:\\Projects\\BonsaiWorkspace\\crates\\bonsai-mcp-server\\Cargo.toml",
+        "Z:\\Projects\\BonsaiWorkspace\\crates\\mcp-server\\Cargo.toml",
         "--release"
       ],
       "env": {
@@ -90,13 +90,13 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ```bash
 cd Z:\Projects\BonsaiWorkspace
-cargo build --package bonsai-mcp-server --release
+cargo build --package mcp-server --release
 ```
 
 ### Step 3: Verify Installation
 
 ```bash
-cargo run --package bonsai-mcp-server --release -- --list-tools
+cargo run --package mcp-server --release -- --list-tools
 ```
 
 Expected output:
@@ -113,14 +113,14 @@ Registered MCP tools:
 **Option A: Manual Start**
 ```bash
 cd Z:\Projects\BonsaiWorkspace
-cargo run --package bonsai-mcp-server --release
+cargo run --package mcp-server --release
 ```
 
 **Option B: Daemonized (Windows)**
 ```powershell
 # Start in background
 Start-Process powershell `
-  -ArgumentList "-NoExit -Command `"cd Z:\Projects\BonsaiWorkspace; cargo run --package bonsai-mcp-server --release`"" `
+  -ArgumentList "-NoExit -Command `"cd Z:\Projects\BonsaiWorkspace; cargo run --package mcp-server --release`"" `
   -WindowStyle Minimized
 ```
 
@@ -135,7 +135,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/home/user/BonsaiWorkspace
-ExecStart=/usr/local/cargo/bin/cargo run --package bonsai-mcp-server --release
+ExecStart=/usr/local/cargo/bin/cargo run --package mcp-server --release
 Restart=always
 RestartSec=10
 
@@ -327,7 +327,7 @@ export PATH="$HOME/.cargo/bin:$PATH"
 ### Issue: "Port 3000 already in use"
 **Solution:** Use different port
 ```bash
-BONSAI_MCP_PORT=3001 cargo run --package bonsai-mcp-server --release
+BONSAI_MCP_PORT=3001 cargo run --package mcp-server --release
 ```
 
 ### Issue: "MCP server not responding"
@@ -338,7 +338,7 @@ curl http://localhost:3000/health
 
 # If not, restart
 killall cargo
-cargo run --package bonsai-mcp-server --release
+cargo run --package mcp-server --release
 ```
 
 ---
@@ -376,8 +376,8 @@ cargo run --package bonsai-mcp-server --release
 ## ✅ Verification Checklist
 
 - [ ] Rust installed and in PATH
-- [ ] MCP server builds: `cargo build --package bonsai-mcp-server --release`
-- [ ] Server starts: `cargo run --package bonsai-mcp-server --release`
+- [ ] MCP server builds: `cargo build --package mcp-server --release`
+- [ ] Server starts: `cargo run --package mcp-server --release`
 - [ ] Health check passes: `curl http://localhost:3000/health`
 - [ ] Tools listed: `curl http://localhost:3000/tools`
 - [ ] Claude can discover MCP server

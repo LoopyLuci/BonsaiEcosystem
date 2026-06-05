@@ -1,4 +1,4 @@
-// titan/axlib/ax6_kernel.ti — Axiom proofs for UOSC kernel safety
+// titan/axlib/ax6_kernel.ti — Axiom proofs for USOS kernel safety
 // Proves: capability isolation, memory safety, scheduler liveness/fairness.
 // These are mechanised safety arguments encoded as executable Titan checks.
 // Each theorem returns 111 on proof success, non-111 on counterexample found.

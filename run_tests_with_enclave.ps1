@@ -27,7 +27,7 @@ Write-Host ""
 if (-not (Test-Path $enclavebin)) {
     Write-Host "✗ Bonsai Enclave binary not found at $enclavebin" -ForegroundColor Red
     Write-Host "  Building now..."
-    cargo build -p bonsai-enclave --bin enclave --release
+    cargo build -p sandbox --bin enclave --release
 }
 
 Write-Host "✓ Bonsai Enclave is ready" -ForegroundColor Green

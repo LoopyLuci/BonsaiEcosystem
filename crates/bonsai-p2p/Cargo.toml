@@ -13,8 +13,8 @@ swarm-lane    = ["dep:libp2p"]
 onion-lane    = ["dep:tokio-socks"]
 
 [dependencies]
-bonsai-transfer-core   = { path = "../bonsai-transfer-core" }
-bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
+p2p-core   = { path = "../p2p-core" }
+p2p-crypto = { path = "../p2p-crypto" }
 
 tokio       = { version = "1", features = ["full"] }
 futures     = "0.3"

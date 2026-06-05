@@ -9,9 +9,9 @@ name = "bonsai-daemon"
 path = "src/main.rs"
 
 [dependencies]
-bonsai-transfer-crypto = { path = "../crates/bonsai-transfer-crypto" }
+p2p-crypto = { path = "../crates/p2p-crypto" }
 bonsai-transfer-store  = { path = "../crates/bonsai-transfer-store" }
-bonsai-transfer-core   = { path = "../crates/bonsai-transfer-core" }
+p2p-core   = { path = "../crates/p2p-core" }
 bonsai-mailbox         = { path = "../crates/bonsai-mailbox" }
 bonsai-query           = { path = "../crates/bonsai-query" }
 bonsai-array           = { path = "../crates/bonsai-array" }

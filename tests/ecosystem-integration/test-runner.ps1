@@ -332,9 +332,9 @@ try {
       return @{ Pass = $true; Notes = "SKIP: java not found; compile check not executed" }
     }
 
-    $androidDir = Join-Path $RepoRoot "bonsai-buddy-android"
+    $androidDir = Join-Path $RepoRoot "android-runtime"
     if (-not (Test-Path (Join-Path $androidDir "gradlew.bat"))) {
-      return @{ Pass = $false; Notes = "gradlew.bat missing in bonsai-buddy-android" }
+      return @{ Pass = $false; Notes = "gradlew.bat missing in android-runtime" }
     }
 
     Push-Location $androidDir

@@ -13,11 +13,11 @@ pub fn main() -> i64 {
     if build_ok >= 80 { score += 14; }
 
     // Stage 3 — Add test stage
-    let test_ok: i64 = add_stage("test", "omni test --all");
+    let test_ok: i64 = add_stage("test", "build test --all");
     if test_ok >= 80 { score += 14; }
 
     // Stage 4 — Add deploy stage
-    let deploy_ok: i64 = add_stage("deploy", "omni deploy --canary");
+    let deploy_ok: i64 = add_stage("deploy", "build deploy --canary");
     if deploy_ok >= 80 { score += 14; }
 
     // Stage 5 — Set trigger

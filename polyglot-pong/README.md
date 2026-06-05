@@ -110,7 +110,7 @@ cargo test -- --nocapture --test-threads=1
 - Bit-identical across all 750+ languages
 
 ### 2. **SovereignService Pattern**
-Both orchestrator and sandboxes implement `SovereignService` (from `bonsai-ai-fallback`):
+Both orchestrator and sandboxes implement `SovereignService` (from `ai-advisor`):
 ```rust
 pub trait SovereignService {
     fn deterministic_core(&self, input: &[u8]) -> Result<Vec<u8>>;  // Primary
@@ -149,7 +149,7 @@ energy-measurement = []      # RAPL energy tracking
 tee = ["sgx-enclave"]        # TEE attestation
 fuzzer = []                  # Differential fuzzing (enabled by default in dev)
 web-dashboard = ["axum"]     # WebSocket dashboard
-archive = ["bonsai-universe"] # Universe integration
+archive = ["audit-log"] # Universe integration
 chaos-tests = []             # AI-poisoning tests
 ```
 
@@ -182,7 +182,7 @@ cargo test -p polyglot-pong-common test_deterministic_execution -- --nocapture
 cargo bench -p polyglot-pong-common
 ```
 
-## Integration with bonsai-ai-fallback
+## Integration with ai-advisor
 
 Both orchestrator and sandbox use the `Arbiter` for graceful degradation:
 
@@ -264,8 +264,8 @@ Safe Stub (mandatory, never fails)
 ## Dependencies
 
 Key external crates:
-- `bonsai-ai-fallback` - AI-optional framework
-- `bonsai-transfer-core` - TransferDaemon v2
+- `ai-advisor` - AI-optional framework
+- `p2p-core` - TransferDaemon v2
 - `serde` - Serialization
 - `tokio` - Async runtime
 - `uuid` - Unique identifiers

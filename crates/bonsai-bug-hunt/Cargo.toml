@@ -29,7 +29,7 @@ sha2 = "0.10"
 dirs = "5"
 
 # Existing Bonsai crates
-bonsai-universe = { path = "../bonsai-universe" }
+audit-log = { path = "../audit-log" }
 bonsai-capability-registry = { path = "../bonsai-capability-registry" }
 
 # Process execution

@@ -819,8 +819,8 @@ dependencies = [
  "blake3",
  "bonsai-capability-registry",
  "bonsai-cas",
- "bonsai-transfer-crypto",
- "bonsai-universe",
+ "p2p-crypto",
+ "audit-log",
  "bytes",
  "chrono",
  "ed25519-dalek",
@@ -961,7 +961,7 @@ name = "bonsai-fabric"
 version = "0.1.0"
 dependencies = [
  "bonsai-error",
- "bonsai-transfer-core",
+ "p2p-core",
  "serde",
  "serde_json",
  "tokio",
@@ -1078,8 +1078,8 @@ name = "bonsai-mailbox"
 version = "0.1.0"
 dependencies = [
  "bonsai-relay",
- "bonsai-transfer-core",
- "bonsai-transfer-crypto",
+ "p2p-core",
+ "p2p-crypto",
  "dashmap 5.5.3",
  "serde",
  "serde_json",
@@ -1104,7 +1104,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-mcp-server"
+name = "mcp-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1174,8 +1174,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "blake3",
- "bonsai-transfer-core",
- "bonsai-transfer-crypto",
+ "p2p-core",
+ "p2p-crypto",
  "dashmap 5.5.3",
  "hex",
  "rand 0.8.5",
@@ -1240,14 +1240,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-transfer-core"
+name = "p2p-core"
 version = "2.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "blake3",
- "bonsai-transfer-crypto",
- "bonsai-transfer-identity",
+ "p2p-crypto",
+ "p2p-identity",
  "bytes",
  "dashmap 5.5.3",
  "parking_lot",
@@ -1260,7 +1260,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-transfer-crypto"
+name = "p2p-crypto"
 version = "2.0.0"
 dependencies = [
  "aes-gcm",
@@ -1281,7 +1281,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-transfer-identity"
+name = "p2p-identity"
 version = "2.0.0"
 dependencies = [
  "anyhow",
@@ -1301,7 +1301,7 @@ dependencies = [
  "aes-gcm",
  "argon2",
  "blake3",
- "bonsai-transfer-crypto",
+ "p2p-crypto",
  "dirs 5.0.1",
  "rand 0.8.5",
  "serde",
@@ -1311,7 +1311,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-universe"
+name = "audit-log"
 version = "0.1.0"
 dependencies = [
  "blake3",
@@ -1367,17 +1367,17 @@ dependencies = [
  "bonsai-knowledge",
  "bonsai-mailbox",
  "bonsai-marketplace",
- "bonsai-mcp-server",
+ "mcp-server",
  "bonsai-native",
  "bonsai-package",
  "bonsai-query",
  "bonsai-skill-compiler",
  "bonsai-sns",
  "bonsai-swarm",
- "bonsai-transfer-core",
- "bonsai-transfer-crypto",
+ "p2p-core",
+ "p2p-crypto",
  "bonsai-transfer-store",
- "bonsai-universe",
+ "audit-log",
  "bonsai-verify",
  "bytes",
  "candle-core",

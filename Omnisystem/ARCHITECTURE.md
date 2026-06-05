@@ -16,30 +16,30 @@ All code in the Omnisystem follows strict naming conventions and architectural p
 ## Naming Conventions
 
 ### Crate/Service Names
-- **Pattern**: `omni-{service-name}`
-- **Examples**: `omni-p2p`, `omni-compress`, `omni-ai`, `omni-observability`
+- **Pattern**: `build-{service-name}`
+- **Examples**: `build-p2p`, `build-compress`, `build-ai`, `build-observability`
 - **All lowercase, hyphenated**
 
 ### Module Names
-- **Pattern**: `omni::{service_name}` (snake_case)
-- **Examples**: `omni::p2p`, `omni::compress`, `omni::container`
+- **Pattern**: `build::{service_name}` (snake_case)
+- **Examples**: `build::p2p`, `build::compress`, `build::container`
 
-### UOSC Kernel Structures
-- **Pattern**: `UOSC_{component}_{subcomponent}`
+### USOS Kernel Structures
+- **Pattern**: `usos_{component}_{subcomponent}`
 - **Examples**: 
-  - `UOSC_process`
-  - `UOSC_memory_region`
-  - `UOSC_capability_token`
-  - `UOSC_ipc_channel`
-  - `UOSC_scheduler`
+  - `usos_process`
+  - `usos_memory_region`
+  - `usos_capability_token`
+  - `usos_ipc_channel`
+  - `usos_scheduler`
 
 ### Configuration Files
-- **Pattern**: `omni.toml` at workspace root
+- **Pattern**: `build.toml` at workspace root
 - **Language-specific**: `titan.toml`, `sylva.toml`, `aether.toml`
 
 ### Build Artifacts
-- **Pattern**: `omni-{name}.{ext}`
-- **Examples**: `omni-kernel.bin`, `omni-system.img`, `omni-services.tar`
+- **Pattern**: `build-{name}.{ext}`
+- **Examples**: `build-kernel.bin`, `build-system.img`, `build-services.tar`
 
 ---
 
@@ -60,14 +60,14 @@ All code in the Omnisystem follows strict naming conventions and architectural p
 - Deterministic execution (no garbage collector; all cleanup is compile-time)
 
 **Primary Uses**:
-- UOSC kernel
-- omni-p2p (crypto core)
-- omni-compress
-- omni-container
-- omni-compiler (core)
-- omni-observability
-- omni-ai (core inference)
-- omni-qa (static analysis)
+- USOS kernel
+- build-p2p (crypto core)
+- build-compress
+- build-container
+- build-compiler (core)
+- build-observability
+- build-ai (core inference)
+- build-qa (static analysis)
 - Standard library
 
 **Standard Library Structure**:
@@ -98,9 +98,9 @@ titan::alloc             # Memory allocator interface
 - JSON/YAML/TOML handling built-in
 
 **Primary Uses**:
-- omni-bot scripting
-- omni-compiler frontend
-- omni-knowledge query language
+- build-bot scripting
+- build-compiler frontend
+- build-knowledge query language
 - Configuration and scripting
 
 **Key Bindings**:
@@ -119,18 +119,18 @@ sylva::repl               # Interactive development
 **Purpose**: Distributed concurrency, message passing, large-scale coordination
 
 **Key Features**:
-- Location-transparent actors (local or remote via omni-p2p)
+- Location-transparent actors (local or remote via build-p2p)
 - CRDT-native state (GCounter, PNCounter, ORSet, LWWRegister)
 - Supervision trees (Erlang-style with restart strategies)
-- Distributed persistence (to omni-observability)
+- Distributed persistence (to build-observability)
 - Automatic message serialization
 - Consistent hashing for actor placement (scales to 10,000+ nodes)
 
 **Primary Uses**:
-- omni-p2p (P2P mesh)
-- omni-media (streaming actors)
-- omni-ai (distributed inference)
-- omni-observability (log collection)
+- build-p2p (P2P mesh)
+- build-media (streaming actors)
+- build-ai (distributed inference)
+- build-observability (log collection)
 - Any distributed service
 
 ---
@@ -148,50 +148,50 @@ sylva::repl               # Interactive development
 - Integrated into UBVM
 
 **Primary Uses**:
-- UOSC kernel verification (memory safety, scheduler correctness)
-- Protocol verification (omni-p2p handshake, etc.)
+- USOS kernel verification (memory safety, scheduler correctness)
+- Protocol verification (build-p2p handshake, etc.)
 - Data structure proofs (no overflow, correct invariants)
-- Constraint verification (omni-ai safety properties)
+- Constraint verification (build-ai safety properties)
 
 ---
 
-## UOSC Core Architecture
+## USOS Core Architecture
 
-The UOSC kernel is minimal (< 5000 lines of Titan), providing only essential primitives.
+The USOS kernel is minimal (< 5000 lines of Titan), providing only essential primitives.
 
 ### Kernel Components
 
-1. **Memory Manager** (`UOSC_memory`)
+1. **Memory Manager** (`usos_memory`)
    - Physical memory allocation (frame allocator)
    - Virtual memory with paging
    - Copy-on-write
    - Capability-based regions
 
-2. **Scheduler** (`UOSC_scheduler`)
+2. **Scheduler** (`usos_scheduler`)
    - Preemptive multitasking
    - Priority queues
    - EDF (Earliest Deadline First) for real-time
    - Deterministic scheduling order
 
-3. **IPC** (`UOSC_ipc`)
+3. **IPC** (`usos_ipc`)
    - Synchronous message passing (rendezvous)
    - Asynchronous message passing (buffered)
    - Both use capabilities for authorization
 
-4. **Capabilities** (`UOSC_capability`)
+4. **Capabilities** (`usos_capability`)
    - Unforgeable tokens for all resources
    - Fine-grained: separate caps for read/write/execute
    - Revocable and delegable
 
-5. **Boot & Service Manager** (`UOSC_boot`)
+5. **Boot & Service Manager** (`usos_boot`)
    - Load initial userspace image from CAS
-   - Start omni-service-manager
+   - Start build-service-manager
    - Initialize logging and audit
 
-### What Is NOT in UOSC Core
+### What Is NOT in USOS Core
 
 - Filesystems (userspace service)
-- Networking stack (userspace omni-p2p)
+- Networking stack (userspace build-p2p)
 - Device drivers (userspace services)
 - GUI / windowing
 - Compression, encryption
@@ -205,41 +205,41 @@ The UOSC kernel is minimal (< 5000 lines of Titan), providing only essential pri
 ### Core Service Tiers
 
 **Tier 1: Essential Infrastructure**
-- omni-p2p (networking)
-- omni-observability (logging/telemetry)
-- omni-container (process isolation)
-- omni-compress (compression library)
+- build-p2p (networking)
+- build-observability (logging/telemetry)
+- build-container (process isolation)
+- build-compress (compression library)
 
 **Tier 2: System Services**
-- omni-vfs (filesystem)
-- omni-enclave (runtime management)
-- omni-compiler (compilation service)
+- build-vfs (filesystem)
+- build-enclave (runtime management)
+- build-compiler (compilation service)
 
 **Tier 3: Business Logic**
-- omni-ai (inference)
-- omni-knowledge (semantic search)
-- omni-media (multimedia)
-- omni-bot (chat bridges)
-- omni-qa (quality assurance)
+- build-ai (inference)
+- build-knowledge (semantic search)
+- build-media (multimedia)
+- build-bot (chat bridges)
+- build-qa (quality assurance)
 
 **Tier 4: Optional**
-- omni-blockchain (Nexus replacement)
+- build-blockchain (Nexus replacement)
 
 ---
 
-## Build System (omni command)
+## Build System (build command)
 
-The `omni` binary (written in Titan) provides:
+The `build` binary (written in Titan) provides:
 
 ```
-omni build [target]      # Build specific service or entire system
-omni test [suite]        # Run UBVM tests
-omni run [service]       # Run service or UOSC kernel
-omni package [name]      # Create deployment package
-omni repl [lang]         # Start REPL (Sylva/Titan)
-omni verify [component]  # Run Axiom proofs
-omni clean               # Remove build artifacts
-omni status              # Show build status
+build build [target]      # Build specific service or entire system
+build test [suite]        # Run UBVM tests
+build run [service]       # Run service or USOS kernel
+build package [name]      # Create deployment package
+build repl [lang]         # Start REPL (Sylva/Titan)
+build verify [component]  # Run Axiom proofs
+build clean               # Remove build artifacts
+build status              # Show build status
 ```
 
 ---
@@ -261,8 +261,8 @@ omni status              # Show build status
 
 ## Implementation Notes
 
-The UOSC kernel (`kernel/capability.ti`, `kernel/memory.ti`, `kernel/scheduler.ti`)
-and all ten platform services (`services/omni-*/`) are fully implemented in Titan and
+The USOS kernel (`kernel/capability.ti`, `kernel/memory.ti`, `kernel/scheduler.ti`)
+and all ten platform services (`services/build-*/`) are fully implemented in Titan and
 pass their test suites. The build tool is `titan-bootstrap/output/titan-compiler.exe`.
 
 **Document Version**: 1.1  

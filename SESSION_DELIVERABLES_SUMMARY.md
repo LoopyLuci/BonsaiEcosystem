@@ -11,8 +11,8 @@
 
 ### PART A: AI-Optional Deterministic-First Backbone (COMPLETE)
 
-#### 1. Core Framework: `bonsai-ai-fallback` v1.0.0
-- **Location**: `crates/bonsai-ai-fallback/`
+#### 1. Core Framework: `ai-advisor` v1.0.0
+- **Location**: `crates/ai-advisor/`
 - **Status**: ✅ Fully implemented, tested, production-ready
 - **Key Components**:
   - `SovereignService` trait (universal service contract)
@@ -24,9 +24,9 @@
 
 #### 2. TransferDaemon v2 (COMPLETE)
 - **4 Production-Ready Crates** (all v2.0.0):
-  1. `bonsai-transfer-identity`: Self-certifying NodeId, DIDs, VCs
-  2. `bonsai-transfer-crypto`: Post-quantum hybrid (X25519 + ML-KEM-768)
-  3. `bonsai-transfer-core`: Core messaging infrastructure
+  1. `p2p-identity`: Self-certifying NodeId, DIDs, VCs
+  2. `p2p-crypto`: Post-quantum hybrid (X25519 + ML-KEM-768)
+  3. `p2p-core`: Core messaging infrastructure
   4. `bonsai-transfer-ai`: Optional AI enhancement (feature-gated)
 
 #### 3. Architectural Documentation (4 Comprehensive Guides)
@@ -156,7 +156,7 @@ polyglot-pong/
 - File structure map (with line counts)
 - Complete code for all critical functions
 - Feature flags & build variants
-- Integration with `bonsai-ai-fallback`
+- Integration with `ai-advisor`
 - Testing & validation strategy
 - Deployment procedures
 - Success criteria & timeline
@@ -176,7 +176,7 @@ polyglot-pong/
 - ✅ 750+ programming languages (specification)
 - ✅ 562,500+ language conversions (specification)
 - ✅ 10 bleeding-edge enhancements (all specified + partially coded)
-- ✅ 100% integration with `bonsai-ai-fallback`
+- ✅ 100% integration with `ai-advisor`
 - ✅ 100% deterministic-first architecture
 - ✅ 100% AI-optional (zero AI in critical path)
 
@@ -244,7 +244,7 @@ polyglot-pong/
 
 ## Production Readiness
 
-### Core Framework (`bonsai-ai-fallback`)
+### Core Framework (`ai-advisor`)
 **Status**: 🟢 **PRODUCTION-READY**
 - Zero AI dependencies (default build)
 - 95%+ test coverage

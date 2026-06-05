@@ -37,7 +37,7 @@ Sylva (Script/REPL)
 
 ### In the REPL
 ```bash
-$ omni repl -f main.sy
+$ build repl -f main.sy
 ```
 
 Outputs:
@@ -52,7 +52,7 @@ Pipeline complete. Use :trace to inspect execution.
 
 ### With time-travel debugging
 ```bash
-$ omni repl
+$ build repl
 sylva> x = [1, 2, 3]
   = [1, 2, 3]
 sylva> y = [4, 5, 6]
@@ -112,15 +112,15 @@ Result: Parallel + fault-tolerant pipeline
 
 ## Extending This Example
 
-1. **Real data**: Load from CSV with `omni load`
+1. **Real data**: Load from CSV with `build load`
 2. **More Titan ops**: Call matrix_multiply, FFT, etc.
-3. **Visualization**: Use `omni observe` to see telemetry graph
+3. **Visualization**: Use `build observe` to see telemetry graph
 4. **Export**: Save results to JSON/Parquet
 5. **Stress test**: Scale to 1GB+ datasets
 
 ## See Also
 
-- `hello_world.omni` — Basic cross-language example
+- `hello_world.build` — Basic cross-language example
 - `web_service/` — Aether actor example
 - GETTING_STARTED.md — Time-travel debugging tutorial
 - CHANGELOG.md — Roadmap for Phase 3+ features

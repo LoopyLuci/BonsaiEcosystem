@@ -2,7 +2,7 @@
 
 ## Quick Start: Adding Deterministic-First AI-Optional Support to Your Crate
 
-This guide walks through integrating the `bonsai-ai-fallback` framework into any Bonsai subsystem (TransferDaemon, BUCE, Scheduler, etc.).
+This guide walks through integrating the `ai-advisor` framework into any Bonsai subsystem (TransferDaemon, BUCE, Scheduler, etc.).
 
 ---
 
@@ -19,10 +19,10 @@ edition = "2021"
 [features]
 default = ["deterministic-core"]
 deterministic-core = []
-ai-enhancements = ["dep:bonsai-ai-fallback"]
+ai-enhancements = ["dep:ai-advisor"]
 
 [dependencies]
-bonsai-ai-fallback = { path = "../../crates/bonsai-ai-fallback", version = "1.0", optional = true }
+ai-advisor = { path = "../../crates/ai-advisor", version = "1.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 
@@ -594,7 +594,7 @@ A: No. Randomness breaks determinism. Use deterministic PRNGs seeded with input 
 A: Run with `min_confidence: 1.5` (impossible threshold) and verify behavior is identical to AI disabled.
 
 **Q: Do I need Axiom proofs?**  
-A: Required for TransferDaemon, Scheduler, UOSC kernel. Recommended for others. Sketch is acceptable initially.
+A: Required for TransferDaemon, Scheduler, USOS kernel. Recommended for others. Sketch is acceptable initially.
 
 ---
 
@@ -603,7 +603,7 @@ A: Required for TransferDaemon, Scheduler, UOSC kernel. Recommended for others. 
 For questions on integrating this framework:
 
 1. Check the example implementations (3 real-world examples provided)
-2. Review `bonsai-ai-fallback` crate documentation
+2. Review `ai-advisor` crate documentation
 3. Open an issue on the Bonsai project tracker
 
 ---

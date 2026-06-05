@@ -1,4 +1,4 @@
-// services/omni-cache/cache.ti — Distributed caching with TTL
+// services/build-cache/cache.ti — Distributed caching with TTL
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

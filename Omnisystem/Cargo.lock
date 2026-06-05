@@ -391,7 +391,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "omni"
+name = "build"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -403,27 +403,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "omni-auth"
+name = "build-auth"
 version = "0.1.0"
 
 [[package]]
-name = "omni-cache"
+name = "build-cache"
 version = "0.1.0"
 
 [[package]]
-name = "omni-compress"
+name = "build-compress"
 version = "0.1.0"
 
 [[package]]
-name = "omni-container"
+name = "build-container"
 version = "0.1.0"
 
 [[package]]
-name = "omni-crypto"
+name = "build-crypto"
 version = "0.1.0"
 
 [[package]]
-name = "omni-ir"
+name = "build-ir"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -431,11 +431,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "omni-observability"
+name = "build-observability"
 version = "0.1.0"
 
 [[package]]
-name = "omni-p2p"
+name = "build-p2p"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -443,15 +443,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "omni-queue"
+name = "build-queue"
 version = "0.1.0"
 
 [[package]]
-name = "omni-rpc"
+name = "build-rpc"
 version = "0.1.0"
 
 [[package]]
-name = "omni-storage"
+name = "build-storage"
 version = "0.1.0"
 
 [[package]]
@@ -736,7 +736,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
-name = "UOSC-kernel"
+name = "kernel"
 version = "0.1.0"
 dependencies = [
  "crossbeam",

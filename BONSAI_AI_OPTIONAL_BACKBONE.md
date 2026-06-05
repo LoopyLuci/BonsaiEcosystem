@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Every system in the Bonsai Ecosystem and UOSC must function **correctly, safely, and predictably without any AI/ML component**. AI enhancements are **strictly optional, advisory, and surgically decoupled** via the `bonsai-ai-fallback` framework.
+Every system in the Bonsai Ecosystem and USOS must function **correctly, safely, and predictably without any AI/ML component**. AI enhancements are **strictly optional, advisory, and surgically decoupled** via the `ai-advisor` framework.
 
 This document specifies the architectural pattern, implementation strategy, and validation methodology for achieving this across all Bonsai subsystems.
 
@@ -56,7 +56,7 @@ else Safe Stub → always works
 
 ---
 
-## 3. Universal Foundation: `bonsai-ai-fallback` Crate
+## 3. Universal Foundation: `ai-advisor` Crate
 
 A lightweight, `no_std`-compatible library (v1.0.0) that every Bonsai service depends on.
 
@@ -124,7 +124,7 @@ pub struct ArbiterConfig {
 - **Fallback**: zstd level 3 (safe, general-purpose default)
 - **Status**: Core stable, AI adaptor needed
 
-### 4.3 UOSC Kernel
+### 4.3 USOS Kernel
 - **Memory Compression**: zram (lz4 default) + AI page prediction
 - **Scheduler (Pulse)**: CFS + EDF with static priorities, AI dynamic tuning
 - **I/O Scheduling**: mq-deadline with static read-ahead, AI prefetch prediction
@@ -348,7 +348,7 @@ This creates a **provable, immutable record** that the system never depended on 
 For each Bonsai crate, the responsible team must:
 
 - [ ] Implement `SovereignService` trait
-- [ ] Integrate `bonsai-ai-fallback` crate (v1.0.0+)
+- [ ] Integrate `ai-advisor` crate (v1.0.0+)
 - [ ] Provide deterministic core for all core functionality
 - [ ] Provide heuristic for every ML-enhanced feature
 - [ ] Provide ADC or small decision tree (if needed)
@@ -364,7 +364,7 @@ For each Bonsai crate, the responsible team must:
 
 ## 16. Conclusion
 
-By implementing the **Sovereign Kernel** pattern, **Trusted Arbiter** orchestration, **graceful degradation ladders**, **safety envelopes**, **shadow-mode validation**, **deterministic stubs**, **formal verification**, and **council-governed ramp-up**, the Bonsai Ecosystem and UOSC achieve an unprecedented level of **AI-immune robustness**.
+By implementing the **Sovereign Kernel** pattern, **Trusted Arbiter** orchestration, **graceful degradation ladders**, **safety envelopes**, **shadow-mode validation**, **deterministic stubs**, **formal verification**, and **council-governed ramp-up**, the Bonsai Ecosystem and USOS achieve an unprecedented level of **AI-immune robustness**.
 
 Every feature—from compression to scheduling to media streaming—will function **correctly, safely, and predictably** even when no AI/ML component is present, when models fail, or when adversaries attack. AI becomes a true, optional enhancement, never a hidden dependency.
 

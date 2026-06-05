@@ -149,7 +149,7 @@ if (lex->current.kind != TOK_RPAREN) {
 
 - **C feature:** Minimal pointer usage (const string, no arithmetic)
 - **Lingua challenge:** Convert to Titan without `unsafe` (certified fidelity)
-- **Verification:** `fidelity: certified` in `.omni/.lingua-status.json`
+- **Verification:** `fidelity: certified` in `.build/.lingua-status.json`
 
 ---
 
@@ -178,8 +178,8 @@ gcc -o calc examples/calc.c
 ### Test 3: Lingua C→Titan Conversion
 
 ```bash
-omni lingua convert examples/calc.c --to=titan --level=certified
-cat examples/.omni/calc.ti | head -20
+build lingua convert examples/calc.c --to=titan --level=certified
+cat examples/.build/calc.ti | head -20
 ```
 
 **Expected output:**
@@ -204,7 +204,7 @@ pub struct Token {
 ### Test 4: Titan Compilation
 
 ```bash
-omni build examples/.omni/calc.ti --target=native --output=calc_titan
+build build examples/.build/calc.ti --target=native --output=calc_titan
 ./calc_titan
 # Expected: Result: 9
 ```
@@ -214,7 +214,7 @@ omni build examples/.omni/calc.ti --target=native --output=calc_titan
 ### Test 5: Bidirectional Round-Trip (Titan→C)
 
 ```bash
-omni lingua convert examples/.omni/calc.ti --to=c --level=certified --output=calc_roundtrip.c
+build lingua convert examples/.build/calc.ti --to=c --level=certified --output=calc_roundtrip.c
 gcc -o calc_roundtrip calc_roundtrip.c
 ./calc_roundtrip
 # Expected: Result: 9
@@ -255,14 +255,14 @@ examples/calc
 
 ```bash
 # Start Lingua daemon
-omni lingua start --watch examples/
+build lingua start --watch examples/
 
 # Should detect calc.c and produce calc.ti
 # Check status:
-omni lingua status examples/
+build lingua status examples/
 
 # Verify certified fidelity:
-cat examples/.omni/.lingua-status.json | grep -A 2 calc.c
+cat examples/.build/.lingua-status.json | grep -A 2 calc.c
 # Expected: "fidelity": "certified"
 ```
 
@@ -270,7 +270,7 @@ cat examples/.omni/.lingua-status.json | grep -A 2 calc.c
 
 ```bash
 # Compile Titan output
-omni build examples/.omni/calc.ti --target=native --output=calc_titan
+build build examples/.build/calc.ti --target=native --output=calc_titan
 calc_titan
 # ✓ Result: 9
 ```
@@ -279,7 +279,7 @@ calc_titan
 
 ```bash
 # Convert Titan back to C
-omni lingua convert examples/.omni/calc.ti --to=c --output=calc_roundtrip.c
+build lingua convert examples/.build/calc.ti --to=c --output=calc_roundtrip.c
 
 # Compile round-tripped C
 gcc -o calc_roundtrip calc_roundtrip.c

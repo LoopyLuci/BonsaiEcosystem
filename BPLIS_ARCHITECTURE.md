@@ -181,7 +181,7 @@ bonsai repl --lang sylva     # Sylva-specific REPL
 - ⏳ Message passing primitives
 - ⏳ Distributed state (CRDTs)
 - ⏳ Location transparency
-- ⏳ Actor runtime integration with UOSC
+- ⏳ Actor runtime integration with USOS
 
 ### Phase 6: Axiom Proof Layer
 - ⏳ Proof kernel integration

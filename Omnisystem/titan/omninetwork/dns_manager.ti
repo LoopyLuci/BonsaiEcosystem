@@ -5,7 +5,7 @@ pub fn main() -> i64 {
     let mut score: i64 = 0;
 
     // Stage 1 — Register DNS
-    let register_ok: i64 = register_dns("api.omni.local", "10.0.1.10");
+    let register_ok: i64 = register_dns("api.build.local", "10.0.1.10");
     if register_ok >= 80 { score += 14; }
 
     // Stage 2 — Configure discovery
@@ -13,7 +13,7 @@ pub fn main() -> i64 {
     if discovery_ok >= 80 { score += 14; }
 
     // Stage 3 — Health check
-    let health_ok: i64 = health_check_dns("api.omni.local");
+    let health_ok: i64 = health_check_dns("api.build.local");
     if health_ok >= 80 { score += 14; }
 
     // Stage 4 — Setup TTL

@@ -1,14 +1,14 @@
-# Bonsai Ecosystem & UOSC Co-OS for NixOS
+# Bonsai Ecosystem & USOS Co-OS for NixOS
 
-Complete Nix flake integration for running the Bonsai Ecosystem and UOSC as a co-operating system alongside NixOS in real-time parallel via KVM.
+Complete Nix flake integration for running the Bonsai Ecosystem and USOS as a co-operating system alongside NixOS in real-time parallel via KVM.
 
 ## What Is This?
 
-UOSC (Unified Secure Operating System) runs as a **co-OS** — a lightweight KVM guest that executes alongside NixOS with:
+USOS (Unified Secure Operating System) runs as a **co-OS** — a lightweight KVM guest that executes alongside NixOS with:
 
 - **Real-time parallel execution** via hardware acceleration (KVM)
 - **Shared resources**: CPU, memory, networking, filesystem (virtio-9p)
-- **Seamless integration**: Bonsai services run on NixOS host, coordinated with UOSC via Echo fabric
+- **Seamless integration**: Bonsai services run on NixOS host, coordinated with USOS via Echo fabric
 - **Zero overhead**: Uses virtio for efficient device emulation
 
 ## Quick Start
@@ -26,10 +26,10 @@ UOSC (Unified Secure Operating System) runs as a **co-OS** — a lightweight KVM
     nixosConfigurations.myMachine = nixpkgs.lib.nixosSystem {
       modules = [
         bonsai.nixosModules.bonsai-services
-        bonsai.nixosModules.UOSC-co-os
+        bonsai.nixosModules.usos-co-os
         {
           services.bonsai-services.enable = true;
-          services.UOSC-co-os = {
+          services.usos-co-os = {
             enable = true;
             memory = "4G";
             cpuCores = 4;
@@ -47,19 +47,19 @@ UOSC (Unified Secure Operating System) runs as a **co-OS** — a lightweight KVM
 sudo nixos-rebuild switch
 ```
 
-Bonsai services and UOSC will start automatically.
+Bonsai services and USOS will start automatically.
 
-### 3. Access UOSC
+### 3. Access USOS
 
 ```bash
-# SSH into UOSC (forwarded to localhost:2222)
-UOSC-ssh
+# SSH into USOS (forwarded to localhost:2222)
+usos-ssh
 
 # List shared folder
-UOSC-share
+usos-share
 
-# Check UOSC VM status
-systemctl status UOSC-co-os
+# Check USOS VM status
+systemctl status usos-co-os
 ```
 
 ## Architecture
@@ -70,7 +70,7 @@ systemctl status UOSC-co-os
 ├─────────────────────────────────────────────────┤
 │                                                  │
 │  ┌──────────────────────┐  ┌─────────────────┐  │
-│  │ Bonsai Services      │  │ UOSC VM (KVM)   │  │
+│  │ Bonsai Services      │  │ USOS VM (KVM)   │  │
 │  │ • MCP Server         │  │ • Weave         │  │
 │  │ • BMF (SMTP/IMAP)    │  │ • Sentinel Core │  │
 │  │ • CLI Tools          │  │ • Bonsai WS     │  │
@@ -102,15 +102,15 @@ services.bonsai-services = {
 };
 ```
 
-### UOSC Co-OS
+### USOS Co-OS
 
 ```nix
-services.UOSC-co-os = {
+services.usos-co-os = {
   enable = true;
   memory = "2G";                    # VM RAM
   cpuCores = 2;                     # vCPUs
   kvmEnabled = true;                # Hardware acceleration
-  sharedFolder = "/var/lib/UOSC-shared";  # 9p mount point
+  sharedFolder = "/var/lib/usos-shared";  # 9p mount point
   sshPort = 2222;                   # SSH forwarding
   autoStart = true;                 # Start on boot
 };
@@ -122,27 +122,27 @@ services.UOSC-co-os = {
 
 ```bash
 nix flake show     # List all packages
-nix build .        # Build UOSC VM
+nix build .        # Build USOS VM
 nix develop        # Enter dev environment
 ```
 
 ### Build specific packages
 
 ```bash
-nix build .#UOSC-vm           # Full VM
+nix build .#usos-vm           # Full VM
 nix build .#sentinel-core     # Just the kernel
 nix build .#bonsai-workspace  # Bonsai IDE
 nix build .#bonsai-cli        # CLI tools
 ```
 
-### Run UOSC VM directly
+### Run USOS VM directly
 
 ```bash
 # Using the built package
-./result/bin/UOSC-vm
+./result/bin/usos-vm
 
 # With custom settings
-UOSC_MEMORY=8G UOSC_CPUS=8 nix run .#UOSC-vm
+USOS_MEMORY=8G USOS_CPUS=8 nix run .#usos-vm
 ```
 
 ## Directory Structure
@@ -152,12 +152,12 @@ nix/
 ├── flake.nix                    # Root flake (builds all crates, packages)
 ├── modules/
 │   ├── bonsai-services.nix     # Bonsai service systemd units
-│   ├── UOSC-co-os.nix          # UOSC VM systemd service
+│   ├── usos-co-os.nix          # USOS VM systemd service
 │   └── default.nix              # Module re-exports
 ├── packages/
-│   ├── UOSC-kernel.nix          # Sentinel Core kernel package
-│   ├── UOSC-initrd.nix          # UOSC initrd with Weave
-│   └── UOSC-vm.nix              # Complete VM with QEMU launcher
+│   ├── kernel.nix          # Sentinel Core kernel package
+│   ├── usos-initrd.nix          # USOS initrd with Weave
+│   └── usos-vm.nix              # Complete VM with QEMU launcher
 ├── shell.nix                    # Legacy dev shell (use flake.nix)
 └── README.md                    # This file
 ```
@@ -172,14 +172,14 @@ nix/
 
 2. **Runtime**
    - NixOS systemd starts Bonsai services (MCP, BMF, etc.) on the host
-   - UOSC VM boots in parallel as a KVM guest
-   - Shared folder (9p) connects host `/var/lib/UOSC-shared` to guest `/mnt/host`
+   - USOS VM boots in parallel as a KVM guest
+   - Shared folder (9p) connects host `/var/lib/usos-shared` to guest `/mnt/host`
    - Network NAT forwards guest port 22 to host port 2222
 
 3. **Interaction**
-   - Bonsai services coordinate with UOSC via Echo fabric (over virtual network)
+   - Bonsai services coordinate with USOS via Echo fabric (over virtual network)
    - CAS storage is accessible to both host and guest (shared folder)
-   - SSH access for debugging and direct UOSC interaction
+   - SSH access for debugging and direct USOS interaction
 
 ## Troubleshooting
 
@@ -192,7 +192,7 @@ kvm-ok || lscpu | grep -i vmx
 
 If KVM unavailable, fallback to TCG (software emulation):
 ```nix
-services.UOSC-co-os.kvmEnabled = false;
+services.usos-co-os.kvmEnabled = false;
 ```
 
 ### Memory/CPU issues
@@ -205,7 +205,7 @@ nproc
 
 Reduce allocation:
 ```nix
-services.UOSC-co-os = {
+services.usos-co-os = {
   memory = "1G";
   cpuCores = 1;
 };
@@ -222,10 +222,10 @@ If missing, ensure your NixOS kernel includes virtio-9p support.
 
 ## Next Steps
 
-- **Integrate Echo fabric**: Enable P2P coordination between host and UOSC
+- **Integrate Echo fabric**: Enable P2P coordination between host and USOS
 - **Add persistent storage**: Use CAS to snapshot and restore VM state
-- **Deploy UBSS**: Run background services in the UOSC VM
-- **Scale horizontally**: Deploy multiple UOSC VMs across the network
+- **Deploy UBSS**: Run background services in the USOS VM
+- **Scale horizontally**: Deploy multiple USOS VMs across the network
 
 ## Resources
 

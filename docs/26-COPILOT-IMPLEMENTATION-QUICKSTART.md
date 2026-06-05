@@ -910,8 +910,8 @@ impl ToolSchemaRegistry {
 ## References
 
 - Main design: `docs/25-COPILOT-TOOL-TRANSLATION-ENGINE.md`
-- Schema registry: `crates/bonsai-mcp-server/tool-schema-registry.yaml`
-- Existing MCP server: `crates/bonsai-mcp-server/src/`
+- Schema registry: `crates/mcp-server/tool-schema-registry.yaml`
+- Existing MCP server: `crates/mcp-server/src/`
 - Universe integration: `bonsai-workspace/src-tauri/src/universe_hooks.rs`
 
 ---

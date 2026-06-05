@@ -115,9 +115,9 @@
     "solution_script": "JSDoc /** @type */ casts in Svelte 4 template attributes are unreliable. Always use a script-level $: reactive declaration with a TypeScript 'as' cast to create a properly typed binding."
   },
   {
-    "error_pattern": "unused import LaneKind bonsai-transfer-core",
+    "error_pattern": "unused import LaneKind p2p-core",
     "solution_type": "rule",
-    "solution_script": "Run 'cargo fix --lib -p bonsai-transfer-core' or manually remove the unused LaneKind import from crates/bonsai-transfer-core/src/scheduler.rs line 165."
+    "solution_script": "Run 'cargo fix --lib -p p2p-core' or manually remove the unused LaneKind import from crates/p2p-core/src/scheduler.rs line 165."
   },
   {
     "error_pattern": "unused import async_trait bonsai-ring",

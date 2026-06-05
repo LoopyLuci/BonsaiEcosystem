@@ -34,7 +34,7 @@ function Test-Cargo {
 }
 
 function Build-McpServer {
-    Write-Status "Building bonsai-mcp-server..." Info
+    Write-Status "Building mcp-server..." Info
 
     try {
         Push-Location
@@ -46,15 +46,15 @@ function Build-McpServer {
         Write-Status "Workspace: $workspaceRoot"
 
         # Build the MCP server
-        Write-Status "Running: cargo build --package bonsai-mcp-server --release" Info
-        & cargo build --package bonsai-mcp-server --release
+        Write-Status "Running: cargo build --package mcp-server --release" Info
+        & cargo build --package mcp-server --release
 
         if ($LASTEXITCODE -ne 0) {
             Write-Status "Build failed. See errors above." Error
             return $false
         }
 
-        $binaryPath = "target/release/bonsai-mcp-server.exe"
+        $binaryPath = "target/release/mcp-server.exe"
         if (Test-Path $binaryPath) {
             Write-Status "✓ Binary created: $binaryPath" Success
             return $binaryPath
@@ -210,7 +210,7 @@ function Main {
     Write-Host ""
     Write-Status "Next steps:" Info
     Write-Status "1. Start MCP server:" Info
-    Write-Status "   .\target\release\bonsai-mcp-server.exe"
+    Write-Status "   .\target\release\mcp-server.exe"
     Write-Host ""
     Write-Status "2. Connect Claude Code to the MCP server"
     Write-Host ""

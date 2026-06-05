@@ -44,7 +44,7 @@ pub fn execute_command(command: String, target: String) -> i64 {
     }
     if command == "new" {
         let project_ok: i64 = generate_project_file("main.ti", "fn main() -> i64 { return 42; }");
-        let config_ok: i64 = generate_project_file("omni.toml", "[project]");
+        let config_ok: i64 = generate_project_file("build.toml", "[project]");
         if project_ok >= 10 && config_ok >= 10 { score += 35; }
     }
     if command == "deploy" {

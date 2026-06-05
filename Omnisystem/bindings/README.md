@@ -23,7 +23,7 @@ effect/socket_io.ti (SOCKET effect)
       ↓
 bindings/socket_handler.ti (effect handler)
       ↓
-libsocket (libc / UOSC kernel)
+libsocket (libc / USOS kernel)
       ↓
 Real network packets
 ```
@@ -91,7 +91,7 @@ kernel/boot_integration.ti (firmware handoff)
       ↓
 kernel/boot_x86_64.ti (GDT, IDT, paging init)
       ↓
-UOSC kernel running
+USOS kernel running
 ```
 
 ### Status
@@ -236,7 +236,7 @@ To deploy the full Omnisystem:
 2. **Compile bindings** → 4 additional test files
 3. **Link C shims** → actual socket/GPU/boot support
 4. **Create bootable image** → UEFI or QEMU-compatible disk
-5. **Deploy to bare metal** → UOSC kernel boots, P2P mesh connects, GPU tasks dispatch
+5. **Deploy to bare metal** → USOS kernel boots, P2P mesh connects, GPU tasks dispatch
 
 ---
 

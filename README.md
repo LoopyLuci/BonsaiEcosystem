@@ -1,4 +1,4 @@
-# 🌿 Bonsai Ecosystem & Unified Secure Operating System (UOSC)
+# 🌿 Bonsai Ecosystem & Unified Secure Operating System (USOS)
 
 **Sovereign · AI‑Optional · Formally Verified · Polyglot (750+ languages)**
 
@@ -30,7 +30,7 @@ cargo build --release --workspace --no-default-features
 | Add support for a new language | [LANGUAGE_SUPPORT.md](docs/LANGUAGE_SUPPORT.md) |
 | Train a public model | [TRAINING.md](docs/TRAINING.md) |
 | Prove a component correct | [FORMAL_VERIFICATION.md](docs/FORMAL_VERIFICATION.md) |
-| Deploy a UOSC node | [DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| Deploy a USOS node | [DEPLOYMENT.md](docs/DEPLOYMENT.md) |
 | Run Polyglot Pong tests | [POLYGLOT_PONG.md](docs/POLYGLOT_PONG.md) |
 
 ---
@@ -60,7 +60,7 @@ cargo build --release --workspace --no-default-features
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | High‑level system design, component hierarchy, data flow diagrams. |
 | [DETERMINISTIC_BACKBONE.md](docs/DETERMINISTIC_BACKBONE.md) | AI‑optional core – how it works, the SovereignService trait, graceful degradation tiers. |
 | [BUILD.md](docs/BUILD.md) | Building from source, feature flags, cross‑compilation, incremental rebuilds. |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploying UOSC, BCF, Echo, TransferDaemon, Nexus, BonsAI – all platforms. |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploying USOS, BCF, Echo, TransferDaemon, Nexus, BonsAI – all platforms. |
 | [LANGUAGE_SUPPORT.md](docs/LANGUAGE_SUPPORT.md) | Full list of 750+ languages, BPLIS/LAIR internals, adding new language support. |
 | [COMPRESSION.md](docs/COMPRESSION.md) | BUCE – algorithms, hardware acceleration, deduplication, benchmarks. |
 | [NETWORKING.md](docs/NETWORKING.md) | TransferDaemon v2 – deterministic core, relay mesh, DCUtR, multi‑path bonding. |
@@ -159,8 +159,8 @@ BonsaiWorkspace/
 ├── crates/                      # All bonsai-* subsystem crates
 │   ├── bonsai-transfer-*        # TransferDaemon v2
 │   ├── bonsai-bmf-*             # Messaging & SMTP/IMAP
-│   ├── bonsai-prec              # Speculative pre-compilation
-│   ├── bonsai-ai-fallback       # SovereignService framework
+│   ├── compiler-cache              # Speculative pre-compilation
+│   ├── ai-advisor       # SovereignService framework
 │   └── [others...]
 ├── docs/                        # Advanced documentation
 │   ├── ARCHITECTURE.md

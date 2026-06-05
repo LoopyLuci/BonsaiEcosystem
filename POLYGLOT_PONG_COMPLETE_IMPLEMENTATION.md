@@ -554,7 +554,7 @@ cargo build --release --no-default-features
 
 ## Critical Integration Points
 
-### 1. bonsai-ai-fallback Integration
+### 1. ai-advisor Integration
 
 Both orchestrator and sandbox MUST implement `SovereignService`:
 
@@ -589,7 +589,7 @@ zk-proofs = ["winterfell"]
 energy-measurement = []
 tee = ["sgx-enclave"]
 fuzzer = []
-archive = ["bonsai-universe"]
+archive = ["audit-log"]
 web-dashboard = ["axum"]
 chaos-tests = []
 ```
@@ -661,7 +661,7 @@ Before production:
 This **complete implementation blueprint** provides:
 
 ✅ Full Rust source code (all 11 crates)  
-✅ 100% integration with `bonsai-ai-fallback`  
+✅ 100% integration with `ai-advisor`  
 ✅ Feature-gated enhancements (10 included)  
 ✅ Production-ready architecture  
 ✅ Comprehensive testing strategy  

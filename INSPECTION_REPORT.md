@@ -23,7 +23,7 @@
 |-------|------|--------|
 | Missing Cargo.toml files (5 crates) | Build Config | ✅ FIXED |
 | Incomplete workspace members list | Build Config | ✅ FIXED |
-| Invalid bonsai-ai-fallback dependency | Dependency | ✅ FIXED |
+| Invalid ai-advisor dependency | Dependency | ✅ FIXED |
 | Async trait method in fuzzer | Code Error | ⚠️ NEEDS FIX |
 | Compilation errors in bug-tracker | Code Error | ⚠️ NEEDS FIX |
 
@@ -49,7 +49,7 @@
 
 #### ✅ Fixed: Invalid Dependencies
 
-**Issue**: `bonsai-ai-fallback = "0.2"` does not exist on crates.io
+**Issue**: `ai-advisor = "0.2"` does not exist on crates.io
 
 **Fix**: Commented out in:
 - ✅ `polyglot-pong/Cargo.toml`
@@ -287,7 +287,7 @@ Untracked files: 28 documentation files + polyglot-pong/ workspace
   - polyglot-pong-bug-tracker (4 errors: TBD)
 
 ❌ BLOCKED BY:
-  - bonsai-ai-fallback crate (commented out, will be available)
+  - ai-advisor crate (commented out, will be available)
 ```
 
 ---
@@ -308,7 +308,7 @@ Untracked files: 28 documentation files + polyglot-pong/ workspace
    - Alphabetized for clarity
 
 3. **Fixed dependency issues**
-   - Commented out non-existent bonsai-ai-fallback
+   - Commented out non-existent ai-advisor
    - Updated orchestrator & sandbox Cargo.toml
 
 4. **Verified file structure**
@@ -384,7 +384,7 @@ pub trait LanguageExecutor: Send + Sync {
 
 ### Medium-term (This week)
 
-1. Create the actual `bonsai-ai-fallback` crate
+1. Create the actual `ai-advisor` crate
 2. Build and test on Windows, Linux, macOS
 3. Add fuzzing tests
 4. Performance benchmarking

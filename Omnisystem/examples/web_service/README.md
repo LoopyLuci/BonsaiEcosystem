@@ -69,6 +69,6 @@ sylva> ws::make_request("/health", "GET", "")
 
 ## See Also
 
-- `hello_world.omni` — Basic actor example
+- `hello_world.build` — Basic actor example
 - `data_pipeline/` — Sylva + Titan integration
 - CONTRIBUTING.md — How to build on this

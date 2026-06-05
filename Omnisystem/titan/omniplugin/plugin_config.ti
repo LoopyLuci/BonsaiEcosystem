@@ -4,9 +4,9 @@
 pub pub fn main() -> i64 {
     let mut score: i64 = 0;
     
-    let var_ok: i64 = register_plugin("omni-plugin-k8s", "1.2.0", "kubernetes-integration") >= 80 { score += 14; }
-    let var_ok: i64 = configure_plugin_sandbox("omni-plugin-k8s", "restricted") >= 80 { score += 14; }
-    let var_ok: i64 = enable_auto_update("omni-plugin-k8s", "minor") >= 80 { score += 14; }
+    let var_ok: i64 = register_plugin("build-plugin-k8s", "1.2.0", "kubernetes-integration") >= 80 { score += 14; }
+    let var_ok: i64 = configure_plugin_sandbox("build-plugin-k8s", "restricted") >= 80 { score += 14; }
+    let var_ok: i64 = enable_auto_update("build-plugin-k8s", "minor") >= 80 { score += 14; }
     let var_ok: i64 = verify_plugin_signature() >= 80 { score += 14; }
     let var_ok: i64 = setup_plugin_store() >= 80 { score += 14; }
     let var_ok: i64 = enable_telemetry() >= 80 { score += 15; }

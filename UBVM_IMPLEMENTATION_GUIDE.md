@@ -22,7 +22,7 @@ This guide provides a complete roadmap for implementing the **Universal Bonsai V
 
 ### ✅ Unified Test Orchestration Fabric (UTOF)
 
-**Location:** `crates/bonsai-utof/` (already in repository)
+**Location:** `crates/test-orchestrator/` (already in repository)
 
 **Deliverables:**
 - 7 production modules (spec, runner, comparer, scheduler, storage, lib, cli)
@@ -37,8 +37,8 @@ This guide provides a complete roadmap for implementing the **Universal Bonsai V
 **Build & Run:**
 ```bash
 cd z:\Projects\BonsaiWorkspace
-cargo build -p bonsai-utof --release
-./target/release/utof --spec crates/bonsai-utof/specs/addition.toml --verbose
+cargo build -p test-orchestrator --release
+./target/release/utof --spec crates/test-orchestrator/specs/addition.toml --verbose
 ```
 
 ---
@@ -382,8 +382,8 @@ git clone https://github.com/bonsai/bonsai-bedf.git
 cd bonsai-bedf
 
 # Phase 1: Already complete
-cargo build -p bonsai-utof --release
-cargo test -p bonsai-utof
+cargo build -p test-orchestrator --release
+cargo test -p test-orchestrator
 
 # Phase 2+: As implemented
 cargo build -p ubvm-ulb --release
@@ -413,7 +413,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - name: Build UTOF
-        run: cargo build -p bonsai-utof --release
+        run: cargo build -p test-orchestrator --release
       - name: Run UBVM
         run: cargo run --release -p ubvm-orchestrator -- \
           --specs-dir testl-specs --workers 4
@@ -448,7 +448,7 @@ curl http://ubvm-dashboard.bonsai.sh/metrics
 Each module includes comprehensive unit tests:
 
 ```bash
-cargo test -p bonsai-utof
+cargo test -p test-orchestrator
 cargo test -p ubvm-ulb
 cargo test -p ubvm-suites
 cargo test -p ubvm-mesh

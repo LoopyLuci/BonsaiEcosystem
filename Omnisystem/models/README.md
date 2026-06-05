@@ -10,7 +10,7 @@ Complete reference guide to all models within the Omnisystem ecosystem.
 |-------|------|--------|----------|
 | **Octopus** | Vision-Language Fine-tuned | ✅ Ready | `Z:\Projects\BonsaiWorkspace\models\trained-models\octopus-ai/` |
 | **Poe** | Personality-based Agent | 🔄 Training | `Z:\Projects\BonsaiWorkspace\models\trained-models\poe-ai/` |
-| **Omni-AI Registry** | Model Management System | ✅ Ready | `Omnisystem/omni-ai/registry/` |
+| **Omni-AI Registry** | Model Management System | ✅ Ready | `Omnisystem/build-ai/registry/` |
 
 ---
 
@@ -59,7 +59,7 @@ Within the Omnisystem, Octopus is used as:
 
 **In Titan code:**
 ```titan
-extern "omni-ai" {
+extern "build-ai" {
     fn octopus_infer(prompt: i64, max_tokens: i64) -> i64;
     fn octopus_load_context(context_hash: i64) -> i64;
 }
@@ -152,11 +152,11 @@ pub fn validate_with_poe(test_case: i64) -> i64 {
 - 🔄 Omnisystem integration in progress
 
 ### Files
-- `Omnisystem/omni-ai/poe/AC_POE_PERSONALITY.md` – Personality definition
-- `Omnisystem/omni-ai/poe/context.md` – Philosophy and approach
-- `Omnisystem/omni-ai/poe/src/` – Source code
-- `Omnisystem/omni-ai/poe/kdb-modules/` – Knowledge base
-- `Omnisystem/omni-ai/poe/config/` – Configuration
+- `Omnisystem/build-ai/poe/AC_POE_PERSONALITY.md` – Personality definition
+- `Omnisystem/build-ai/poe/context.md` – Philosophy and approach
+- `Omnisystem/build-ai/poe/src/` – Source code
+- `Omnisystem/build-ai/poe/kdb-modules/` – Knowledge base
+- `Omnisystem/build-ai/poe/config/` – Configuration
 
 ---
 
@@ -167,18 +167,18 @@ Central model discovery, registration, and management system for all AI models w
 
 ### Components
 
-**Omni-AI Registry** (`Omnisystem/omni-ai/registry/`)
+**Omni-AI Registry** (`Omnisystem/build-ai/registry/`)
 - Model registration and discovery
 - Version tracking
 - Hardware requirement specification
 - Metadata management
 
-**Omni-AI Scanner** (`Omnisystem/omni-ai/scanner/`)
+**Omni-AI Scanner** (`Omnisystem/build-ai/scanner/`)
 - Automatically discovers available models
 - Catalogs models with metadata
 - Validates model integrity
 
-**Omni-AI Converter** (`Omnisystem/omni-ai/converter/`)
+**Omni-AI Converter** (`Omnisystem/build-ai/converter/`)
 - Format conversion (PyTorch ↔ ONNX ↔ GGUF ↔ SPIR-V)
 - Quantization (FP32 → FP16 → INT8)
 - Model optimization for target hardware
@@ -187,7 +187,7 @@ Central model discovery, registration, and management system for all AI models w
 
 ```json
 {
-  "model_id": "omni-ai-octopus-v1",
+  "model_id": "build-ai-octopus-v1",
   "name": "Omni-AI Octopus",
   "type": "vision-language-model",
   "version": "1.0.0",
@@ -218,13 +218,13 @@ from omnisystem.omni_ai.registry import OmniAIRegistry
 
 registry = OmniAIRegistry()
 models = registry.list_models()
-octopus = registry.get_model("omni-ai-octopus-v1")
+octopus = registry.get_model("build-ai-octopus-v1")
 ```
 
 **Register new model:**
 ```python
 registry.register_model(
-    model_id="omni-ai-custom-v1",
+    model_id="build-ai-custom-v1",
     metadata={...},
     model_path="/path/to/model"
 )
@@ -242,9 +242,9 @@ spir_v_model = converter.to_spirv(
 ```
 
 ### Files
-- `Omnisystem/omni-ai/registry/` – Registry implementation
-- `Omnisystem/omni-ai/scanner/` – Model discovery
-- `Omnisystem/omni-ai/converter/` – Format conversion
+- `Omnisystem/build-ai/registry/` – Registry implementation
+- `Omnisystem/build-ai/scanner/` – Model discovery
+- `Omnisystem/build-ai/converter/` – Format conversion
 - `Omnisystem/models/MODEL_MANIFEST.json` – Global model manifest
 
 ---
@@ -260,7 +260,7 @@ Omnisystem/
 │   │   └── README.md (Reference to D:\Models\Custom\octopus-ai-model)
 │   │
 │   ├── poe-ai/
-│   │   └── README.md (Reference to omni-ai/poe)
+│   │   └── README.md (Reference to build-ai/poe)
 │   │
 │   ├── configs/
 │   │   ├── omnisystem-octopus-config.json
@@ -272,7 +272,7 @@ Omnisystem/
 │   │
 │   └── MODEL_MANIFEST.json (Global registry)
 │
-├── omni-ai/
+├── build-ai/
 │   ├── README.md (Omni-AI system overview)
 │   │
 │   ├── registry/

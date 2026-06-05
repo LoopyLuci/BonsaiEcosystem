@@ -59,7 +59,7 @@
 │ Layer 1: Operating System & Hardware Abstraction       │
 │  Watchdog | Survival Engine | File System | Devices    │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │ UOSC (Unnamed Sovereign Operating System)        │  │
+│  │ USOS (Unnamed Sovereign Operating System)        │  │
 │  │ Replaces OS dependencies, Phase 0-6 replacement  │  │
 │  └──────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
@@ -95,12 +95,12 @@ BonsaiWorkspace/
 │   ├── src/                       # Rust implementation
 │   └── Cargo.toml
 │
-├── bonsai-buddy-android/          # Mobile app (Android)
+├── android-runtime/          # Mobile app (Android)
 │   ├── app/src/                   # Kotlin/Java code
 │   └── build.gradle
 │
 ├── crates/                        # Shared Rust libraries
-│   ├── bonsai-ai-fallback/       # AI-optional fallback trait
+│   ├── ai-advisor/       # AI-optional fallback trait
 │   ├── bonsai-transfer/          # P2P networking (TransferDaemon)
 │   ├── bonsai-trainer/           # Model training engine
 │   ├── bonsai-kdb/               # Knowledge database
@@ -238,7 +238,7 @@ src/
 Each crate is a reusable Rust library:
 
 **Core Libraries**:
-- `bonsai-ai-fallback` - AI-optional architecture trait
+- `ai-advisor` - AI-optional architecture trait
 - `bonsai-transfer` - P2P networking protocol
 - `bonsai-trainer` - Model training engine
 - `bonsai-kdb` - Knowledge database implementation
@@ -270,7 +270,7 @@ Each numbered doc covers one major system:
 - **07-COLLABORATION.md** - TransferDaemon, sharing
 - **08-COMPUTE-FABRIC.md** - Distributed compute
 - **09-MOBILE.md** - Android apps, USB Lab
-- **10-SOVEREIGNTY.md** - UOSC phases, roadmap
+- **10-SOVEREIGNTY.md** - USOS phases, roadmap
 - **11-SECURITY.md** - Encryption, threats, audit
 - **12-DEVELOPER.md** - Build, contribute, testing
 - **13-TROUBLESHOOTING.md** - Common issues & fixes
@@ -810,11 +810,11 @@ bonsai-bot (Messaging bot)
   ├─ depends on: tokio, reqwest, serde
   └─ links: bonsai-transfer, bonsai-trainer
 
-bonsai-buddy-android (Mobile app)
+android-runtime (Mobile app)
   ├─ Android SDK
   └─ Kotlin/Java dependencies
 
-crates/bonsai-ai-fallback
+crates/ai-advisor
   └─ No external dependencies (by design)
 
 crates/bonsai-transfer
@@ -836,7 +836,7 @@ crates/bonsai-crypto
   ├─ depends on: curve25519-dalek
   └─ no external random (uses bonsai-rng)
 
-UOSC Phase 1 Crates:
+USOS Phase 1 Crates:
   ├─ bonsai-error (custom error types)
   ├─ bonsai-log (logging framework)
   ├─ bonsai-rng (random numbers)
@@ -1182,7 +1182,7 @@ docker run -d \
 ### Mobile Deployment (Android)
 
 ```
-bonsai-buddy-android/
+android-runtime/
   ├─ Build APK (Android Studio)
   ├─ Sign with keystore
   └─ Upload to Google Play

@@ -5,8 +5,8 @@ edition = "2021"
 description = "Zero-copy DMI ring-channel transport lane (Linux-only hugepage-backed SPSC)"
 
 [dependencies]
-bonsai-transfer-core   = { path = "../bonsai-transfer-core" }
-bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
+p2p-core   = { path = "../p2p-core" }
+p2p-crypto = { path = "../p2p-crypto" }
 async-trait = "0.1"
 serde       = { version = "1", features = ["derive"] }
 tokio       = { version = "1", features = ["sync", "rt"] }

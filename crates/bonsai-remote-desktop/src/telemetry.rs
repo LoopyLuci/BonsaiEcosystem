@@ -1,6 +1,6 @@
 //! Telemetry and event logging for remote desktop sessions.
 //!
-//! This module integrates with bonsai-universe for comprehensive event logging
+//! This module integrates with audit-log for comprehensive event logging
 //! and monitoring of remote desktop operations.
 
 use crate::{PeerId, SessionId};

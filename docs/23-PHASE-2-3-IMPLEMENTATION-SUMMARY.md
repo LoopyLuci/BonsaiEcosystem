@@ -93,7 +93,7 @@ error!("Failed to lock models HashMap: {}", e);
 
 ### 2. Production-Ready BonsaiService (400+ LOC)
 
-**File**: `bonsai-buddy-android/library-bonsai-shared/src/main/java/ai/bonsai/shared/service/BonsaiService.kt`
+**File**: `android-runtime/library-bonsai-shared/src/main/java/ai/bonsai/shared/service/BonsaiService.kt`
 
 Enhanced Android Service with full Phase 2-3 support:
 
@@ -211,7 +211,7 @@ override fun shutdown() {
 
 ### 3. Updated AIDL Interface
 
-**File**: `bonsai-buddy-android/library-bonsai-shared/src/main/aidl/ai/bonsai/shared/IBonsaiService.aidl`
+**File**: `android-runtime/library-bonsai-shared/src/main/aidl/ai/bonsai/shared/IBonsaiService.aidl`
 
 ```aidl
 interface IBonsaiService {
@@ -399,10 +399,10 @@ cargo build --target aarch64-linux-android --release
 
 # 2. Copy .so file
 cp target/.../libbonsai_mobile_ffi.so \
-   ../../bonsai-buddy-android/.../arm64-v8a/libbonsai_android_llm.so
+   ../../android-runtime/.../arm64-v8a/libbonsai_android_llm.so
 
 # 3. Build Android project
-cd ../../bonsai-buddy-android
+cd ../../android-runtime
 ./gradlew :library-bonsai-shared:build
 
 # 4. Verify no errors
@@ -482,10 +482,10 @@ adb logcat | grep "BonsaiService\|BonsaiLLM"
 ✓ crates/bonsai-mobile-ffi/Cargo.toml
   └─ Added: uuid, lazy_static dependencies
 
-✓ bonsai-buddy-android/library-bonsai-shared/src/main/java/.../BonsaiService.kt
+✓ android-runtime/library-bonsai-shared/src/main/java/.../BonsaiService.kt
   └─ Complete rewrite (420 LOC) with Phase 2-3 implementation
 
-✓ bonsai-buddy-android/library-bonsai-shared/src/main/aidl/.../IBonsaiService.aidl
+✓ android-runtime/library-bonsai-shared/src/main/aidl/.../IBonsaiService.aidl
   └─ Added: 6 new LLM interface methods
   └─ Kept: Legacy methods for backward compatibility
 ```

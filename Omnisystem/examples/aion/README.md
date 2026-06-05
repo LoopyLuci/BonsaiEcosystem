@@ -189,23 +189,23 @@ Machine-checked theorems that must pass before production deployment.
 
 ```bash
 # Build Aion components
-omni build titan/aion/core.ti --verify=full
-omni build titan/aion/safety_classifier.ti --verify=full
-omni build aether/aion/cortex.ae
-omni build aether/aion/verifier.ae
-omni build axiom/aion/deployment.ax
+build build titan/aion/core.ti --verify=full
+build build titan/aion/safety_classifier.ti --verify=full
+build build aether/aion/cortex.ae
+build build aether/aion/verifier.ae
+build build axiom/aion/deployment.ax
 
 # Run the interactive studio
-omni run sylva/aion/studio.sy
+build run sylva/aion/studio.sy
 
 # Verify deployment proofs
-omni prove axiom/aion/deployment.ax
+build prove axiom/aion/deployment.ax
 
 # Deploy distributed (3-node cluster)
-omni deploy aion/deploy.omni --nodes=3 --wait-for-proofs
+build deploy aion/deploy.build --nodes=3 --wait-for-proofs
 
 # Check Aion status
-omni observe --aion
+build observe --aion
 ```
 
 ---
@@ -305,7 +305,7 @@ aion> /replay
 
 ```
 aion/
-├── deploy.omni                  # Deployment configuration
+├── deploy.build                  # Deployment configuration
 └── README.md                    # This file
 
 titan/aion/

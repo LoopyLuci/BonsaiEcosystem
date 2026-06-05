@@ -1,4 +1,4 @@
-# MCP Server (bonsai-mcp-server)
+# MCP Server (mcp-server)
 
 This document explains how to run the MCP server, obtain a capability token, and call the MCP HTTP API.
 
@@ -8,7 +8,7 @@ Set the daemon URL if different from the default:
 
 ```powershell
 $env:BONSAI_DAEMON_URL = "http://127.0.0.1:8080/api"
-cargo run -p bonsai-mcp-server -- --host 127.0.0.1 --port 3000
+cargo run -p mcp-server -- --host 127.0.0.1 --port 3000
 ```
 
 ## Obtain a token

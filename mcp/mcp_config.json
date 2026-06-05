@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "bonsai-mcp-server": {
+    "mcp-server": {
       "command": "cargo",
       "args": [
         "run",
         "--manifest-path",
-        "Z:\\Projects\\BonsaiWorkspace\\crates\\bonsai-mcp-server\\Cargo.toml",
+        "Z:\\Projects\\BonsaiWorkspace\\crates\\mcp-server\\Cargo.toml",
         "--release"
       ],
       "env": {

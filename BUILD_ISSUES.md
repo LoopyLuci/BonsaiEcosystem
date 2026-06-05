@@ -14,7 +14,7 @@ The Bonsai Workspace uses a Tauri 2 + Rust + TypeScript stack. Frontend compiles
    └── Generates dist/ with optimized JS/CSS bundles
    
 2. Backend Compilation (Cargo) → 🔧 IN PROGRESS
-   ├── bonsai-universe → ✅ FIXED
+   ├── audit-log → ✅ FIXED
    ├── bonsai-kdb → ✅ FIXED
    ├── bonsai-android-bridge → 🔧 FIXING
    └── Other crates → ⏳ PENDING
@@ -35,7 +35,7 @@ The Bonsai Workspace uses a Tauri 2 + Rust + TypeScript stack. Frontend compiles
 **Status**: ✅ RESOLVED
 
 ### Issue 2: tokio_rusqlite Error Type Mismatch
-**Crate**: `bonsai-universe`  
+**Crate**: `audit-log`  
 **Error**: `tokio_rusqlite::Error::Rusqlite` variant doesn't exist  
 **Root Cause**: tokio_rusqlite 0.6 API changed; `Rusqlite` variant removed  
 **Solution**:
@@ -44,7 +44,7 @@ The Bonsai Workspace uses a Tauri 2 + Rust + TypeScript stack. Frontend compiles
 - Added explicit return types to closures: `|conn| -> Result<T, String>`
 - Fixed type inference by specifying closure return types
 
-**Files Modified**: `crates/bonsai-universe/src/store.rs`, `src/event.rs`  
+**Files Modified**: `crates/audit-log/src/store.rs`, `src/event.rs`  
 **Status**: ✅ RESOLVED
 
 ### Issue 3: HnswIndex API Mismatch
@@ -193,7 +193,7 @@ pub enum Error {
 
 **Crates Fixed**:
 1. ✅ bonsai-kdb - Missing zip dependency + HnswIndex API mismatch
-2. ✅ bonsai-universe - tokio_rusqlite error type refactoring  
+2. ✅ audit-log - tokio_rusqlite error type refactoring  
 3. ✅ bonsai-android-bridge - 9 errors: traits, error types, borrow checker
 4. ✅ bonsai-extensions - Compilation verified
 5. ✅ bonsai-sns - Compilation verified

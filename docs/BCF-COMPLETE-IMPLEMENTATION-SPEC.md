@@ -24,7 +24,7 @@ Layer 3: Runtime
 ├─ CAS Image Manager (pull/push, deduplication)
 └─ Volume Manager (CRDT sync, snapshots)
 
-Layer 2: Kernel Services (UOSC)
+Layer 2: Kernel Services (USOS)
 ├─ Sentinel Core (resource enforcement)
 ├─ Sanctum (hardware isolation)
 ├─ Echo Fabric (P2P, mDNS)
@@ -46,7 +46,7 @@ Layer 1: Bonsai Ecosystem
 
 ### 1. Blueprint Module (COMPLETE)
 
-**File:** `crates/bonsai-bcf/src/blueprint.rs`
+**File:** `crates/container/src/blueprint.rs`
 
 **Status:** ✅ Fully implemented with:
 - Complete validation logic (name, replicas, resources, ports)
@@ -81,7 +81,7 @@ impl BlueprintManager {
 
 ### 2. Scheduler Module (NEEDS IMPLEMENTATION)
 
-**File:** `crates/bonsai-bcf/src/scheduler.rs`
+**File:** `crates/container/src/scheduler.rs`
 
 **Required Functionality:**
 
@@ -148,7 +148,7 @@ impl PulseScheduler {
 
 ### 3. Vault Manager Module (NEEDS IMPLEMENTATION)
 
-**File:** `crates/bonsai-bcf/src/vault.rs`
+**File:** `crates/container/src/vault.rs`
 
 **Required Functionality:**
 
@@ -232,7 +232,7 @@ pub struct ContainerMetrics {
 
 ### 4. Service Mesh Module (NEEDS IMPLEMENTATION)
 
-**File:** `crates/bonsai-bcf/src/mesh.rs`
+**File:** `crates/container/src/mesh.rs`
 
 **Required Functionality:**
 
@@ -309,7 +309,7 @@ impl ServiceMesh {
 
 ### 5. Image Manager Module (NEEDS IMPLEMENTATION)
 
-**File:** `crates/bonsai-bcf/src/image.rs`
+**File:** `crates/container/src/image.rs`
 
 **Required Functionality:**
 
@@ -366,7 +366,7 @@ impl ImageManager {
 
 ### 6. Healing System Module (NEEDS IMPLEMENTATION)
 
-**File:** `crates/bonsai-bcf/src/healing.rs`
+**File:** `crates/container/src/healing.rs`
 
 **Required Functionality:**
 
@@ -436,13 +436,13 @@ impl SurvivalSystem {
 
 ```bash
 # Verify all modules compile
-cargo build -p bonsai-bcf --release
+cargo build -p container --release
 
 # Run comprehensive tests
-cargo test -p bonsai-bcf --all-features
+cargo test -p container --all-features
 
 # Profile performance
-cargo bench -p bonsai-bcf
+cargo bench -p container
 
 # Check security
 cargo audit

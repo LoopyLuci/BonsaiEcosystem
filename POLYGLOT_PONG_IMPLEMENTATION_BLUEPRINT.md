@@ -33,9 +33,9 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-bonsai-ai-fallback = { path = "../../crates/bonsai-ai-fallback" }
-bonsai-transfer-core = { path = "../../crates/bonsai-transfer-core" }
-bonsai-universe = { path = "../../crates/bonsai-universe", optional = true }
+ai-advisor = { path = "../../crates/ai-advisor" }
+p2p-core = { path = "../../crates/p2p-core" }
+audit-log = { path = "../../crates/audit-log", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
@@ -101,11 +101,11 @@ pub struct Orchestrator {
     scheduler: JobScheduler,
     comparator: TraceComparator,
     transfer_daemon: TransferDaemonClient,
-    arbiter: Arbiter,  // from bonsai-ai-fallback
+    arbiter: Arbiter,  // from ai-advisor
     ai_enabled: bool,
 }
 
-// Implements SovereignService from bonsai-ai-fallback
+// Implements SovereignService from ai-advisor
 impl SovereignService for Orchestrator {
     fn deterministic_core(&self, input: &[u8]) -> Result<Vec<u8>> {
         // Pure round-robin job scheduling
@@ -634,20 +634,20 @@ energy-measurement = []         # RAPL reader
 tee = ["sgx-enclave"]
 fuzzer = []
 web-dashboard = ["axum", "tokio-tungstenite"]
-archive = ["bonsai-universe"]
+archive = ["audit-log"]
 chaos-tests = []
 ```
 
 ---
 
-## Part IV: Integration with bonsai-ai-fallback
+## Part IV: Integration with ai-advisor
 
 Both orchestrator and sandbox implement `SovereignService`:
 
 ```rust
 // Both crates depend on:
 [dependencies]
-bonsai-ai-fallback = { path = "../../crates/bonsai-ai-fallback" }
+ai-advisor = { path = "../../crates/ai-advisor" }
 
 // Both implement:
 impl SovereignService for Orchestrator { ... }
@@ -789,7 +789,7 @@ This **Polyglot Pong framework** is a complete, production-ready system that:
 6. ✅ Generates cryptographic proofs of correctness
 7. ✅ Remains AI-optional with zero default AI
 8. ✅ Creates permanent scientific archive
-9. ✅ Integrates fully with `bonsai-ai-fallback`
+9. ✅ Integrates fully with `ai-advisor`
 10. ✅ Is ready for immediate engineering implementation
 
 All code is **production-grade**, **fully tested**, and **formally verified** where critical.

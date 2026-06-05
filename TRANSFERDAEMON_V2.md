@@ -16,9 +16,9 @@ TransferDaemon v2 is a complete reimagining of the peer-to-peer transport layer 
 ```
 TransferDaemon v2
 ├── Core (Deterministic, Zero AI)
-│   ├── bonsai-transfer-identity     – Self-certifying NodeId, DIDs, VCs
-│   ├── bonsai-transfer-crypto       – Post-quantum hybrid crypto
-│   └── bonsai-transfer-core         – Connection state machine, scheduler, CC
+│   ├── p2p-identity     – Self-certifying NodeId, DIDs, VCs
+│   ├── p2p-crypto       – Post-quantum hybrid crypto
+│   └── p2p-core         – Connection state machine, scheduler, CC
 │
 └── Optional AI (Feature-Gated)
     └── bonsai-transfer-ai          – Congestion advisor, safety envelope
@@ -51,7 +51,7 @@ AI components are **strictly optional** and feature-flagged:
 ### Production Build (No AI)
 
 ```bash
-cargo build --release -p bonsai-transfer-core
+cargo build --release -p p2p-core
 ```
 
 Result: Binary with zero AI dependencies, minimal size, maximum stability.
@@ -59,7 +59,7 @@ Result: Binary with zero AI dependencies, minimal size, maximum stability.
 ### Development Build (With AI Optional)
 
 ```bash
-cargo build --release -p bonsai-transfer-core --features ai-enhancements
+cargo build --release -p p2p-core --features ai-enhancements
 ```
 
 Result: Binary includes AI modules (disabled by default in config).
@@ -137,9 +137,9 @@ TransferDaemon v2 integrates with:
 
 ### Completed ✅
 
-- Self-certifying identity crate (bonsai-transfer-identity)
-- Post-quantum crypto crate (bonsai-transfer-crypto)
-- Core connection state machine (bonsai-transfer-core)
+- Self-certifying identity crate (p2p-identity)
+- Post-quantum crypto crate (p2p-crypto)
+- Core connection state machine (p2p-core)
 - AI enhancement crate skeleton (bonsai-transfer-ai)
 - Workspace integration
 - Feature flags
@@ -167,10 +167,10 @@ All tests pass without AI:
 
 ```bash
 # Test deterministic core only
-cargo test -p bonsai-transfer-core
+cargo test -p p2p-core
 
 # Test with AI features (if enabled)
-cargo test -p bonsai-transfer-core --features ai-enhancements
+cargo test -p p2p-core --features ai-enhancements
 
 # Full workspace test
 cargo test --workspace

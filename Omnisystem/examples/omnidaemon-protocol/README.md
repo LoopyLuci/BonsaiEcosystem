@@ -238,18 +238,18 @@ This is the first data transfer protocol where you can travel back in time to se
 cd examples/omnidaemon-protocol
 
 # Build Titan components
-omni build titan/omnidaemon/dmi_ring.ti
-omni build titan/omnidaemon/crypto.ti
+build build titan/omnidaemon/dmi_ring.ti
+build build titan/omnidaemon/crypto.ti
 
 # Check Aether actors
-omni check aether/omnidaemon/adaptive_engine.ae
-omni check aether/omnidaemon/transport_lanes.ae
+build check aether/omnidaemon/adaptive_engine.ae
+build check aether/omnidaemon/transport_lanes.ae
 
 # Verify security proofs
-omni prove axiom/omnidaemon/protocol_proofs.ax
+build prove axiom/omnidaemon/protocol_proofs.ax
 
 # Launch interactive dashboard
-omni run sylva/omnidaemon/transfer_dashboard.sy
+build run sylva/omnidaemon/transfer_dashboard.sy
 ```
 
 ### Expected Output

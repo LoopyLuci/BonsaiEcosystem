@@ -234,9 +234,9 @@ bti android metrics <device_id>
 - `ed25519-dalek` (signatures)
 - `x25519-dalek` (key agreement)
 - `aes-gcm` (encryption)
-- `bonsai-transfer-crypto` (integration)
+- `p2p-crypto` (integration)
 - `bonsai-cas` (blob storage)
-- `bonsai-universe` (time-travel debugging)
+- `audit-log` (time-travel debugging)
 
 ## Architecture Highlights
 
@@ -291,7 +291,7 @@ cargo build --release
 5. Test with `npm run tauri dev`
 
 ### For MCP Integration
-1. Copy MCP tool definitions to `crates/bonsai-mcp-server/src/android_tools.rs`
+1. Copy MCP tool definitions to `crates/mcp-server/src/android_tools.rs`
 2. Update `tools.rs` to include Android tools
 3. Implement tool dispatch handler
 4. Test with Claude API or agent

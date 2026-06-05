@@ -21,7 +21,7 @@ This document covers the complete integration of the Bonsai Universal Linter (BU
 
 ### 1.1 Registered Tools
 
-Four linting tools are now registered in the MCP server (`crates/bonsai-mcp-server/src/tools.rs`):
+Four linting tools are now registered in the MCP server (`crates/mcp-server/src/tools.rs`):
 
 #### 1. `bonsai_lint_file`
 Lint a single file.
@@ -98,7 +98,7 @@ Get an AI-generated explanation for a diagnostic.
 
 ### 1.2 Handler Implementation
 
-Command handlers are in `crates/bonsai-mcp-server/src/lint_commands.rs`:
+Command handlers are in `crates/mcp-server/src/lint_commands.rs`:
 
 ```rust
 pub async fn handle_lint_file(request: LintFileRequest) -> Result<LintResult> {
@@ -465,7 +465,7 @@ fix:
 
 ```bash
 # Test MCP handlers
-cargo test -p bonsai-mcp-server lint_commands
+cargo test -p mcp-server lint_commands
 
 # Test lint commands
 cargo test -p bonsai-lint lint_commands

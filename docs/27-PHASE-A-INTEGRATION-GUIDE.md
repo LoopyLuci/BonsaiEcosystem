@@ -22,19 +22,19 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │                    MCP SERVER LAYER (Backend)                     │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │ bonsai-mcp-server/src/tools.rs (Tool Registry)            │  │
+│  │ mcp-server/src/tools.rs (Tool Registry)            │  │
 │  │  - bonsai_report_false_positive                           │  │
 │  │  - bonsai_dismiss_diagnostic                              │  │
 │  │  - bonsai_apply_fix                                        │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │ bonsai-mcp-server/src/lint_commands.rs (Handlers)         │  │
+│  │ mcp-server/src/lint_commands.rs (Handlers)         │  │
 │  │  - handle_report_false_positive()                         │  │
 │  │  - handle_dismiss_diagnostic()                            │  │
 │  │  - handle_apply_fix()                                      │  │
 │  └────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │ bonsai-mcp-server/src/lint_integration.rs (Processors)    │  │
+│  │ mcp-server/src/lint_integration.rs (Processors)    │  │
 │  │  - process_report_false_positive()                        │  │
 │  │  - process_dismiss_diagnostic()                           │  │
 │  │  - process_apply_fix()                                     │  │
@@ -115,9 +115,9 @@
 ### 2. MCP Server ↔ ETL
 
 **Files:**
-- `crates/bonsai-mcp-server/src/tools.rs` - Tool registry with 3 new tools
-- `crates/bonsai-mcp-server/src/lint_commands.rs` - Request types & handlers
-- `crates/bonsai-mcp-server/src/lint_integration.rs` - Process methods
+- `crates/mcp-server/src/tools.rs` - Tool registry with 3 new tools
+- `crates/mcp-server/src/lint_commands.rs` - Request types & handlers
+- `crates/mcp-server/src/lint_integration.rs` - Process methods
 
 **New Tools:**
 ```rust
@@ -346,10 +346,10 @@ sqlx = ["dep:sqlx"]  # Enable SQLx backend
 ### Step 2: Update MCP Server
 
 **Files:**
-- `crates/bonsai-mcp-server/src/tools.rs` ✅ Complete
-- `crates/bonsai-mcp-server/src/lint_commands.rs` ✅ Complete
-- `crates/bonsai-mcp-server/src/lint_integration.rs` ✅ Complete
-- `crates/bonsai-mcp-server/src/bridge.rs` ✅ Complete
+- `crates/mcp-server/src/tools.rs` ✅ Complete
+- `crates/mcp-server/src/lint_commands.rs` ✅ Complete
+- `crates/mcp-server/src/lint_integration.rs` ✅ Complete
+- `crates/mcp-server/src/bridge.rs` ✅ Complete
 
 ### Step 3: Extend Rule Registry
 
@@ -589,9 +589,9 @@ cargo run --bin etl-daemon
 
 ### Modified (5 files)
 - `bonsai-workspace/src/lib/components/LintPanel.svelte` - IDE feedback
-- `crates/bonsai-mcp-server/src/tools.rs` - Tool registry
-- `crates/bonsai-mcp-server/src/lint_commands.rs` - Feedback handlers
-- `crates/bonsai-mcp-server/src/lint_integration.rs` - Processors
+- `crates/mcp-server/src/tools.rs` - Tool registry
+- `crates/mcp-server/src/lint_commands.rs` - Feedback handlers
+- `crates/mcp-server/src/lint_integration.rs` - Processors
 - `crates/bonsai-lint/src/rules/mod.rs` - Rule registry with metadata
 - `bonsai-workspace/src-tauri/src/system_event_bus.rs` - Universe events
 

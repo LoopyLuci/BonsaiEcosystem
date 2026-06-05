@@ -1,4 +1,4 @@
-// services/omni-crypto/crypto.ti — Cryptographic key management and cipher primitives
+// services/build-crypto/crypto.ti — Cryptographic key management and cipher primitives
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

@@ -148,7 +148,7 @@ Add these handlers to the invoke_handler registration:
 
 ## MCP Tool Integration
 
-### 1. Update `crates/bonsai-mcp-server/src/tools.rs`
+### 1. Update `crates/mcp-server/src/tools.rs`
 
 Add the 5 remote desktop tools:
 

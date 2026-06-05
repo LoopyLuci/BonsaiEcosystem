@@ -38,7 +38,7 @@ All source files use `.ti` and are compiled by `titan-compiler.exe`.
 
 ```
 Omnisystem/
-├── kernel/                 UOSC microkernel — pure Titan, no external deps
+├── kernel/                 USOS microkernel — pure Titan, no external deps
 │   ├── capability.ti       Capability system (8 Axiom-proved invariants)
 │   ├── memory.ti           Physical allocator + virtual memory
 │   └── scheduler.ti        EDF real-time + CFS scheduler with preemption
@@ -121,7 +121,7 @@ make test
 
 | Category | Count | Status |
 |----------|-------|--------|
-| UOSC Kernel | 3 | ✅ |
+| USOS Kernel | 3 | ✅ |
 | Platform Services | 10 | ✅ |
 | Axiom Proofs (kernel + services) | 2 | ✅ (17 theorems) |
 | Aether (actors, CRDTs, mesh) | 4 | ✅ |
@@ -163,6 +163,6 @@ chaos jobs across agents. Fidelity checks verify determinism across repeated run
 
 `titan-bootstrap/output/titan-compiler.exe` is the sole seed binary. It is a
 Windows x86-64 native executable. Once the Titan compiler achieves full self-hosting
-on UOSC (bare metal), this binary will be replaced by one produced by the
+on USOS (bare metal), this binary will be replaced by one produced by the
 self-hosted compiler — closing the bootstrap chain permanently.
 See `titan/compiler/self_host_verify.ti` for the formal proof that this is safe.

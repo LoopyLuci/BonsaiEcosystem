@@ -35,8 +35,8 @@ BonsaiWorkspace/
 │   ├── bonsai-mailbox/        # Signed message delivery
 │   ├── bonsai-p2p/            # WebRTC, libp2p lanes
 │   ├── bonsai-package/        # .bkp package format
-│   ├── bonsai-transfer-core/  # ECF-RG multi-path engine
-│   ├── bonsai-transfer-crypto/# Ed25519, X25519, AES-GCM
+│   ├── p2p-core/  # ECF-RG multi-path engine
+│   ├── p2p-crypto/# Ed25519, X25519, AES-GCM
 │   ├── bonsai-transfer-store/ # Encrypted at-rest store
 │   └── ...
 ├── src-daemon/                # Headless daemon

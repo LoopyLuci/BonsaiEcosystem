@@ -13,7 +13,7 @@
 ### **1. ✅ Android WebSocket Integration (OkHttp3)**
 Real-time updates from backend to mobile apps using Kotlin Flow
 
-**File:** `bonsai-buddy-android/app/src/main/java/ai/bonsai/buddy/network/WebSocketManager.kt`
+**File:** `android-runtime/app/src/main/java/ai/bonsai/buddy/network/WebSocketManager.kt`
 
 **Features:**
 - Persistent WebSocket connection management

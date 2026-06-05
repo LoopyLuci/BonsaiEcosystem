@@ -9,7 +9,7 @@ pub fn main() -> i64 {
     if config_ok >= 80 { score += 14; }
 
     // Stage 2 — Load history
-    let history_ok: i64 = load_repl_history("~/.omni/repl_history");
+    let history_ok: i64 = load_repl_history("~/.build/repl_history");
     if history_ok >= 80 { score += 14; }
 
     // Stage 3 — Enable autocomplete

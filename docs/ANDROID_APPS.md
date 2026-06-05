@@ -11,7 +11,7 @@ through a secure, zero-configuration connection. Nothing requires a manual.
 
 1. [App Overview](#1-app-overview)
 2. [Bonsai Workspace Android App](#2-bonsai-workspace-android-app)
-3. [Bonsai Buddy Android App](#3-bonsai-buddy-android-app)
+3. [Bonsai Buddy Android App](#3-android-runtime-app)
 4. [Inter-App Integration](#4-inter-app-integration)
 5. [Bonsai-Bot Mobile Automation](#5-bonsai-bot-mobile-automation)
 6. [Distributed Computing Platform (Layers 0–3)](#6-distributed-computing-platform)

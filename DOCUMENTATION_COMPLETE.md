@@ -1,4 +1,4 @@
-# Complete Documentation Suite – Bonsai Ecosystem & UOSC
+# Complete Documentation Suite – Bonsai Ecosystem & USOS
 
 **Status**: 🟢 Production Ready | **Date**: 2026-06-04 | **Version**: 3.0
 
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-**Comprehensive, production-grade documentation** has been created that provides **100% understanding** of every feature and every line of code in the Bonsai Ecosystem and UOSC. All advanced documentation is linked from the main README with no private model names or internal naming conventions.
+**Comprehensive, production-grade documentation** has been created that provides **100% understanding** of every feature and every line of code in the Bonsai Ecosystem and USOS. All advanced documentation is linked from the main README with no private model names or internal naming conventions.
 
 ---
 
@@ -58,7 +58,7 @@ Each document below has **complete specification, outline, and key sections defi
 - Testing: `cargo test --workspace`, fuzzing, CI/CD
 
 **[DEPLOYMENT.md](DEPLOYMENT.md)** – Deployment Guide
-- UOSC as co-OS (NixOS module example)
+- USOS as co-OS (NixOS module example)
 - Running BCF (daemon, image registry, overlayfs)
 - Running Echo P2P fabric (bootstrap nodes, DHT)
 - Running TransferDaemon (systemd service, config)
@@ -192,7 +192,7 @@ Each document below has **complete specification, outline, and key sections defi
 
 **[GLOSSARY.md](GLOSSARY.md)** – All Terminology Defined
 - All technical terms
-- Acronyms (BPLIS, LAIR, BUCE, UOSC, BCF, etc.)
+- Acronyms (BPLIS, LAIR, BUCE, USOS, BCF, etc.)
 - Cross-references
 
 **[CHANGELOG.md](CHANGELOG.md)** – Version History
@@ -425,7 +425,7 @@ git add docs/ && git commit -m "docs: update"
 
 ---
 
-**This documentation suite provides complete, authoritative, transparent understanding of every feature and every line of code in the Bonsai Ecosystem and UOSC.**
+**This documentation suite provides complete, authoritative, transparent understanding of every feature and every line of code in the Bonsai Ecosystem and USOS.**
 
 **No private models. No internal naming. 100% sovereignty. 🚀**
 

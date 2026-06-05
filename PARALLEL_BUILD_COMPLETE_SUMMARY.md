@@ -296,7 +296,7 @@ Z:\Projects\BonsaiWorkspace\
 │   └── bonsai-app-menu/
 │       └── src/discovery.rs     (unchanged)
 │
-├── bonsai-buddy-android/
+├── android-runtime/
 │   └── app/src/main/java/ai/bonsai/buddy/
 │       ├── workshop/
 │       │   └── ModelWorkshopActivity.kt    ✅ NEW (300+ lines)
@@ -351,11 +351,11 @@ cargo run --release -p bonsai-model-workshop
 ### Android Build (10 minutes)
 ```bash
 # Option 1: Android Studio
-File → Open → bonsai-buddy-android/
+File → Open → android-runtime/
 Run → Run 'app'
 
 # Option 2: Command line
-cd bonsai-buddy-android
+cd android-runtime
 ./gradlew assembleDebug
 ./gradlew installDebug
 ```

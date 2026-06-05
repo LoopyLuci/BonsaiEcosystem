@@ -80,11 +80,11 @@ to CAS, and hot-reloadable. If the initiator drops, the room migrates to the nex
 
 ## 3. TransferDaemon as Universal Protocol
 
-TransferDaemon (`bonsai-transfer-core` + `bonsai-transfer-crypto` + `bonsai-mailbox` + `bonsai-transfer-store`) is extended with two additions for collaboration:
+TransferDaemon (`p2p-core` + `p2p-crypto` + `bonsai-mailbox` + `bonsai-transfer-store`) is extended with two additions for collaboration:
 
 ### 3.1 StreamType Enum
 
-Added to `bonsai-transfer-core/src/lane.rs` as a logical multiplexer layer above the physical `LaneKind`. A single QUIC connection carries multiple `StreamType` channels simultaneously.
+Added to `p2p-core/src/lane.rs` as a logical multiplexer layer above the physical `LaneKind`. A single QUIC connection carries multiple `StreamType` channels simultaneously.
 
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -243,7 +243,7 @@ collab_broadcast_cursor(session_id, file, line, column)
 
 ### 6.1 WebRTC Media via TransferDaemon Signaling
 
-The existing `LaneKind::WebRtc` in `bonsai-transfer-core` handles data. For media, we use
+The existing `LaneKind::WebRtc` in `p2p-core` handles data. For media, we use
 WebRTC's built-in RTP transport (audio/video) but route the **SDP signaling** through
 `AgentMailbox` (topic: `collab.media.signal`), eliminating the need for a separate
 signaling server.
@@ -706,8 +706,8 @@ crates/bonsai-collab/
 Dependencies:
 ```toml
 [dependencies]
-bonsai-transfer-core   = { path = "../bonsai-transfer-core" }
-bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
+p2p-core   = { path = "../p2p-core" }
+p2p-crypto = { path = "../p2p-crypto" }
 bonsai-mailbox         = { path = "../bonsai-mailbox" }
 bonsai-crdt            = { path = "../bonsai-crdt" }
 bonsai-cas             = { path = "../bonsai-cas" }

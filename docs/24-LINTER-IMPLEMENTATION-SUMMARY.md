@@ -95,10 +95,10 @@ A **production-grade, real-time, polyglot linting platform** for the Bonsai Ecos
   - `Cargo.toml`, `src/lib.rs`, `src/language.rs`
 
 **MCP Server Extensions**
-- `crates/bonsai-mcp-server/src/lint_commands.rs` – MCP handlers (260 LOC)
-- `crates/bonsai-mcp-server/src/lint_integration.rs` – Integration layer (210 LOC)
-- Updated `crates/bonsai-mcp-server/src/tools.rs` – Tool registration
-- Updated `crates/bonsai-mcp-server/src/lib.rs` – Module exports
+- `crates/mcp-server/src/lint_commands.rs` – MCP handlers (260 LOC)
+- `crates/mcp-server/src/lint_integration.rs` – Integration layer (210 LOC)
+- Updated `crates/mcp-server/src/tools.rs` – Tool registration
+- Updated `crates/mcp-server/src/lib.rs` – Module exports
 
 ### Frontend Components (Svelte)
 

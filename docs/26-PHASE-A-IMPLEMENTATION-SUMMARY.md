@@ -295,7 +295,7 @@ Core dependencies:
 ```
 LintPanel.svelte
    ↓ (WebSocket)
-bonsai-mcp-server
+mcp-server
    ↓ (call_tool)
 lint_commands.rs (handle_lint_file, handle_lint_repo)
    ↓ (emit feedback)

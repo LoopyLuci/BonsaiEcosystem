@@ -209,11 +209,11 @@ else:
 
 ```
 1. Bootloader (CPU only):
-   - Load UOSC kernel from NVMe
+   - Load USOS kernel from NVMe
    - Detect RAM/VRAM sizes
    - Initialize UMM
 
-2. UOSC Kernel (CPU):
+2. USOS Kernel (CPU):
    - Create tmpfs in unified memory
    - Decompress system image (squashfs → tmpfs)
    - Mount root filesystem

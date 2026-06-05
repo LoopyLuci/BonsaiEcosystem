@@ -17,7 +17,7 @@ pub fn main() -> i64 {
     if output_ok >= 80 { score += 14; }
 
     // Stage 4 — Configure theme
-    let theme_ok: i64 = set_docs_theme("omni-dark");
+    let theme_ok: i64 = set_docs_theme("build-dark");
     if theme_ok >= 80 { score += 14; }
 
     // Stage 5 — Enable search

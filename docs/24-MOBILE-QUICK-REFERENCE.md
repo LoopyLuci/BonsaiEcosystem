@@ -386,7 +386,7 @@ crates/bonsai-mobile-ffi/
 ├─ src/llm_jni.rs                (620 LOC JNI layer)
 └─ Cargo.toml                     (uuid, lazy_static)
 
-bonsai-buddy-android/
+android-runtime/
 ├─ library-bonsai-shared/
 │  ├─ src/main/java/.../BonsaiService.kt    (420 LOC)
 │  ├─ src/main/aidl/.../IBonsaiService.aidl (updated)

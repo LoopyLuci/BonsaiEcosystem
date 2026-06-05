@@ -39,7 +39,7 @@
 |------|----------|--------|
 | `self_host_verify.ti` | Bootstrap determinism, stage-1/stage-2 agreement, fixed-point, hash collision resistance, bootstrap elimination | ✅ 111 |
 
-### UOSC Kernel (`kernel/`)
+### USOS Kernel (`kernel/`)
 
 | File | Description | LOC | Status |
 |------|-------------|-----|--------|
@@ -52,16 +52,16 @@
 
 | Service | Source | Description | LOC | Status |
 |---------|--------|-------------|-----|--------|
-| omni-p2p | `p2p.ti` | Peer-to-peer networking, message routing, TTL | 112 | ✅ Passing |
-| omni-compress | `compress.ti` | RLE compression, deterministic round-trip | 171 | ✅ Passing |
-| omni-container | `container.ti` | Process sandboxing, state machine lifecycle | 138 | ✅ Passing |
-| omni-observability | `observability.ti` | Distributed tracing, spans, metrics | 127 | ✅ Passing |
-| omni-storage | `storage.ti` | Content-addressed storage with djb2 hashing | 170 | ✅ Passing |
-| omni-cache | `cache.ti` | TTL-based cache with tick-driven expiry | 120 | ✅ Passing |
-| omni-queue | `queue.ti` | Priority message queue, FIFO with preemption | 104 | ✅ Passing |
-| omni-rpc | `rpc.ti` | RPC server with method dispatch table | 137 | ✅ Passing |
-| omni-auth | `auth.ti` | Principal + permission model, auth levels | 116 | ✅ Passing |
-| omni-crypto | `crypto.ti` | Key store, XOR stream cipher, encrypt/decrypt | 188 | ✅ Passing |
+| build-p2p | `p2p.ti` | Peer-to-peer networking, message routing, TTL | 112 | ✅ Passing |
+| build-compress | `compress.ti` | RLE compression, deterministic round-trip | 171 | ✅ Passing |
+| build-container | `container.ti` | Process sandboxing, state machine lifecycle | 138 | ✅ Passing |
+| build-observability | `observability.ti` | Distributed tracing, spans, metrics | 127 | ✅ Passing |
+| build-storage | `storage.ti` | Content-addressed storage with djb2 hashing | 170 | ✅ Passing |
+| build-cache | `cache.ti` | TTL-based cache with tick-driven expiry | 120 | ✅ Passing |
+| build-queue | `queue.ti` | Priority message queue, FIFO with preemption | 104 | ✅ Passing |
+| build-rpc | `rpc.ti` | RPC server with method dispatch table | 137 | ✅ Passing |
+| build-auth | `auth.ti` | Principal + permission model, auth levels | 116 | ✅ Passing |
+| build-crypto | `crypto.ti` | Key store, XOR stream cipher, encrypt/decrypt | 188 | ✅ Passing |
 
 **Total kernel + services: 2,009 LOC — 100% Titan — 0 Rust**
 
@@ -162,7 +162,7 @@ titan-bootstrap/output/titan-compiler.exe
 | Domain | Rule | Examples |
 |--------|------|---------|
 | Project | `Omnisystem` | Repo, docs, brand |
-| Kernel | `UOSC` or `kernel` | `kernel/capability.ti` |
+| Kernel | `USOS` or `kernel` | `kernel/capability.ti` |
 | Languages | `Titan`, `Sylva`, `Aether`, `Axiom` | Compiler, runtime, stdlib dirs |
 | Services | Single functional word | `p2p`, `compress`, `storage`, `auth` |
 | Libraries | Functional name, no prefix | `crdt`, `ir`, `effect`, `mesh` |

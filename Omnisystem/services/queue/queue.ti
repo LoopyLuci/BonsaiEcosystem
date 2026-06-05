@@ -1,4 +1,4 @@
-// services/omni-queue/queue.ti — Priority message queue
+// services/build-queue/queue.ti — Priority message queue
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

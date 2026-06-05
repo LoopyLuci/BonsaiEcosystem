@@ -42,17 +42,17 @@ cargo clippy --target aarch64-linux-android --all-targets
 
 ```bash
 # Create JNI directory structure
-mkdir -p z:\Projects\BonsaiWorkspace\bonsai-buddy-android\library-bonsai-shared\src\main\jniLibs\arm64-v8a
-mkdir -p z:\Projects\BonsaiWorkspace\bonsai-buddy-android\library-bonsai-shared\src\main\jniLibs\x86_64
+mkdir -p z:\Projects\BonsaiWorkspace\android-runtime\library-bonsai-shared\src\main\jniLibs\arm64-v8a
+mkdir -p z:\Projects\BonsaiWorkspace\android-runtime\library-bonsai-shared\src\main\jniLibs\x86_64
 
 # Copy ARM64 library (for actual devices)
 cp z:\Projects\BonsaiWorkspace\crates\bonsai-mobile-ffi\target\aarch64-linux-android\release\libbonsai_mobile_ffi.so \
-   z:\Projects\BonsaiWorkspace\bonsai-buddy-android\library-bonsai-shared\src\main\jniLibs\arm64-v8a\libbonsai_android_llm.so
+   z:\Projects\BonsaiWorkspace\android-runtime\library-bonsai-shared\src\main\jniLibs\arm64-v8a\libbonsai_android_llm.so
 
 # For x86_64 (emulator)
 cargo build --target x86_64-linux-android --release
 cp z:\Projects\BonsaiWorkspace\crates\bonsai-mobile-ffi\target\x86_64-linux-android\release\libbonsai_mobile_ffi.so \
-   z:\Projects\BonsaiWorkspace\bonsai-buddy-android\library-bonsai-shared\src\main\jniLibs\x86_64\libbonsai_android_llm.so
+   z:\Projects\BonsaiWorkspace\android-runtime\library-bonsai-shared\src\main\jniLibs\x86_64\libbonsai_android_llm.so
 ```
 
 **Success Criteria:**
@@ -63,7 +63,7 @@ cp z:\Projects\BonsaiWorkspace\crates\bonsai-mobile-ffi\target\x86_64-linux-andr
 ### Step 3: Gradle Build
 
 ```bash
-cd z:\Projects\BonsaiWorkspace\bonsai-buddy-android
+cd z:\Projects\BonsaiWorkspace\android-runtime
 
 # Clean rebuild
 ./gradlew clean build
@@ -259,8 +259,8 @@ Memory (Session): < 10MB
 git add crates/bonsai-mobile-ffi/src/llm_jni.rs
 git add crates/bonsai-mobile-ffi/src/lib.rs
 git add crates/bonsai-mobile-ffi/Cargo.toml
-git add bonsai-buddy-android/library-bonsai-shared/src/main/java/ai/bonsai/shared/service/BonsaiService.kt
-git add bonsai-buddy-android/library-bonsai-shared/src/main/aidl/ai/bonsai/shared/IBonsaiService.aidl
+git add android-runtime/library-bonsai-shared/src/main/java/ai/bonsai/shared/service/BonsaiService.kt
+git add android-runtime/library-bonsai-shared/src/main/aidl/ai/bonsai/shared/IBonsaiService.aidl
 git add docs/21-MOBILE-ECOSYSTEM-PHASE-2-3.md
 git add docs/22-MOBILE-INTEGRATION-CHECKLIST.md
 
@@ -321,7 +321,7 @@ fn generate_token_stream(prompt: &str, ...) -> Vec<String> {
 ## Support Contacts
 
 - **Architecture**: See CLAUDE.md
-- **Android Issues**: Check bonsai-buddy-android README
+- **Android Issues**: Check android-runtime README
 - **JNI Binding Issues**: See crates/bonsai-mobile-ffi docs
 - **Performance**: Profile with Android Studio Profiler
 

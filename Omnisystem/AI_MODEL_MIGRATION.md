@@ -46,7 +46,7 @@ Omnisystem:
 **Access Pattern:**
 ```titan
 // In Omnisystem (pure Titan)
-extern "omni-ai" {
+extern "build-ai" {
     fn octopus_infer(prompt: i64, max_tokens: i64) -> i64;
 }
 
@@ -62,9 +62,9 @@ pub fn use_omni_ai_octopus() -> i64 {
 
 **What Changed:**
 - **Naming**: "Poe AI" → "Omni-AI Poe"
-- **Location**: `poe-ai/` (root) → `Omnisystem/omni-ai/poe/`
+- **Location**: `poe-ai/` (root) → `Omnisystem/build-ai/poe/`
 - **Integration**: Full Omnisystem integration (proof tactics, UVM validation)
-- **Personality**: AC_POE_PERSONALITY.md moved to `Omnisystem/omni-ai/poe/`
+- **Personality**: AC_POE_PERSONALITY.md moved to `Omnisystem/build-ai/poe/`
 
 **What Stayed the Same:**
 - ✅ Core personality definition and communication style
@@ -84,7 +84,7 @@ Omnisystem:
 **Access Pattern:**
 ```titan
 // In Omnisystem (pure Titan)
-extern "omni-ai" {
+extern "build-ai" {
     fn poe_analyze(goal_hash: i64, context: i64) -> i64;
     fn poe_suggest_tactic(proof_state: i64) -> i64;
 }
@@ -101,7 +101,7 @@ pub fn use_omni_ai_poe() -> i64 {
 
 **What Changed:**
 - **Naming**: "BonsAI Model System" → "Omni-AI Registry/Scanner/Converter"
-- **Location**: `crates/bonsai-model-*` → `Omnisystem/omni-ai/*`
+- **Location**: `crates/bonsai-model-*` → `Omnisystem/build-ai/*`
 - **Integration**: Now part of Omnisystem build and runtime
 
 **Components:**
@@ -130,8 +130,8 @@ Omnisystem:
 from omnisystem.omni_ai.registry import OmniAIRegistry
 
 registry = OmniAIRegistry()
-models = registry.list_models()          # ["omni-ai-octopus-v1", ...]
-octopus = registry.get_model("omni-ai-octopus-v1")
+models = registry.list_models()          # ["build-ai-octopus-v1", ...]
+octopus = registry.get_model("build-ai-octopus-v1")
 ```
 
 ---
@@ -171,7 +171,7 @@ Omnisystem:
     │   └── omnisystem-poe-config.json
     └── MODEL_MANIFEST.json
 
-  omni-ai/                   (NEW DIRECTORY)
+  build-ai/                   (NEW DIRECTORY)
     ├── octopus/            (Inference handler)
     ├── poe/                (Full Omnisystem integration)
     │   ├── AC_POE_PERSONALITY.md
@@ -195,11 +195,11 @@ Omnisystem:
 | Context | Bonsai Name | Omnisystem Name |
 |---------|-------------|-----------------|
 | Code | `bonsai_model_registry` | `omni_ai_registry` |
-| Files | `bonsai-model-registry/` | `omni-ai/registry/` |
+| Files | `bonsai-model-registry/` | `build-ai/registry/` |
 | Types | `BonsaiModel` | `OmniAIModel` |
 | Constants | `BONSAI_MODEL_*` | `OMNI_AI_*` |
-| FFI | `extern "bonsai"` | `extern "omni-ai"` |
-| Crates | `crates/bonsai-*` | `omnisystem/omni-ai/*` |
+| FFI | `extern "bonsai"` | `extern "build-ai"` |
+| Crates | `crates/bonsai-*` | `omnisystem/build-ai/*` |
 
 **Outside Omnisystem** (e.g., in other projects), original names are preserved.
 
@@ -219,12 +219,12 @@ let model = registry.load_model("octopus-ai-v1")?;
 
 **New (Omnisystem):**
 ```titan
-extern "omni-ai" {
+extern "build-ai" {
     fn registry_load_model(model_id: i64) -> i64;
 }
 
 pub fn load_omni_ai_model() -> i64 {
-    return registry_load_model(hash("omni-ai-octopus-v1"));
+    return registry_load_model(hash("build-ai-octopus-v1"));
 }
 ```
 
@@ -266,7 +266,7 @@ tactic omni_ai_auto :=
 ### 2. Update FFI Declarations (Titan code)
 ```diff
 - extern "bonsai" { fn ... }
-+ extern "omni-ai" { fn ... }
++ extern "build-ai" { fn ... }
 ```
 
 ### 3. Update Config References
@@ -278,7 +278,7 @@ tactic omni_ai_auto :=
 ### 4. Update Documentation Links
 All references to models should link to:
 - `Omnisystem/models/README.md`
-- `Omnisystem/omni-ai/poe/AC_POE_PERSONALITY.md`
+- `Omnisystem/build-ai/poe/AC_POE_PERSONALITY.md`
 - `Omnisystem/AI_MODEL_MIGRATION.md` (this file)
 
 ---
@@ -292,11 +292,11 @@ All references to models should link to:
 
 ### In Omnisystem (Renamed)
 - All references use **Omni-AI** naming
-- New FFI interfaces with `omni-ai` prefix
+- New FFI interfaces with `build-ai` prefix
 - New configuration files with `omnisystem-` prefix
 
 ### Bridging Layer
-- `Omnisystem/omni-ai/compatibility/` (future) - Maps old names to new names for existing code
+- `Omnisystem/build-ai/compatibility/` (future) - Maps old names to new names for existing code
 
 ---
 
@@ -306,10 +306,10 @@ All references to models should link to:
 |-----------|--------|---------|
 | **Omni-AI Octopus Reference** | ✅ Complete | Omnisystem/models/octopus-ai/README.md |
 | **Omni-AI Octopus Integration** | ✅ Complete | Effect handler ready for development |
-| **Omni-AI Poe Migration** | ✅ Complete | All files moved to Omnisystem/omni-ai/poe/ |
-| **Omni-AI Registry** | ✅ Complete | Omnisystem/omni-ai/registry/ ready |
-| **Omni-AI Scanner** | ✅ Complete | Omnisystem/omni-ai/scanner/ ready |
-| **Omni-AI Converter** | ✅ Complete | Omnisystem/omni-ai/converter/ ready |
+| **Omni-AI Poe Migration** | ✅ Complete | All files moved to Omnisystem/build-ai/poe/ |
+| **Omni-AI Registry** | ✅ Complete | Omnisystem/build-ai/registry/ ready |
+| **Omni-AI Scanner** | ✅ Complete | Omnisystem/build-ai/scanner/ ready |
+| **Omni-AI Converter** | ✅ Complete | Omnisystem/build-ai/converter/ ready |
 | **Documentation** | ✅ Complete | All docs updated with Omni-AI naming |
 
 ---
@@ -335,18 +335,18 @@ ls -la Omnisystem/models/
 # Omnisystem build test
 cd Omnisystem
 make test
-# Should show omni-ai registry tests passing
+# Should show build-ai registry tests passing
 ```
 
 ### Verify Naming
 
 ```bash
 # Grep for old naming (should be minimal/none in Omnisystem)
-grep -r "bonsai_model" Omnisystem/omni-ai/
+grep -r "bonsai_model" Omnisystem/build-ai/
 # Expected: (empty)
 
 # Grep for new naming
-grep -r "omni_ai" Omnisystem/omni-ai/
+grep -r "omni_ai" Omnisystem/build-ai/
 # Expected: Many matches
 ```
 
@@ -393,15 +393,15 @@ A: See the "API Changes" section above. Update imports and FFI declarations.
 A: Yes. Octopus AI (312 MB) and Poe AI components are identical. Only the naming and organization changed.
 
 **Q: Can I contribute new Omni-AI models?**  
-A: Yes. Follow the pattern in `Omnisystem/omni-ai/registry/` and add your model metadata.
+A: Yes. Follow the pattern in `Omnisystem/build-ai/registry/` and add your model metadata.
 
 ---
 
 ## References
 
 - `Omnisystem/models/README.md` – Comprehensive model documentation
-- `Omnisystem/omni-ai/poe/AC_POE_PERSONALITY.md` – Poe AI personality definition
-- `Omnisystem/omni-ai/registry/` – Model registry implementation
+- `Omnisystem/build-ai/poe/AC_POE_PERSONALITY.md` – Poe AI personality definition
+- `Omnisystem/build-ai/registry/` – Model registry implementation
 - `models/trained-models/README.md` (original Bonsai) – Original documentation
 
 ---

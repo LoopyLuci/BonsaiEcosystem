@@ -14,7 +14,7 @@ pub struct BonsaiIntegration;
 impl BonsaiIntegration {
     /// Emit a lint result to the Universe event bus.
     pub async fn emit_to_universe(diagnostics: &[Diagnostic]) -> Result<()> {
-        // TODO: Integrate with bonsai-universe crate
+        // TODO: Integrate with audit-log crate
         tracing::info!("Emitting {} diagnostics to Universe", diagnostics.len());
         Ok(())
     }

@@ -190,7 +190,7 @@ All dependencies are production-ready:
 ```
 LintPanel.svelte (Svelte)
    ↓ WebSocket event: "diagnostic.accepted" | "diagnostic.rejected" | "diagnostic.dismissed"
-bonsai-mcp-server (Tauri)
+mcp-server (Tauri)
    ↓ MCP tool call: "emit_feedback_event"
 lint_commands.rs (Rust)
    ↓ Call FeedbackCollector

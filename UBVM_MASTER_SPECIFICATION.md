@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The **Universal Bonsai Validation Mesh (UBVM)** is the ultimate validation framework for the Bonsai Ecosystem and UOSC. It is a single, deterministic, AI-optional system that:
+The **Universal Bonsai Validation Mesh (UBVM)** is the ultimate validation framework for the Bonsai Ecosystem and USOS. It is a single, deterministic, AI-optional system that:
 
 1. **Proves correctness** of every Bonsai subsystem through polyglot testing
 2. **Scales infinitely** from developer laptops to planet-scale mesh without architectural changes
@@ -42,7 +42,7 @@ The orchestration, execution, and analysis cores are purely deterministic. AI is
 
 - **Feature Gates**: `--features ai-enhancements` activates all optional AI
 - **Arbiter Safety Wrapper**: All AI suggestions pass through the Trusted Arbiter
-- **Fallback Correctness**: System works perfectly without AI (tested via `bonsai-ai-fallback`)
+- **Fallback Correctness**: System works perfectly without AI (tested via `ai-advisor`)
 - **Audit Trail**: Every AI decision is logged to Universe with full provenance
 
 ### 1.3 Content-Addressed Everything
@@ -85,7 +85,7 @@ Every Bonsai component is validated by a dedicated test suite:
 | Containers | BCF Images | 🟡 Ready for implementation |
 | Security | Sanctum + Crypto | 🟡 Ready for implementation |
 | Storage | AriaDB + CAS | 🟡 Ready for implementation |
-| Kernel | UOSC + BIR | 🟡 Ready for implementation |
+| Kernel | USOS + BIR | 🟡 Ready for implementation |
 | Resilience | Chaos + Recovery | 🟡 Ready for implementation |
 | Omnisystem | Sylva, Titan, Aether, Axiom | 🟡 Ready for implementation |
 
@@ -113,7 +113,7 @@ The orchestrator, comparer, and sandbox harness carry Axiom proofs of correctnes
 
 ### 2.1 Overview
 
-**UTOF** is the Rust crate `crates/bonsai-utof` (also called `ubvm-orchestrator`). It is the heart of the validation system.
+**UTOF** is the Rust crate `crates/test-orchestrator` (also called `ubvm-orchestrator`). It is the heart of the validation system.
 
 **Current State:** ✅ **PRODUCTION READY**
 - Fully implemented, compiled, and tested
@@ -336,7 +336,7 @@ Each suite validates one critical Bonsai component. Each suite includes:
 
 **What:** BonsAI V2 inference determinism, tool-calling, fallback correctness  
 **Status:** 🟡 **READY FOR IMPLEMENTATION**  
-**Dependencies:** `bonsai-ai-fallback`, BonsAI V2
+**Dependencies:** `ai-advisor`, BonsAI V2
 
 **Test Cases:**
 - Inference determinism (same seed = same logits)
@@ -376,9 +376,9 @@ Each suite validates one critical Bonsai component. Each suite includes:
 
 ### 4.7 Kernel Suite
 
-**What:** UOSC scheduler real-time guarantees, memory migration, BIR cross-compilation  
+**What:** USOS scheduler real-time guarantees, memory migration, BIR cross-compilation  
 **Status:** 🟡 **READY FOR IMPLEMENTATION**  
-**Dependencies:** UOSC crate, BIR crate
+**Dependencies:** USOS crate, BIR crate
 
 **Test Cases:**
 - RT scheduling (deadline-driven tasks complete by deadline)
@@ -602,7 +602,7 @@ Upon test failure, an optional AI agent examines the diff and logs probable caus
 **Status:** ✅ **DONE**  
 **Timeline:** Completed 2026-06-04  
 **Deliverables:**
-- UTOF orchestrator (Rust crate `bonsai-utof`)
+- UTOF orchestrator (Rust crate `test-orchestrator`)
 - Language equivalence suite (proven at 750×750)
 - CLI and example test specs
 - Documentation
@@ -623,7 +623,7 @@ Upon test failure, an optional AI agent examines the diff and logs probable caus
 - AI-Optional suite (BonsAI V2)
 - Security suite (Sanctum + crypto)
 - Storage suite (AriaDB + CAS)
-- Kernel suite (UOSC + BIR)
+- Kernel suite (USOS + BIR)
 - Resilience suite (Survival System)
 
 ### Phase 4: Formal Verification (🟡 PLANNED)
@@ -656,7 +656,7 @@ Upon test failure, an optional AI agent examines the diff and logs probable caus
 
 ## Part 9: The Ultimate Vision
 
-The UBVM is not just a test framework; it is the **living proof** that the Bonsai Ecosystem and UOSC are:
+The UBVM is not just a test framework; it is the **living proof** that the Bonsai Ecosystem and USOS are:
 
 - **Sovereign** — No dependency on third parties or proprietary systems
 - **Deterministic** — Identical results every time, everywhere
@@ -700,16 +700,16 @@ With the UBVM:
 
 ```bash
 cd z:\Projects\BonsaiWorkspace
-cargo build -p bonsai-utof --release
-cargo run -p bonsai-utof -- --spec crates/bonsai-utof/specs/addition.toml --verbose
+cargo build -p test-orchestrator --release
+cargo run -p test-orchestrator -- --spec crates/test-orchestrator/specs/addition.toml --verbose
 ```
 
 ### Create Custom Test Spec
 
-1. Copy `crates/bonsai-utof/specs/addition.toml`
+1. Copy `crates/test-orchestrator/specs/addition.toml`
 2. Update `name`, `description`, `canonical_source`
 3. Add test cases with `input`, `expected`, `seed`
-4. Run: `cargo run -p bonsai-utof -- --spec your-spec.toml`
+4. Run: `cargo run -p test-orchestrator -- --spec your-spec.toml`
 
 ---
 

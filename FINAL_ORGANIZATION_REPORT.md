@@ -267,7 +267,7 @@ Z:\Projects\BonsaiWorkspace/
 └── 🌳 Applications
     ├── bonsai-workspace/        (IDE)
     ├── bonsai-bot/              (Bot framework)
-    ├── bonsai-buddy-android/    (Android app)
+    ├── android-runtime/    (Android app)
     └── [other apps]
 
 D:\Models\Custom/               (EXTERNAL - PRIVATE)

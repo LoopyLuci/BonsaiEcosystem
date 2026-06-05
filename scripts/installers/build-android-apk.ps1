@@ -12,7 +12,7 @@ $workspace = Get-Location
 Write-Host "🔨 Building Android APKs..." -ForegroundColor Cyan
 
 $apps = @(
-    @{Name="BonsaiBuddy"; Path="bonsai-buddy-android"; Output="BonsaiBuddy-release.apk"},
+    @{Name="BonsaiBuddy"; Path="android-runtime"; Output="BonsaiBuddy-release.apk"},
     @{Name="ModelWorkshop"; Path="android\BonsaiModelWorkshop"; Output="ModelWorkshop-release.apk"},
     @{Name="McpManager"; Path="android\BonsaiMcpManager"; Output="McpManager-release.apk"}
 )

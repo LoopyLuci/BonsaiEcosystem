@@ -7,7 +7,7 @@
 
 ## Summary
 
-The Polyglot Pong framework is **50% complete** with all core components implemented and ready for integration. The system is structured to be **deterministic-first, AI-optional**, and fully integrated with the `bonsai-ai-fallback` backbone.
+The Polyglot Pong framework is **50% complete** with all core components implemented and ready for integration. The system is structured to be **deterministic-first, AI-optional**, and fully integrated with the `ai-advisor` backbone.
 
 ---
 

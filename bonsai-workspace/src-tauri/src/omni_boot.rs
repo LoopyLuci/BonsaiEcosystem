@@ -193,7 +193,7 @@ impl OmniBoot {
         let manifest: BootManifest = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
         *self.manifest.write().unwrap() = manifest;
         *self.manifest_key.write().unwrap() = Some(key_hex.to_string());
-        info!("[omni-boot] manifest loaded from {}", &key_hex[..8]);
+        info!("[build-boot] manifest loaded from {}", &key_hex[..8]);
         Ok(())
     }
 
@@ -222,7 +222,7 @@ impl OmniBoot {
                 let data = match std::fs::read(path) {
                     Ok(d) => d,
                     Err(e) => {
-                        warn!("[omni-boot] cannot read {:?}: {}", path, e);
+                        warn!("[build-boot] cannot read {:?}: {}", path, e);
                         continue;
                     }
                 };
@@ -260,7 +260,7 @@ impl OmniBoot {
         let bytes = serde_json::to_vec(&manifest).map_err(|e| e.to_string())?;
         let key = self
             .cas
-            .put(&bytes, "application/x-omni-boot-manifest")
+            .put(&bytes, "application/x-build-boot-manifest")
             .await
             .map_err(|e| e.to_string())?;
         let hex = key.hex();
@@ -268,7 +268,7 @@ impl OmniBoot {
         *self.manifest.write().unwrap() = manifest;
         *self.manifest_key.write().unwrap() = Some(hex.clone());
         info!(
-            "[omni-boot] manifest snapshotted: {} components, key={}",
+            "[build-boot] manifest snapshotted: {} components, key={}",
             self.manifest.read().unwrap().components.len(),
             &hex[..8]
         );
@@ -404,7 +404,7 @@ impl OmniBoot {
         report.total_duration_ms = start.elapsed().as_millis() as u64;
         report.boot_successful = true;
         info!(
-            "[omni-boot] boot verified: {} components, {}ms",
+            "[build-boot] boot verified: {} components, {}ms",
             report.verified_components, report.total_duration_ms
         );
 
@@ -430,7 +430,7 @@ impl OmniBoot {
         let bytes = serde_json::to_vec(&proof).map_err(|e| e.to_string())?;
         let key = self
             .cas
-            .put(&bytes, "application/x-omni-boot-proof")
+            .put(&bytes, "application/x-build-boot-proof")
             .await
             .map_err(|e| e.to_string())?;
         let hex = key.hex();
@@ -443,7 +443,7 @@ impl OmniBoot {
         {
             comp.proof_key = Some(hex.clone());
             info!(
-                "[omni-boot] proof registered for {} → {}",
+                "[build-boot] proof registered for {} → {}",
                 component_name,
                 &hex[..8]
             );

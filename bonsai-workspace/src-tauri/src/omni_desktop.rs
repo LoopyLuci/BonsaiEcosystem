@@ -345,7 +345,7 @@ impl OmniDesktop {
             focused_window: RwLock::new(None),
             active_workspace: AtomicU32::new(0),
         });
-        info!("[omni-desktop] compositor initialised");
+        info!("[build-desktop] compositor initialised");
         desktop
     }
 
@@ -358,7 +358,7 @@ impl OmniDesktop {
         self.damage.mark_dirty(bounds).await;
         self.windows.write().await.insert(id.clone(), win);
         *self.focused_window.write().await = Some(id.clone());
-        debug!("[omni-desktop] opened window {id} ({app_id})");
+        debug!("[build-desktop] opened window {id} ({app_id})");
         id
     }
 
@@ -573,7 +573,7 @@ impl OmniDesktop {
 
     pub fn switch_workspace(&self, workspace: u32) {
         self.active_workspace.store(workspace, Ordering::Relaxed);
-        info!("[omni-desktop] switched to workspace {workspace}");
+        info!("[build-desktop] switched to workspace {workspace}");
     }
 
     // ── Wallpaper ────────────────────────────────────────────────────────────

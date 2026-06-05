@@ -5,8 +5,8 @@ edition     = "2021"
 description = "Agent-to-agent secure mailbox for Bonsai swarm communication"
 
 [dependencies]
-bonsai-transfer-crypto = { path = "../bonsai-transfer-crypto" }
-bonsai-transfer-core   = { path = "../bonsai-transfer-core" }
+p2p-crypto = { path = "../p2p-crypto" }
+p2p-core   = { path = "../p2p-core" }
 bonsai-relay           = { path = "../bonsai-relay" }
 tokio        = { version = "1", features = ["full"] }
 serde        = { version = "1", features = ["derive"] }

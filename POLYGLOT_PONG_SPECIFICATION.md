@@ -8,7 +8,7 @@
 - ✅ Runs each implementation in **hardware-isolated Sanctum vaults** with deterministic execution
 - ✅ **Converts** each implementation to **every other language** via BPLIS pipeline (source → LAIR → target)
 - ✅ **Validates correctness** with bit-identical gameplay traces and fidelity metrics
-- ✅ **Operates entirely without AI/ML** in the critical path (uses `bonsai-ai-fallback` for optional enhancements)
+- ✅ **Operates entirely without AI/ML** in the critical path (uses `ai-advisor` for optional enhancements)
 - ✅ **Stress-tests the entire Bonsai Ecosystem**: BPLIS, Sanctum, TransferDaemon v2, AriaDB, Universe
 
 **Result**: The most comprehensive polyglot language benchmark ever created, generating a 750×750 conversion fidelity matrix with complete traceability and formal verification.
@@ -97,7 +97,7 @@ update_loop():
 
 ### 3. Orchestrator as a `SovereignService`
 
-The central orchestrator implements the trait from `bonsai-ai-fallback`:
+The central orchestrator implements the trait from `ai-advisor`:
 
 ```rust
 pub struct PolyglorPongOrchestrator {
@@ -106,7 +106,7 @@ pub struct PolyglorPongOrchestrator {
     results_table: AriaDB,
     universe_logger: UniverseClient,
     transfer_daemon: TransferDaemonNode,
-    arbiter: Arbiter,  // from bonsai-ai-fallback
+    arbiter: Arbiter,  // from ai-advisor
 }
 
 impl SovereignService for PolyglorPongOrchestrator {
@@ -613,7 +613,7 @@ Proof: Job queue state machine with timeouts and retries.
 1. **BPLIS Validation**: Identify which language conversions are problematic
 2. **Scientific Dataset**: 750×750 fidelity matrix for language research
 3. **Determinism Proof**: Demonstrates large-scale reproducible distributed computing
-4. **AI-Optional Blueprint**: Reference implementation of `bonsai-ai-fallback`
+4. **AI-Optional Blueprint**: Reference implementation of `ai-advisor`
 5. **Performance Benchmarks**: Unique dataset comparing execution speed across 750+ languages
 6. **Continuous Quality**: Every Bonsai release automatically tested against full language corpus
 
@@ -634,4 +634,4 @@ This framework demonstrates that a **next-generation system can be both ambitiou
 **Version**: 1.0.0  
 **Release Date**: 2026-06-04  
 **Status**: Specification complete, ready for implementation  
-**Built On**: bonsai-ai-fallback v1.0.0, TransferDaemon v2, Sanctum, BPLIS, AriaDB, Universe
+**Built On**: ai-advisor v1.0.0, TransferDaemon v2, Sanctum, BPLIS, AriaDB, Universe

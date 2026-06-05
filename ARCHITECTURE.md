@@ -1,4 +1,4 @@
-# System Architecture – Bonsai Ecosystem & UOSC
+# System Architecture – Bonsai Ecosystem & USOS
 
 **Version**: 3.0 | **Date**: 2026-06-04 | **Status**: Production-Ready
 
@@ -39,7 +39,7 @@
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│         UOSC Kernel (Unnamed Sovereign OS)                      │
+│         USOS Kernel (Unnamed Sovereign OS)                      │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
 │  │  Scheduler   │  │     IPC      │  │   File System        │ │
 │  │  (Preempt.)  │  │  (Unix sock) │  │  (VFS abstraction)   │ │
@@ -81,7 +81,7 @@
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                   Operating System                              │
 │            Linux | macOS | Windows (via WSL) | NixOS           │
-│         (with UOSC co-OS systemd services)                      │
+│         (with USOS co-OS systemd services)                      │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
@@ -138,7 +138,7 @@ pub trait SovereignService {
 
 ---
 
-### Layer 3: UOSC Kernel
+### Layer 3: USOS Kernel
 
 The **core operating system** (replaces kernel responsibilities):
 
@@ -239,7 +239,7 @@ Auto-detection and fallback chain:
 
 ```
 bonsai-ecosystem/
-├── bonsai-kernel/                      # UOSC kernel (30 crates)
+├── bonsai-kernel/                      # USOS kernel (30 crates)
 │   ├── bonsai-process/                 # Process management
 │   ├── bonsai-ipc/                     # Inter-process communication
 │   ├── bonsai-vfs/                     # Virtual file system
@@ -247,7 +247,7 @@ bonsai-ecosystem/
 │   ├── bonsai-scheduler/               # Preemptive scheduler
 │   └── bonsai-syscall/                 # System call interface
 │
-├── bonsai-ai-fallback/                 # SovereignService trait
+├── ai-advisor/                 # SovereignService trait
 │   ├── SovereignService trait
 │   ├── Arbiter (tier selection)
 │   └── Safety envelopes
@@ -270,7 +270,7 @@ bonsai-ecosystem/
 ├── bonsai-fabric/                      # BCF + Echo (10 crates)
 │   ├── bonsai-container/               # OCI-compatible runtime
 │   ├── bonsai-scheduler-fabric/        # Cross-device scheduling
-│   ├── bonsai-echo-dht/                # Distributed hash table (DHT)
+│   ├── discovery-dht/                # Distributed hash table (DHT)
 │   ├── bonsai-service-mesh/            # No-sidecar service mesh
 │   └── bonsai-compute-fabric/          # Work distribution
 │
@@ -282,7 +282,7 @@ bonsai-ecosystem/
 │   └── ... (750+ language parsers)
 │
 ├── bonsai-observable/                  # Universe + observability
-│   ├── bonsai-universe/                # Immutable event log
+│   ├── audit-log/                # Immutable event log
 │   ├── bonsai-tracing/                 # OpenTelemetry integration
 │   └── bonsai-bush/                    # Network simulator (time-travel)
 │
@@ -325,7 +325,7 @@ Input validation (is query valid?)
 [Tool Calling]
 Capability check: does user have "shell:execute" token?
     ↓
-[UOSC Kernel]
+[USOS Kernel]
 IPC → bonsai-shell service
     ↓
 Execute: "ls /home"
@@ -420,7 +420,7 @@ Level 3 (Levels 0-2):
   bonsai-transfer, bonsai-fabric, bonsai-kernel
 
 Level 4 (Levels 0-3):
-  bonsai-bplis, bonsai-compression, bonsai-ai-fallback
+  bonsai-bplis, bonsai-compression, ai-advisor
 
 Level 5 (All):
   Applications (workspace, CLI, web UI)
@@ -443,7 +443,7 @@ Level 5 (All):
 └────────────────────────────────────────────────┘
            ↓ (capability token boundary)
 ┌────────────────────────────────────────────────┐
-│ Trust Domain: UOSC Kernel                      │
+│ Trust Domain: USOS Kernel                      │
 │ ├─ Enforces: capability token verification   │
 │ ├─ Manages: process isolation (via Sanctum)  │
 │ └─ Audits: all syscalls (to Universe)        │

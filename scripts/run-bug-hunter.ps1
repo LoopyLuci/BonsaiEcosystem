@@ -86,7 +86,7 @@ function Main {
     }
     catch {
         Write-Status "✗ MCP server not responding on http://127.0.0.1:3000" Error
-        Write-Status "  Start the server with: ./target/release/bonsai-mcp-server.exe" Warning
+        Write-Status "  Start the server with: ./target/release/mcp-server.exe" Warning
         exit 1
     }
 

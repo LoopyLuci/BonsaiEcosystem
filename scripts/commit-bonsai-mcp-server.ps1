@@ -1,5 +1,5 @@
 param(
-    [string]$Message = "chore: add bonsai-mcp-server crate"
+    [string]$Message = "chore: add mcp-server crate"
 )
 
 Write-Host "Staging changes..."

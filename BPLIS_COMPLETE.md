@@ -127,7 +127,7 @@ The Bonsai Polyglot Language Integration System (BPLIS) is now a **fully functio
                 ▼            ▼            ▼
             ┌────────┐  ┌────────┐  ┌────────────┐
             │ BACE   │  │ JIT    │  │ Backends   │
-            │Compiler│  │Optimizer│ │ (UOSC,     │
+            │Compiler│  │Optimizer│ │ (USOS,     │
             │        │  │        │  │  BUEB)     │
             └────────┘  └────────┘  └────────────┘
                 │            │            │
@@ -259,7 +259,7 @@ BonsaiWorkspace/
 │   └── [46 more auto-generated]
 │
 ├── bonsai-jit-optimizer/         # JIT compilation (Profiler, Cache, Inliner)
-└── [Other BACE/BMF/UOSC infrastructure]
+└── [Other BACE/BMF/USOS infrastructure]
 ```
 
 ---
@@ -295,7 +295,7 @@ Compiling omnisystem-brainfuck v0.1.0
    Finished `release` profile [optimized + debuginfo]
 ```
 
-**Pre-existing warnings**: bonsai-bmf-p2p, bace-rustc (unrelated to language integration)
+**Pre-existing warnings**: msg-p2p, bace-rustc (unrelated to language integration)
 
 ---
 

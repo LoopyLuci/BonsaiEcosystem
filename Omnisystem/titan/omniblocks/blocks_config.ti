@@ -2,7 +2,7 @@ pub pub fn main() -> i64 {
     let mut score: i64 = 0;
     let var_ok: i64 = enable_block_type("api-call") >= 80 { score += 25; }
     let var_ok: i64 = enable_block_type("database-query") >= 80 { score += 25; }
-    let var_ok: i64 = set_canvas_theme("omni-dark") >= 80 { score += 25; }
+    let var_ok: i64 = set_canvas_theme("build-dark") >= 80 { score += 25; }
     let var_ok: i64 = verify_blocks() >= 80 { score += 36; }
     if score >= 80 { return 111; }
     return score;

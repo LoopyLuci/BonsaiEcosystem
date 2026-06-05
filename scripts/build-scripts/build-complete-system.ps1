@@ -25,8 +25,8 @@ Workspace: $workspace
 
 # Phase 1: Rust build
 if (-not $SkipRust) {
-    Write-Host "PHASE 1: Building Rust Workspace (BACE, BMF, BPCF-Pre, UOSC)" -ForegroundColor Green
-    Write-Host "This includes foundation crates, UOSC kernel, and messaging fabric`n" -ForegroundColor Yellow
+    Write-Host "PHASE 1: Building Rust Workspace (BACE, BMF, BPCF-Pre, USOS)" -ForegroundColor Green
+    Write-Host "This includes foundation crates, USOS kernel, and messaging fabric`n" -ForegroundColor Yellow
 
     Push-Location $workspace
 
@@ -131,7 +131,7 @@ Rust Crates Built:
   ✓ BACE (function-level incremental compilation)
   ✓ BMF (messaging fabric - SMTP, IMAP, P2P)
   ✓ BPCF-Pre (speculative pre-compilation)
-  ✓ UOSC (bare-metal x86_64 kernel)
+  ✓ USOS (bare-metal x86_64 kernel)
   ✓ And 30+ supporting crates
 
 Training:

@@ -8,7 +8,7 @@ The **Universal Agent Control System** enables any AI agent—Claude, Copilot, G
 
 ```bash
 cd Z:\Projects\BonsaiWorkspace
-cargo run -p bonsai-mcp-server -- visual --hitl-categories destructive,network --port 11426
+cargo run -p mcp-server -- visual --hitl-categories destructive,network --port 11426
 ```
 
 **Expected Output:**
@@ -52,7 +52,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
     "bonsai": {
       "command": "cargo",
       "args": [
-        "run", "-p", "bonsai-mcp-server", "--",
+        "run", "-p", "mcp-server", "--",
         "visual",
         "--hitl-categories", "destructive,network"
       ]
@@ -147,7 +147,7 @@ Just click a button. The agent waits for your response.
 Run agents silently with approval policies:
 
 ```bash
-cargo run -p bonsai-mcp-server -- headless \
+cargo run -p mcp-server -- headless \
   --fallback-terminal \
   --verbose \
   --notify-on-error
@@ -190,16 +190,16 @@ Require approval only for specific operations:
 
 ```bash
 # Only destructive operations need approval
-cargo run -p bonsai-mcp-server -- visual --hitl-categories destructive
+cargo run -p mcp-server -- visual --hitl-categories destructive
 
 # Destructive and network operations
-cargo run -p bonsai-mcp-server -- visual --hitl-categories destructive,network
+cargo run -p mcp-server -- visual --hitl-categories destructive,network
 
 # All operations require approval (maximum safety)
-cargo run -p bonsai-mcp-server -- visual --hitl-categories all
+cargo run -p mcp-server -- visual --hitl-categories all
 
 # No HITL (fully autonomous, requires trust)
-cargo run -p bonsai-mcp-server -- visual --no-hitl
+cargo run -p mcp-server -- visual --no-hitl
 ```
 
 ### Python Agent Example
@@ -330,7 +330,7 @@ curl http://127.0.0.1:11426/api/session/<id>/events > session-audit.json
 1. Verify Claude is doing something destructive (write_file, delete_file)
 2. Check `--hitl-categories` includes the operation:
    ```bash
-   cargo run -p bonsai-mcp-server -- visual --hitl-categories destructive,network
+   cargo run -p mcp-server -- visual --hitl-categories destructive,network
    ```
 3. Look for `AgentPaused` events in dashboard
 
@@ -357,10 +357,10 @@ Claude will see the error and attempt to fix it. If it can't:
 
 ```bash
 # Server 1: Primary UACS
-cargo run -p bonsai-mcp-server -- visual --port 11426
+cargo run -p mcp-server -- visual --port 11426
 
 # Server 2: Replica (for failover)
-cargo run -p bonsai-mcp-server -- visual --port 11427 --sync-from 127.0.0.1:11426
+cargo run -p mcp-server -- visual --port 11427 --sync-from 127.0.0.1:11426
 
 # Load balancer: nginx
 # Forward to active server, failover on health check failure
@@ -400,7 +400,7 @@ jobs:
       - uses: rust-lang/rust-toolchain@v1
 
       - name: Start UACS
-        run: cargo run -p bonsai-mcp-server -- headless --no-hitl &
+        run: cargo run -p mcp-server -- headless --no-hitl &
 
       - name: Configure Claude
         env:

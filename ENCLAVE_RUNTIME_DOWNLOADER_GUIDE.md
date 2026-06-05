@@ -103,7 +103,7 @@ When a runtime is needed:
 ### Module Structure
 
 ```
-crates/bonsai-enclave/src/
+crates/sandbox/src/
 ├── runtime/
 │   ├── mod.rs              # Runtime & RuntimeManager (legacy)
 │   ├── manifest.rs         # RuntimeManifest & RuntimeEntry
@@ -389,7 +389,7 @@ We prove:
 ## 📄 Files Modified/Created
 
 ```
-crates/bonsai-enclave/
+crates/sandbox/
 ├── Cargo.toml                        # Added xz2, tar dependencies
 ├── src/
 │   ├── lib.rs                        # Exported RuntimeDownloader, RuntimeManifest

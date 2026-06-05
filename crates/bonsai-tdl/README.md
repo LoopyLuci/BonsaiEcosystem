@@ -217,7 +217,7 @@ pub async fn tdl_export_dataset(db_path: String, ...) -> Result<...>
 
 ### Android Integration
 
-See `bonsai-buddy-android` for Kotlin wrappers:
+See `android-runtime` for Kotlin wrappers:
 - `BonsaiTdlClient`: Manages local TDL database copy
 - Syncs from desktop via background service
 - Provides offline access to training examples

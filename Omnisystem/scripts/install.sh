@@ -119,12 +119,12 @@ elif [ -n "$BASH_VERSION" ]; then
 fi
 
 VENV_BIN="$VENV_PATH/bin"
-OMNI_CMD="$VENV_BIN/omni"
+OMNI_CMD="$VENV_BIN/build"
 
 # Create wrapper script
 cat > "$OMNI_CMD" << 'EOF'
 #!/bin/bash
-python "$VENV_PATH/tools/omni/main.py" "$@"
+python "$VENV_PATH/tools/build/main.py" "$@"
 EOF
 chmod +x "$OMNI_CMD"
 success "  Created wrapper: $OMNI_CMD"
@@ -156,15 +156,15 @@ echo "1. Reload your shell:"
 echo -e "   ${YELLOW}source $SHELL_RC${NC}"
 echo ""
 echo "2. Verify installation:"
-echo -e "   ${YELLOW}omni --version${NC}"
+echo -e "   ${YELLOW}build --version${NC}"
 echo ""
 echo "3. Get started:"
-echo -e "   ${YELLOW}omni new myapp${NC}"
+echo -e "   ${YELLOW}build new myapp${NC}"
 echo -e "   ${YELLOW}cd myapp${NC}"
-echo -e "   ${YELLOW}omni run examples/hello_world.omni${NC}"
+echo -e "   ${YELLOW}build run examples/hello_world.build${NC}"
 echo ""
 echo "4. Try the REPL:"
-echo -e "   ${YELLOW}omni repl${NC}"
+echo -e "   ${YELLOW}build repl${NC}"
 echo ""
 echo -e "${CYAN}Documentation: https://omnilang.org/getting-started${NC}"
 echo -e "${CYAN}Community: https://github.com/omnilang/omnisystem${NC}"

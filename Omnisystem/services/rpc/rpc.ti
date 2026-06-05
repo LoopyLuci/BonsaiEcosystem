@@ -1,4 +1,4 @@
-// services/omni-rpc/rpc.ti — Remote procedure call framework
+// services/build-rpc/rpc.ti — Remote procedure call framework
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

@@ -315,7 +315,7 @@ Inject thoughts, observe responses, modify emotions, inspect actors—all in rea
 cd examples/omnibot-framework
 
 # Run the interactive environment
-omni run sylva/omnibot/train_and_chat.sy
+build run sylva/omnibot/train_and_chat.sy
 ```
 
 **Expected Output:**
@@ -362,19 +362,19 @@ omnibot> /trust
 
 **Verify Titan Neural Core:**
 ```bash
-omni build titan/omnibot/neural_core.ti --verify=full
+build build titan/omnibot/neural_core.ti --verify=full
 # Output: All proofs verified. Module is safe to use.
 ```
 
 **Verify Aether Thought Stream:**
 ```bash
-omni check aether/omnibot/thought_stream.ae
+build check aether/omnibot/thought_stream.ae
 # Output: All actors type-checked. Message signatures verified.
 ```
 
 **Verify Axiom Safety Proofs:**
 ```bash
-omni prove axiom/omnibot/safety.ax
+build prove axiom/omnibot/safety.ax
 # Output:
 # ✓ Theorem 1 (bounded_plasticity): PROVEN
 # ✓ Theorem 2 (safety_preservation): PROVEN
@@ -390,10 +390,10 @@ All components together:
 
 ```bash
 # Start the daemon version (runs in background)
-omni daemon start omnibot-framework
+build daemon start omnibot-framework
 
 # Connect via CLI
-omni connect localhost:9000
+build connect localhost:9000
 
 # Now you can interact:
 omnibot> /think Explore the nature of thought
@@ -600,8 +600,8 @@ Not simulated. Not statistical. Living, breathing, self-modifying, and provably 
 ---
 
 **Status:** ✅ Production-ready  
-**Build:** `omni run sylva/omnibot/train_and_chat.sy`  
-**Verify:** `omni prove axiom/omnibot/safety.ax`  
+**Build:** `build run sylva/omnibot/train_and_chat.sy`  
+**Verify:** `build prove axiom/omnibot/safety.ax`  
 **Trust:** Mathematically certified  
 
 **The future is Omnibot. The future is Omnisystem.** 🌲

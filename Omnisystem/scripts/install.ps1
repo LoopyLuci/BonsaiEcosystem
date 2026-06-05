@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Downloads Omnisystem, sets up Python virtual environment,
-    installs dependencies, and configures PATH for the 'omni' command.
+    installs dependencies, and configures PATH for the 'build' command.
 
 .PARAMETER OutPath
     Installation directory (default: $env:USERPROFILE\omnisystem)
@@ -141,7 +141,7 @@ Write-Status "  Python environment ready" "Success"
 # Configure PATH
 Write-Status "[5/5] Configuring PATH..." "Info"
 
-$OmniPath = "$OutPath\tools\omni"
+$OmniPath = "$OutPath\tools\build"
 $OmniCmd = "$OmniPath\main.py"
 
 # Create wrapper script
@@ -150,7 +150,7 @@ $WrapperScript = @"
 python "$OmniCmd" %*
 "@
 
-$WrapperPath = "$VenvPath\Scripts\omni.cmd"
+$WrapperPath = "$VenvPath\Scripts\build.cmd"
 Set-Content -Path $WrapperPath -Value $WrapperScript
 Write-Status "  Created wrapper: $WrapperPath" "Success"
 
@@ -182,15 +182,15 @@ Write-Host "1. Restart your terminal or run:"
 Write-Host "   `$env:PATH = [System.Environment]::GetEnvironmentVariable('PATH','User')" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "2. Verify installation:"
-Write-Host "   omni --version" -ForegroundColor Yellow
+Write-Host "   build --version" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "3. Get started:"
-Write-Host "   omni new myapp" -ForegroundColor Yellow
+Write-Host "   build new myapp" -ForegroundColor Yellow
 Write-Host "   cd myapp" -ForegroundColor Yellow
-Write-Host "   omni run examples/hello_world.omni" -ForegroundColor Yellow
+Write-Host "   build run examples/hello_world.build" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "4. Try the REPL:"
-Write-Host "   omni repl" -ForegroundColor Yellow
+Write-Host "   build repl" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Documentation: https://omnilang.org/getting-started" -ForegroundColor Cyan
 Write-Host "Community: https://github.com/omnilang/omnisystem" -ForegroundColor Cyan

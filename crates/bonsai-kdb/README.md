@@ -330,7 +330,7 @@ pub fn kdb_list_modules(base_dir: String) -> Result<...>
 
 ## Android Integration
 
-See `bonsai-buddy-android` for Kotlin wrapper `BonsaiKdbClient`:
+See `android-runtime` for Kotlin wrapper `BonsaiKdbClient`:
 - Loads modules from sync'd desktop data
 - Simple brute-force search (suitable for small modules)
 - Optional JNI extension for HNSW on Android

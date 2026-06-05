@@ -27,12 +27,12 @@ A **fully integrated, production-ready runtime downloader** for Bonsai Enclave t
 
 ## 📦 Deliverables
 
-### 1. Rust Crate (`bonsai-enclave`)
+### 1. Rust Crate (`sandbox`)
 
 #### New Modules
 
 ```
-crates/bonsai-enclave/src/
+crates/sandbox/src/
 ├── runtime/
 │   ├── mod.rs                  (182 lines) - Module organization + legacy Runtime/RuntimeManager
 │   ├── manifest.rs             (119 lines) - RuntimeManifest & RuntimeEntry with parsing/finding
@@ -145,7 +145,7 @@ Key features:
 ### Compilation
 
 ```
-✅ Compiling bonsai-enclave v0.1.0
+✅ Compiling sandbox v0.1.0
    Finished `release` profile [optimized + debuginfo] target(s) in 7.62s
 ```
 

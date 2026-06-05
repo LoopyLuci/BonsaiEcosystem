@@ -14,7 +14,7 @@
 
 The core orchestrator that runs deterministic, polyglot test suites across the Bonsai Ecosystem.
 
-**Location:** `crates/bonsai-utof/`
+**Location:** `crates/test-orchestrator/`
 
 **Core Modules:**
 
@@ -66,7 +66,7 @@ Features:
 - Return success/failure based on test results
 
 ```bash
-cargo run --release -p bonsai-utof -- \
+cargo run --release -p test-orchestrator -- \
   --spec specs/addition.toml \
   --output-json results.json \
   --output-csv results.csv \
@@ -260,9 +260,9 @@ pub async fn log_event_to_universe(event: &str) -> Result<()> {
 
 ### Integration Checklist
 - [ ] Add `bonsai-ariadb` dependency, replace `ResultStore` with DB client
-- [ ] Add `bonsai-universe` dependency, implement event logging
-- [ ] Add `bonsai-enclave` dependency, run tests in Enclave runtimes
-- [ ] Add `bonsai-transfer-core` dependency, distribute jobs via TransferDaemon
+- [ ] Add `audit-log` dependency, implement event logging
+- [ ] Add `sandbox` dependency, run tests in Enclave runtimes
+- [ ] Add `p2p-core` dependency, distribute jobs via TransferDaemon
 - [ ] Add BLAKE3 content hashing for artifact deduplication
 
 ---
@@ -288,23 +288,23 @@ pub async fn log_event_to_universe(event: &str) -> Result<()> {
 ### Build
 ```bash
 cd z:\Projects\BonsaiWorkspace
-cargo build -p bonsai-utof
+cargo build -p test-orchestrator
 ```
 
 ### Run Tests
 ```bash
 # Simple addition (expected mixed results due to Rust syntax in spec)
-cargo run -p bonsai-utof -- --spec crates/bonsai-utof/specs/addition.toml --verbose
+cargo run -p test-orchestrator -- --spec crates/test-orchestrator/specs/addition.toml --verbose
 
 # Export results
-cargo run -p bonsai-utof -- \
-  --spec crates/bonsai-utof/specs/addition.toml \
+cargo run -p test-orchestrator -- \
+  --spec crates/test-orchestrator/specs/addition.toml \
   --output-json results.json \
   --output-csv results.csv
 
 # Run with custom working directory
-cargo run -p bonsai-utof -- \
-  --spec crates/bonsai-utof/specs/fibonacci.toml \
+cargo run -p test-orchestrator -- \
+  --spec crates/test-orchestrator/specs/fibonacci.toml \
   --work-dir ./my-ubvm-workspace
 ```
 
@@ -313,14 +313,14 @@ cargo run -p bonsai-utof -- \
 2. Update `name`, `description`, `subsystems`
 3. Update `canonical_source` with actual language-agnostic implementation
 4. Add test cases with `input` and `expected` outputs
-5. Run: `cargo run -p bonsai-utof -- --spec your-spec.toml`
+5. Run: `cargo run -p test-orchestrator -- --spec your-spec.toml`
 
 ---
 
 ## 📚 File Structure
 
 ```
-crates/bonsai-utof/
+crates/test-orchestrator/
 ├── Cargo.toml                    # Package manifest
 ├── src/
 │   ├── lib.rs                    # Main library (Orchestrator)
@@ -389,7 +389,7 @@ Storage interface ready for multiple backends:
 
 ### Immediate (This Sprint)
 1. Create polyglot test specs (language-agnostic canonical sources)
-2. Integrate with bonsai-enclave for runtime provisioning
+2. Integrate with sandbox for runtime provisioning
 3. Add network subsystem tests
 
 ### Short Term (Next Sprint)

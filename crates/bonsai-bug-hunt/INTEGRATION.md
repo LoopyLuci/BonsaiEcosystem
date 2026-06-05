@@ -107,7 +107,7 @@ When a crash occurs:
 ```rust
 // Survival System detects panic
 let crash_event = CrashEvent {
-    component: "bonsai-mcp-server",
+    component: "mcp-server",
     backtrace: "...",
     error: "panicked at 'called `Option::unwrap()` on a `None` value'",
     timestamp: Utc::now(),
@@ -115,7 +115,7 @@ let crash_event = CrashEvent {
 
 // Trigger Bug Hunt targeted scan
 let scan_req = SurvivalScanRequest {
-    component_path: PathBuf::from("crates/bonsai-mcp-server/src"),
+    component_path: PathBuf::from("crates/mcp-server/src"),
     error_context: crash_event.error.clone(),
     backtrace_snippet: Some("request.rs:42"),
 };

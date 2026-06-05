@@ -18,8 +18,8 @@ authors = ["Bonsai Team"]
 license = "MIT"
 
 [workspace.dependencies]
-# Note: bonsai-ai-fallback is part of the architecture to be implemented
-# bonsai-ai-fallback = { path = "../crates/bonsai-ai-fallback" }
+# Note: ai-advisor is part of the architecture to be implemented
+# ai-advisor = { path = "../crates/ai-advisor" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }

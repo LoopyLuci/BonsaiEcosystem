@@ -762,7 +762,7 @@ impl RuleSurvivalHandler {
 
 ### 6.1 MCP Tools for Rule Review
 
-Register these tools in `bonsai-mcp-server`:
+Register these tools in `mcp-server`:
 
 ```json
 {
@@ -797,7 +797,7 @@ Register these tools in `bonsai-mcp-server`:
 Handler:
 
 ```rust
-// crates/bonsai-mcp-server/src/lint_rule_reviewer.rs
+// crates/mcp-server/src/lint_rule_reviewer.rs
 
 pub async fn handle_review_rule_mutations(
     filter: &str,
@@ -978,7 +978,7 @@ Rules by Accuracy:
 5. Tests: 3 integration tests
 
 **Deliverables:**
-- `crates/bonsai-mcp-server/src/lint_rule_reviewer.rs` (250 LOC)
+- `crates/mcp-server/src/lint_rule_reviewer.rs` (250 LOC)
 - CLI commands (in bonsai-cli)
 - MCP tool definitions
 

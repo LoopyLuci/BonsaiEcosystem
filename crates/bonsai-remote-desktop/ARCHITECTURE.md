@@ -74,7 +74,7 @@ Benefits:
 
 ### 4. Event-Driven Monitoring
 
-Deep integration with bonsai-universe telemetry:
+Deep integration with audit-log telemetry:
 
 ```
 RemoteDesktopTelemetry (Module)

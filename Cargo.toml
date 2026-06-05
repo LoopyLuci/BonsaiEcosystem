@@ -34,11 +34,8 @@ members = [
     # ========== BUEB (Universal Execution Backend) ==========
     "crates/bonsai-backend",           # Hardware abstraction & device allocation
 
-    # ========== UDC (Universal Driver Compiler) ==========
-    "crates/bonsai-udc",               # Driver code generation for macOS, Linux, UOSC
-
-    # ========== UOSC Bare-Metal Kernel ==========
-    # "crates/UOSC-kernel",              # UOSC Co-OS x86_64 bare-metal kernel (disabled: x86_64 crate has unstable features)
+    # ========== USOS Bare-Metal Kernel ==========
+    # "crates/kernel",              # USOS Co-OS x86_64 bare-metal kernel (disabled: x86_64 crate has unstable features)
 
     # ========== Legacy Foundation (keep for compatibility) ==========
     "bonsai-runtime",
@@ -46,26 +43,26 @@ members = [
     "bonsai-bot",
 
     # ========== BPCF-Pre (Pre-Compilation Fabric) ==========
-    "crates/bonsai-prec",               # Speculative pre-compilation with AI hints
+    "crates/compiler-cache",               # Speculative pre-compilation with AI hints
 
     # ========== TransferDaemon v2 (Sovereign P2P Transport) ==========
-    "crates/bonsai-transfer-identity",  # Self-certifying identity (Iroh-inspired)
-    "crates/bonsai-transfer-crypto",    # Post-quantum hybrid cryptography
-    "crates/bonsai-transfer-core",      # Deterministic core (no AI required)
+    "crates/p2p-identity",  # Self-certifying identity (Iroh-inspired)
+    "crates/p2p-crypto",    # Post-quantum hybrid cryptography
+    "crates/p2p-core",      # Deterministic core (no AI required)
     "crates/bonsai-transfer-ai",        # Optional AI enhancements (feature-gated)
 
     # ========== BMF (Bonsai Messaging Fabric) ==========
-    "crates/bonsai-bmf-core",           # Core messaging types and encryption
-    "crates/bonsai-bmf-smtp",           # SMTP server
-    "crates/bonsai-bmf-imap",           # IMAP server
-    "crates/bonsai-bmf-p2p",            # P2P delivery via TransferDaemon
-    "crates/bonsai-bmf-server", "crates/bonsai-model-workshop", "crates/bonsai-mcp-manager",         # Unified BMF server
+    "crates/msg-core",           # Core messaging types and encryption
+    "crates/msg-smtp",           # SMTP server
+    "crates/msg-imap",           # IMAP server
+    "crates/msg-p2p",            # P2P delivery via TransferDaemon
+    "crates/msg-server", "crates/bonsai-model-workshop", "crates/bonsai-mcp-manager",         # Unified BMF server
 
     # ========== BONSAI ENCLAVE (Universal Environment Manager) ==========
-    "crates/bonsai-enclave",            # Universal dependency and environment manager
+    "crates/sandbox",            # Universal dependency and environment manager
 
     # ========== UBVM (Universal Bonsai Validation Mesh) ==========
-    "crates/bonsai-utof",               # Unified Test Orchestration Fabric
+    "crates/test-orchestrator",               # Unified Test Orchestration Fabric
     "crates/ubvm-core",                 # Core types and traits
     "crates/ubvm-ulb",                  # Universal Language Binding (750+ languages)
     "crates/ubvm-suites",               # 10 comprehensive test suites

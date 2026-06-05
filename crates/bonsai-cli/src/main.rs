@@ -335,13 +335,13 @@ fn spawn_service(
         c.current_dir(workspace);
         match service {
             "mcp-server" => {
-                c.args(["run", "-p", "bonsai-mcp-server", "--"]);
+                c.args(["run", "-p", "mcp-server", "--"]);
                 if let Some(p) = port {
                     c.args(["--port", &p.to_string()]);
                 }
             }
             "uacs" => {
-                c.args(["run", "-p", "bonsai-mcp-server", "--", "visual"]);
+                c.args(["run", "-p", "mcp-server", "--", "visual"]);
                 if let Some(p) = port {
                     c.args(["--port", &p.to_string()]);
                 }

@@ -252,7 +252,7 @@ sudo efibootmgr -c -d /dev/sda -p 1 -L "Omnisystem" -l "\\EFI\\BOOT\\BOOTX64.efi
 ### Phase 5: Deploy & Test
 ```bash
 # Boot the system (on hardware or VM)
-# UOSC kernel initializes with:
+# USOS kernel initializes with:
 # ✅ Capability system active
 # ✅ Virtual memory enabled
 # ✅ Scheduler running (EDF + CFS)
@@ -287,7 +287,7 @@ sudo efibootmgr -c -d /dev/sda -p 1 -L "Omnisystem" -l "\\EFI\\BOOT\\BOOTX64.efi
 
 ### 4. Capability-Based Access Control
 **Decision:** All hardware resources wrapped in kernel capabilities.  
-**Rationale:** Prevents privilege escalation, enables secure multi-tenancy, aligns with UOSC security model.
+**Rationale:** Prevents privilege escalation, enables secure multi-tenancy, aligns with USOS security model.
 
 ---
 

@@ -23,7 +23,7 @@ Manage MCP server settings, connected clients, external MCP servers, and enable/
 
 - Rust 1.70+
 - Tokio runtime
-- MCP Server instance (bonsai-mcp-server)
+- MCP Server instance (mcp-server)
 
 ### Build
 

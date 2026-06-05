@@ -358,7 +358,7 @@ ls -la D:\Models\Custom\octopus-ai-model/
   - tokenizer.json
 
 # Verify Poe implementation
-ls -la Omnisystem/omni-ai/poe/
+ls -la Omnisystem/build-ai/poe/
   - src/
   - kdb-modules/
   - config/

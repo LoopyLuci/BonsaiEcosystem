@@ -39,7 +39,7 @@ crates/bonsai-android-bridge/
 
 ### I want to add MCP tools (30 minutes)
 1. Read **INTEGRATION.md** Part 2: MCP Tool Integration
-2. Copy tool definitions into `crates/bonsai-mcp-server/src/`
+2. Copy tool definitions into `crates/mcp-server/src/`
 3. Update tool handler registration
 4. Test with Claude API
 

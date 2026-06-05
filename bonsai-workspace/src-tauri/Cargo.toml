@@ -19,15 +19,15 @@ bonsai-coordinator       = { path = "../../crates/bonsai-coordinator" }
 bonsai-credits           = { path = "../../crates/bonsai-credits" }
 bonsai-marketplace       = { path = "../../crates/bonsai-marketplace" }
 bonsai-swarm             = { path = "../../crates/bonsai-swarm" }
-bonsai-universe          = { path = "../../crates/bonsai-universe" }
+audit-log          = { path = "../../crates/audit-log" }
 bonsai-fabric            = { path = "../../crates/bonsai-fabric" }
 bonsai-failure-finder    = { path = "../../crates/bonsai-failure-finder" }
 bonsai-sns               = { path = "../../crates/bonsai-sns" }
 bonsai-extensions        = { path = "../../crates/bonsai-extensions" }
 bonsai-skill-compiler    = { path = "../../crates/bonsai-skill-compiler" }
-bonsai-transfer-crypto   = { path = "../../crates/bonsai-transfer-crypto" }
+p2p-crypto   = { path = "../../crates/p2p-crypto" }
 bonsai-transfer-store    = { path = "../../crates/bonsai-transfer-store" }
-bonsai-transfer-core     = { path = "../../crates/bonsai-transfer-core" }
+p2p-core     = { path = "../../crates/p2p-core" }
 bonsai-mailbox           = { path = "../../crates/bonsai-mailbox" }
 bonsai-capability-registry = { path = "../../crates/bonsai-capability-registry" }
 bonsai-query = { path = "../../crates/bonsai-query" }
@@ -141,7 +141,7 @@ bonsai-hnsw    = { path = "../../crates/bonsai-hnsw" }
 bonsai-kdb     = { path = "../../crates/bonsai-kdb" }
 bonsai-package = { path = "../../crates/bonsai-package" }
 bonsai-fabric  = { path = "../../crates/bonsai-fabric" }
-bonsai-mcp-server = { path = "../../crates/bonsai-mcp-server" }
+mcp-server = { path = "../../crates/mcp-server" }
 bonsai-android-bridge = { path = "../../crates/bonsai-android-bridge" }
 
 [[bin]]

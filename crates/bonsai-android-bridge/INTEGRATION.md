@@ -489,7 +489,7 @@ File: `bonsai-workspace/src/lib/components/AndroidPanel.svelte`
 
 ### 2.1 Define MCP Tools
 
-File: `crates/bonsai-mcp-server/src/android_tools.rs`
+File: `crates/mcp-server/src/android_tools.rs`
 
 ```rust
 use serde_json::{json, Value};
@@ -696,7 +696,7 @@ pub async fn handle_android_tool(
 
 ### 2.2 Register in MCP Server
 
-Update `crates/bonsai-mcp-server/src/tools.rs`:
+Update `crates/mcp-server/src/tools.rs`:
 
 ```rust
 pub fn list_tools() -> Vec<McpTool> {

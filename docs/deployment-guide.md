@@ -174,7 +174,7 @@ npm run build:firefox  # outputs dist/firefox/
 ### 3.5 Build Bonsai Buddy (Android)
 
 ```bash
-cd bonsai-buddy-android
+cd android-runtime
 ./gradlew assembleDebug       # debug APK
 ./gradlew assembleRelease     # release APK (requires signing config)
 ```

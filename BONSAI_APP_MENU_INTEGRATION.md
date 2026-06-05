@@ -233,7 +233,7 @@ In your toolbar/navigation (e.g., `src/components/Toolbar.svelte`):
 Copy `BonsaiAppMenu.kt` from `crates/bonsai-app-menu/` to your Android app:
 
 ```
-bonsai-buddy-android/app/src/main/java/ai/bonsai/buddy/menu/BonsaiAppMenu.kt
+android-runtime/app/src/main/java/ai/bonsai/buddy/menu/BonsaiAppMenu.kt
 ```
 
 ### Step 2: Import in Your Activity

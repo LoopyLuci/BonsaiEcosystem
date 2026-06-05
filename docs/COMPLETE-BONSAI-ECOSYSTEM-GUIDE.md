@@ -33,7 +33,7 @@ cargo build --release
 cargo test --all
 
 # Start BCF (Bonsai Container Fabric)
-./target/release/bonsai-bcf
+./target/release/container
 ```
 
 ### Deploy Your First Container
@@ -91,7 +91,7 @@ bonsai container logs --service web-service --tail 100
 │  ├─ Security (SBOM, encryption, scanning)   │
 │  └─ Optimization (lock-free, SIMD)          │
 ├─────────────────────────────────────────────┤
-│  UOSC (Bonsai Microkernel)                  │
+│  USOS (Bonsai Microkernel)                  │
 │  ├─ Sentinel Core (resource enforcement)    │
 │  ├─ Sanctum (hardware isolation)            │
 │  ├─ Echo Fabric (P2P networking)            │

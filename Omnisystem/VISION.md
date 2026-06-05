@@ -21,7 +21,7 @@ This fragmentation creates:
 
 ## The Solution: Omni-Languages
 
-We rebuild the **entire Bonsai Ecosystem and UOSC** using just **four carefully designed languages**:
+We rebuild the **entire Bonsai Ecosystem and USOS** using just **four carefully designed languages**:
 
 | Language | Domain | Replaces |
 |----------|--------|----------|
@@ -37,7 +37,7 @@ Each is **production-grade, formally verified, and designed for excellence in it
 ## Core Principles
 
 ### 1. **Minimalism**
-The UOSC kernel is **under 5000 lines** of code. It provides only:
+The USOS kernel is **under 5000 lines** of code. It provides only:
 - Memory management (physical and virtual)
 - Process scheduling (EDF for real-time)
 - Inter-process communication (message passing)
@@ -60,7 +60,7 @@ All I/O and randomness is **tracked via the effect system**. This ensures:
 
 ### 3. **Formal Verification**
 Critical code is accompanied by **Axiom proofs**:
-- UOSC kernel: memory safety, scheduler correctness, capability enforcement
+- USOS kernel: memory safety, scheduler correctness, capability enforcement
 - Services: protocol security, data structure invariants, safety properties
 - Standard library: no memory leaks, no data races
 
@@ -71,7 +71,7 @@ The Omnisystem builds itself:
 1. Rust compiles Titan compiler (bootstrap)
 2. Titan compiler compiles itself (`titan0` → `titan`)
 3. All languages (Sylva, Aether, Axiom) compiled by Titan
-4. Build tool (`omni`) written entirely in Titan
+4. Build tool (`build`) written entirely in Titan
 5. System verifies itself at compile time
 
 By 2027, there will be **zero dependency on external tools**. The Omnisystem is entirely sovereign.
@@ -102,13 +102,13 @@ All use the same effect types: `io`, `alloc`, `net`, `fail`, `async`. Cross-lang
 
 ```
 ┌─────────────────────────────────────────────────┐
-│         Applications (omni-ide, omni-bot, etc)  │
+│         Applications (build-ide, build-bot, etc)  │
 ├─────────────────────────────────────────────────┤
 │  Services (p2p, ai, media, knowledge, etc.)     │
 ├─────────────────────────────────────────────────┤
 │  Standard Library (titan::*, sylva::*, etc.)    │
 ├─────────────────────────────────────────────────┤
-│  UOSC Kernel (memory, scheduler, IPC, caps)     │
+│  USOS Kernel (memory, scheduler, IPC, caps)     │
 ├─────────────────────────────────────────────────┤
 │  Hardware (x86, ARM, RISC-V, GPU, WASM)         │
 └─────────────────────────────────────────────────┘
@@ -127,7 +127,7 @@ For existing codebases, we provide **transpilers** that convert code from legacy
 - Top 100 languages (C++, Python, JavaScript, etc.): hand-crafted transpilers
 - Remaining 650+ languages: auto-generated via Polyglot Pong
 
-Example: `omni import --from cpp --file my_library.cpp` generates equivalent Titan code.
+Example: `build import --from cpp --file my_library.cpp` generates equivalent Titan code.
 
 ### Phase B: Migration (2026-2027)
 All new code in Bonsai is written in Omni-languages. Legacy transpilers still available for old code.
@@ -155,8 +155,8 @@ By the end of 2026, the Omnisystem will have:
 ✅ **Scalability**: Tested at planet scale
 - 750×750 Polyglot Pong (language equivalence)
 - 10,000+ node Aether clusters
-- 1,000,000+ logs/second (omni-observability)
-- 1Gbps+ P2P throughput (omni-p2p)
+- 1,000,000+ logs/second (build-observability)
+- 1Gbps+ P2P throughput (build-p2p)
 
 ✅ **Security**: Defense-in-depth
 - Capability-based OS (no ambient authority)
@@ -167,7 +167,7 @@ By the end of 2026, the Omnisystem will have:
 ✅ **Maintainability**: Unified platform
 - Four languages instead of 750
 - Consistent APIs across services
-- Common tooling (omni command)
+- Common tooling (build command)
 - Clear architectural boundaries
 
 ---
@@ -189,7 +189,7 @@ By the end of 2026, the Omnisystem will have:
 ### 3. **Distributed Computing**
 - Automatic data replication (CRDT-based)
 - Consensus protocols (Byzantine fault tolerance)
-- Cross-continent failover (omni-p2p mesh)
+- Cross-continent failover (build-p2p mesh)
 - Zero-trust networking (capability-based)
 
 ### 4. **Standards & Ecosystem**
@@ -233,7 +233,7 @@ By the end of 2026, the Omnisystem will have:
 | Date | Milestone | Status |
 |------|-----------|--------|
 | **2026-Q1** | Phase 0: Language enhancements complete | 🚧 In progress |
-| **2026-Q2** | Phase 1-2: UOSC core + core services | 📋 Planned |
+| **2026-Q2** | Phase 1-2: USOS core + core services | 📋 Planned |
 | **2026-Q3** | Phase 3: All services running | 📋 Planned |
 | **2026-Q4** | Phase 4-5: Verification & self-hosting | 📋 Planned |
 | **2027-Q1** | Production release: Omnisystem 1.0 | 📋 Planned |

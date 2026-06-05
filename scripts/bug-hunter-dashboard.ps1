@@ -64,7 +64,7 @@ class Dashboard {
         }
         catch {
             Write-Host "  ✗ MCP Server Status: NOT RUNNING" -ForegroundColor Red
-            Write-Host "  ✗ Start with: .\target\release\bonsai-mcp-server.exe" -ForegroundColor Yellow
+            Write-Host "  ✗ Start with: .\target\release\mcp-server.exe" -ForegroundColor Yellow
         }
 
         Write-Host "└──────────────────────────────────────────────────────────────┘" -ForegroundColor Cyan

@@ -899,7 +899,7 @@ pip install torch transformers datasets
 
 # Download models
 # Omni-AI Octopus: D:\Models\Custom\octopus-ai-model/
-# Omni-AI Poe: omnisystem/omni-ai/poe/
+# Omni-AI Poe: omnisystem/build-ai/poe/
 ```
 
 ### Execution Script
@@ -910,8 +910,8 @@ suite = EvaluationSuite()
 suite.load_100_prompts()
 
 # Test both models
-octopus_results = suite.evaluate_model("omni-ai-octopus", all_prompts)
-poe_results = suite.evaluate_model("omni-ai-poe", all_prompts)
+octopus_results = suite.evaluate_model("build-ai-octopus", all_prompts)
+poe_results = suite.evaluate_model("build-ai-poe", all_prompts)
 
 # Generate report
 suite.generate_report(octopus_results, poe_results)

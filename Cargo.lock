@@ -1079,67 +1079,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-bmf-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "chrono",
- "rand 0.8.6",
- "serde",
- "serde_json",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-bmf-imap"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bonsai-bmf-core",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-bmf-p2p"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "bonsai-bmf-core",
- "serde",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-bmf-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bonsai-bmf-core",
- "bonsai-bmf-imap",
- "bonsai-bmf-smtp",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "bonsai-bmf-smtp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bonsai-bmf-core",
- "chrono",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "bonsai-bot"
 version = "0.1.0"
 dependencies = [
@@ -1238,9 +1177,9 @@ dependencies = [
  "bonsai-actors",
  "bonsai-capability-registry",
  "bonsai-cas",
- "bonsai-transfer-crypto",
  "hex",
  "log",
+ "p2p-crypto",
  "serde",
  "serde_json",
  "tokio",
@@ -1305,8 +1244,6 @@ dependencies = [
  "bonsai-skills",
  "bonsai-sylva",
  "bonsai-tool-registry",
- "bonsai-transfer-core",
- "bonsai-transfer-crypto",
  "bonsai-transfer-store",
  "bonsai-ui-orchestrator",
  "bonsai-verify-agda",
@@ -1317,6 +1254,8 @@ dependencies = [
  "bonsai-verify-tla",
  "dirs 5.0.1",
  "hex",
+ "p2p-core",
+ "p2p-crypto",
  "rand 0.8.6",
  "serde",
  "serde_json",
@@ -1327,36 +1266,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
-]
-
-[[package]]
-name = "bonsai-enclave"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "chrono",
- "clap",
- "dashmap 5.5.3",
- "dirs 5.0.1",
- "futures",
- "hex",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.9",
- "tar",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "toml 0.8.2",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "walkdir",
- "xz2",
 ]
 
 [[package]]
@@ -1421,9 +1330,9 @@ name = "bonsai-mailbox"
 version = "0.1.0"
 dependencies = [
  "bonsai-relay",
- "bonsai-transfer-core",
- "bonsai-transfer-crypto",
  "dashmap 5.5.3",
+ "p2p-core",
+ "p2p-crypto",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -1471,36 +1380,17 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "bonsai-transfer-core",
- "bonsai-transfer-crypto",
  "bytes",
  "futures",
  "libp2p",
+ "p2p-core",
+ "p2p-crypto",
  "serde",
  "thiserror 1.0.69",
  "tokio",
  "tokio-socks",
  "tracing",
  "webrtc",
-]
-
-[[package]]
-name = "bonsai-prec"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bincode",
- "blake3",
- "bonsai-bco",
- "bonsai-buir",
- "bonsai-cas-ext",
- "dashmap 5.5.3",
- "hex",
- "lru",
- "serde",
- "serde_json",
- "tokio",
- "zstd 0.13.3",
 ]
 
 [[package]]
@@ -1532,10 +1422,10 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "blake3",
- "bonsai-transfer-core",
- "bonsai-transfer-crypto",
  "dashmap 5.5.3",
  "hex",
+ "p2p-core",
+ "p2p-crypto",
  "rand 0.8.6",
  "serde",
  "serde_json",
@@ -1632,90 +1522,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-transfer-core"
-version = "2.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "blake3",
- "bonsai-transfer-ai",
- "bonsai-transfer-crypto",
- "bonsai-transfer-identity",
- "bytes",
- "dashmap 5.5.3",
- "parking_lot",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-transfer-crypto"
-version = "2.0.0"
-dependencies = [
- "aes-gcm",
- "argon2",
- "bip39",
- "bitflags 2.11.1",
- "blake3",
- "chrono",
- "ed25519-dalek",
- "hex",
- "rand 0.8.6",
- "rand_core 0.6.4",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "x25519-dalek",
- "zeroize",
-]
-
-[[package]]
-name = "bonsai-transfer-identity"
-version = "2.0.0"
-dependencies = [
- "anyhow",
- "blake3",
- "chrono",
- "ed25519-dalek",
- "hex",
- "rand 0.8.6",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "bonsai-transfer-store"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "argon2",
  "blake3",
- "bonsai-transfer-crypto",
  "dirs 5.0.1",
+ "p2p-crypto",
  "rand 0.8.6",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "zeroize",
-]
-
-[[package]]
-name = "bonsai-udc"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "hex",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "uuid",
 ]
 
 [[package]]
@@ -1744,37 +1563,6 @@ dependencies = [
  "anyhow",
  "arc-swap",
  "serde",
-]
-
-[[package]]
-name = "bonsai-utof"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "chrono",
- "clap",
- "dashmap 5.5.3",
- "dirs 5.0.1",
- "futures",
- "hex",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "serde_json_path",
- "serde_yaml",
- "sha2 0.10.9",
- "tar",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "toml 0.8.2",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "walkdir",
- "xz2",
 ]
 
 [[package]]
@@ -2281,6 +2069,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "compiler-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "blake3",
+ "bonsai-bco",
+ "bonsai-buir",
+ "bonsai-cas-ext",
+ "dashmap 5.5.3",
+ "hex",
+ "lru",
+ "serde",
+ "serde_json",
+ "tokio",
+ "zstd 0.13.3",
 ]
 
 [[package]]
@@ -5988,6 +5795,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "msg-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "chrono",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "msg-imap"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "msg-core",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "msg-p2p"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "msg-core",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "msg-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "msg-core",
+ "msg-imap",
+ "msg-smtp",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "msg-smtp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "msg-core",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "multiaddr"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6550,6 +6418,64 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "p2p-core"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "blake3",
+ "bonsai-transfer-ai",
+ "bytes",
+ "dashmap 5.5.3",
+ "p2p-crypto",
+ "p2p-identity",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "p2p-crypto"
+version = "2.0.0"
+dependencies = [
+ "aes-gcm",
+ "argon2",
+ "bip39",
+ "bitflags 2.11.1",
+ "blake3",
+ "chrono",
+ "ed25519-dalek",
+ "hex",
+ "rand 0.8.6",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "x25519-dalek",
+ "zeroize",
+]
+
+[[package]]
+name = "p2p-identity"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "chrono",
+ "ed25519-dalek",
+ "hex",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -8074,6 +8000,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "sandbox"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "chrono",
+ "clap",
+ "dashmap 5.5.3",
+ "dirs 5.0.1",
+ "futures",
+ "hex",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "toml 0.8.2",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "walkdir",
+ "xz2",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9162,6 +9118,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "test-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "chrono",
+ "clap",
+ "dashmap 5.5.3",
+ "dirs 5.0.1",
+ "futures",
+ "hex",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "serde_json_path",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "toml 0.8.2",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "walkdir",
+ "xz2",
 ]
 
 [[package]]

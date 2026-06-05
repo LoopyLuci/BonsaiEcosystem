@@ -532,7 +532,7 @@ pub async fn rollback_model(
 
 ## 📱 Android Implementation
 
-### 1. Create `bonsai-buddy-android/app/src/main/java/ai/bonsai/buddy/workshop/ModelWorkshopActivity.kt`
+### 1. Create `android-runtime/app/src/main/java/ai/bonsai/buddy/workshop/ModelWorkshopActivity.kt`
 
 ```kotlin
 package ai.bonsai.buddy.workshop
@@ -790,7 +790,7 @@ suspend fun fetchJobs(client: OkHttpClient): List<JobData> {
 }
 ```
 
-### 2. Create `bonsai-buddy-android/app/src/main/java/ai/bonsai/buddy/mcp/McpManagerActivity.kt`
+### 2. Create `android-runtime/app/src/main/java/ai/bonsai/buddy/mcp/McpManagerActivity.kt`
 
 ```kotlin
 package ai.bonsai.buddy.mcp

@@ -21,8 +21,8 @@ pub fn main() -> i64 {
     let auth_gen: i64 = generate_project_file("auth.ti", "password hashing");
     if auth_gen >= 10 { score += 1; }
 
-    // Test 5 — Generate omni.toml config
-    let config_gen: i64 = generate_project_file("omni.toml", "project config");
+    // Test 5 — Generate build.toml config
+    let config_gen: i64 = generate_project_file("build.toml", "project config");
     if config_gen >= 10 { score += 1; }
 
     // Test 6 — Generate README.md
@@ -38,7 +38,7 @@ pub fn generate_project_file(filename: String, description: String) -> i64 {
     if filename == "server.ti" { return 15; }
     if filename == "database.ti" { return 12; }
     if filename == "auth.ti" { return 12; }
-    if filename == "omni.toml" { return 15; }
+    if filename == "build.toml" { return 15; }
     if filename == "README.md" { return 15; }
     return 10;
 }

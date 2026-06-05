@@ -1,4 +1,4 @@
-// services/omni-compress/compress.ti — Deterministic compression (RLE + LZ-style)
+// services/build-compress/compress.ti — Deterministic compression (RLE + LZ-style)
 
 extern "titan" {
     fn heap_alloc_term() -> i64;

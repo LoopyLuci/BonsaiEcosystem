@@ -1038,7 +1038,7 @@ cargo test --all-features -- --chaos   # Chaos tests with poisoned AI (must pres
 - ✅ Validates entire AI-optional backbone
 - ✅ Proves system survives AI failure
 - ✅ Ensures deterministic core is truly primary
-- ✅ Reference implementation for `bonsai-ai-fallback`
+- ✅ Reference implementation for `ai-advisor`
 
 ---
 
@@ -1211,7 +1211,7 @@ pub async fn verify_historical_polyglot_pong(run_id: UUID) -> anyhow::Result<boo
 
 These **10 bleeding-edge enhancements** transform Polyglot Pong from a test framework into a **scientific instrument and permanent record of programming language interoperability**. The system remains fully deterministic, AI-optional, and formally verifiable—while advancing the state of language research, compiler quality, and green computing.
 
-Together with the core Polyglot Pong framework and the `bonsai-ai-fallback` backbone, this represents the **most ambitious, rigorous, and future-proof validation infrastructure ever built for a polyglot ecosystem**. 🚀
+Together with the core Polyglot Pong framework and the `ai-advisor` backbone, this represents the **most ambitious, rigorous, and future-proof validation infrastructure ever built for a polyglot ecosystem**. 🚀
 
 ---
 

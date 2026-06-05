@@ -119,7 +119,7 @@ Dashboard Updated
 | `crates/bonsai-etl/src/confidence.rs` | Calculate dynamic confidence scores |
 | `crates/bonsai-lint/src/rules/mod.rs` | Rule registry with metadata |
 | `bonsai-workspace/src/lib/components/LintPanel.svelte` | IDE feedback UI |
-| `crates/bonsai-mcp-server/src/lint_commands.rs` | Handle feedback requests |
+| `crates/mcp-server/src/lint_commands.rs` | Handle feedback requests |
 
 ---
 
