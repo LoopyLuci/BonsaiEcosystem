@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-06-05 — External Binding Framework Complete (49/49 Passing)
+
+### Added
+- `bindings/socket_handler.ti` — SOCKET effect handler with FFI to libc (sendto/recvfrom)
+- `bindings/socket_shim.c` — Minimal C wrapper for POSIX socket syscalls
+- `bindings/p2p_socket_integration.ti` — Integration test: Aether mesh + real sockets
+- `bindings/gpu_runtime.ti` — GPU effect handler for CUDA/HIP/Vulkan drivers
+- `bindings/bootloader.ti` — UEFI protocol handler for firmware handoff
+- `bindings/README.md` — Complete external binding architecture guide
+
+### Result
+- **49 / 49 Titan files passing** (45 core + 4 binding modules)
+- **4 complete external binding layers** (network, GPU, boot, SMT solver)
+- Omnisystem fully bridged to physical hardware and OS services
+
+### External Binding Architecture
+```
+Pure Titan Core (45 tests) → Effect System → External Bindings (4 tests) → Hardware
+- Network: socket_handler → libsocket → Real network packets
+- GPU: gpu_runtime → CUDA/HIP/Vulkan → GPU kernel execution
+- Boot: bootloader → UEFI firmware → Bare-metal kernel
+- SMT: smt_solver → Z3/CVC5 → Automated proof discharge
+```
+
+---
+
 ## 2026-06-05 — Bootable Kernel Integration & System Completion (45/45 Passing)
 
 ### Added

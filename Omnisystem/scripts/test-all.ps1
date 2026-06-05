@@ -51,6 +51,12 @@ $sources = [ordered]@{
         "effect\socket_io.ti",
         "titan\std\effect_handlers.ti"
     )
+    "Bindings (External Integration)" = @(
+        "bindings\socket_handler.ti",
+        "bindings\p2p_socket_integration.ti",
+        "bindings\gpu_runtime.ti",
+        "bindings\bootloader.ti"
+    )
     "Build Infrastructure" = @(
         "build\ir\ir.ti"
     )
