@@ -372,7 +372,7 @@ intent-filter {
 
 ### Build All Apps
 ```bash
-cd /z/Projects/BonsaiWorkspace/android-runtime
+cd /z/Projects/BonsaiEcosystem/android-runtime
 ./gradlew assembleDebug  # All apps in one build
 ./gradlew test           # Run all tests
 ```

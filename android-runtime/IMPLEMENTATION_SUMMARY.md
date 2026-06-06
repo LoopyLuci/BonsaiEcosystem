@@ -349,7 +349,7 @@ The complete Kotlin BRDF Mobile Client implementation for Bonsai Buddy is now pr
 
 ### Run All Tests
 ```bash
-cd /z/Projects/BonsaiWorkspace/android-runtime
+cd /z/Projects/BonsaiEcosystem/android-runtime
 ./gradlew test
 ```
 

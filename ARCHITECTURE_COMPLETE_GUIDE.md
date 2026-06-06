@@ -85,7 +85,7 @@
 ### Root Level
 
 ```
-BonsaiWorkspace/
+BonsaiEcosystem/
 ├── bonsai-workspace/              # Main Tauri application
 │   ├── src/                       # Svelte frontend
 │   ├── src-tauri/                # Rust backend (Tauri commands)

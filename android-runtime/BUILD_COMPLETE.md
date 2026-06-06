@@ -394,7 +394,7 @@ All apps need:
 
 ### Build Everything
 ```bash
-cd /z/Projects/BonsaiWorkspace/android-runtime
+cd /z/Projects/BonsaiEcosystem/android-runtime
 ./gradlew clean build
 ```
 

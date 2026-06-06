@@ -228,7 +228,7 @@ Rust runner:       14 lines of validation code ✓
 
 ```powershell
 # Step 1: Navigate to workspace
-cd z:\Projects\BonsaiWorkspace
+cd z:\Projects\BonsaiEcosystem
 
 # Step 2: Run the 10×10 test
 .\run_10x10_test.ps1 -Frames 100
