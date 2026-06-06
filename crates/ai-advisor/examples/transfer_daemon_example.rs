@@ -3,7 +3,7 @@
 //! Demonstrates how TransferDaemon integrates the SovereignService trait
 //! and Arbiter orchestration for deterministic-first, AI-optional messaging.
 
-use bonsai_ai_fallback::{
+use ai_fallback::{
     SovereignService, Arbiter, ArbiterConfig, ExecutionTier, AdvisoryOutput, Error, Result,
 };
 

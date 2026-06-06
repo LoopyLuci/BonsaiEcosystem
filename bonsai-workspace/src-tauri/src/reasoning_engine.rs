@@ -10,10 +10,10 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use bonsai_knowledge::{
+use knowledge::{
     new_belief_id, Belief, BeliefId, Entity, Evidence, KnowledgeGraph, ProvenanceSource,
 };
-use bonsai_verify::{definitionally_equal, AxiomKernel, Context as VerifyContext, Term};
+use verify::{definitionally_equal, AxiomKernel, Context as VerifyContext, Term};
 
 use crate::belief_reviser::{BeliefReviser, ConsistencyResult};
 use crate::metacognitive_monitor::{
@@ -176,7 +176,7 @@ impl ReasoningEngine {
         let belief_hits: Vec<Belief> = relevant
             .iter()
             .filter_map(|r| match &r.kind {
-                bonsai_knowledge::SearchResultKind::Belief(b) => Some(b.clone()),
+                knowledge::SearchResultKind::Belief(b) => Some(b.clone()),
                 _ => None,
             })
             .collect();
@@ -199,11 +199,11 @@ impl ReasoningEngine {
         // 4. Check for transitive Is-A relations
         let transitive = self
             .knowledge
-            .transitive_closure(&bonsai_knowledge::Predicate::Implies);
+            .transitive_closure(&knowledge::Predicate::Implies);
         let relevant_transitive: Vec<_> = transitive
             .iter()
             .filter(|r| {
-                if let bonsai_knowledge::RelationTarget::Entity(eid) = &r.object {
+                if let knowledge::RelationTarget::Entity(eid) = &r.object {
                     self.knowledge.get_entity(eid).map_or(false, |e| {
                         e.name
                             .to_lowercase()
@@ -298,7 +298,7 @@ impl ReasoningEngine {
         let entity_list: Vec<Entity> = entities
             .iter()
             .filter_map(|r| match &r.kind {
-                bonsai_knowledge::SearchResultKind::Entity(e) => Some(e.clone()),
+                knowledge::SearchResultKind::Entity(e) => Some(e.clone()),
                 _ => None,
             })
             .collect();
@@ -378,7 +378,7 @@ impl ReasoningEngine {
         let mut scored: Vec<(Belief, f32)> = candidates
             .iter()
             .filter_map(|r| match &r.kind {
-                bonsai_knowledge::SearchResultKind::Belief(b) => {
+                knowledge::SearchResultKind::Belief(b) => {
                     // Score = belief confidence × search score
                     let posterior = b.confidence * r.score;
                     Some((b.clone(), posterior))
@@ -491,10 +491,10 @@ impl ReasoningEngine {
         // Find beliefs affected by the change via Causes/DependsOn relations
         let affected: Vec<Entity> = self
             .knowledge
-            .transitive_closure(&bonsai_knowledge::Predicate::Causes)
+            .transitive_closure(&knowledge::Predicate::Causes)
             .into_iter()
             .filter_map(|r| {
-                if let bonsai_knowledge::RelationTarget::Entity(eid) = r.object {
+                if let knowledge::RelationTarget::Entity(eid) = r.object {
                     self.knowledge.get_entity(&eid)
                 } else {
                     None
@@ -650,7 +650,7 @@ fn extract_counterfactual_change(query: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonsai_knowledge::{Belief, Entity, EntityType, KnowledgeGraph};
+    use knowledge::{Belief, Entity, EntityType, KnowledgeGraph};
 
     fn engine_with_knowledge() -> ReasoningEngine {
         let kg = Arc::new(KnowledgeGraph::new());

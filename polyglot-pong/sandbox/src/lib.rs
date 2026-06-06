@@ -7,7 +7,7 @@
 pub mod runner;
 
 use polyglot_pong_common::*;
-use bonsai_ai_fallback::{SovereignService, Arbiter, ArbiterConfig, AdvisoryOutput};
+use ai_fallback::{SovereignService, Arbiter, ArbiterConfig, AdvisoryOutput};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;

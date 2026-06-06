@@ -1,10 +1,10 @@
-use bonsai_bco::BcoFile;
+use bco::BcoFile;
 
 pub struct PartialEvaluator;
 
 impl PartialEvaluator {
     /// Partially evaluate a function with known arguments
-    pub fn evaluate(&self, func: &bonsai_buir::BuirFunction, _known_args: &[(String, serde_json::Value)]) -> bonsai_buir::BuirFunction {
+    pub fn evaluate(&self, func: &buir::BuirFunction, _known_args: &[(String, serde_json::Value)]) -> buir::BuirFunction {
         // Placeholder: fold constant expressions, eliminate dead branches
         func.clone()
     }

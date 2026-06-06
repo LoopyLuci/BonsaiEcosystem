@@ -3,7 +3,7 @@
 //! Exposes the full `bonsai-swarm` API to the frontend as typed IPC commands.
 //! All heavy state lives in `SwarmState`.
 
-use bonsai_swarm::{
+use swarm::{
     assistant::AssistantSuggestion,
     hierarchy::{HierarchyNode, HierarchyStats, NodeStatus},
     ledger::LedgerEntry,
@@ -204,7 +204,7 @@ pub async fn spawn_agent_node(
     state: State<'_, SwarmState>,
     request: SpawnAgentRequest,
 ) -> Result<SpawnAgentResponse, String> {
-    use bonsai_swarm::hierarchy::HierarchyNode;
+    use swarm::hierarchy::HierarchyNode;
 
     let swarm_id: Uuid = request.swarm_id.parse().map_err(|_| "invalid swarm_id")?;
     let parent_id: Option<Uuid> = request
@@ -290,7 +290,7 @@ pub async fn register_agent_capabilities(
     state: State<'_, SwarmState>,
     request: RegisterCapabilityRequest,
 ) -> Result<(), String> {
-    use bonsai_swarm::role::AgentProfile;
+    use swarm::role::AgentProfile;
 
     let agent_id: Uuid = request.agent_id.parse().map_err(|_| "invalid agent_id")?;
     let role = match request.role.as_str() {
@@ -374,7 +374,7 @@ pub async fn spawn_swarm_from_template(
     });
 
     // 2. Load template from the registry
-    let registry = bonsai_swarm::TemplateRegistry::new();
+    let registry = swarm::TemplateRegistry::new();
     registry.load_defaults().await;
     let template = registry.get(&template_name).await
         .ok_or_else(|| format!("Template '{}' not found", template_name))?;
@@ -397,7 +397,7 @@ pub async fn spawn_swarm_from_template(
 pub async fn get_swarm_dag(
     state: State<'_, SwarmState>,
     swarm_id: String,
-) -> Result<Vec<bonsai_swarm::dag::TaskNode>, String> {
+) -> Result<Vec<swarm::dag::TaskNode>, String> {
     let id: Uuid = swarm_id.parse().map_err(|_| "invalid swarm_id")?;
     let orch = state.registry.get(id).await.ok_or("swarm not found")?;
     let dag = orch.dag.read().await;

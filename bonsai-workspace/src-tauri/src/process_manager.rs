@@ -23,7 +23,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::gpu_layer::GpuLayer;
-use bonsai_capability_registry::BonsaiEffect;
+use capability_registry::BonsaiEffect;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1 — Trust level and sandboxing

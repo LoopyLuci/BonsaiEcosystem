@@ -5,7 +5,7 @@ use tracing::{debug, info, warn};
 
 use crate::checkpoint_impl;
 use crate::state::DaemonState;
-use bonsai_cas::{CasEvent, CasStore};
+use cas::{CasEvent, CasStore};
 
 /// Memory ceiling above which a warning is emitted (bytes).
 const MEMORY_WARN_BYTES: u64 = 512 * 1024 * 1024; // 512 MiB
@@ -33,7 +33,7 @@ pub async fn run_health_monitor(state: Arc<DaemonState>, cas: Arc<CasStore>) {
         if let Ok(key_str) = std::fs::read_to_string(&checkpoint_key_path) {
             let key_str = key_str.trim();
             if !key_str.is_empty() {
-                match bonsai_cas::CasKey::from_hex(key_str) {
+                match cas::CasKey::from_hex(key_str) {
                     Ok(key) => match checkpoint_impl::restore(&state, &cas, &key).await {
                         Ok(()) => {
                             info!(cas_key = %key_str, "health-monitor: restored state from checkpoint")

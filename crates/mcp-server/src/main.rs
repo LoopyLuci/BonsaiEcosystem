@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use bonsai_mcp_server::uacs::{HeadlessConfig, HITLConfig, ApprovalCategory};
+use mcp_server::uacs::{HeadlessConfig, HITLConfig, ApprovalCategory};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -94,7 +94,7 @@ async fn main() {
             } else {
                 tracing::warn!("Human-In-The-Loop: DISABLED");
             }
-            bonsai_mcp_server::server::run_uacs_visual(&host, port, hitl)
+            mcp_server::server::run_uacs_visual(&host, port, hitl)
                 .await
                 .unwrap();
         }
@@ -129,7 +129,7 @@ async fn main() {
             } else {
                 tracing::warn!("Human-In-The-Loop: DISABLED");
             }
-            bonsai_mcp_server::server::run_uacs_headless(&host, port, config, hitl)
+            mcp_server::server::run_uacs_headless(&host, port, config, hitl)
                 .await
                 .unwrap();
         }
@@ -138,7 +138,7 @@ async fn main() {
             let hitl = HITLConfig::default();
             tracing::info!("Starting Universal Agent Control System in Headless Mode (default)");
             tracing::info!("Human-In-The-Loop: ENABLED (default categories)");
-            bonsai_mcp_server::server::run_uacs_headless("127.0.0.1", 11425, config, hitl)
+            mcp_server::server::run_uacs_headless("127.0.0.1", 11425, config, hitl)
                 .await
                 .unwrap();
         }

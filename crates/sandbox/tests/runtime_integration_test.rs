@@ -1,6 +1,6 @@
 //! Integration tests for Bonsai Enclave runtime downloader
 
-use bonsai_enclave::{
+use enclave::{
     EnclaveConfig, RuntimeManifest, RuntimeEntry, ContentAddressedStore,
 };
 use tempfile::TempDir;
@@ -159,7 +159,7 @@ async fn test_content_addressed_storage() {
         .unwrap();
 
     let data = b"test data";
-    let hash = bonsai_enclave::cas::ContentHash(
+    let hash = enclave::cas::ContentHash(
         blake3::hash(data).to_hex().to_string(),
     );
 

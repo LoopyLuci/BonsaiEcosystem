@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use bonsai_credits::{
+use credits::{
     community::PersistentCommunityPool,
     estimator::{default_profiles, estimate, ProgressEstimator, TaskEstimateRequest, TaskProfile},
     ledger::Ledger,
@@ -14,7 +14,7 @@ use bonsai_credits::{
     meter::{MeterHandle, ResourceMeter},
     urv::{credits_per_minute, paid_bonus_multiplier, DeviceClass, DeviceUrv, BASE_RATE},
 };
-use bonsai_marketplace::{
+use marketplace::{
     free_tier::{FreeProject, FreeProjectStatus, FreeTierOrchestrator},
     listing::{filter_listings, to_listing, DeviceListing, MarketplaceFilter},
     registry::{DeviceRegistration, DeviceRegistry},
@@ -411,7 +411,7 @@ pub async fn estimate_project(
 pub async fn earnings_history(
     state: State<'_, ClusterState>,
     days: u32,
-) -> Result<Vec<bonsai_credits::manager::EarnReceipt>, String> {
+) -> Result<Vec<credits::manager::EarnReceipt>, String> {
     state
         .credit_manager
         .earnings_history(days)
@@ -423,7 +423,7 @@ pub async fn earnings_history(
 pub async fn spending_history(
     state: State<'_, ClusterState>,
     days: u32,
-) -> Result<Vec<bonsai_credits::manager::SpendReceipt>, String> {
+) -> Result<Vec<credits::manager::SpendReceipt>, String> {
     state
         .credit_manager
         .spending_history(days)

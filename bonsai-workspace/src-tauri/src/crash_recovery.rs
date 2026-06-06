@@ -39,7 +39,7 @@ pub fn arm_crash_flag(app: &AppHandle) {
 pub async fn check_and_recover(
     app: &AppHandle,
     wal: &crate::wal::WAL,
-    universe: Option<&Arc<bonsai_universe::Universe>>,
+    universe: Option<&Arc<universe::Universe>>,
 ) -> bool {
     let path = flag_path(app);
     if !path.exists() {

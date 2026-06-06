@@ -59,7 +59,7 @@ pub struct MgmtState {
     >,
     pub app_handle: tauri::AppHandle,
     pub pair_token: String,
-    pub bonsai_core: Arc<crate::bonsai_core::BonsaiCore>,
+    pub bonsai_core: Arc<crate::core::BonsaiCore>,
     pub telemetry: Arc<crate::telemetry::TelemetryStore>,
     pub dual_session: Arc<crate::dual_inference::SessionManager>,
     pub training_loop: Arc<crate::training_loop::TrainingLoopState>,
@@ -67,7 +67,7 @@ pub struct MgmtState {
     pub plugin_host: Arc<crate::plugin_host::PluginHost>,
     pub tool_registry: Arc<crate::tool_registry::ToolRegistryState>,
     pub game_sessions: Arc<crate::games::GameSessionStore>,
-    pub knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
+    pub knowledge: Arc<knowledge::KnowledgeGraph>,
     pub reasoning: Arc<crate::reasoning_engine::ReasoningEngine>,
     pub belief_reviser: Arc<tokio::sync::RwLock<crate::belief_reviser::BeliefReviser>>,
     pub metacognitive: Arc<tokio::sync::RwLock<crate::metacognitive_monitor::MetacognitiveMonitor>>,
@@ -692,7 +692,7 @@ async fn mgmt_curator_flush(State(s): State<MgmtState>, headers: HeaderMap) -> i
 struct BonsaiProcessBody {
     request: String,
     #[serde(default)]
-    history: Vec<crate::bonsai_core::ChatMessage>,
+    history: Vec<crate::core::ChatMessage>,
 }
 
 async fn mgmt_bonsai_process(
@@ -1078,7 +1078,7 @@ async fn mgmt_chess_new(
     headers: HeaderMap,
     Json(req): Json<ChessNewReq>,
 ) -> impl IntoResponse {
-    use bonsai_chess::{
+    use chess::{
         ChessColor, ChessGameSession, Player as ChessPlayer, PlayerKind as ChessPlayerKind,
     };
     auth!(s, headers);
@@ -1251,7 +1251,7 @@ async fn mgmt_go_new(
     headers: HeaderMap,
     Json(req): Json<GoNewReq>,
 ) -> impl IntoResponse {
-    use bonsai_go::{GoColor, GoGameSession, GoPlayer, GoPlayerKind};
+    use go::{GoColor, GoGameSession, GoPlayer, GoPlayerKind};
     auth!(s, headers);
     let player_name = req.player_name.unwrap_or_else(|| "BotPlayer".into());
     let color = req.human_color.as_deref().unwrap_or("black");
@@ -1307,8 +1307,8 @@ async fn mgmt_go_move(
     headers: HeaderMap,
     Json(req): Json<GoMoveReq>,
 ) -> impl IntoResponse {
-    use bonsai_go::mcts::{go_search, RandomGoEvaluator};
-    use bonsai_go::Stone;
+    use go::mcts::{go_search, RandomGoEvaluator};
+    use go::Stone;
     auth!(s, headers);
     let id: uuid::Uuid = match req.game_id.parse() {
         Ok(v) => v,
@@ -1338,7 +1338,7 @@ async fn mgmt_go_move(
         )
             .into_response();
     }
-    let ai_move = if matches!(session.result, bonsai_go::GoGameResult::Ongoing) {
+    let ai_move = if matches!(session.result, go::GoGameResult::Ongoing) {
         let ai_color: Stone = if session.white.id == "bonsai" {
             Stone::White
         } else {
@@ -1346,7 +1346,7 @@ async fn mgmt_go_move(
         };
         let board = session.board.clone();
         let eval = RandomGoEvaluator;
-        let cfg = bonsai_go::GoMctsConfig::interactive();
+        let cfg = go::GoMctsConfig::interactive();
         let r = go_search(&board, ai_color, &eval, &cfg);
         let mv = r.best_move.clone();
         let _ = session.play("bonsai", &mv);
@@ -1534,9 +1534,9 @@ async fn mgmt_knowledge_search(
         .unwrap_or(10);
     let results = state.knowledge.text_search(q, top_k);
     let items: Vec<serde_json::Value> = results.iter().map(|r| match &r.kind {
-        bonsai_knowledge::SearchResultKind::Entity(e) =>
+        knowledge::SearchResultKind::Entity(e) =>
             json!({ "kind": "entity", "id": e.id, "name": e.name, "confidence": e.confidence, "score": r.score }),
-        bonsai_knowledge::SearchResultKind::Belief(b) =>
+        knowledge::SearchResultKind::Belief(b) =>
             json!({ "kind": "belief", "id": b.id, "statement": b.statement, "confidence": b.confidence, "score": r.score }),
     }).collect();
     Json(json!({ "results": items, "count": items.len() })).into_response()
@@ -1551,7 +1551,7 @@ async fn mgmt_knowledge_add_entity(
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     }
     let name = body["name"].as_str().unwrap_or("unnamed");
-    let entity = bonsai_knowledge::Entity::new(name, bonsai_knowledge::EntityType::Concept);
+    let entity = knowledge::Entity::new(name, knowledge::EntityType::Concept);
     let id = state.knowledge.upsert_entity(entity);
     Json(json!({ "entity_id": id })).into_response()
 }
@@ -1566,7 +1566,7 @@ async fn mgmt_knowledge_add_belief(
     }
     let statement = body["statement"].as_str().unwrap_or("");
     let confidence = body["confidence"].as_f64().unwrap_or(0.7) as f32;
-    let belief = bonsai_knowledge::Belief::new(statement, confidence);
+    let belief = knowledge::Belief::new(statement, confidence);
     let id = state.knowledge.add_belief(belief);
     Json(json!({ "belief_id": id })).into_response()
 }

@@ -21,5 +21,5 @@ fn main() {
     // Publish the mode so lib.rs setup can read it without threading it through run().
     // SAFETY: we set this before any threads spawn, so there is no race.
     unsafe { std::env::set_var("BONSAI_LAUNCH_MODE", &cli.mode) };
-    bonsai_workspace_lib::run();
+    workspace_lib::run();
 }

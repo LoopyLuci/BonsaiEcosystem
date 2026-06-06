@@ -1,0 +1,18 @@
+
+[package]
+name = "model-registry"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+blake3 = "1"
+ed25519-dalek = "2.0"
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+walkdir = "2"
+cas = { path = "../cas" }
+error-types = { path = "../error-types" }
+p2p = { path = "../p2p" }

@@ -21,12 +21,12 @@ parking_lot = "0.12"
 anyhow     = "1"
 
 # Optional AI enhancements (feature-gated)
-bonsai-transfer-ai = { path = "../bonsai-transfer-ai", optional = true }
+transfer-ai = { path = "../transfer-ai", optional = true }
 
 [features]
 default = ["deterministic-core"]
 deterministic-core = []
-ai-enhancements = ["bonsai-transfer-ai"]
+ai-enhancements = ["transfer-ai"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

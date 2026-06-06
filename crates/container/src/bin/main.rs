@@ -1,7 +1,7 @@
-use bonsai_bcf::BonsaiContainerFabric;
+use bcf::BonsaiContainerFabric;
 
 #[tokio::main]
-async fn main() -> bonsai_bcf::Result<()> {
+async fn main() -> bcf::Result<()> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
 

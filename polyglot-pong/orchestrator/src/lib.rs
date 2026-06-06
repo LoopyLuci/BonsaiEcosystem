@@ -10,7 +10,7 @@ pub mod language_runner;
 // mod comparison;
 
 use polyglot_pong_common::*;
-// use bonsai_ai_fallback::{SovereignService, Arbiter, ArbiterConfig, AdvisoryOutput};
+// use ai_fallback::{SovereignService, Arbiter, ArbiterConfig, AdvisoryOutput};
 use std::sync::Arc;
 use std::path::PathBuf;
 use tokio::sync::RwLock;

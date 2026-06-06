@@ -1,0 +1,29 @@
+[package]
+name = "bedf-fuzzing"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Team A: Fuzzing Engine"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+blake3.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+
+[[lib]]
+name = "bonsai_bedf_fuzzing"
+path = "src/lib.rs"
+
+[lints]
+workspace = true

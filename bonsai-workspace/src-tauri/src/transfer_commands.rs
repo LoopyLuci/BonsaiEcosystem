@@ -13,8 +13,8 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 
-use bonsai_mailbox::{AgentMailbox, MailEnvelope};
-use bonsai_transfer_core::{
+use mailbox::{AgentMailbox, MailEnvelope};
+use transfer_core::{
     lane::InProcessLane,
     scheduler::EcfRgScheduler,
     transfer::{
@@ -22,11 +22,11 @@ use bonsai_transfer_core::{
         MAX_CHUNK_SIZE,
     },
 };
-use bonsai_transfer_crypto::{
+use transfer_crypto::{
     identity::BonsaiIdentity,
     kdf::{generate_phrase, kdf_phrase_to_seed, ARGON2_PARAMS_TEST},
 };
-use bonsai_transfer_store::EncryptedStore;
+use transfer_store::EncryptedStore;
 
 // ── Managed state types ───────────────────────────────────────────────────────
 
@@ -289,12 +289,12 @@ pub async fn transfer_send_file_loopback(
     let seed = identity.export_seed();
     let session_key = {
         let key_bytes = blake3::derive_key("bonsai-loopback-session", &seed);
-        Arc::new(bonsai_transfer_crypto::session::SessionKey(key_bytes))
+        Arc::new(transfer_crypto::session::SessionKey(key_bytes))
     };
 
     let (lane, _rx) = InProcessLane::new_pair("loopback");
     let mut lanes_map = std::collections::HashMap::new();
-    let lane_arc: Arc<dyn bonsai_transfer_core::lane::TransportLane> = Arc::new(lane);
+    let lane_arc: Arc<dyn transfer_core::lane::TransportLane> = Arc::new(lane);
     lanes_map.insert("loopback".to_string(), lane_arc);
     let lanes = Arc::new(lanes_map);
 
@@ -333,7 +333,7 @@ pub async fn transfer_send_file_loopback(
 
     let status = TransferStatus {
         id: handle.id,
-        direction: bonsai_transfer_core::transfer::TransferDirection::Send,
+        direction: transfer_core::transfer::TransferDirection::Send,
         total_bytes: data.len() as u64,
         transferred_bytes: handle.bytes_sent(),
         chunk_count: (data.len().saturating_add(cs - 1) / cs) as u64,

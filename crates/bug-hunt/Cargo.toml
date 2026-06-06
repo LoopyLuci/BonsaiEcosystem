@@ -1,0 +1,36 @@
+[package]
+name = "bug-hunt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+blake3 = "1"
+regex = "1"
+log = "0.4"
+rayon = "1"
+async-trait = "0.1"
+parking_lot = "0.12"
+
+# Database
+chrono = { version = "0.4", features = ["serde"] }
+
+# Cargo integration
+cargo_metadata = "0.18"
+
+# File system
+walkdir = "2"
+sha2 = "0.10"
+dirs = "5"
+
+# Existing Bonsai crates
+audit-log = { path = "../audit-log" }
+capability-registry = { path = "../capability-registry" }
+
+# Process execution
+which = "5"

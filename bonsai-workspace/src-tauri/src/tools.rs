@@ -6,7 +6,7 @@
 //! Uses ReAct-style prompting so ANY model (including those without native function-
 //! calling support) can invoke tools by outputting `<tool_call>...</tool_call>` tags.
 
-use bonsai_capability_registry::EffectRow;
+use capability_registry::EffectRow;
 use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -212,7 +212,7 @@ pub fn built_in_tools() -> Vec<ToolDef> {
             capability_tags: vec!["tool".into(), "io".into(), "file".into()],
             examples: vec![],
             requires_model: None,
-            effect_row: EffectRow { effects: vec![bonsai_capability_registry::BonsaiEffect::FileIO] },
+            effect_row: EffectRow { effects: vec![capability_registry::BonsaiEffect::FileIO] },
         },
         ToolDef {
             name: "edit_file".into(),
@@ -231,7 +231,7 @@ pub fn built_in_tools() -> Vec<ToolDef> {
             capability_tags: vec!["tool".into(), "io".into(), "file".into()],
             examples: vec![],
             requires_model: None,
-            effect_row: EffectRow { effects: vec![bonsai_capability_registry::BonsaiEffect::FileIO] },
+            effect_row: EffectRow { effects: vec![capability_registry::BonsaiEffect::FileIO] },
         },
         ToolDef {
             name: "create_dir".into(),
@@ -285,7 +285,7 @@ pub fn built_in_tools() -> Vec<ToolDef> {
             capability_tags: vec!["tool".into(), "shell".into(), "danger".into()],
             examples: vec![],
             requires_model: None,
-            effect_row: EffectRow { effects: vec![bonsai_capability_registry::BonsaiEffect::ShellExec] },
+            effect_row: EffectRow { effects: vec![capability_registry::BonsaiEffect::ShellExec] },
         },
         ToolDef {
             name: "get_system_stats".into(),

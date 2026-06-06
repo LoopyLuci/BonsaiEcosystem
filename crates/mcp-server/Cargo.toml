@@ -13,7 +13,7 @@ axum = { version = "0.7", features = ["ws"] }
 tower = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 lazy_static = "1.4"
-bonsai-capability-registry = { path = "../bonsai-capability-registry" }
+capability-registry = { path = "../capability-registry" }
 error-types = { path = "../error-types" }
 clap = { version = "4", features = ["derive"] }
 notify-rust = "4"
@@ -27,4 +27,4 @@ tempfile = "3"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 lazy_static = "1.4"
 tracing = "0.1"
-bonsai-capability-registry = { path = "../bonsai-capability-registry" }
+capability-registry = { path = "../capability-registry" }

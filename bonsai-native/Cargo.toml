@@ -1,5 +1,5 @@
 [package]
-name = "bonsai-native"
+name = "native"
 version = "0.1.0"
 edition = "2021"
 description = "Thin Rust FFI wrapper around llama.cpp Vulkan backend for Bonsai GPU inference"

@@ -1,5 +1,5 @@
 /// UTOF CLI - Universal Test Orchestration Fabric
-use bonsai_utof::{Orchestrator, UtofConfig, TestSpec};
+use utof::{Orchestrator, UtofConfig, TestSpec};
 use clap::Parser;
 use std::path::PathBuf;
 

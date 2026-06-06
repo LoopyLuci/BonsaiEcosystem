@@ -332,7 +332,7 @@ pub struct AppState {
     /// Pluggable agent registry with built-in CodeWriter and CodeReviewer.
     pub agent_host: Arc<agent_host::AgentHost>,
     /// BonsAI-Core orchestrator — plan, execute, curate.
-    pub bonsai_core: Arc<bonsai_core::BonsaiCore>,
+    pub bonsai_core: Arc<core::BonsaiCore>,
     /// Telemetry store — training runs + inference metrics.
     pub telemetry: Arc<telemetry::TelemetryStore>,
     /// Native llama.cpp Vulkan engine (AMD 7900 XTX GPU inference).
@@ -352,7 +352,7 @@ pub struct AppState {
     /// Pluggable tool registry (execute_code, system_info, …).
     pub tool_registry: Arc<tool_registry::ToolRegistryState>,
     /// Universal Capability Registry (UCR) — aggregated capability manifest
-    pub capability_registry: Arc<bonsai_capability_registry::UniversalCapabilityRegistry>,
+    pub capability_registry: Arc<capability_registry::UniversalCapabilityRegistry>,
     /// Thoughts DB store — persistent model thinking capture
     pub thoughts_db: Arc<thoughts::ThoughtsStore>,
     /// Cross-training event sender — feed chat/plugin/tool events for passive data collection.
@@ -374,17 +374,17 @@ pub struct AppState {
     /// Thinking settings — per-role visibility toggles, max tokens.
     pub thinking_settings: Arc<tokio::sync::RwLock<serde_json::Value>>,
     /// CAS (Content-Addressed Store) — Blake3-keyed deduplicating blob store.
-    pub cas_store: Arc<bonsai_cas::CasStore>,
+    pub cas_store: Arc<cas::CasStore>,
     /// Sylva scripting runtime — hot-reloadable Lua scripts as UCR tools.
     pub sylva: crate::sylva::SylvaState,
     /// Federated training coordinator — CRDT-backed multi-peer state.
     pub federated_trainer: Arc<crate::federated_trainer::FederatedTrainer>,
     /// Actor system — supervisor trees for swarm workers and background agents.
-    pub actor_system: Arc<bonsai_actors::ActorSystem>,
+    pub actor_system: Arc<actors::ActorSystem>,
     /// Chess and Go game session store.
     pub game_sessions: Arc<crate::games::GameSessionStore>,
     /// Knowledge graph — entities, relations, beliefs.
-    pub knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
+    pub knowledge: Arc<knowledge::KnowledgeGraph>,
     /// Multi-strategy reasoning engine.
     pub reasoning: Arc<crate::reasoning_engine::ReasoningEngine>,
     /// Bayesian belief reviser with contradiction resolution.
@@ -430,7 +430,7 @@ pub struct AppState {
     /// Upgrade dispatcher — zero-downtime hot-swap for binary, WASM, and UI components.
     pub upgrade_dispatcher: Arc<upgrade_dispatcher::UpgradeDispatcher>,
     /// Universe — append-only time-travel event ledger + snapshot engine.
-    pub universe: Arc<bonsai_universe::Universe>,
+    pub universe: Arc<universe::Universe>,
 }
 
 impl AppState {
@@ -874,9 +874,9 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .unwrap_or_else(|_| std::path::PathBuf::from("."));
-            let bonsai_memory = bonsai_core::CoreMemory::new(Some(memory_path));
+            let bonsai_memory = core::CoreMemory::new(Some(memory_path));
             let bonsai_curator = data_curator::DataCurator::new(curator_path, prompt_template.clone());
-            let shared_bonsai_core = Arc::new(bonsai_core::BonsaiCore::new(
+            let shared_bonsai_core = Arc::new(core::BonsaiCore::new(
                 None,
                 bonsai_inference_url,
                 bonsai_memory,
@@ -920,7 +920,7 @@ pub fn run() {
             let early_game_sessions = crate::games::GameSessionStore::new();
 
             // Build knowledge graph + reasoning engine — shared across MgmtState and AppState.
-            let early_knowledge = Arc::new(bonsai_knowledge::KnowledgeGraph::new());
+            let early_knowledge = Arc::new(knowledge::KnowledgeGraph::new());
             let early_reasoning = Arc::new(crate::reasoning_engine::ReasoningEngine::new(early_knowledge.clone()));
             let early_belief_reviser: Arc<tokio::sync::RwLock<crate::belief_reviser::BeliefReviser>> =
                 Arc::new(tokio::sync::RwLock::new(crate::belief_reviser::BeliefReviser::new()));
@@ -1015,7 +1015,7 @@ pub fn run() {
                 let ah         = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
                     use std::sync::Arc;
-                    let specs = launcher::bonsai_specs::bonsai_components(api_port, buddy_port);
+                    let specs = launcher::specs::bonsai_components(api_port, buddy_port);
                     let sup   = Arc::new(launcher::LaunchSupervisor::new(specs));
                     match sup.clone().probe_all(Some(ah.clone())).await {
                         Ok(()) => {
@@ -1173,7 +1173,7 @@ pub fn run() {
             ));
 
             // Initialize Universal Capability Registry (UCR) and register tool registry
-            let capability_registry = bonsai_capability_registry::UniversalCapabilityRegistry::new();
+            let capability_registry = capability_registry::UniversalCapabilityRegistry::new();
             // Register the current ToolRegistry snapshot as a capability source
             tauri::async_runtime::block_on(capability_registry.register(Box::new((*tool_registry).clone())));
 
@@ -1213,7 +1213,7 @@ pub fn run() {
                 .unwrap_or_else(|_| std::path::PathBuf::from("."));
             let cas_store = Arc::new(
                 tauri::async_runtime::block_on(
-                    bonsai_cas::CasStore::open(
+                    cas::CasStore::open(
                         &cas_data_dir.join("cas.db"),
                         &cas_data_dir.join("cas_blobs"),
                     )
@@ -1221,7 +1221,7 @@ pub fn run() {
             );
 
             // Actor system — supervision trees for swarm and background agents
-            let actor_system = bonsai_actors::ActorSystem::new();
+            let actor_system = actors::ActorSystem::new();
 
             // Federated training coordinator
             let machine_id = format!("local-{}", uuid::Uuid::new_v4().simple());
@@ -1449,13 +1449,13 @@ pub fn run() {
                         .to_string();
                     // Block on async init — acceptable at startup
                     tokio::runtime::Handle::current().block_on(async {
-                        bonsai_universe::Universe::open(&db_path, device_id)
+                        universe::Universe::open(&db_path, device_id)
                             .await
                             .unwrap_or_else(|e| {
                                 tracing::error!("Universe init failed: {}", e);
                                 // Fallback to in-memory DB
                                 tokio::runtime::Handle::current().block_on(
-                                    bonsai_universe::Universe::open(
+                                    universe::Universe::open(
                                         std::path::Path::new(":memory:"),
                                         "fallback"
                                     )

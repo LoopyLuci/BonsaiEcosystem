@@ -22,7 +22,7 @@ pub async fn query_capabilities(
     top_k: Option<usize>,
 ) -> Result<serde_json::Value, String> {
     let top = top_k.unwrap_or(6);
-    let q = bonsai_query::CapabilityQuery::new(state.capability_registry.clone());
+    let q = query::CapabilityQuery::new(state.capability_registry.clone());
     let scored = q.search(&query, None, top).await;
     let arr: Vec<serde_json::Value> = scored
         .into_iter()

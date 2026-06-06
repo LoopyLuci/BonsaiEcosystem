@@ -1,4 +1,4 @@
-use bonsai_universe::{
+use universe::{
     RevertPreview, TimelineFilter, Universe, UniverseEvent, UniverseSnapshot,
     EventCategory,
 };
@@ -166,7 +166,7 @@ pub async fn revert_confirm(
     target_event_id: Option<String>,
     target_snapshot_id: Option<String>,
 ) -> Result<String, String> {
-    use bonsai_universe::{EventCategory, EventSource, UniverseEvent};
+    use universe::{EventCategory, EventSource, UniverseEvent};
 
     let target = target_event_id
         .as_deref()

@@ -1,8 +1,8 @@
 //! Belief Revision System — Bayesian updating, contradiction resolution,
 //! temporal evidence decay, and source diversity scoring.
 
-use bonsai_knowledge::{Belief, BeliefId, Evidence, ProvenanceSource};
-use bonsai_verify::{definitionally_equal, AxiomKernel};
+use knowledge::{Belief, BeliefId, Evidence, ProvenanceSource};
+use verify::{definitionally_equal, AxiomKernel};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -121,7 +121,7 @@ impl BeliefReviser {
         if let (Some(fa), Some(fb)) = (&a.formal_statement, &b.formal_statement) {
             let k = AxiomKernel::new();
             // a ≡ ¬b iff a ≡ (b → ⊥); use definitional equality in the env
-            let not_b = bonsai_verify::Term::pi("_", fb.clone(), bonsai_verify::Term::prop());
+            let not_b = verify::Term::pi("_", fb.clone(), verify::Term::prop());
             definitionally_equal(fa, &not_b, &k.env)
         } else {
             // Heuristic: one statement is the negation of the other
@@ -253,7 +253,7 @@ fn source_discriminant(source: &ProvenanceSource) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonsai_knowledge::Evidence;
+    use knowledge::Evidence;
 
     fn make_evidence(strength: f32) -> Evidence {
         Evidence {

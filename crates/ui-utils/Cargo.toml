@@ -1,0 +1,13 @@
+[package]
+name = "ui-utils"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "bonsai_ui_utils"
+path = "src/lib.rs"
+
+[dependencies]
+arc-swap = "1.5"
+anyhow = "1"
+serde = { version = "1.0", features = ["derive"] }

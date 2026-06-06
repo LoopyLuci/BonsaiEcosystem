@@ -670,10 +670,10 @@ pub async fn submit_chat(
         tools::system_prompt_for(&tools, workspace_path.as_deref(), Some(&last_user_text));
     // Inject BONSAI.md when the feature is enabled
     if crate::features::FeatureFlags::global().bonsai_md_enabled {
-        sys_prompt = crate::bonsai_md::inject(&sys_prompt, workspace_path.as_deref());
+        sys_prompt = crate::md::inject(&sys_prompt, workspace_path.as_deref());
         // Ensure a BONSAI.md exists for the project (creates default if absent)
         if let Some(ws) = workspace_path.as_deref() {
-            crate::bonsai_md::ensure_exists(ws);
+            crate::md::ensure_exists(ws);
         }
     }
     if is_file_inventory_request(&last_user_text) {
@@ -6878,13 +6878,13 @@ pub async fn clear_gpu_crash_flag(app_handle: AppHandle) -> Result<(), String> {
 /// Read the BONSAI.md for a project workspace.
 #[tauri::command]
 pub async fn get_bonsai_md(workspace_path: String) -> Result<String, String> {
-    Ok(crate::bonsai_md::load(Some(&workspace_path)))
+    Ok(crate::md::load(Some(&workspace_path)))
 }
 
 /// Write (overwrite) the BONSAI.md for a project workspace.
 #[tauri::command]
 pub async fn set_bonsai_md(workspace_path: String, content: String) -> Result<(), String> {
-    crate::bonsai_md::write(&workspace_path, &content).map_err(|e| format!("write failed: {e}"))
+    crate::md::write(&workspace_path, &content).map_err(|e| format!("write failed: {e}"))
 }
 
 // ── Memory node commands ──────────────────────────────────────────────────────
@@ -7124,7 +7124,7 @@ pub async fn run_coordinated_task(
     model_url: Option<String>,
     max_workers: Option<usize>,
 ) -> Result<serde_json::Value, String> {
-    use bonsai_coordinator::{Coordinator, CoordinatorConfig, CoordinatorTask};
+    use coordinator::{Coordinator, CoordinatorConfig, CoordinatorTask};
 
     if items.is_empty() {
         return Err("No items provided".into());

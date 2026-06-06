@@ -3,7 +3,7 @@
 //! Exposes install, scan, configure, uninstall, and browse operations
 //! to the frontend as typed IPC commands.
 
-use bonsai_extensions::{
+use extensions::{
     default_registry,
     installer::{InstallResult, Installer},
     manifest::{ExtensionCategory, ExtensionManifest, SecurityVerdict},
@@ -246,7 +246,7 @@ pub async fn ext_rescan(
         .get_installed(&extension_id)
         .ok_or_else(|| format!("extension {extension_id} not found"))?;
 
-    let scanner = bonsai_extensions::SecurityScanner::new();
+    let scanner = extensions::SecurityScanner::new();
     let report = scanner
         .scan(
             &ext.install_path,
@@ -381,7 +381,7 @@ pub async fn ext_preview_scan(
         repo_dir = entry.path();
     }
 
-    let scanner = bonsai_extensions::SecurityScanner::new();
+    let scanner = extensions::SecurityScanner::new();
     let report = scanner.scan(&repo_dir, "preview", "0.0.0").await;
 
     let _ = tokio::fs::remove_dir_all(&tmp_dir).await;

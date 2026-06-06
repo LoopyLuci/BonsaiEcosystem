@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bonsai_skill_compiler::{
+use skill_compiler::{
     compile_skill, compile_skill_from_str, compile_skill_with_override, distill::DistillationJob,
     load_compiled_skill, persist_compiled_skill, register_compiled_skill, verify_skill_integrity,
     CompiledSkill, SkillToolDef, ToolRegistryMut,
@@ -143,7 +143,7 @@ pub async fn verify_compiled_skill(id: String) -> Result<bool, String> {
 /// List all compiled skills in `~/.bonsai/skills/compiled/`.
 #[tauri::command]
 pub async fn list_compiled_skills() -> Result<Vec<CompiledSkill>, String> {
-    let dir = bonsai_skill_compiler::compiled_skills_dir();
+    let dir = skill_compiler::compiled_skills_dir();
     if !dir.exists() {
         return Ok(vec![]);
     }
@@ -172,7 +172,7 @@ pub async fn invoke_skill(
     args: Value,
 ) -> Result<String, String> {
     // Look up WASM bytes from disk
-    let dir = bonsai_skill_compiler::compiled_skills_dir();
+    let dir = skill_compiler::compiled_skills_dir();
     let mut found: Option<CompiledSkill> = None;
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
@@ -215,17 +215,17 @@ pub async fn distill_skill_to_lora(
 ) -> Result<DistillationJob, String> {
     let compiled = load_compiled_skill(&skill_id).map_err(|e| e.to_string())?;
 
-    let rules: Vec<bonsai_skill_compiler::extractor::Rule> = compiled
+    let rules: Vec<skill_compiler::extractor::Rule> = compiled
         .rules
         .iter()
-        .map(|r| bonsai_skill_compiler::extractor::Rule {
+        .map(|r| skill_compiler::extractor::Rule {
             condition: r.condition.clone(),
             action: r.action.clone(),
             confidence: r.confidence,
         })
         .collect();
 
-    let metadata = bonsai_skill_compiler::parser::SkillMetadata {
+    let metadata = skill_compiler::parser::SkillMetadata {
         name: compiled.name.clone(),
         description: compiled.description.clone(),
         owner: Some(compiled.id.split('/').next().unwrap_or("local").to_string()),
@@ -248,7 +248,7 @@ pub async fn distill_skill_to_lora(
             .into_owned()
     });
 
-    bonsai_skill_compiler::distill::distill_skill(
+    skill_compiler::distill::distill_skill(
         &metadata,
         &rules,
         &model_path,
@@ -262,7 +262,7 @@ pub async fn distill_skill_to_lora(
 /// Uninstall (delete) a compiled skill from disk.
 #[tauri::command]
 pub async fn uninstall_compiled_skill(id: String) -> Result<(), String> {
-    let dir = bonsai_skill_compiler::compiled_skills_dir();
+    let dir = skill_compiler::compiled_skills_dir();
     let safe_id = id.replace('/', "__");
     let json_path = dir.join(format!("{safe_id}.json"));
     let wasm_path = dir.join(format!("{safe_id}.wasm"));

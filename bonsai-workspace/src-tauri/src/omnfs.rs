@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use bonsai_cas::{CasKey, CasStore};
+use cas::{CasKey, CasStore};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1 — Index types

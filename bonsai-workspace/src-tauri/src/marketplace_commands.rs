@@ -160,7 +160,7 @@ pub async fn publish_compiled_skill_to_marketplace(
     state: State<'_, MarketState>,
     skill_id: String,
 ) -> Result<Asset, String> {
-    use bonsai_skill_compiler::{compiled_skills_dir, load_compiled_skill};
+    use skill_compiler::{compiled_skills_dir, load_compiled_skill};
 
     let compiled = load_compiled_skill(&skill_id).map_err(|e| e.to_string())?;
 
@@ -212,8 +212,8 @@ pub async fn install_skill_from_marketplace(
     app_state: State<'_, crate::AppState>,
     market_state: State<'_, MarketState>,
     asset_id: String,
-) -> Result<bonsai_skill_compiler::CompiledSkill, String> {
-    use bonsai_skill_compiler::{
+) -> Result<skill_compiler::CompiledSkill, String> {
+    use skill_compiler::{
         compiled_skills_dir, verify_skill_integrity, CompiledSkill, SecurityReport,
     };
     use sha2::Digest as _;

@@ -4,17 +4,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use bonsai_ci::OrchestratorActor;
-use bonsai_ui_orchestrator::UIOrchestrator;
-use bonsai_creator::CreatorOrchestrator;
-use bonsai_mailbox::AgentMailbox;
-use bonsai_p2p::WebRtcLane;
-use bonsai_query::sql::SqlEngine;
-use bonsai_tool_registry::ToolRegistry;
-use bonsai_transfer_core::lane::TransportLane;
-use bonsai_transfer_core::transfer::{TransferHandle, TransferStatus};
-use bonsai_transfer_crypto::identity::BonsaiIdentity;
-use bonsai_transfer_store::EncryptedStore;
+use ci::OrchestratorActor;
+use ui_orchestrator::UIOrchestrator;
+use creator::CreatorOrchestrator;
+use mailbox::AgentMailbox;
+use p2p::WebRtcLane;
+use query::sql::SqlEngine;
+use tool_registry::ToolRegistry;
+use transfer_core::lane::TransportLane;
+use transfer_core::transfer::{TransferHandle, TransferStatus};
+use transfer_crypto::identity::BonsaiIdentity;
+use transfer_store::EncryptedStore;
 
 pub struct DaemonState {
     /// Auth token — compared on every WebSocket connection handshake.
@@ -46,7 +46,7 @@ pub struct DaemonState {
 }
 
 impl DaemonState {
-    pub fn new(token: String, cas: Arc<bonsai_cas::CasStore>) -> Self {
+    pub fn new(token: String, cas: Arc<cas::CasStore>) -> Self {
         let store_path = EncryptedStore::default_path();
         let sql = SqlEngine::in_memory().expect("SQLite in-memory");
 

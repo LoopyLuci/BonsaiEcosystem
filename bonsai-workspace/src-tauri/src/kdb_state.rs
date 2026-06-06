@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
-use bonsai_kdb::{KdbRetriever, KdbStore, Result as KdbResult};
+use kdb::{KdbRetriever, KdbStore, Result as KdbResult};
 
 pub struct KdbAppState {
     /// Mutex because rusqlite::Connection is !Sync.

@@ -1,0 +1,12 @@
+[package]
+name = "lint-treesitter-sylva"
+version = "0.1.0"
+edition = "2021"
+description = "Tree-sitter grammar bindings for Omnisystem Sylva language"
+
+[dependencies]
+tree-sitter = "0.22"
+lazy_static = "1.4"
+
+[build-dependencies]
+cc = "1.0"

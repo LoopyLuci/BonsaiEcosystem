@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use bonsai_crdt::{GCounter, LwwRegister, OrSet, PNCounter, VClock};
+use crdt::{GCounter, LwwRegister, OrSet, PNCounter, VClock};
 
 // ── Peer identity ─────────────────────────────────────────────────────────────
 

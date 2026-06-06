@@ -1,4 +1,4 @@
-use crate::bonsai_core::{BonsaiPlan, BonsaiResponse};
+use crate::core::{BonsaiPlan, BonsaiResponse};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::sync::RwLock;

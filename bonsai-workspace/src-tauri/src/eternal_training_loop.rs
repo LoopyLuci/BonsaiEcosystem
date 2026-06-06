@@ -824,13 +824,13 @@ pub struct EternalTrainingLoop {
     history: RwLock<std::collections::VecDeque<LoopCycleResult>>,
     running: RwLock<bool>,
     /// CAS store for deduplicating training datasets and LoRA adapter weights.
-    cas_store: Option<Arc<bonsai_cas::CasStore>>,
+    cas_store: Option<Arc<cas::CasStore>>,
     /// System event bus — emits TrainingComplete when an adapter is promoted.
     event_bus: Option<crate::system_event_bus::SharedEventBus>,
     /// Maps cycle number → CAS key of the exported dataset snapshot.
     dataset_keys: RwLock<std::collections::VecDeque<(u64, String)>>,
     /// Knowledge graph shared with AppState — feeds reasoning self-play.
-    knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
+    knowledge: Arc<knowledge::KnowledgeGraph>,
     /// Model orchestrator — accepts DPO batches from reasoning training.
     orchestrator: Arc<crate::model_orchestrator::ModelOrchestrator>,
 }
@@ -843,7 +843,7 @@ impl EternalTrainingLoop {
         promotion_gate: Arc<PromotionGate>,
         self_play: Arc<SelfPlayTrainer>,
         orchestrator: Arc<crate::model_orchestrator::ModelOrchestrator>,
-        knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
+        knowledge: Arc<knowledge::KnowledgeGraph>,
     ) -> Arc<Self> {
         Self::with_cas(
             collector,
@@ -863,9 +863,9 @@ impl EternalTrainingLoop {
         forgetting: Arc<ForgettingPrevention>,
         promotion_gate: Arc<PromotionGate>,
         self_play: Arc<SelfPlayTrainer>,
-        cas_store: Option<Arc<bonsai_cas::CasStore>>,
+        cas_store: Option<Arc<cas::CasStore>>,
         orchestrator: Arc<crate::model_orchestrator::ModelOrchestrator>,
-        knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
+        knowledge: Arc<knowledge::KnowledgeGraph>,
     ) -> Arc<Self> {
         Arc::new(Self {
             collector,
@@ -1119,7 +1119,7 @@ impl EternalTrainingLoop {
     /// cycles and training. Requires `cas_store` to be configured on this loop.
     pub async fn start_go_training(
         &self,
-        config: bonsai_go_nn::training_loop::GoTrainingConfig,
+        config: go_nn::training_loop::GoTrainingConfig,
     ) -> Result<(), String> {
         let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
         let cas = match &self.cas_store {
@@ -1128,7 +1128,7 @@ impl EternalTrainingLoop {
         };
 
         // Create training loop instance
-        let mut loop_inst = match bonsai_go_nn::training_loop::GoTrainingLoop::new(
+        let mut loop_inst = match go_nn::training_loop::GoTrainingLoop::new(
             config,
             device,
             None,
@@ -1177,8 +1177,8 @@ impl IngestRaw for UnifiedTrainingCollector {
 /// Uses the neural network evaluator when weights are available, otherwise
 /// falls back to `MaterialEvaluator`.
 pub async fn run_chess_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
-    use bonsai_chess::mcts::{self_play_game, MctsConfig};
-    use bonsai_chess::network::NetworkEvaluator;
+    use chess::mcts::{self_play_game, MctsConfig};
+    use chess::network::NetworkEvaluator;
     use chrono::Utc;
     use serde_json::json;
     use uuid::Uuid;
@@ -1190,7 +1190,7 @@ pub async fn run_chess_self_play_once(collector: Arc<UnifiedTrainingCollector>) 
         self_play_game(&net_eval, &cfg, &[])
     } else {
         tracing::debug!("chess self-play: neural weights not found, using MaterialEvaluator");
-        self_play_game(&bonsai_chess::MaterialEvaluator, &cfg, &[])
+        self_play_game(&chess::MaterialEvaluator, &cfg, &[])
     };
     tracing::info!(count = examples.len(), "generated chess self-play examples");
 
@@ -1240,8 +1240,8 @@ pub async fn run_chess_self_play_once(collector: Arc<UnifiedTrainingCollector>) 
 /// Run one Go self-play game and ingest all resulting training examples.
 /// Uses the neural network evaluator when weights are available.
 pub async fn run_go_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
-    use bonsai_go::mcts::{self_play_game, GoMctsConfig};
-    use bonsai_go::network::NetworkGoEvaluator;
+    use go::mcts::{self_play_game, GoMctsConfig};
+    use go::network::NetworkGoEvaluator;
     use chrono::Utc;
     use serde_json::json;
     use uuid::Uuid;
@@ -1253,7 +1253,7 @@ pub async fn run_go_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
         self_play_game(19, &net_eval, &cfg)
     } else {
         tracing::debug!("go self-play: neural weights not found, using RandomGoEvaluator");
-        self_play_game(19, &bonsai_go::RandomGoEvaluator, &cfg)
+        self_play_game(19, &go::RandomGoEvaluator, &cfg)
     };
     tracing::info!(count = examples.len(), "generated go self-play examples");
 
@@ -1314,11 +1314,11 @@ pub async fn run_go_self_play_once(collector: Arc<UnifiedTrainingCollector>) {
 /// `chess::TrainingExample`), then saves the updated weights back to disk.
 ///
 /// Call this after enough game data has been collected (e.g., every 50 games).
-pub async fn train_chess_network_step(game_examples: Vec<bonsai_chess::TrainingExample>) {
-    use bonsai_chess::network::{
+pub async fn train_chess_network_step(game_examples: Vec<chess::TrainingExample>) {
+    use chess::network::{
         teacher_distill_examples, train_epoch, AdamState, NetworkEvaluator, TOTAL_PARAMS,
     };
-    use bonsai_chess::ChessPosition;
+    use chess::ChessPosition;
 
     if game_examples.is_empty() {
         return;
@@ -1340,14 +1340,14 @@ pub async fn train_chess_network_step(game_examples: Vec<bonsai_chess::TrainingE
             .filter_map(|ex| {
                 let pos = ChessPosition::from_fen(&ex.fen).ok()?;
                 let raw = pos.to_nn_input();
-                let n = bonsai_chess::network::INPUT_SIZE;
+                let n = chess::network::INPUT_SIZE;
                 let mut input = vec![0.0f32; n];
                 let copy_len = raw.len().min(n);
                 input[..copy_len].copy_from_slice(&raw[..copy_len]);
                 let policy_target = ex.move_probs.iter().map(|(_, p)| *p).collect::<Vec<f32>>();
                 let value_target = ex.game_result.unwrap_or(0.5);
                 let n_moves = policy_target.len();
-                Some(bonsai_chess::network::NetTrainExample {
+                Some(chess::network::NetTrainExample {
                     input,
                     policy_target,
                     value_target,
@@ -1387,8 +1387,8 @@ pub async fn train_chess_network_step(game_examples: Vec<bonsai_chess::TrainingE
 }
 
 /// Train the Go neural network for one pass on accumulated self-play games.
-pub async fn train_go_network_step(game_examples: Vec<bonsai_go::TrainingExample>) {
-    use bonsai_go::network::{
+pub async fn train_go_network_step(game_examples: Vec<go::TrainingExample>) {
+    use go::network::{
         mcts_to_train_examples, train_epoch, AdamState, NetworkGoEvaluator, TOTAL_PARAMS,
     };
 
@@ -1505,7 +1505,7 @@ const REASONING_SEEDS: &[(&str, &str, &str)] = &[
 /// Produces DPO pairs from seed tasks and ingests them into the training collector.
 pub async fn run_reasoning_self_improvement(
     collector: Arc<UnifiedTrainingCollector>,
-    knowledge: Arc<bonsai_knowledge::KnowledgeGraph>,
+    knowledge: Arc<knowledge::KnowledgeGraph>,
 ) {
     use crate::reasoning_engine::ReasoningEngine;
     use chrono::Utc;

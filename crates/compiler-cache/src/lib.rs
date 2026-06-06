@@ -27,7 +27,7 @@ impl PreCompiler {
     }
 
     /// Run a full pre-compilation cycle
-    pub async fn precompile(&self, _source_files: &[String]) -> anyhow::Result<Vec<bonsai_bco::BcoFile>> {
+    pub async fn precompile(&self, _source_files: &[String]) -> anyhow::Result<Vec<bco::BcoFile>> {
         // Placeholder: full implementation would parse, expand, evaluate
         Ok(vec![])
     }

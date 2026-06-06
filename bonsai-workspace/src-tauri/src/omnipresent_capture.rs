@@ -383,7 +383,7 @@ impl SessionTracker {
 const RING_CAPACITY: usize = 10_000;
 
 pub struct OmnipresentCapture {
-    cas: Arc<bonsai_cas::CasStore>,
+    cas: Arc<cas::CasStore>,
     collector: Arc<UnifiedTrainingCollector>,
     session: RwLock<SessionTracker>,
     ring: RwLock<VecDeque<OmnEvent>>,
@@ -395,7 +395,7 @@ pub struct OmnipresentCapture {
 
 impl OmnipresentCapture {
     pub fn new(
-        cas: Arc<bonsai_cas::CasStore>,
+        cas: Arc<cas::CasStore>,
         collector: Arc<UnifiedTrainingCollector>,
     ) -> Arc<Self> {
         Arc::new(Self {

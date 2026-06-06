@@ -12,61 +12,65 @@ members = [
     "crates/core-ir",                  # Language-Agnostic Intermediate Representation
 
     # ========== BACE Foundation (Function-Level Compilation) ==========
-    "crates/bonsai-bco",               # Bonsai Compiled Objects (serialized functions)
-    "crates/bonsai-compile-cache",     # Local compilation cache
-    "crates/bonsai-cas-ext",           # CAS extensions for BACE
-    "crates/bonsai-hotreload",         # Hot-reload macro and runtime
+    "crates/compile-cache",            # Local compilation cache
+    "crates/cas-ext",                  # CAS extensions for BACE
+    "crates/hotreload",                # Hot-reload macro and runtime
     "crates/bace-rustc",               # BACE Rust compiler wrapper
     "crates/bace-rt",                  # BACE runtime and proc-macro
     "crates/cargo-bace",               # cargo-bace CLI subcommand
 
-    # ========== Bonsai Polyglot Language System (BPLIS) ==========
+    # ========== Language System ==========
     "crates/language-system",          # Language frontend trait & registry
-    "crates/bonsai-regex-frontend",    # Regex fallback frontend for languages without LSP
-    "bonsai-lang-gen",                 # Meta-generator tool for creating language crates
+    "crates/regex-frontend",           # Regex fallback frontend for languages without LSP
+    "lang-gen",                        # Meta-generator tool for creating language crates (root level)
+
+    # ========== Compiled Objects ==========
+    "crates/co",                       # Compiled Objects (serialized functions)
 
     # ========== Omnisystem Languages ==========
     "crates/omnisystem-sylva",         # Sylva scripting language
     "crates/omnisystem-titan",         # Titan systems language
     "crates/omnisystem-aether",        # Aether actor language
 
-    # ========== BUEB (Universal Execution Backend) ==========
-    "crates/bonsai-backend",           # Hardware abstraction & device allocation
+    # ========== Execution Backend ==========
+    "crates/backend",                  # Hardware abstraction & device allocation
 
-    # ========== USOS Bare-Metal Kernel ==========
+    # ========== Bare-Metal Kernel ==========
     # "crates/kernel",              # USOS Co-OS x86_64 bare-metal kernel (disabled: x86_64 crate has unstable features)
 
     # ========== Legacy Foundation (keep for compatibility) ==========
-    "bonsai-runtime",
+    "runtime",
     "src-daemon",
-    "bonsai-bot",
+    "bot",
 
-    # ========== BPCF-Pre (Pre-Compilation Fabric) ==========
-    "crates/compiler-cache",               # Speculative pre-compilation with AI hints
+    # ========== Pre-Compilation Fabric ==========
+    "crates/compiler-cache",           # Speculative pre-compilation with AI hints
 
-    # ========== TransferDaemon v2 (Sovereign P2P Transport) ==========
-    "crates/p2p-identity",  # Self-certifying identity (Iroh-inspired)
-    "crates/p2p-crypto",    # Post-quantum hybrid cryptography
-    "crates/p2p-core",      # Deterministic core (no AI required)
-    "crates/bonsai-transfer-ai",        # Optional AI enhancements (feature-gated)
+    # ========== P2P Transport ==========
+    "crates/p2p-identity",             # Self-certifying identity (Iroh-inspired)
+    "crates/p2p-crypto",               # Post-quantum hybrid cryptography
+    "crates/p2p-core",                 # Deterministic core (no AI required)
+    "crates/transfer-ai",              # Optional AI enhancements (feature-gated)
 
-    # ========== BMF (Bonsai Messaging Fabric) ==========
-    "crates/msg-core",           # Core messaging types and encryption
-    "crates/msg-smtp",           # SMTP server
-    "crates/msg-imap",           # IMAP server
-    "crates/msg-p2p",            # P2P delivery via TransferDaemon
-    "crates/msg-server", "crates/bonsai-model-workshop", "crates/bonsai-mcp-manager",         # Unified BMF server
+    # ========== Messaging Fabric ==========
+    "crates/msg-core",                 # Core messaging types and encryption
+    "crates/msg-smtp",                 # SMTP server
+    "crates/msg-imap",                 # IMAP server
+    "crates/msg-p2p",                  # P2P delivery via TransferDaemon
+    "crates/msg-server",
+    "crates/model-workshop",           # Model training and management
+    "crates/mcp-manager",              # MCP server management
 
-    # ========== BONSAI ENCLAVE (Universal Environment Manager) ==========
-    "crates/sandbox",            # Universal dependency and environment manager
+    # ========== Environment Manager ==========
+    "crates/sandbox",                  # Universal dependency and environment manager
 
-    # ========== UBVM (Universal Bonsai Validation Mesh) ==========
-    "crates/test-orchestrator",               # Unified Test Orchestration Fabric
-    "crates/ubvm-core",                 # Core types and traits
-    "crates/ubvm-ulb",                  # Universal Language Binding (750+ languages)
-    "crates/ubvm-suites",               # 10 comprehensive test suites
-    "crates/ubvm-axiom",                # Formal verification with Axiom
-    "crates/ubvm-mesh",                 # Planet-scale distributed mesh
+    # ========== Validation Mesh ==========
+    "crates/test-orchestrator",        # Unified Test Orchestration Fabric
+    "crates/ubvm-core",                # Core types and traits
+    "crates/ubvm-ulb",                 # Universal Language Binding (750+ languages)
+    "crates/ubvm-suites",              # 10 comprehensive test suites
+    "crates/ubvm-axiom",               # Formal verification with Axiom
+    "crates/ubvm-mesh",                # Planet-scale distributed mesh
 ]
 
 [workspace.lints.rust]

@@ -1,6 +1,6 @@
 use msg_core::{SmtpConfig, ImapConfig, Message};
-use bonsai_bmf_smtp::SmtpServer;
-use bonsai_bmf_imap::ImapServer;
+use bmf_smtp::SmtpServer;
+use bmf_imap::ImapServer;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

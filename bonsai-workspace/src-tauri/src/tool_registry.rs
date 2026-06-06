@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bonsai_capability_registry::{CapabilityEntry, CapabilitySource, EffectRow};
+use capability_registry::{CapabilityEntry, CapabilitySource, EffectRow};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::RwLock;
@@ -323,7 +323,7 @@ impl ToolRegistryState {
     /// Derived metadata: `requires_approval = false` (registry tools are sandboxed or safe),
     /// trigger phrases built from name + lowercase description words.
     pub fn to_tool_defs(&self) -> Vec<crate::tools::ToolDef> {
-        use bonsai_capability_registry::EffectRow;
+        use capability_registry::EffectRow;
         self.list_tools()
             .into_iter()
             .map(|info| {

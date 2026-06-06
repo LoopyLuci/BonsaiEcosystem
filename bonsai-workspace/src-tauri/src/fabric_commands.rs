@@ -2,16 +2,16 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::RwLock;
-use bonsai_fabric::catalog;
+use fabric::catalog;
 
 pub struct FabricState {
-    pub coordinator: Arc<bonsai_fabric::CoordinatorActor>,
+    pub coordinator: Arc<fabric::CoordinatorActor>,
 }
 
 impl FabricState {
     pub fn new() -> Self {
         Self {
-            coordinator: Arc::new(bonsai_fabric::CoordinatorActor::new()),
+            coordinator: Arc::new(fabric::CoordinatorActor::new()),
         }
     }
 }
@@ -40,7 +40,7 @@ pub async fn fabric_submit_and_await(
     state: State<'_, FabricState>,
     request: TaskRequest,
 ) -> Result<TaskResponse, String> {
-    use bonsai_fabric::types::{FabricTask, TaskStatus, TaskType};
+    use fabric::types::{FabricTask, TaskStatus, TaskType};
 
     let task_id = uuid::Uuid::new_v4().to_string();
     let task_type = match request.task_type.as_str() {
@@ -92,7 +92,7 @@ pub async fn fabric_register_node(
     available_cores: u32,
     available_memory_mb: u64,
 ) -> Result<(), String> {
-    use bonsai_fabric::types::ComputeNode;
+    use fabric::types::ComputeNode;
     state
         .coordinator
         .add_node(ComputeNode {

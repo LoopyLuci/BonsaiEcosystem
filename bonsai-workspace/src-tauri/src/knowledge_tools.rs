@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use crate::belief_reviser::BeliefReviser;
 use crate::reasoning_engine::ReasoningEngine;
 use crate::tool_registry::{Tool, ToolResult};
-use bonsai_knowledge::{Belief, KnowledgeGraph};
+use knowledge::{Belief, KnowledgeGraph};
 
 // ── ReasonTool ────────────────────────────────────────────────────────────────
 
@@ -67,10 +67,10 @@ impl Tool for KnowledgeQueryTool {
             .iter()
             .map(|r| {
                 let (kind, name, confidence) = match &r.kind {
-                    bonsai_knowledge::SearchResultKind::Entity(e) => {
+                    knowledge::SearchResultKind::Entity(e) => {
                         ("entity", e.name.as_str(), e.confidence)
                     }
-                    bonsai_knowledge::SearchResultKind::Belief(b) => {
+                    knowledge::SearchResultKind::Belief(b) => {
                         ("belief", b.statement.as_str(), b.confidence)
                     }
                 };

@@ -12,7 +12,7 @@ pub async fn start_go_self_play(
     let device = Device::Cpu;
     // Spawn self-play in background
     tokio::spawn(async move {
-        if let Err(e) = bonsai_go_nn::train::self_play_loop(&model_path, device, num_games).await {
+        if let Err(e) = go_nn::train::self_play_loop(&model_path, device, num_games).await {
             tracing::error!("Self-play failed: {}", e);
         }
     });
@@ -32,7 +32,7 @@ pub async fn start_go_training(
     num_games_per_cycle: Option<usize>,
 ) -> Result<String, String> {
     // Build a simple config from args
-    let mut cfg = bonsai_go_nn::training_loop::GoTrainingConfig::default();
+    let mut cfg = go_nn::training_loop::GoTrainingConfig::default();
     if let Some(n) = num_games_per_cycle {
         cfg.self_play_games_per_cycle = n;
     }
@@ -42,7 +42,7 @@ pub async fn start_go_training(
 
     // Spawn the training loop in the background.
     tokio::spawn(async move {
-        match bonsai_go_nn::training_loop::GoTrainingLoop::new(cfg, device, None, cas).await {
+        match go_nn::training_loop::GoTrainingLoop::new(cfg, device, None, cas).await {
             Ok(mut loop_inst) => loop {
                 if let Err(e) = loop_inst.run_cycle().await {
                     tracing::error!("go training cycle failed: {}", e);

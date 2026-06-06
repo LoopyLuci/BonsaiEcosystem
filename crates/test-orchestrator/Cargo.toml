@@ -42,10 +42,10 @@ serde_json_path = "0.1"
 
 # Bonsai ecosystem integration
 # sandbox = { path = "../sandbox" }
-# bonsai-transfer = { path = "../p2p-core" }
-# bonsai-sanctum = { path = "../bonsai-sanctum" }
+# transfer = { path = "../p2p-core" }
+# sanctum = { path = "../sanctum" }
 # audit-log = { path = "../audit-log" }
-# bonsai-ariadb = { path = "../bonsai-ariadb" }
+# ariadb = { path = "../ariadb" }
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -1,6 +1,6 @@
 //! Tauri commands for Training Data Library (TDL) operations.
 
-use bonsai_tdl::{ExportFormat, Metadata, TrainingDataLibrary};
+use tdl::{ExportFormat, Metadata, TrainingDataLibrary};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -209,7 +209,7 @@ pub async fn tdl_export_dataset(
     let format: ExportFormat = request
         .format
         .parse()
-        .map_err(|e: bonsai_tdl::TdlError| e.to_string())?;
+        .map_err(|e: tdl::TdlError| e.to_string())?;
 
     let output_path = Path::new(&request.output_path);
     let result_path = library

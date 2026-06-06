@@ -8,7 +8,7 @@
 ///   - `emit_file_change`: called directly from write_file/delete_file commands.
 use std::sync::Arc;
 
-use bonsai_universe::{EventCategory, EventSource, Universe, UniverseEvent};
+use universe::{EventCategory, EventSource, Universe, UniverseEvent};
 use tracing::{debug, warn};
 
 use crate::system_event_bus::{SharedEventBus, SystemEvent};

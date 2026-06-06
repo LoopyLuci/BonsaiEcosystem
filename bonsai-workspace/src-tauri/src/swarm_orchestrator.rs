@@ -10,8 +10,8 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, oneshot};
 
-use bonsai_actors::{Actor, ActorContext, ActorSystem, SupervisionDirective};
-use bonsai_crdt::{GCounter, LwwRegister, OrSet};
+use actors::{Actor, ActorContext, ActorSystem, SupervisionDirective};
+use crdt::{GCounter, LwwRegister, OrSet};
 
 use crate::agent_store::ResolvedAgent;
 use crate::context_builder::estimate_tokens;
@@ -305,7 +305,7 @@ impl Actor for SwarmSupervisorActor {
 
     async fn on_child_failed(
         &mut self,
-        child_id: bonsai_actors::ActorId,
+        child_id: actors::ActorId,
         error: String,
         ctx: &mut ActorContext,
     ) -> SupervisionDirective {
@@ -331,7 +331,7 @@ pub struct SwarmOrchestrator {
     cmd_tx: mpsc::UnboundedSender<SwarmCmd>,
     /// Actor system backing the supervisor (held for lifetime).
     pub actor_system: Arc<ActorSystem>,
-    pub supervisor_ref: bonsai_actors::ActorRef<SwarmSupervisorMsg>,
+    pub supervisor_ref: actors::ActorRef<SwarmSupervisorMsg>,
 }
 
 impl SwarmOrchestrator {

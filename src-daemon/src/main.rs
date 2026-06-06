@@ -51,8 +51,8 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{info, warn};
 
-use bonsai_actors::supervisor::{ChildSpec, Supervisor};
-use bonsai_cas::CasStore;
+use actors::supervisor::{ChildSpec, Supervisor};
+use cas::CasStore;
 use bonsai_skill_compiler;
 use bonsai_skills;
 use state::DaemonState;
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Register generative tools with the creator orchestrator.
     {
-        use bonsai_creator::{
+        use creator::{
             audio::{BarkTtsTool, MusicGenTool},
             gaussian::GaussianSplattingTool,
             image::FluxDiTTool,
@@ -116,10 +116,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Load initial skills from compiled_skills_dir() and start the file watcher.
     // The watcher is kept alive by binding it to `_skills_watcher`.
-    let skills_dir = bonsai_skill_compiler::compiled_skills_dir();
+    let skills_dir = skill_compiler::compiled_skills_dir();
     tokio::fs::create_dir_all(&skills_dir).await?;
-    let _ = bonsai_skills::load_initial(&daemon_state.tools, &skills_dir);
-    let _skills_watcher = bonsai_skills::watch_skills_dir(daemon_state.tools.clone(), &skills_dir)
+    let _ = skills::load_initial(&daemon_state.tools, &skills_dir);
+    let _skills_watcher = skills::watch_skills_dir(daemon_state.tools.clone(), &skills_dir)
         .inspect_err(|e| tracing::warn!("skills watcher unavailable: {e}"))
         .ok();
 

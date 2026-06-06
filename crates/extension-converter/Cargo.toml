@@ -1,0 +1,21 @@
+[package]
+name = "extension-converter"
+version = "0.1.0"
+edition = "2021"
+description = "Bidirectional extension conversion between Bonsai and VSCode/Visual Studio/JetBrains/MCP"
+
+[dependencies]
+extensions = { path = "../extensions" }
+tokio     = { version = "1", features = ["full"] }
+serde     = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+thiserror = "1"
+tracing   = "0.1"
+reqwest   = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+zip       = { version = "0.6", default-features = false, features = ["deflate"] }
+walkdir   = "2"
+blake3    = "1"
+hex       = "0.4"
+tempfile  = "3"
+regex     = "1"

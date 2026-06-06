@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::kdb_state::KdbAppState;
-use bonsai_package::{
+use package::{
     manifest::{BaseModelInfo, PackageManifest},
     PackageReader, PackageWriter,
 };
@@ -99,7 +99,7 @@ pub async fn package_import(
         if manifest_path.exists() {
             if let Ok(raw) = std::fs::read_to_string(&manifest_path) {
                 if let Ok(kmod_manifest) =
-                    serde_json::from_str::<bonsai_kdb::module::ModuleManifest>(&raw)
+                    serde_json::from_str::<kdb::module::ModuleManifest>(&raw)
                 {
                     let store = state.store.lock().await;
                     let _ = store.register_module(&kmod_manifest, &dest);

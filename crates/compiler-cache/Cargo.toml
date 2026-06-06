@@ -14,6 +14,6 @@ lru = "0.12"
 hex = "0.4"
 bincode = "1"
 zstd = "0.13"
-bonsai-buir = { path = "../bonsai-buir" }
-bonsai-bco = { path = "../bonsai-bco" }
-bonsai-cas-ext = { path = "../bonsai-cas-ext" }
+buir = { path = "../buir" }
+co = { path = "../co" }
+cas-ext = { path = "../cas-ext" }

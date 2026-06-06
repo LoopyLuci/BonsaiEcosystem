@@ -139,14 +139,14 @@ pub struct SpecStats {
 /// Log an event to Universe (stub)
 pub async fn log_event_to_universe(event: &str) -> anyhow::Result<()> {
     tracing::info!("[Universe] {}", event);
-    // TODO: In production, call bonsai_universe::log_event() here
+    // TODO: In production, call universe::log_event() here
     Ok(())
 }
 
 /// Store a BLAKE3 hash of test artifacts (for content-addressed storage)
 pub async fn store_artifact_hash(hash: &str, _content: &[u8]) -> anyhow::Result<()> {
     tracing::debug!("[CAS] Stored artifact with hash: {}", hash);
-    // TODO: In production, call bonsai_cas::store(hash, _content) here
+    // TODO: In production, call cas::store(hash, _content) here
     Ok(())
 }
 

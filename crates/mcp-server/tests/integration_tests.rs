@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use bonsai_mcp_server::mobile_session::{
+    use mcp_server::mobile_session::{
         SessionRegistry, SessionStatus, PeerInfo, PeerStatus, SessionStats,
     };
     use chrono::Utc;
@@ -270,7 +270,7 @@ mod tests {
 /// Integration tests for UACS mobile events
 #[cfg(test)]
 mod uacs_tests {
-    use bonsai_mcp_server::uacs::{ApprovalCategory, UacsEvent};
+    use mcp_server::uacs::{ApprovalCategory, UacsEvent};
 
     #[test]
     fn test_approval_category_descriptions() {
@@ -341,7 +341,7 @@ mod uacs_tests {
 /// Integration tests for BTI commands
 #[cfg(test)]
 mod bti_tests {
-    use bonsai_mcp_server::bti_commands;
+    use mcp_server::bti_commands;
 
     #[test]
     fn test_remote_connect_command_formatting() {

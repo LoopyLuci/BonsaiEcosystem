@@ -9,12 +9,12 @@ use tauri::State;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use bonsai_chess::{
+use chess::{
     search as chess_search, ChessColor, ChessGameSession, ChessPosition,
     GameResult as ChessGameResult, MaterialEvaluator, MctsConfig, Player as ChessPlayer,
     PlayerKind as ChessPlayerKind,
 };
-use bonsai_go::{
+use go::{
     go_search, mcts::RandomGoEvaluator, GoColor, GoGameResult, GoGameSession, GoMctsConfig,
     GoPlayer, GoPlayerKind, Stone,
 };
@@ -359,7 +359,7 @@ pub async fn make_chess_ai_move_with_events(
 
 /// Go AI move with streaming thinking events.
 pub async fn make_go_ai_move_with_events(
-    session: &mut bonsai_go::GoGameSession,
+    session: &mut go::GoGameSession,
     app: &tauri::AppHandle,
 ) {
     use tauri::Emitter;
@@ -1099,7 +1099,7 @@ pub async fn execute_slash_command(
                 };
                 (a, h)
             };
-            let mut session = bonsai_go::GoGameSession::with_options(black, white, size, komi);
+            let mut session = go::GoGameSession::with_options(black, white, size, komi);
             if session.needs_ai_move() {
                 make_go_ai_move_inner(&mut session);
             }
@@ -1140,7 +1140,7 @@ pub async fn execute_slash_command(
                                     s.moves.last().map(|m| m.gtp.clone()).unwrap_or_default();
                                 let state = go_to_chat_state(
                                     s,
-                                    s.result == bonsai_go::GoGameResult::Ongoing,
+                                    s.result == go::GoGameResult::Ongoing,
                                     "black",
                                 );
                                 (
@@ -1180,7 +1180,7 @@ pub async fn execute_slash_command(
                                     s.moves.last().map(|m| m.gtp.clone()).unwrap_or_default();
                                 let state = go_to_chat_state(
                                     s,
-                                    s.result == bonsai_go::GoGameResult::Ongoing,
+                                    s.result == go::GoGameResult::Ongoing,
                                     "black",
                                 );
                                 (format!("You passed. BonsAI played: {}", last), Some(state))

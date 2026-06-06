@@ -1,25 +1,25 @@
 [package]
-name        = "bonsai-daemon"
+name        = "daemon"
 version     = "0.1.0"
 edition     = "2021"
 description = "Headless Bonsai service — WebSocket JSON-RPC bridge for VSCode and other clients"
 
 [[bin]]
-name = "bonsai-daemon"
+name = "daemon"
 path = "src/main.rs"
 
 [dependencies]
 p2p-crypto = { path = "../crates/p2p-crypto" }
-bonsai-transfer-store  = { path = "../crates/bonsai-transfer-store" }
+transfer-store = { path = "../crates/bonsai-transfer-store" }
 p2p-core   = { path = "../crates/p2p-core" }
-bonsai-mailbox         = { path = "../crates/bonsai-mailbox" }
-bonsai-query           = { path = "../crates/bonsai-query" }
-bonsai-array           = { path = "../crates/bonsai-array" }
-bonsai-verify-lean     = { path = "../crates/bonsai-verify-lean" }
-bonsai-verify-fstar    = { path = "../crates/bonsai-verify-fstar" }
-bonsai-verify-tla      = { path = "../crates/bonsai-verify-tla" }
-bonsai-ci              = { path = "../crates/bonsai-ci" }
-bonsai-ui-orchestrator = { path = "../crates/bonsai-ui-orchestrator" }
+mailbox = { path = "../crates/bonsai-mailbox" }
+query = { path = "../crates/bonsai-query" }
+array = { path = "../crates/bonsai-array" }
+verify-lean = { path = "../crates/bonsai-verify-lean" }
+verify-fstar = { path = "../crates/bonsai-verify-fstar" }
+verify-tla = { path = "../crates/bonsai-verify-tla" }
+ci = { path = "../crates/bonsai-ci" }
+ui-orchestrator = { path = "../crates/bonsai-ui-orchestrator" }
 
 tokio        = { version = "1", features = ["full"] }
 axum         = { version = "0.7", features = ["ws", "macros"] }
@@ -34,18 +34,18 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 anyhow       = "1"
 tokio-tungstenite = { version = "0.21", optional = true }
 uuid = { version = "1" }
-bonsai-actors        = { path = "../crates/bonsai-actors" }
-bonsai-cas           = { path = "../crates/bonsai-cas" }
-bonsai-tool-registry = { path = "../crates/bonsai-tool-registry" }
-bonsai-skills        = { path = "../crates/bonsai-skills" }
-bonsai-skill-compiler      = { path = "../crates/bonsai-skill-compiler" }
-bonsai-verify-coq          = { path = "../crates/bonsai-verify-coq" }
-bonsai-verify-agda         = { path = "../crates/bonsai-verify-agda" }
-bonsai-verify-isabelle     = { path = "../crates/bonsai-verify-isabelle" }
-bonsai-capability-registry = { path = "../crates/bonsai-capability-registry" }
-bonsai-sylva               = { path = "../crates/bonsai-sylva" }
-bonsai-p2p      = { path = "../crates/bonsai-p2p" }
-bonsai-creator  = { path = "../crates/bonsai-creator" }
+actors = { path = "../crates/bonsai-actors" }
+cas = { path = "../crates/bonsai-cas" }
+tool-registry = { path = "../crates/bonsai-tool-registry" }
+skills = { path = "../crates/bonsai-skills" }
+skill-compiler = { path = "../crates/bonsai-skill-compiler" }
+verify-coq = { path = "../crates/bonsai-verify-coq" }
+verify-agda = { path = "../crates/bonsai-verify-agda" }
+verify-isabelle = { path = "../crates/bonsai-verify-isabelle" }
+capability-registry = { path = "../crates/bonsai-capability-registry" }
+sylva = { path = "../crates/bonsai-sylva" }
+p2p = { path = "../crates/bonsai-p2p" }
+creator = { path = "../crates/bonsai-creator" }
 arc-swap      = "1"
 sysinfo       = "0.30"
 tempfile      = "3"

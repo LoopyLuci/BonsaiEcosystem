@@ -8,27 +8,27 @@ use serde_json::Value;
 
 use crate::state::DaemonState;
 
-use bonsai_array::AplEval;
-use bonsai_capability_registry::{DeploymentGate, TrustScore};
-use bonsai_ci::{OrchestratorActor, PipelineDef};
-use bonsai_ui_orchestrator::{UIOrchestrator, ComponentManifest};
-use bonsai_sylva::SylvaVm;
-use bonsai_transfer_core::{
+use array::AplEval;
+use capability_registry::{DeploymentGate, TrustScore};
+use ci::{OrchestratorActor, PipelineDef};
+use ui_orchestrator::{UIOrchestrator, ComponentManifest};
+use sylva::SylvaVm;
+use transfer_core::{
     lane::{InProcessLane, TransportLane},
     scheduler::EcfRgScheduler,
     transfer::{Transfer, TransferStatus},
 };
-use bonsai_transfer_crypto::{
+use transfer_crypto::{
     identity::BonsaiIdentity,
     kdf::{kdf_phrase_to_seed, ARGON2_PARAMS_TEST},
     session::SessionKey,
 };
-use bonsai_verify_agda::{AgdaRequest, AgdaSidecar};
-use bonsai_verify_coq::{CoqRequest, CoqSidecar};
-use bonsai_verify_fstar::{FStarRequest, FStarSidecar};
-use bonsai_verify_isabelle::{IsabelleRequest, IsabelleSidecar};
-use bonsai_verify_lean::{LeanRequest, LeanSidecar};
-use bonsai_verify_tla::{TlaRequest, TlaSidecar};
+use verify_agda::{AgdaRequest, AgdaSidecar};
+use verify_coq::{CoqRequest, CoqSidecar};
+use verify_fstar::{FStarRequest, FStarSidecar};
+use verify_isabelle::{IsabelleRequest, IsabelleSidecar};
+use verify_lean::{LeanRequest, LeanSidecar};
+use verify_tla::{TlaRequest, TlaSidecar};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -131,7 +131,7 @@ pub async fn dispatch(
         }
 
         "mailbox.send" => {
-            use bonsai_mailbox::MailEnvelope;
+            use mailbox::MailEnvelope;
             let to = params
                 .get("to")
                 .and_then(|v| v.as_str())
@@ -190,7 +190,7 @@ pub async fn dispatch(
             // Build in-process lanes + scheduler
             let (lane, _rx) = InProcessLane::new_pair("loopback");
             let mut lanes_map = std::collections::HashMap::new();
-            let lane_arc: Arc<dyn bonsai_transfer_core::lane::TransportLane> = Arc::new(lane);
+            let lane_arc: Arc<dyn transfer_core::lane::TransportLane> = Arc::new(lane);
             lanes_map.insert("loopback".to_string(), lane_arc);
             let lanes = Arc::new(lanes_map);
 
@@ -202,8 +202,8 @@ pub async fn dispatch(
             let scheduler = Arc::new(tokio::sync::Mutex::new(sched));
 
             let cs = chunk_size
-                .unwrap_or(bonsai_transfer_core::transfer::DEFAULT_CHUNK_SIZE)
-                .min(bonsai_transfer_core::transfer::MAX_CHUNK_SIZE)
+                .unwrap_or(transfer_core::transfer::DEFAULT_CHUNK_SIZE)
+                .min(transfer_core::transfer::MAX_CHUNK_SIZE)
                 .max(1);
 
             let transfer = Transfer::new();
@@ -221,13 +221,13 @@ pub async fn dispatch(
             // Insert initial status and handle into state maps
             let initial_status = TransferStatus {
                 id: handle.id,
-                direction: bonsai_transfer_core::transfer::TransferDirection::Send,
+                direction: transfer_core::transfer::TransferDirection::Send,
                 total_bytes: data.len() as u64,
                 transferred_bytes: handle.bytes_sent(),
                 chunk_count: (data.len().saturating_add(cs - 1) / cs) as u64,
                 chunks_done: (handle.bytes_sent().saturating_add(cs as u64 - 1) / cs as u64),
                 active_lanes: vec!["loopback".to_string()],
-                state: bonsai_transfer_core::transfer::TransferState::Active,
+                state: transfer_core::transfer::TransferState::Active,
                 bytes_per_sec: 0.0,
             };
 
@@ -288,7 +288,7 @@ pub async fn dispatch(
                 handle.cancel();
                 // Update status map
                 if let Some(status) = state.transfers.lock().await.get_mut(id) {
-                    status.state = bonsai_transfer_core::transfer::TransferState::Cancelled;
+                    status.state = transfer_core::transfer::TransferState::Cancelled;
                 }
                 Ok(serde_json::json!({"ok": true}))
             } else {
@@ -418,7 +418,7 @@ pub async fn dispatch(
             // Wire tool_fn so Sylva scripts can call daemon RPC methods via
             // tool("method_name", args_json_value).
             let state_clone = state.clone();
-            let tool_fn: bonsai_sylva::vm::ToolFn =
+            let tool_fn: sylva::vm::ToolFn =
                 Arc::new(move |method: String, args: serde_json::Value| {
                     // Dispatch synchronously using a blocking runtime handle.
                     let state2 = state_clone.clone();
@@ -427,10 +427,10 @@ pub async fn dispatch(
                         tokio::runtime::Handle::current()
                             .block_on(async move { dispatch(&method2, &args, &state2).await })
                     });
-                    result.map_err(|e| bonsai_sylva::VmError::ToolCallFailed(e))
+                    result.map_err(|e| sylva::VmError::ToolCallFailed(e))
                 });
             let mut vm = SylvaVm::with_tool_fn(tool_fn);
-            bonsai_sylva::stdlib::register_stdlib(&mut vm);
+            sylva::stdlib::register_stdlib(&mut vm);
             let result = vm.eval_str(src).map_err(|e| e.to_string())?;
             Ok(result.to_json())
         }
@@ -742,17 +742,17 @@ pub async fn dispatch(
             // Build a TrustScore from the skill's required permissions and
             // check it passes the Staging gate before executing.
             let mut score = TrustScore::default();
-            use bonsai_capability_registry::effect_penalty;
+            use capability_registry::effect_penalty;
             // Convert permission strings to BonsaiEffect for penalty calculation.
             // Unknown strings incur no penalty.
-            let effects: Vec<bonsai_capability_registry::BonsaiEffect> = skill
+            let effects: Vec<capability_registry::BonsaiEffect> = skill
                 .requires_permissions
                 .iter()
                 .filter_map(|p| serde_json::from_value(serde_json::json!(p)).ok())
                 .collect();
             score.add_capability_penalty(effect_penalty(&effects));
             let gate = DeploymentGate::Staging;
-            if let bonsai_capability_registry::GateResult::Fail {
+            if let capability_registry::GateResult::Fail {
                 required,
                 actual,
                 reason,
@@ -767,7 +767,7 @@ pub async fn dispatch(
             // Execute on a blocking thread — wasmtime is sync.
             let wasm_bytes = skill.wasm_bytes.clone();
             let result = tokio::task::spawn_blocking(move || {
-                bonsai_skills::execute_skill(&wasm_bytes, &args)
+                skills::execute_skill(&wasm_bytes, &args)
             })
             .await
             .map_err(|e| e.to_string())?
@@ -815,7 +815,7 @@ pub async fn dispatch(
                 })
                 .unwrap_or_else(|| vec!["stun:stun.l.google.com:19302".into()]);
 
-            let (lane, offer_sdp) = bonsai_p2p::WebRtcLane::new_offer(name, stuns)
+            let (lane, offer_sdp) = p2p::WebRtcLane::new_offer(name, stuns)
                 .await
                 .map_err(|e| e.to_string())?;
 
@@ -845,7 +845,7 @@ pub async fn dispatch(
                 .get(name)
                 .cloned()
                 .ok_or_else(|| format!("no WebRTC lane: {name}"))?;
-            bonsai_p2p::WebRtcLane::accept_answer(&lane, answer_sdp)
+            p2p::WebRtcLane::accept_answer(&lane, answer_sdp)
                 .await
                 .map_err(|e| e.to_string())?;
             Ok(serde_json::json!({ "ok": true }))
@@ -860,7 +860,7 @@ pub async fn dispatch(
                 .get("peer_addr")
                 .and_then(|v| v.as_str())
                 .ok_or("missing peer_addr")?;
-            let lane = bonsai_p2p::SwarmLane::connect(name, peer_addr)
+            let lane = p2p::SwarmLane::connect(name, peer_addr)
                 .await
                 .map_err(|e| e.to_string())?;
             let lane_name = lane.name().to_string();
@@ -885,7 +885,7 @@ pub async fn dispatch(
                 .get("proxy_addr")
                 .and_then(|v| v.as_str())
                 .unwrap_or("127.0.0.1:9050");
-            let lane = bonsai_p2p::OnionLane::connect(name, proxy_addr, target, port)
+            let lane = p2p::OnionLane::connect(name, proxy_addr, target, port)
                 .await
                 .map_err(|e| e.to_string())?;
             let lane_name = lane.name().to_string();
@@ -928,11 +928,11 @@ pub async fn dispatch(
 
         // ── Creator (generative AI) ───────────────────────────────────────────
         "creator.generate" => {
-            let gen_params: bonsai_creator::GenerateParams =
+            let gen_params: creator::GenerateParams =
                 serde_json::from_value(params.clone()).map_err(|e| format!("bad params: {e}"))?;
 
             // Guardian prompt check.
-            let guardian = bonsai_creator::guardian::Guardian::default();
+            let guardian = creator::guardian::Guardian::default();
             guardian
                 .check_prompt(&gen_params.prompt)
                 .map_err(|e| format!("content policy: {e}"))?;
@@ -966,11 +966,11 @@ pub async fn dispatch(
                 .get("dataset_cas_key")
                 .and_then(|v| v.as_str())
                 .ok_or("missing dataset_cas_key")?;
-            let dataset_key = bonsai_cas::CasKey::from_hex(dataset_hex)
+            let dataset_key = cas::CasKey::from_hex(dataset_hex)
                 .map_err(|e| format!("invalid CAS key: {e}"))?;
 
             let actor =
-                bonsai_creator::fine_tuning::FineTuningActor::new(state.creator.cas.clone());
+                creator::fine_tuning::FineTuningActor::new(state.creator.cas.clone());
             let adapter_key = actor
                 .start_lora_job(base_model, vec![dataset_key], epochs)
                 .await
@@ -995,7 +995,7 @@ pub async fn dispatch(
                 .unwrap_or_default()
                 .join("bonsai")
                 .join("models");
-            bonsai_creator::model_fetch::fetch_model(name, url, &cache_dir, confirmed)
+            creator::model_fetch::fetch_model(name, url, &cache_dir, confirmed)
                 .await
                 .map(|p| serde_json::json!({ "path": p.display().to_string() }))
                 .map_err(|e| e.to_string())
@@ -1006,7 +1006,7 @@ pub async fn dispatch(
                 .unwrap_or_default()
                 .join("bonsai")
                 .join("models");
-            let models = bonsai_creator::model_fetch::list_cached(&cache_dir)
+            let models = creator::model_fetch::list_cached(&cache_dir)
                 .await
                 .unwrap_or_default();
             Ok(serde_json::json!({ "models": models }))
@@ -1018,7 +1018,7 @@ pub async fn dispatch(
                 .and_then(|v| v.as_str())
                 .ok_or("missing script")?
                 .to_string();
-            let composer = bonsai_creator::composer::SylvaComposer::new(
+            let composer = creator::composer::SylvaComposer::new(
                 state.creator.clone(),
                 state.tools.clone(),
             );
@@ -1052,12 +1052,12 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
     use tempfile::tempdir;
-    use bonsai_cas::CasStore;
-    use bonsai_creator::CreatorOrchestrator;
-    use bonsai_mailbox::AgentMailbox;
-    use bonsai_query::sql::SqlEngine;
-    use bonsai_tool_registry::ToolRegistry;
-    use bonsai_transfer_store::EncryptedStore;
+    use cas::CasStore;
+    use creator::CreatorOrchestrator;
+    use mailbox::AgentMailbox;
+    use query::sql::SqlEngine;
+    use tool_registry::ToolRegistry;
+    use transfer_store::EncryptedStore;
 
     async fn build_test_state() -> Arc<DaemonState> {
         let dir = tempdir().unwrap();

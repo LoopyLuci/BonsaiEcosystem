@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::process_manager::TrustLevel;
-use bonsai_cas::{CasKey, CasStore};
-use bonsai_verify::{AxiomKernel, Context, Term};
+use cas::{CasKey, CasStore};
+use verify::{AxiomKernel, Context, Term};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1 — Manifest types

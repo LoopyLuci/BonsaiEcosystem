@@ -1,13 +1,13 @@
 [package]
-name = "bonsai-workspace"
+name = "workspace"
 version = "0.2.0"
 edition = "2021"
-default-run = "bonsai-workspace"
+default-run = "workspace"
 
 [workspace]
 
 [[bin]]
-name = "bonsai-workspace"
+name = "workspace"
 path = "src/main.rs"
 
 [lib]
@@ -15,32 +15,32 @@ name = "bonsai_workspace_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-bonsai-coordinator       = { path = "../../crates/bonsai-coordinator" }
-bonsai-credits           = { path = "../../crates/bonsai-credits" }
-bonsai-marketplace       = { path = "../../crates/bonsai-marketplace" }
-bonsai-swarm             = { path = "../../crates/bonsai-swarm" }
+coordinator = { path = "../../crates/bonsai-coordinator" }
+credits = { path = "../../crates/bonsai-credits" }
+marketplace = { path = "../../crates/bonsai-marketplace" }
+swarm = { path = "../../crates/bonsai-swarm" }
 audit-log          = { path = "../../crates/audit-log" }
-bonsai-fabric            = { path = "../../crates/bonsai-fabric" }
-bonsai-failure-finder    = { path = "../../crates/bonsai-failure-finder" }
-bonsai-sns               = { path = "../../crates/bonsai-sns" }
-bonsai-extensions        = { path = "../../crates/bonsai-extensions" }
-bonsai-skill-compiler    = { path = "../../crates/bonsai-skill-compiler" }
+fabric = { path = "../../crates/bonsai-fabric" }
+failure-finder = { path = "../../crates/bonsai-failure-finder" }
+sns = { path = "../../crates/bonsai-sns" }
+extensions = { path = "../../crates/bonsai-extensions" }
+skill-compiler = { path = "../../crates/bonsai-skill-compiler" }
 p2p-crypto   = { path = "../../crates/p2p-crypto" }
-bonsai-transfer-store    = { path = "../../crates/bonsai-transfer-store" }
+transfer-store = { path = "../../crates/bonsai-transfer-store" }
 p2p-core     = { path = "../../crates/p2p-core" }
-bonsai-mailbox           = { path = "../../crates/bonsai-mailbox" }
-bonsai-capability-registry = { path = "../../crates/bonsai-capability-registry" }
-bonsai-query = { path = "../../crates/bonsai-query" }
-bonsai-cas    = { path = "../../crates/bonsai-cas" }
-bonsai-ir     = { path = "../../crates/bonsai-ir" }
-bonsai-crdt   = { path = "../../crates/bonsai-crdt" }
-bonsai-actors = { path = "../../crates/bonsai-actors" }
-bonsai-chess    = { path = "../../crates/bonsai-chess" }
-bonsai-go       = { path = "../../crates/bonsai-go" }
-bonsai-go-nn    = { path = "../../crates/bonsai-go-nn" }
+mailbox = { path = "../../crates/bonsai-mailbox" }
+capability-registry = { path = "../../crates/bonsai-capability-registry" }
+query = { path = "../../crates/bonsai-query" }
+cas = { path = "../../crates/bonsai-cas" }
+ir = { path = "../../crates/bonsai-ir" }
+crdt = { path = "../../crates/bonsai-crdt" }
+actors = { path = "../../crates/bonsai-actors" }
+chess = { path = "../../crates/bonsai-chess" }
+go = { path = "../../crates/bonsai-go" }
+go-nn = { path = "../../crates/bonsai-go-nn" }
 candle-core     = { version = "0.8" }
-bonsai-knowledge = { path = "../../crates/bonsai-knowledge" }
-bonsai-verify    = { path = "../../crates/bonsai-verify" }
+knowledge = { path = "../../crates/bonsai-knowledge" }
+verify = { path = "../../crates/bonsai-verify" }
 mlua          = { version = "0.10", features = ["lua54", "vendored", "async", "serialize", "send"] }
 tauri                        = { version = "2", features = ["protocol-asset", "devtools", "tray-icon", "custom-protocol"] }
 tauri-plugin-fs              = "2"
@@ -136,20 +136,20 @@ portable-pty = "0.8"
 scrap        = "0.5"
 enigo        = "0.0.14"
 
-bonsai-native  = { path = "../../bonsai-native", optional = true }
-bonsai-hnsw    = { path = "../../crates/bonsai-hnsw" }
-bonsai-kdb     = { path = "../../crates/bonsai-kdb" }
-bonsai-package = { path = "../../crates/bonsai-package" }
-bonsai-fabric  = { path = "../../crates/bonsai-fabric" }
+native = { path = "../../native", optional = true }
+hnsw = { path = "../../crates/bonsai-hnsw" }
+kdb = { path = "../../crates/bonsai-kdb" }
+package = { path = "../../crates/bonsai-package" }
+fabric = { path = "../../crates/bonsai-fabric" }
 mcp-server = { path = "../../crates/mcp-server" }
-bonsai-android-bridge = { path = "../../crates/bonsai-android-bridge" }
+android-bridge = { path = "../../crates/bonsai-android-bridge" }
 
 [[bin]]
-name = "bonsai-music-worker"
+name = "music-worker"
 path = "src/bin/music_worker.rs"
 
 [features]
-native-gpu = ["bonsai-native"]
+native-gpu = ["native"]
 
 [profile.release]
 lto            = "thin"         # Thin LTO: faster than fat, almost as optimized

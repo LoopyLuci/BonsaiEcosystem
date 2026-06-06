@@ -6,7 +6,7 @@ use tracing::{info, warn};
 // ── Feature-gated native backend ─────────────────────────────────────────────
 
 #[cfg(feature = "native-gpu")]
-use bonsai_native::HybridEngine;
+use native::HybridEngine;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

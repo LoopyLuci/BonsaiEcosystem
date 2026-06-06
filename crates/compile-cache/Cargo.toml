@@ -1,0 +1,15 @@
+[package]
+name = "compile-cache"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+blake3 = "1"
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tokio = { version = "1", features = ["sync", "fs"] }
+dashmap = "5"
+buir = { path = "../buir" }
+co = { path = "../co" }

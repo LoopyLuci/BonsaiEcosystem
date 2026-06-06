@@ -19,7 +19,7 @@ use crate::omni_shell::OmniShellState;
 use crate::omnipresent_capture::OmnipresentCapture;
 use crate::predictive_engine::PredictiveEngine;
 use crate::process_manager::ProcessManager;
-use bonsai_cas::CasStore;
+use cas::CasStore;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1 — Session state types
@@ -161,7 +161,7 @@ impl OmniSession {
         // Restore previous snapshot if available
         let snap_key = self.last_snapshot_key.read().await.clone();
         if let Some(key_hex) = snap_key {
-            if let Ok(cas_key) = bonsai_cas::CasKey::from_hex(&key_hex) {
+            if let Ok(cas_key) = cas::CasKey::from_hex(&key_hex) {
                 if let Ok(Some(bytes)) = self.cas.get(&cas_key).await {
                     if let Ok(snap) = serde_json::from_slice::<SessionSnapshot>(&bytes) {
                         state.open_apps = snap.open_apps;

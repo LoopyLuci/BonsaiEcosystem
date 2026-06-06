@@ -1,4 +1,4 @@
-use bonsai_failure_finder::{
+use failure_finder::{
     CampaignSpec, CampaignState, F3Orchestrator, FailureReport,
     OrchestratorStats, SurvivalBridge, TargetKind, FuzzStrategy, ResourceBudget,
 };
@@ -96,7 +96,7 @@ pub async fn fff_export_failure(
 
 // ── Sandbox Nervous System commands ───────────────────────────────────────────
 
-use bonsai_sns::{SandboxInfo, SandboxSupervisor};
+use sns::{SandboxInfo, SandboxSupervisor};
 
 pub struct SnsState {
     pub supervisor: Arc<SandboxSupervisor>,
@@ -104,7 +104,7 @@ pub struct SnsState {
 
 impl SnsState {
     pub fn new() -> Self {
-        Self { supervisor: bonsai_sns::start_supervisor() }
+        Self { supervisor: sns::start_supervisor() }
     }
 }
 
@@ -118,7 +118,7 @@ pub async fn sns_list_sandboxes(
 #[tauri::command]
 pub async fn sns_list_violations(
     state: State<'_, SnsState>,
-) -> Result<Vec<bonsai_sns::CapabilityViolation>, String> {
+) -> Result<Vec<sns::CapabilityViolation>, String> {
     Ok(state.supervisor.all_violations())
 }
 

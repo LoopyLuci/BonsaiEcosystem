@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::Mutex;
-use bonsai_android_bridge::{AndroidBridge, connection::TelemetryCollector};
+use android_bridge::{AndroidBridge, connection::TelemetryCollector};
 use std::time::Duration;
 
 /// Shared state for Android Bridge management

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::kdb_state::KdbAppState;
-use bonsai_kdb::module::ModuleInfo;
+use kdb::module::ModuleInfo;
 
 // ── Shared DTOs ──────────────────────────────────────────────────────────────
 

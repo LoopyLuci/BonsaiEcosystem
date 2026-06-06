@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
     println!("- Streaming events to Universe\n");
 
     // In production:
-    // let etl = bonsai_lint::phase_a::EtlCycle::new()?;
+    // let etl = lint::phase_a::EtlCycle::new()?;
     // etl.collect_feedback().await?;
     // etl.adjust_rule_confidence().await?;
 
@@ -49,8 +49,8 @@ async fn main() -> Result<()> {
     println!("- Omnisystem deep linting (Titan/Aether/Sylva/Axiom)\n");
 
     // Create Phase C orchestrator
-    let phase_c_config = bonsai_lint::PhaseCConfig::default();
-    let phase_c = bonsai_lint::PhaseCOrchestrator::new(phase_c_config).await?;
+    let phase_c_config = lint::PhaseCConfig::default();
+    let phase_c = lint::PhaseCOrchestrator::new(phase_c_config).await?;
 
     // Enrich diagnostics with formal verification
     println!("  ✓ Axiom: Verifying rule 'unused-import'...");
@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
     println!("- Real-time diagnostic sharing across team peers");
     println!("- Distributed rule updates via P2P mesh\n");
 
-    let td_bridge = bonsai_lint::TransferDaemonBridge::new("peer-1".to_string()).await?;
+    let td_bridge = lint::TransferDaemonBridge::new("peer-1".to_string()).await?;
     println!("  ✓ TransferDaemon bridge initialized");
     println!("    - Peer ID: peer-1");
     println!("    - Status: Enabled\n");
@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
     println!("- Parallelize linting across multiple machines");
     println!("- Expected speedup: 5-10x on large codebases\n");
 
-    let dist_coord = bonsai_lint::DistributedLintCoordinator::new("local-peer".to_string()).await?;
+    let dist_coord = lint::DistributedLintCoordinator::new("local-peer".to_string()).await?;
     println!("  ✓ Distributed coordinator initialized");
     let speedup = dist_coord.estimate_speedup();
     println!("    - Estimated speedup: {:.1}x\n", speedup);
@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
     println!("- Check documentation for grammar and style issues");
     println!("- Analyze tone of code comments\n");
 
-    let prose = bonsai_lint::ProseChecker::new("http://localhost:8081".to_string()).await?;
+    let prose = lint::ProseChecker::new("http://localhost:8081".to_string()).await?;
     println!("  ✓ Prose checker initialized");
 
     // Detect language
@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
     println!("- Share custom rules with other teams\n");
 
     let marketplace =
-        bonsai_lint::PluginMarketplace::new("https://plugins.bonsai.sh".to_string()).await?;
+        lint::PluginMarketplace::new("https://plugins.bonsai.sh".to_string()).await?;
     println!("  ✓ Marketplace connected");
 
     // Search for plugins
@@ -126,7 +126,7 @@ async fn main() -> Result<()> {
     println!("- Correlate crashes with lint warnings");
     println!("- Auto-escalate severity of related rules\n");
 
-    let survival = bonsai_lint::integration::survival_feedback::SurvivalFeedbackBridge::new().await?;
+    let survival = lint::integration::survival_feedback::SurvivalFeedbackBridge::new().await?;
     println!("  ✓ Survival bridge initialized");
 
     // Get correlation metrics for a rule
@@ -145,7 +145,7 @@ async fn main() -> Result<()> {
     println!("- Time-travel debugging of diagnostics");
     println!("- Impact analysis on bug density\n");
 
-    let dashboard = bonsai_lint::LintDashboard::new().await?;
+    let dashboard = lint::LintDashboard::new().await?;
     println!("  ✓ Dashboard connected to Universe");
 
     // Get real-time status

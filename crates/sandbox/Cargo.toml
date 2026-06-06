@@ -44,8 +44,8 @@ tar = "0.4"
 
 # Bonsai integration (when available)
 # ai-advisor = { path = "../ai-advisor" }
-# bonsai-transfer = { path = "../p2p-core" }
-# bonsai-sanctum = { path = "../bonsai-sanctum" }
+# transfer = { path = "../p2p-core" }
+# sanctum = { path = "../sanctum" }
 
 [dev-dependencies]
 tokio-test = "0.4"

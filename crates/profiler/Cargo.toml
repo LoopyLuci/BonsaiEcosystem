@@ -1,0 +1,59 @@
+[package]
+name = "profiler"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Performance profiling and optimization framework for Bonsai Ecosystem"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+
+# Profiling and metrics
+pprof = { version = "0.13", features = ["flamegraph", "criterion", "with_bencher"] }
+criterion = { version = "0.5", features = ["async_tokio"] }
+dhat = "0.3"
+statrs = "0.16"
+
+# Data processing
+ndarray = "0.15"
+polars = { version = "0.20", features = ["lazy", "json"] }
+
+# Visualization
+plotly = "0.8"
+
+# Async utilities
+futures = "0.3"
+dashmap.workspace = true
+
+# Benchmarking
+perf-event = "0.4"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "ecosystem_integration"
+harness = false
+
+[[bench]]
+name = "event_bus_throughput"
+harness = false
+
+[[bench]]
+name = "command_execution"
+harness = false
+
+[[bench]]
+name = "inference_pipeline"
+harness = false
+
+[lints]
+workspace = true

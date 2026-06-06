@@ -3,7 +3,7 @@
 //! Shows how BUCE uses SovereignService to provide deterministic compression,
 //! heuristic strategy selection, and optional AI codec selection.
 
-use bonsai_ai_fallback::{
+use ai_fallback::{
     SovereignService, Arbiter, ArbiterConfig, ExecutionTier, AdvisoryOutput, Result,
 };
 
