@@ -73,7 +73,12 @@ dependencies = [
 name = "aether-vision"
 version = "5.0.0"
 dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -764,6 +769,10 @@ dependencies = [
 [[package]]
 name = "axiom-opencv"
 version = "5.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "axum"
@@ -2116,7 +2125,10 @@ dependencies = [
  "blake3",
  "cv",
  "serde",
+ "serde_json",
+ "thiserror 1.0.69",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -8887,6 +8899,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sylva-opencv"
+version = "5.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9321,6 +9342,9 @@ version = "5.0.0"
 [[package]]
 name = "titan-opencv-imgproc"
 version = "5.0.0"
+dependencies = [
+ "titan-opencv",
+]
 
 [[package]]
 name = "tokio"

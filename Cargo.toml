@@ -90,6 +90,9 @@ members = [
     "crates/titan-opencv",             # Titan core implementation
     "crates/titan-opencv-imgproc",     # Image processing module
 
+    # Phase 4: Sylva Scripting
+    "crates/sylva-opencv",             # Sylva scripting wrapper
+
     # Phase 5: Aether Distribution
     "crates/aether-vision",            # Distributed actor pipelines
 

@@ -5,6 +5,9 @@ edition = "2021"
 
 [dependencies]
 cv = { path = "../cv" }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true }
+serde_json = { workspace = true }
 blake3 = { workspace = true }
+uuid = { workspace = true }
+thiserror = "1"

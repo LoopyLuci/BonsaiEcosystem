@@ -1,8 +1,10 @@
 [package]
-name = "axiom-opencv"
+name = "sylva-opencv"
 version = "5.0.0"
 edition = "2021"
+description = "Sylva scripting layer for OpenCV 5"
 
 [dependencies]
+tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

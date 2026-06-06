@@ -4,4 +4,9 @@ version = "5.0.0"
 edition = "2021"
 
 [dependencies]
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+async-trait = { workspace = true }
+thiserror = "1"
