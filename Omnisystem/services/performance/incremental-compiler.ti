@@ -1,0 +1,396 @@
+// services/performance/incremental-compiler.ti – Enhanced incremental compilation
+// Function-level caching, distributed mesh compilation, pre-compiled modules
+
+module performance::incremental_compiler
+
+use blake3::Hash
+use core::collections::HashMap
+use serde::{Serialize, Deserialize}
+
+/// Compilation unit: a function or small module that can be compiled independently
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CompilationUnit {
+    pub id: String,                          // "module::function"
+    pub source_hash: Hash,                   // BLAKE3 of source code
+    pub dependencies: Vec<String>,           // IDs of compilation units this depends on
+    pub status: CompilationStatus,
+    pub native_code_hash: Option<Hash>,      // CAS hash of compiled object
+    pub omniir_hash: Option<Hash>,           // CAS hash of Omni-IR bytecode
+    pub compiled_at: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum CompilationStatus {
+    Pending,
+    Compiling,
+    Cached,      // Loaded from cache
+    Compiled,
+    Failed(String),
+}
+
+/// Compilation cache: maps source hash → compiled artifacts
+pub struct CompilationCache {
+    pub cache_dir: String,
+    pub entries: HashMap<Hash, CacheEntry>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CacheEntry {
+    pub source_hash: Hash,
+    pub compiler_version: String,
+    pub target_triple: String,                // "x86_64-unknown-linux-gnu"
+    pub optimization_level: u32,              // 0, 1, 2, 3
+    pub native_object_hash: Option<Hash>,     // CAS hash
+    pub omniir_bytecode_hash: Option<Hash>,
+    pub metadata: HashMap<String, String>,
+}
+
+impl CompilationCache {
+    pub fn new(cache_dir: &str) -> Self {
+        Self {
+            cache_dir: cache_dir.to_string(),
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Look up a compiled artifact in cache
+    pub fn lookup(
+        &self,
+        source_hash: &Hash,
+        compiler_version: &str,
+        target: &str,
+        opt_level: u32,
+    ) -> Option<CacheEntry> {
+        self.entries.get(source_hash)
+            .filter(|e| {
+                e.compiler_version == compiler_version &&
+                e.target_triple == target &&
+                e.optimization_level == opt_level
+            })
+            .cloned()
+    }
+
+    /// Store a compiled artifact in cache
+    pub fn store(&mut self, entry: CacheEntry) {
+        self.entries.insert(entry.source_hash.clone(), entry);
+    }
+
+    /// Clear expired entries (older than a threshold)
+    pub fn evict_old_entries(&mut self, max_age_seconds: u64) {
+        // In real implementation: check mtime and remove old entries
+        // For now, just return
+    }
+}
+
+/// Incremental compilation state: tracks which units need recompilation
+pub struct IncrementalCompilationState {
+    pub units: HashMap<String, CompilationUnit>,
+    pub cache: CompilationCache,
+    pub changed_sources: Vec<String>,  // IDs of changed units
+}
+
+impl IncrementalCompilationState {
+    pub fn new(cache_dir: &str) -> Self {
+        Self {
+            units: HashMap::new(),
+            cache: CompilationCache::new(cache_dir),
+            changed_sources: vec![],
+        }
+    }
+
+    /// Mark a source as changed; propagate to dependents
+    pub fn mark_changed(&mut self, unit_id: &str) {
+        self.changed_sources.push(unit_id.to_string());
+
+        // Find all units that depend on this one
+        let dependents: Vec<String> = self.units.iter()
+            .filter(|(_, u)| u.dependencies.contains(&unit_id.to_string()))
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        for dependent_id in dependents {
+            if !self.changed_sources.contains(&dependent_id) {
+                self.mark_changed(&dependent_id);
+            }
+        }
+    }
+
+    /// Get the set of units that need recompilation
+    pub fn units_to_compile(&self) -> Vec<&CompilationUnit> {
+        self.changed_sources.iter()
+            .filter_map(|id| self.units.get(id))
+            .collect()
+    }
+
+    /// Try to serve a unit from cache
+    pub fn try_cache_hit(
+        &mut self,
+        unit_id: &str,
+        compiler_version: &str,
+        target: &str,
+        opt_level: u32,
+    ) -> bool {
+        let unit = match self.units.get_mut(unit_id) {
+            Some(u) => u,
+            None => return false,
+        };
+
+        if let Some(_entry) = self.cache.lookup(&unit.source_hash, compiler_version, target, opt_level) {
+            unit.status = CompilationStatus::Cached;
+            return true;
+        }
+
+        false
+    }
+}
+
+/// Distributed compilation task: sent to remote builders
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DistributedCompilationTask {
+    pub task_id: String,
+    pub unit_id: String,
+    pub source_code: String,
+    pub compiler_version: String,
+    pub target_triple: String,
+    pub optimization_level: u32,
+    pub compiler_flags: Vec<String>,
+}
+
+/// Result of a distributed compilation
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CompilationResult {
+    pub task_id: String,
+    pub success: bool,
+    pub native_object: Option<Vec<u8>>,      // Compiled object file
+    pub omniir_bytecode: Option<Vec<u8>>,    // Omni-IR bytecode
+    pub error_message: Option<String>,
+    pub compilation_time_ms: u32,
+}
+
+/// Distributed compilation orchestrator
+pub struct DistributedCompiler {
+    pub task_queue: Vec<DistributedCompilationTask>,
+    pub pending_results: HashMap<String, CompilationResult>,
+    pub builder_pool: Vec<BuilderNode>,
+}
+
+#[derive(Clone, Debug)]
+pub struct BuilderNode {
+    pub node_id: String,
+    pub capacity: u32,              // Number of concurrent tasks
+    pub current_load: u32,
+    pub supported_targets: Vec<String>,
+}
+
+impl DistributedCompiler {
+    pub fn new() -> Self {
+        Self {
+            task_queue: vec![],
+            pending_results: HashMap::new(),
+            builder_pool: vec![],
+        }
+    }
+
+    /// Register a builder node
+    pub fn register_builder(&mut self, node: BuilderNode) {
+        self.builder_pool.push(node);
+    }
+
+    /// Dispatch a compilation task to the best available builder
+    pub fn dispatch(&mut self, task: DistributedCompilationTask) -> Result<(), String> {
+        // Find the builder with lowest load that supports the target
+        let best_builder = self.builder_pool.iter_mut()
+            .filter(|b| {
+                b.current_load < b.capacity &&
+                b.supported_targets.contains(&task.target_triple)
+            })
+            .min_by_key(|b| b.current_load);
+
+        if let Some(builder) = best_builder {
+            builder.current_load += 1;
+            self.task_queue.push(task);
+            Ok(())
+        } else {
+            Err("No available builders".to_string())
+        }
+    }
+
+    /// Process incoming compilation results
+    pub fn record_result(&mut self, result: CompilationResult) {
+        self.pending_results.insert(result.task_id.clone(), result);
+
+        // Decrement load on the builder that completed the task
+        for builder in &mut self.builder_pool {
+            if builder.current_load > 0 {
+                builder.current_load -= 1;
+                break;
+            }
+        }
+    }
+
+    /// Wait for all pending tasks to complete
+    pub async fn wait_all(&mut self) -> Result<(), String> {
+        // In real implementation: poll or wait for completion notifications
+        // For now, just return success
+        Ok(())
+    }
+}
+
+/// Link-Time Optimization (LTO) scheduler
+pub struct LtoScheduler {
+    pub background_enabled: bool,
+    pub high_priority_funcs: Vec<String>,  // Functions to optimize aggressively
+    pub low_priority_funcs: Vec<String>,   // Functions to optimize with standard LTO
+}
+
+impl LtoScheduler {
+    pub fn new() -> Self {
+        Self {
+            background_enabled: true,
+            high_priority_funcs: vec![],
+            low_priority_funcs: vec![],
+        }
+    }
+
+    /// Schedule LTO passes for hot functions in background
+    pub fn schedule_background_lto(&self) -> Vec<String> {
+        // Return list of functions to LTO in background
+        self.high_priority_funcs.clone()
+    }
+
+    /// Use PGO (Profile-Guided Optimization) data to identify hot functions
+    pub fn identify_hot_functions(&mut self, pgo_data: &HashMap<String, u64>) {
+        let mut sorted: Vec<_> = pgo_data.iter().collect();
+        sorted.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
+
+        // Top 10% of functions
+        let cutoff = (pgo_data.len() / 10).max(1);
+        for (func_name, _) in sorted.iter().take(cutoff) {
+            self.high_priority_funcs.push(func_name.to_string());
+        }
+
+        // Rest go to low priority
+        for (func_name, _) in sorted.iter().skip(cutoff) {
+            self.low_priority_funcs.push(func_name.to_string());
+        }
+    }
+}
+
+/// Pre-compiled module cache (for standard library, third-party dependencies)
+pub struct PrecompiledModuleCache {
+    pub entries: HashMap<String, PrecompiledModule>,  // module_name -> module
+}
+
+#[derive(Clone, Debug)]
+pub struct PrecompiledModule {
+    pub name: String,
+    pub version: String,
+    pub source_hash: Hash,
+    pub native_libs: Vec<(String, Vec<u8>)>,  // (arch, object_file)
+    pub omniir_bytecode: Vec<u8>,
+    pub module_interface: String,  // AST or type signature
+}
+
+impl PrecompiledModuleCache {
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    /// Store a precompiled module
+    pub fn store(&mut self, module: PrecompiledModule) {
+        self.entries.insert(module.name.clone(), module);
+    }
+
+    /// Retrieve a precompiled module
+    pub fn get(&self, name: &str) -> Option<&PrecompiledModule> {
+        self.entries.get(name)
+    }
+
+    /// Pre-compile the standard library (done at first install or update)
+    pub fn precompile_stdlib(&mut self) -> Result<(), String> {
+        // In real implementation: compile Titan stdlib, Bonsai stdlib, etc.
+        Ok(())
+    }
+}
+
+/// Incremental compiler facade: ties everything together
+pub struct IncrementalCompiler {
+    pub state: IncrementalCompilationState,
+    pub distributed: DistributedCompiler,
+    pub lto_scheduler: LtoScheduler,
+    pub precompiled_cache: PrecompiledModuleCache,
+    pub parallelism: u32,  // Number of parallel compile jobs
+}
+
+impl IncrementalCompiler {
+    pub fn new(cache_dir: &str, parallelism: u32) -> Self {
+        Self {
+            state: IncrementalCompilationState::new(cache_dir),
+            distributed: DistributedCompiler::new(),
+            lto_scheduler: LtoScheduler::new(),
+            precompiled_cache: PrecompiledModuleCache::new(),
+            parallelism,
+        }
+    }
+
+    /// Main compilation entry point: compile changed sources, reuse cache, parallelize
+    pub async fn compile(
+        &mut self,
+        compiler_version: &str,
+        target: &str,
+        opt_level: u32,
+    ) -> Result<HashMap<String, Vec<u8>>, String> {
+        let mut results = HashMap::new();
+
+        // Get units to compile
+        let units_to_compile = self.state.units_to_compile();
+
+        if units_to_compile.is_empty() {
+            return Ok(results);  // Nothing changed
+        }
+
+        // Try cache hits first
+        for unit in &units_to_compile {
+            if self.state.try_cache_hit(&unit.id, compiler_version, target, opt_level) {
+                // Cache hit - get the artifact
+                if let Some(_entry) = self.state.cache.lookup(&unit.source_hash, compiler_version, target, opt_level) {
+                    // Artifact is available; would fetch from CAS
+                    results.insert(unit.id.clone(), vec![]);
+                }
+            }
+        }
+
+        // For units that missed cache, dispatch to builders
+        for unit in units_to_compile {
+            if !results.contains_key(&unit.id) {
+                let task = DistributedCompilationTask {
+                    task_id: format!("task-{}", uuid::Uuid::new_v4()),
+                    unit_id: unit.id.clone(),
+                    source_code: String::new(),  // Would load from source
+                    compiler_version: compiler_version.to_string(),
+                    target_triple: target.to_string(),
+                    optimization_level: opt_level,
+                    compiler_flags: vec![],
+                };
+
+                self.distributed.dispatch(task)?;
+            }
+        }
+
+        // Wait for all distributed tasks
+        self.distributed.wait_all().await?;
+
+        // Collect results
+        for (task_id, result) in &self.distributed.pending_results {
+            if result.success {
+                if let Some(object) = &result.native_object {
+                    results.insert(result.task_id.clone(), object.clone());
+                }
+            }
+        }
+
+        Ok(results)
+    }
+}
