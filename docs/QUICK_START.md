@@ -106,7 +106,7 @@ You've built the **complete Bonsai Ecosystem**:
 
 1. **Deterministic-First Core**: All systems work without AI. Try `--no-default-features` vs `--all-features` and both produce identical results.
 2. **Polyglot Pong**: A test framework that validates 750+ languages against a canonical fixed-point spec.
-3. **TransferDaemon v2**: P2P networking with self-certifying identities and post-quantum crypto.
+3. **TransferDaemon**: P2P networking with self-certifying identities and post-quantum crypto.
 4. **SovereignService**: A trait that ensures graceful degradation (AI → Heuristic → Deterministic → Safe Stub).
 
 ---

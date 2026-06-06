@@ -686,7 +686,7 @@ Timeline:
 
 ---
 
-### 💬 Bonsai OmniBot
+### 💬 OmniBot
 
 OmniBot is a unified chat bot accessible from **anywhere**.
 
@@ -1009,7 +1009,7 @@ A: UOSC core: 500 MB. BonsAI V2: 4-40 GB depending on model size. Plus your data
 A: Android: Yes (lightweight components). iOS: No (not yet).
 
 **Q: What if I find a bug?**  
-A: Report it via Bonsai OmniBot or open an issue on GitHub. The Bug Hunter helps us find issues proactively.
+A: Report it via OmniBot or open an issue on GitHub. The Bug Hunter helps us find issues proactively.
 
 **Q: Is my data really private?**  
 A: Yes. No data leaves your device unless you explicitly allow it. You can verify this by checking the audit log in Universe.

@@ -55,7 +55,7 @@ A structured log of all releases, features, and breaking changes. Maintained in 
 ## D
 
 ### DCUtR (Distributed Connectivity Update Request)
-A protocol extension in TransferDaemon v2 that allows NAT traversal and hole punching for P2P connections. Part of the Echo fabric.
+A protocol extension in TransferDaemon that allows NAT traversal and hole punching for P2P connections. Part of the Echo fabric.
 
 ### Deterministic Core
 The portion of any system that produces the same output given identical inputs, without reliance on AI, randomness, or external state. Required for all critical systems in the Bonsai Ecosystem.
@@ -68,7 +68,7 @@ A fine-tuning technique used to teach BonsAI V2 to follow preferences without RL
 ## E
 
 ### Echo Fabric
-The P2P mesh network that powers TransferDaemon v2. Routes messages via multiple paths and automatically selects the best link based on latency and bandwidth.
+The P2P mesh network that powers TransferDaemon. Routes messages via multiple paths and automatically selects the best link based on latency and bandwidth.
 
 ---
 
@@ -105,7 +105,7 @@ The second execution tier in SovereignService. Uses rule-based algorithms (no AI
 ## I
 
 ### Identity (Self-Certifying)
-In TransferDaemon v2, a public key that also serves as the peer's unique identifier. No central CA required; cryptographic properties ensure uniqueness.
+In TransferDaemon, a public key that also serves as the peer's unique identifier. No central CA required; cryptographic properties ensure uniqueness.
 
 ---
 
@@ -136,14 +136,14 @@ An abstraction layer that allows conversion between 750+ programming languages. 
 A YAML or JSON file listing all languages and their metadata (family, version, compilation flags, etc.). Used by the Polyglot Pong orchestrator to parameterize test runs.
 
 ### Multi-Path Bonding
-A technique in TransferDaemon v2 where multiple links (WiFi, Bluetooth, LTE, etc.) are simultaneously used to route P2P messages, selecting the fastest available path.
+A technique in TransferDaemon where multiple links (WiFi, Bluetooth, LTE, etc.) are simultaneously used to route P2P messages, selecting the fastest available path.
 
 ---
 
 ## N
 
 ### NAT Traversal
-Techniques (UPnP, hole punching, relay fallback) that allow P2P connections through network address translators (firewalls, routers). Built into TransferDaemon v2 via DCUtR.
+Techniques (UPnP, hole punching, relay fallback) that allow P2P connections through network address translators (firewalls, routers). Built into TransferDaemon via DCUtR.
 
 ### Nexus Core
 An optional blockchain component providing quad-token economics, governance voting, and distributed consensus. Can be disabled for offline use.
@@ -163,7 +163,7 @@ A unified control plane for Bonsai across Discord, Telegram, Matrix, and Email. 
 A deterministic distributed game framework used to validate 750+ languages against a canonical specification. Serves as both a test suite and a demonstration of deterministic-first architecture.
 
 ### Post-Quantum Cryptography
-Algorithms (X25519 + ML-KEM-768 hybrid, SPHINCS+ signatures) that remain secure even against hypothetical quantum computers. Standard in TransferDaemon v2 and all messaging.
+Algorithms (X25519 + ML-KEM-768 hybrid, SPHINCS+ signatures) that remain secure even against hypothetical quantum computers. Standard in TransferDaemon and all messaging.
 
 ---
 
@@ -201,7 +201,7 @@ A formal specification language used to model concurrent systems and prove prope
 ### Trace (Execution Trace)
 A record of all state transitions during execution of a program. Polyglot Pong compares traces to measure fidelity and detect divergences.
 
-### TransferDaemon v2
+### TransferDaemon
 A peer-to-peer networking daemon with self-certifying identities, multi-path bonding, post-quantum crypto, and NAT traversal. The foundation of all distributed features in Bonsai.
 
 ---

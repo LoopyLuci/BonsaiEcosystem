@@ -59,7 +59,7 @@ cargo build --release
 ### Overview
 v1.0.0 is the production-ready release:
 - 750+ languages fully validated
-- TransferDaemon v2 P2P mesh stable
+- TransferDaemon P2P mesh stable
 - All formal verification proofs complete
 - Private name sanitization verified
 

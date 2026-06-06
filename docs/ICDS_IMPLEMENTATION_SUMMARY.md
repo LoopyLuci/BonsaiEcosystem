@@ -266,7 +266,7 @@ The ICDS is designed to leverage existing Bonsai subsystems:
 | Subsystem | Role | Status |
 |-----------|------|--------|
 | **ai-advisor** | Arbiter for optional enhancements | ✅ Ready to integrate |
-| **TransferDaemon v2** | P2P distribution of atoms | 🔄 Planned for Phase 2 |
+| **TransferDaemon** | P2P distribution of atoms | 🔄 Planned for Phase 2 |
 | **bonsai-cas** | Content-addressed storage backend | 🔄 Planned for Phase 2 |
 | **AriaDB** | Metadata store + temporal queries | 🔄 Planned for Phase 2 |
 | **BUCE** | Compression of atom text | 🔄 Planned for Phase 2 |

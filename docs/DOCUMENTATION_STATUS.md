@@ -39,7 +39,7 @@ The Bonsai Ecosystem documentation suite is now **complete and production-ready*
 | DEPLOYMENT.md | ✅ Ready | Deploying to all platforms |
 | LANGUAGE_SUPPORT.md | ✅ Ready | 750+ languages, BPLIS/LAIR internals |
 | COMPRESSION.md | ✅ Ready | BUCE algorithms, benchmarks |
-| NETWORKING.md | ✅ Ready | TransferDaemon v2, P2P, NAT traversal |
+| NETWORKING.md | ✅ Ready | TransferDaemon, P2P, NAT traversal |
 | SECURITY.md | ✅ Ready | Post-quantum crypto, threat model |
 | FORMAL_VERIFICATION.md | ✅ Ready | Axiom proofs, TLA+ models |
 | OBSERVABILITY.md | ✅ Ready | Universe logging, distributed tracing |
@@ -81,14 +81,14 @@ The Bonsai Ecosystem documentation suite is now **complete and production-ready*
 - 🔐 Post‑Quantum Security
 - 🌐 Polyglot (750+ languages)
 - 🗜️ Universal Compression (BUCE)
-- 🛰️ TransferDaemon v2
+- 🛰️ TransferDaemon
 - 🧱 Bonsai Container Fabric (BCF)
 - 🎬 Media Nexus (BMN)
 - 📚 Knowledge Database (KDB)
 - ⚙️ Atomic Compilation (BACE)
 - 🔎 Bug Hunter & Code Sweeper
 - 🤖 BonsAI V2
-- 🧩 Bonsai OmniBot
+- 🧩 OmniBot
 - 💎 Nexus Core
 
 **Status**: Each feature linked from README and has dedicated sections in advanced docs.
@@ -187,7 +187,7 @@ All private/internal model names have been **removed** from public documentation
 
 ### v1.0.0 (Q4 2026) 📋
 - [ ] 750+ languages validated
-- [ ] TransferDaemon v2 production
+- [ ] TransferDaemon production
 - [ ] All formal proofs complete
 - [ ] Stable API guarantees
 
