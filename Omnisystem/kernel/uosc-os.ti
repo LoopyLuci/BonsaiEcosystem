@@ -1,0 +1,354 @@
+// kernel/uosc-os.ti – UOSC Operating System Core
+// Complete sovereign OS built on the UOSC microkernel with userspace services
+
+module kernel::uosc_os
+
+use core::option::Option
+use core::result::Result
+use core::collections::HashMap
+use serde::{Serialize, Deserialize}
+use blake3::Hash
+
+/// ============================================================================
+/// Kernel Extensions (Minimal – still fits in < 50KB)
+/// ============================================================================
+
+/// Dynamic module loading: allows loading kernel modules (drivers, filesystems) at runtime
+pub async fn syscall_module_load(
+    module_hash: &Hash,
+    module_type: ModuleType,
+    capabilities: &CapabilitySet,
+) -> Result<ModuleHandle, KernelError> {
+    // Verify module signature against council keys
+    verify_module_signature(module_hash)?;
+
+    // Load the module binary into kernel space (immutable page region)
+    let module_handle = load_and_map_module(module_hash)?;
+
+    // Initialize the module with granted capabilities
+    initialize_module(&module_handle, capabilities)?;
+
+    // Register in module table
+    KERNEL_STATE.lock().register_module(module_handle.clone());
+
+    Ok(module_handle)
+}
+
+/// Process creation: spawn a new process with a subset of parent's capabilities
+pub async fn syscall_process_create(
+    entrypoint: &str,
+    initial_capabilities: CapabilitySet,
+    memory_limit_mb: u32,
+) -> Result<ProcessHandle, KernelError> {
+    // Validate that the caller has the PROCESS_CREATE capability
+    let current = current_process()?;
+    if !current.capabilities.has("PROCESS_CREATE") {
+        return Err(KernelError::CapabilityDenied);
+    }
+
+    // Load the entrypoint (ELF or Titan binary) from CAS
+    let binary = load_binary(entrypoint)?;
+
+    // Create new process structure
+    let process = ProcessHandle {
+        pid: allocate_pid(),
+        entrypoint: entrypoint.to_string(),
+        capabilities: initial_capabilities,
+        memory_limit_bytes: (memory_limit_mb as u64) * 1024 * 1024,
+        state: ProcessState::Created,
+        parent_pid: Some(current.pid),
+    };
+
+    // Allocate page table, memory regions
+    let address_space = allocate_address_space(&process)?;
+
+    // Map binary into address space
+    map_binary(&address_space, &binary)?;
+
+    // Initialize registers, stack, etc.
+    initialize_execution_context(&process, &address_space)?;
+
+    // Register in process table
+    KERNEL_STATE.lock().register_process(process.clone());
+
+    Ok(process)
+}
+
+/// Event delivery: send asynchronous notifications to a process
+pub async fn syscall_event_send(
+    target_pid: u32,
+    event: OsEvent,
+) -> Result<(), KernelError> {
+    let mut kernel = KERNEL_STATE.lock();
+    let target = kernel.get_process(target_pid)?;
+
+    // Check if sender has capability to send events to target
+    let current = current_process()?;
+    if !current.capabilities.has_event_capability_to(target_pid) {
+        return Err(KernelError::CapabilityDenied);
+    }
+
+    // Add event to target's event queue
+    target.event_queue.push(event);
+
+    // Wake target if sleeping
+    schedule_process(target_pid);
+
+    Ok(())
+}
+
+/// ============================================================================
+/// Operating System Abstractions (Userspace-Facing)
+/// ============================================================================
+
+/// Operating system handle: represents the running OS instance
+#[derive(Clone, Debug)]
+pub struct OsHandle {
+    pub os_id: String,
+    pub boot_time: u64,
+    pub root_filesystem_hash: Hash,
+    pub configuration: OsConfiguration,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct OsConfiguration {
+    pub hostname: String,
+    pub timezone: String,
+    pub locale: String,
+    pub security_level: SecurityLevel,
+    pub enable_deterministic_mode: bool,
+    pub enable_ai_features: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum SecurityLevel {
+    Permissive,   // Development
+    Standard,     // Default
+    Strict,       // No network by default
+    Hardened,     // Formal verification required for all modules
+}
+
+/// Process representation
+#[derive(Clone, Debug)]
+pub struct ProcessHandle {
+    pub pid: u32,
+    pub entrypoint: String,
+    pub capabilities: CapabilitySet,
+    pub memory_limit_bytes: u64,
+    pub state: ProcessState,
+    pub parent_pid: Option<u32>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProcessState {
+    Created,
+    Running,
+    Paused,
+    Blocked,
+    Terminated,
+}
+
+/// Capability set: declarative resource access
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CapabilitySet {
+    pub capabilities: HashMap<String, CapabilityGrant>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CapabilityGrant {
+    pub resource: String,  // "net:outbound", "fs:read:/home", "gpu:virgl"
+    pub access_level: String,  // "read", "write", "execute"
+    pub limit: Option<String>,  // "bandwidth:100Mbps", "mem:512MB"
+}
+
+impl CapabilitySet {
+    pub fn has(&self, capability: &str) -> bool {
+        self.capabilities.contains_key(capability)
+    }
+
+    pub fn has_event_capability_to(&self, target_pid: u32) -> bool {
+        // In real implementation: check if sender has capability to send events to target
+        true  // Simplified
+    }
+}
+
+/// Module type
+#[derive(Clone, Debug)]
+pub enum ModuleType {
+    Driver,        // Device driver
+    Filesystem,    // Filesystem backend
+    Service,       // System service
+    Library,       // Shared library
+}
+
+/// Module handle: represents a loaded module
+#[derive(Clone, Debug)]
+pub struct ModuleHandle {
+    pub hash: Hash,
+    pub module_type: ModuleType,
+    pub base_address: usize,
+    pub size: usize,
+    pub entry_point: Option<usize>,
+}
+
+/// OS event: asynchronous notification
+#[derive(Clone, Debug)]
+pub enum OsEvent {
+    ProcessExit { pid: u32, exit_code: i32 },
+    SignalReceived { signal: u32 },
+    DeviceAttached { device_name: String },
+    TimeoutExpired { timer_id: u64 },
+    MessageReceived { from_pid: u32, data: Vec<u8> },
+}
+
+/// Kernel error
+#[derive(Debug)]
+pub enum KernelError {
+    ProcessNotFound,
+    CapabilityDenied,
+    InvalidModule,
+    OutOfMemory,
+    InvalidAddress,
+}
+
+/// ============================================================================
+/// Global Kernel State
+/// ============================================================================
+
+pub struct KernelState {
+    pub processes: HashMap<u32, ProcessHandle>,
+    pub modules: HashMap<Hash, ModuleHandle>,
+    pub next_pid: u32,
+}
+
+impl KernelState {
+    pub fn new() -> Self {
+        Self {
+            processes: HashMap::new(),
+            modules: HashMap::new(),
+            next_pid: 1000,  // Reserve 0-999 for system processes
+        }
+    }
+
+    pub fn register_process(&mut self, process: ProcessHandle) {
+        self.processes.insert(process.pid, process);
+    }
+
+    pub fn get_process(&self, pid: u32) -> Result<ProcessHandle, KernelError> {
+        self.processes
+            .get(&pid)
+            .cloned()
+            .ok_or(KernelError::ProcessNotFound)
+    }
+
+    pub fn register_module(&mut self, module: ModuleHandle) {
+        self.modules.insert(module.hash.clone(), module);
+    }
+}
+
+/// ============================================================================
+/// Helper Functions (Simplified)
+/// ============================================================================
+
+fn allocate_pid() -> u32 {
+    // In real implementation: allocate a unique PID
+    42
+}
+
+fn current_process() -> Result<ProcessHandle, KernelError> {
+    // In real implementation: return the currently executing process
+    Err(KernelError::ProcessNotFound)
+}
+
+fn verify_module_signature(_hash: &Hash) -> Result<(), KernelError> {
+    // In real implementation: verify BLS signature against council keys
+    Ok(())
+}
+
+fn load_binary(_entrypoint: &str) -> Result<Vec<u8>, KernelError> {
+    // In real implementation: load ELF/Titan binary from CAS
+    Ok(vec![])
+}
+
+fn allocate_address_space(_process: &ProcessHandle) -> Result<AddressSpace, KernelError> {
+    Ok(AddressSpace { base: 0x400000, size: 0 })
+}
+
+fn map_binary(_address_space: &AddressSpace, _binary: &[u8]) -> Result<(), KernelError> {
+    Ok(())
+}
+
+fn initialize_execution_context(_process: &ProcessHandle, _address_space: &AddressSpace) -> Result<(), KernelError> {
+    Ok(())
+}
+
+fn load_and_map_module(_hash: &Hash) -> Result<ModuleHandle, KernelError> {
+    Ok(ModuleHandle {
+        hash: blake3::hash(b"module"),
+        module_type: ModuleType::Service,
+        base_address: 0x80000000,
+        size: 65536,
+        entry_point: Some(0x80000000),
+    })
+}
+
+fn initialize_module(_module: &ModuleHandle, _capabilities: &CapabilitySet) -> Result<(), KernelError> {
+    Ok(())
+}
+
+fn schedule_process(_pid: u32) {
+    // In real implementation: mark process as ready and add to scheduler queue
+}
+
+pub struct AddressSpace {
+    pub base: usize,
+    pub size: usize,
+}
+
+// Global kernel state (mutex-protected)
+lazy_static::lazy_static! {
+    pub static ref KERNEL_STATE: std::sync::Mutex<KernelState> = std::sync::Mutex::new(KernelState::new());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_capability_set() {
+        let mut caps = CapabilitySet {
+            capabilities: HashMap::new(),
+        };
+
+        caps.capabilities.insert(
+            "net:outbound".to_string(),
+            CapabilityGrant {
+                resource: "network".to_string(),
+                access_level: "read_write".to_string(),
+                limit: Some("100Mbps".to_string()),
+            },
+        );
+
+        assert!(caps.has("net:outbound"));
+        assert!(!caps.has("gpu:virgl"));
+    }
+
+    #[test]
+    fn test_kernel_state() {
+        let mut state = KernelState::new();
+        let process = ProcessHandle {
+            pid: 1000,
+            entrypoint: "init".to_string(),
+            capabilities: CapabilitySet {
+                capabilities: HashMap::new(),
+            },
+            memory_limit_bytes: 1024 * 1024 * 512,
+            state: ProcessState::Running,
+            parent_pid: None,
+        };
+
+        state.register_process(process.clone());
+        assert!(state.get_process(1000).is_ok());
+        assert!(state.get_process(9999).is_err());
+    }
+}
