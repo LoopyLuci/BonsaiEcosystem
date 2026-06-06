@@ -14,7 +14,7 @@ param(
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 $CARGO = "$env:USERPROFILE\.cargo\bin\cargo.exe"
 $RUSTC = "$env:USERPROFILE\.cargo\bin\rustc.exe"
-$ROOT = "Z:\Projects\BonsaiWorkspace"
+$ROOT = "Z:\Projects\BonsaiEcosystem"
 $WS_DIR = "$ROOT\bonsai-workspace"
 
 Write-Host "🚀 Bonsai Build and Run Script" -ForegroundColor Cyan

@@ -8,7 +8,7 @@
 
 param([switch]$SkipKernelBuild, [switch]$SkipIDE, [switch]$LaunchStack)
 
-$workspace = "Z:\Projects\BonsaiWorkspace"
+$workspace = "Z:\Projects\BonsaiEcosystem"
 
 function Write-Header {
     param([string]$Text)

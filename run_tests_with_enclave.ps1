@@ -13,7 +13,7 @@ param(
     [int]$Frames = 100
 )
 
-$workdir = "z:\Projects\BonsaiWorkspace"
+$workdir = "z:\Projects\BonsaiEcosystem"
 $enclavebin = "$workdir\target\release\enclave.exe"
 $polyglotdir = "$workdir\polyglot-pong"
 

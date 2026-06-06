@@ -5,12 +5,12 @@
       "args": [
         "run",
         "--manifest-path",
-        "Z:\\Projects\\BonsaiWorkspace\\crates\\mcp-server\\Cargo.toml",
+        "Z:\\Projects\\BonsaiEcosystem\\crates\\mcp-server\\Cargo.toml",
         "--release"
       ],
       "env": {
         "RUST_LOG": "debug,bonsai_mcp=trace",
-        "BONSAI_CONFIG": "Z:\\Projects\\BonsaiWorkspace\\.bonsai\\config.toml"
+        "BONSAI_CONFIG": "Z:\\Projects\\BonsaiEcosystem\\.bonsai\\config.toml"
       }
     },
     "bonsai-bug-hunter": {
@@ -18,7 +18,7 @@
       "args": [
         "run",
         "--manifest-path",
-        "Z:\\Projects\\BonsaiWorkspace\\crates\\bonsai-bug-hunter\\Cargo.toml",
+        "Z:\\Projects\\BonsaiEcosystem\\crates\\bonsai-bug-hunter\\Cargo.toml",
         "--release"
       ],
       "env": {
@@ -30,7 +30,7 @@
       "args": [
         "run",
         "--manifest-path",
-        "Z:\\Projects\\BonsaiWorkspace\\crates\\bonsai-ci\\Cargo.toml",
+        "Z:\\Projects\\BonsaiEcosystem\\crates\\bonsai-ci\\Cargo.toml",
         "--release"
       ]
     }

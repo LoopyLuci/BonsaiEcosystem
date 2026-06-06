@@ -3,7 +3,7 @@
 
 param([switch]$LaunchStack)
 
-$workspace = "Z:\Projects\BonsaiWorkspace"
+$workspace = "Z:\Projects\BonsaiEcosystem"
 
 Write-Host @'
 ================================================================================

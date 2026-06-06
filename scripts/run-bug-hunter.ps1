@@ -1,9 +1,9 @@
 # Bug Hunter Automated Scan & Fix Script
 # Purpose: Run complete Bug Hunter workflow with Survival System & KDB integration
-# Usage: .\scripts\run-bug-hunter.ps1 -Path "Z:\Projects\BonsaiWorkspace" -Mode "full"
+# Usage: .\scripts\run-bug-hunter.ps1 -Path "Z:\Projects\BonsaiEcosystem" -Mode "full"
 
 param(
-    [string]$Path = "Z:\Projects\BonsaiWorkspace",
+    [string]$Path = "Z:\Projects\BonsaiEcosystem",
     [ValidateSet("quick", "full", "ai")]
     [string]$Mode = "full",
     [switch]$AutoFix = $true,

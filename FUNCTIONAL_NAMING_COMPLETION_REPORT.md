@@ -301,7 +301,7 @@ Brand identity now appears only in:
 
 ### 1. Compilation Verification
 ```bash
-cd z:\Projects\BonsaiWorkspace
+cd z:\Projects\BonsaiEcosystem
 cargo build                    # Full workspace build
 cargo test                     # Run all tests
 ```

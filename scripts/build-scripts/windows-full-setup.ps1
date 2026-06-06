@@ -35,7 +35,7 @@ param(
     [switch]$LaunchStack
 )
 
-$workspace = "Z:\Projects\BonsaiWorkspace"
+$workspace = "Z:\Projects\BonsaiEcosystem"
 $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 
 function Write-Header {
@@ -322,7 +322,7 @@ Option 2: QEMU full VM (realistic)
 NIGHTLY IMPROVEMENT (Optional):
 
 Edit windows-improve-octopus.ps1 and schedule it daily:
-  powershell -File Z:\Projects\BonsaiWorkspace\windows-improve-octopus.ps1
+  powershell -File Z:\Projects\BonsaiEcosystem\windows-improve-octopus.ps1
 
 Or run manually anytime to fine-tune from feedback.
 

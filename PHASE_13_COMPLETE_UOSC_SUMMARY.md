@@ -364,7 +364,7 @@ $ uosc-build --target armv7
 ## Files & Locations
 
 ```
-BonsaiWorkspace/
+BonsaiEcosystem/
 ├── Omnisystem/
 │   ├── kernel/
 │   │   └── uosc-os.ti           [Microkernel, 900 lines]

@@ -11,7 +11,7 @@
 
 param([switch]$SkipKernel, [switch]$SkipIDE, [switch]$LaunchStack)
 
-$workspace = "Z:\Projects\BonsaiWorkspace"
+$workspace = "Z:\Projects\BonsaiEcosystem"
 $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
 
 function Write-Header {
@@ -320,7 +320,7 @@ Option 2: Via API (CLI)
    .\scripts\improve-octopus.ps1
 
    Schedule daily (3 AM):
-   \$action = New-ScheduledTaskAction -Execute "pwsh" -Argument "-File Z:\Projects\BonsaiWorkspace\scripts\improve-octopus.ps1"
+   \$action = New-ScheduledTaskAction -Execute "pwsh" -Argument "-File Z:\Projects\BonsaiEcosystem\scripts\improve-octopus.ps1"
    \$trigger = New-ScheduledTaskTrigger -Daily -At 3am
    Register-ScheduledTask -TaskName "OctopusAI-Improvement" -Action \$action -Trigger \$trigger
 
