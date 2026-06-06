@@ -15,7 +15,6 @@ inventory::collect!(LanguageRegistration);
 
 /// Global language registry
 pub struct LanguageRegistry {
-    cache: RwLock<HashMap<String, Box<dyn LanguageFrontend>>>,
     ext_map: RwLock<HashMap<String, String>>, // extension -> language name
 }
 
@@ -33,7 +32,6 @@ impl LanguageRegistry {
         }
 
         Self {
-            cache: RwLock::new(HashMap::new()),
             ext_map: RwLock::new(ext_map),
         }
     }

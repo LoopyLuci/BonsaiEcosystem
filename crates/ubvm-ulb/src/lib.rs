@@ -51,7 +51,7 @@ impl CodeGenerator for RustGenerator {
             for stmt in &func.body {
                 match stmt {
                     Statement::Print(s) => code.push_str(&format!("    println!(\"{{}}\", \"{}\");\n", s)),
-                    Statement::Return(s) => code.push_str(&format!("    return;\n")),
+                    Statement::Return(_s) => code.push_str(&format!("    return;\n")),
                     Statement::Assert { condition, message } => {
                         code.push_str(&format!("    assert!({}, \"{}\");\n", condition, message))
                     }

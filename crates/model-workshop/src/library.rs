@@ -1,5 +1,5 @@
 use axum::{Json, extract::{State, Path}};
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 use crate::{AppState, ModuleInfo};
 
 #[derive(Debug, Deserialize)]
@@ -50,7 +50,7 @@ pub async fn create_module(
         created_at: chrono::Utc::now().to_rfc3339(),
     };
 
-    state.modules.write().await.insert(module_id.clone(), module);
+    let _ = state.modules.write().await.insert(module_id.clone(), module);
 
     Json(serde_json::json!({
         "status": "created",
@@ -101,7 +101,7 @@ pub async fn delete_module(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
-    state.modules.write().await.remove(&id);
+    let _ = state.modules.write().await.remove(&id);
     Json(serde_json::json!({
         "status": "deleted",
         "module_id": id

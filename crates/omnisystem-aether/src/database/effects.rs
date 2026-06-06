@@ -6,7 +6,6 @@
 //! - Automatic transaction scoping
 //! - Effect inference at compile time
 
-use std::marker::PhantomData;
 
 /// DbRead effect — functions that perform database reads are marked with this
 #[derive(Debug, Clone)]
@@ -153,16 +152,16 @@ impl DbReadHandler for MockDbHandler {
 impl DbWriteHandler for MockDbHandler {
     fn create<T: serde::Serialize>(&self, entity: &T) -> Result<uuid::Uuid, String> {
         let id = uuid::Uuid::new_v4();
-        let value = serde_json::to_value(entity).map_err(|e| e.to_string())?;
+        let _value = serde_json::to_value(entity).map_err(|e| e.to_string())?;
         Ok(id)
     }
 
-    fn update<T: serde::Serialize>(&self, id: uuid::Uuid, entity: &T) -> Result<(), String> {
-        let value = serde_json::to_value(entity).map_err(|e| e.to_string())?;
+    fn update<T: serde::Serialize>(&self, _id: uuid::Uuid, entity: &T) -> Result<(), String> {
+        let _value = serde_json::to_value(entity).map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    fn delete(&self, id: uuid::Uuid) -> Result<(), String> {
+    fn delete(&self, _id: uuid::Uuid) -> Result<(), String> {
         Ok(())
     }
 }

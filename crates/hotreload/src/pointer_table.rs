@@ -1,5 +1,4 @@
 use dashmap::DashMap;
-use std::sync::Arc;
 
 /// Wrapper for raw pointers to make them Send + Sync (safe for raw address sharing)
 #[repr(transparent)]

@@ -1,6 +1,5 @@
 //! AI Congestion Control Advisor – Advisory only, never modifies core state directly
 
-use crate::safety::SafetyEnvelope;
 use serde::{Serialize, Deserialize};
 
 /// An AI-powered congestion advisor that provides suggestions (not commands).
@@ -8,7 +7,6 @@ use serde::{Serialize, Deserialize};
 /// All suggestions are validated against SafetyEnvelope bounds before use.
 #[derive(Debug, Clone)]
 pub struct AiCongestionAdvisor {
-    confidence_threshold: f32,
     is_healthy: bool,
 }
 
@@ -21,9 +19,8 @@ pub struct AiAdvice {
 }
 
 impl AiCongestionAdvisor {
-    pub fn new(confidence_threshold: f32) -> Self {
+    pub fn new(_confidence_threshold: f32) -> Self {
         Self {
-            confidence_threshold,
             is_healthy: false,
         }
     }

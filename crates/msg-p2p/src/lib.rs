@@ -1,15 +1,10 @@
 use msg_core::Message;
-use std::sync::Arc;
 
-pub struct P2pDelivery {
-    echo: Arc<std::sync::Mutex<String>>,
-}
+pub struct P2pDelivery;
 
 impl P2pDelivery {
     pub fn new() -> Self {
-        Self {
-            echo: Arc::new(std::sync::Mutex::new(String::new())),
-        }
+        Self
     }
 
     /// Discover a peer by email address via Echo service registry

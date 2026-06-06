@@ -4,8 +4,6 @@ pub mod partial_eval;
 pub mod ai_hints;
 pub mod orchestrator;
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Central coordinator for pre-compilation activities.
 pub struct PreCompiler {

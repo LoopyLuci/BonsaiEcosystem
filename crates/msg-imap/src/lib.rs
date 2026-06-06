@@ -38,7 +38,6 @@ async fn handle_imap_session(
     let mut buf = BufReader::new(reader);
     writer.write_all(b"* OK IMAP4 Bonsai BMF ready\r\n").await?;
 
-    let mut tag = String::new();
     let mut line = String::new();
 
     loop {
@@ -46,7 +45,7 @@ async fn handle_imap_session(
         if buf.read_line(&mut line).await? == 0 { break; }
         let parts: Vec<&str> = line.trim().splitn(2, ' ').collect();
         if parts.len() < 2 { continue; }
-        tag = parts[0].to_string();
+        let tag = parts[0].to_string();
         let command = parts[1].to_uppercase();
 
         if command.starts_with("LOGOUT") {

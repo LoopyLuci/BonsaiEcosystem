@@ -23,7 +23,6 @@ pub struct SimpleRegistry {
 
 #[derive(Clone)]
 struct WorkerInfo {
-    capabilities: Vec<String>,
     healthy: bool,
 }
 
@@ -39,11 +38,6 @@ impl SimpleRegistry {
         self.workers.insert(
             id.to_string(),
             WorkerInfo {
-                capabilities: vec![
-                    "rust".into(),
-                    "python".into(),
-                    "javascript".into(),
-                ],
                 healthy: true,
             },
         );
@@ -67,11 +61,10 @@ impl WorkerRegistry for SimpleRegistry {
             .collect())
     }
 
-    async fn register_worker(&self, id: &str, capabilities: Vec<String>) -> anyhow::Result<()> {
+    async fn register_worker(&self, id: &str, _capabilities: Vec<String>) -> anyhow::Result<()> {
         self.workers.insert(
             id.to_string(),
             WorkerInfo {
-                capabilities,
                 healthy: true,
             },
         );

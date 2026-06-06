@@ -1,5 +1,5 @@
 use axum::{Json, extract::{State, Path}};
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 use crate::{AppState, DatasetInfo};
 
 #[derive(Debug, Deserialize)]
@@ -35,7 +35,7 @@ pub async fn create_dataset(
         created_at: chrono::Utc::now().to_rfc3339(),
     };
 
-    state.datasets.write().await.insert(dataset_id.clone(), dataset);
+    let _ = state.datasets.write().await.insert(dataset_id.clone(), dataset);
 
     Json(serde_json::json!({
         "status": "created",
@@ -49,7 +49,7 @@ pub async fn delete_dataset(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
-    state.datasets.write().await.remove(&id);
+    let _ = state.datasets.write().await.remove(&id);
     Json(serde_json::json!({
         "status": "deleted",
         "dataset_id": id

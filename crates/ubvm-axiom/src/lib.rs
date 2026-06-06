@@ -1,6 +1,5 @@
 /// Axiom Proof Checker Integration
 use std::path::Path;
-use std::process::Command;
 
 /// Verify an Axiom proof file
 pub async fn verify_proof(proof_path: &Path) -> anyhow::Result<bool> {
@@ -59,7 +58,7 @@ impl ProofValidator {
     }
 
     pub fn validate_all(&self) -> anyhow::Result<bool> {
-        for (path, meta) in &self.proofs {
+        for (_path, meta) in &self.proofs {
             if !meta.verified {
                 return Ok(false);
             }

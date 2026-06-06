@@ -2,7 +2,6 @@
 //!
 //! Base actor infrastructure with supervision and location transparency.
 
-use std::sync::Arc;
 
 /// Base trait for actors
 pub trait Actor: Send + Sync {

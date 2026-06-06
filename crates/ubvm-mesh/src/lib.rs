@@ -2,8 +2,7 @@
 pub mod worker;
 pub mod coordinator;
 
-use ubvm_core::{TestJob, TestResult};
-use std::sync::Arc;
+use ubvm_core::TestResult;
 
 /// Mesh configuration
 #[derive(Debug, Clone)]
@@ -34,18 +33,14 @@ pub struct MeshStatus {
 
 /// Main mesh coordinator
 pub struct Mesh {
-    config: MeshConfig,
     workers: dashmap::DashMap<String, worker::WorkerState>,
-    job_queue: std::sync::Arc<tokio::sync::Mutex<Vec<TestJob>>>,
     results: dashmap::DashMap<ubvm_core::TestId, TestResult>,
 }
 
 impl Mesh {
-    pub fn new(config: MeshConfig) -> Self {
+    pub fn new(_config: MeshConfig) -> Self {
         Self {
-            config,
             workers: dashmap::DashMap::new(),
-            job_queue: Arc::new(tokio::sync::Mutex::new(Vec::new())),
             results: dashmap::DashMap::new(),
         }
     }

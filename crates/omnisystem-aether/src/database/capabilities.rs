@@ -3,7 +3,6 @@
 //! Actors receive scoped DbCapability tokens that limit what they can do.
 //! No ambient authority — an actor cannot touch the database unless explicitly granted.
 
-use std::collections::HashSet;
 
 /// A capability token that grants access to a specific table and operations
 #[derive(Debug, Clone)]

@@ -15,7 +15,6 @@ pub mod safety;
 pub use advisor::AiCongestionAdvisor;
 pub use safety::SafetyEnvelope;
 
-use serde::{Serialize, Deserialize};
 
 /// Central AI enhancement manager – all AI components are optional.
 #[derive(Debug, Clone)]

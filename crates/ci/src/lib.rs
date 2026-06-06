@@ -6,7 +6,6 @@ use std::path::Path;
 use std::sync::Arc;
 use cas::CasStore;
 use p2p_crypto::BonsaiIdentity;
-use tokio::io::AsyncReadExt;
 use walkdir::WalkDir;
 use std::ffi::OsStr;
 

@@ -3,7 +3,6 @@
 //! Queries are typed expressions validated at compile time against the schema.
 //! No SQL strings, no runtime errors from schema mismatches.
 
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Query<T> {
