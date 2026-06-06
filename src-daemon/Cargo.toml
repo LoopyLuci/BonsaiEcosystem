@@ -10,16 +10,16 @@ path = "src/main.rs"
 
 [dependencies]
 p2p-crypto = { path = "../crates/p2p-crypto" }
-transfer-store = { path = "../crates/bonsai-transfer-store" }
+transfer-store = { path = "../crates/transfer-store" }
 p2p-core   = { path = "../crates/p2p-core" }
-mailbox = { path = "../crates/bonsai-mailbox" }
-query = { path = "../crates/bonsai-query" }
-array = { path = "../crates/bonsai-array" }
-verify-lean = { path = "../crates/bonsai-verify-lean" }
-verify-fstar = { path = "../crates/bonsai-verify-fstar" }
-verify-tla = { path = "../crates/bonsai-verify-tla" }
-ci = { path = "../crates/bonsai-ci" }
-ui-orchestrator = { path = "../crates/bonsai-ui-orchestrator" }
+mailbox = { path = "../crates/mailbox" }
+query = { path = "../crates/query" }
+array = { path = "../crates/array" }
+verify-lean = { path = "../crates/verify-lean" }
+verify-fstar = { path = "../crates/verify-fstar" }
+verify-tla = { path = "../crates/verify-tla" }
+ci = { path = "../crates/ci" }
+ui-orchestrator = { path = "../crates/ui-orchestrator" }
 
 tokio        = { version = "1", features = ["full"] }
 axum         = { version = "0.7", features = ["ws", "macros"] }
@@ -34,18 +34,18 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 anyhow       = "1"
 tokio-tungstenite = { version = "0.21", optional = true }
 uuid = { version = "1" }
-actors = { path = "../crates/bonsai-actors" }
-cas = { path = "../crates/bonsai-cas" }
-tool-registry = { path = "../crates/bonsai-tool-registry" }
-skills = { path = "../crates/bonsai-skills" }
-skill-compiler = { path = "../crates/bonsai-skill-compiler" }
-verify-coq = { path = "../crates/bonsai-verify-coq" }
-verify-agda = { path = "../crates/bonsai-verify-agda" }
-verify-isabelle = { path = "../crates/bonsai-verify-isabelle" }
-capability-registry = { path = "../crates/bonsai-capability-registry" }
-sylva = { path = "../crates/bonsai-sylva" }
-p2p = { path = "../crates/bonsai-p2p" }
-creator = { path = "../crates/bonsai-creator" }
+actors = { path = "../crates/actors" }
+cas = { path = "../crates/cas" }
+tool-registry = { path = "../crates/tool-registry" }
+skills = { path = "../crates/skills" }
+skill-compiler = { path = "../crates/skill-compiler" }
+verify-coq = { path = "../crates/verify-coq" }
+verify-agda = { path = "../crates/verify-agda" }
+verify-isabelle = { path = "../crates/verify-isabelle" }
+capability-registry = { path = "../crates/capability-registry" }
+sylva = { path = "../crates/sylva" }
+p2p = { path = "../crates/p2p" }
+creator = { path = "../crates/creator" }
 arc-swap      = "1"
 sysinfo       = "0.30"
 tempfile      = "3"

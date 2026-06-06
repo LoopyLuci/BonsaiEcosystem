@@ -6,6 +6,9 @@
     clippy::items_after_test_module
 )]
 
+// External crate imports
+pub use runtime;
+
 // Re-export modules for integration testing
 pub mod admin_api;
 pub mod buddy_client;

@@ -3,6 +3,23 @@
 version = 4
 
 [[package]]
+name = "actors"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "ciborium",
+ "dashmap 6.2.1",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -233,6 +250,16 @@ dependencies = [
  "blake2",
  "cpufeatures 0.2.17",
  "password-hash",
+]
+
+[[package]]
+name = "array"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -796,9 +823,9 @@ name = "bace-rt"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bonsai-bco",
- "bonsai-hotreload",
+ "co",
  "dashmap 5.5.3",
+ "hotreload",
  "serde",
  "serde_json",
 ]
@@ -809,11 +836,31 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "blake3",
- "bonsai-bco",
- "bonsai-buir",
+ "buir",
+ "co",
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "backend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "dashmap 5.5.3",
+ "env_logger 0.11.10",
+ "lazy_static",
+ "log",
+ "ndarray",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "thiserror 1.0.69",
+ "tokio",
+ "winapi",
 ]
 
 [[package]]
@@ -1020,73 +1067,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-actors"
-version = "0.1.0"
-dependencies = [
- "arc-swap",
- "async-trait",
- "ciborium",
- "dashmap 6.2.1",
- "serde",
- "serde_json",
- "sysinfo",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-array"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-backend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "dashmap 5.5.3",
- "env_logger 0.11.10",
- "lazy_static",
- "log",
- "ndarray",
- "rayon",
- "serde",
- "serde_json",
- "sysinfo",
- "thiserror 1.0.69",
- "tokio",
- "winapi",
-]
-
-[[package]]
-name = "bonsai-bco"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "bonsai-buir",
- "hex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "bonsai-bot"
+name = "bot"
 version = "0.1.0"
 dependencies = [
  "async-imap",
  "async-native-tls",
  "async-trait",
  "axum",
- "bonsai-runtime",
  "chrono",
  "dashmap 5.5.3",
  "dirs 5.0.1",
@@ -1101,6 +1088,7 @@ dependencies = [
  "rand 0.8.6",
  "regex",
  "reqwest 0.12.28",
+ "runtime",
  "rusqlite",
  "serde",
  "serde_json",
@@ -1120,488 +1108,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bonsai-buir"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "serde",
- "serde_json",
- "smallvec",
-]
-
-[[package]]
-name = "bonsai-capability-registry"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "chrono",
- "once_cell",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "bonsai-cas"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "hex",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "bonsai-cas-ext"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "bonsai-buir",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "bonsai-ci"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "bonsai-actors",
- "bonsai-capability-registry",
- "bonsai-cas",
- "hex",
- "log",
- "p2p-crypto",
- "p2p-identity",
- "serde",
- "serde_json",
- "tokio",
- "walkdir",
-]
-
-[[package]]
-name = "bonsai-compile-cache"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "bonsai-bco",
- "bonsai-buir",
- "dashmap 5.5.3",
- "hex",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "bonsai-creator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bonsai-actors",
- "bonsai-cas",
- "bonsai-sylva",
- "bonsai-tool-registry",
- "bytemuck",
- "image",
- "rand 0.8.6",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tracing",
- "wgpu",
-]
-
-[[package]]
-name = "bonsai-daemon"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arc-swap",
- "axum",
- "blake3",
- "bonsai-actors",
- "bonsai-array",
- "bonsai-capability-registry",
- "bonsai-cas",
- "bonsai-ci",
- "bonsai-creator",
- "bonsai-mailbox",
- "bonsai-p2p",
- "bonsai-query",
- "bonsai-skill-compiler",
- "bonsai-skills",
- "bonsai-sylva",
- "bonsai-tool-registry",
- "bonsai-transfer-store",
- "bonsai-ui-orchestrator",
- "bonsai-verify-agda",
- "bonsai-verify-coq",
- "bonsai-verify-fstar",
- "bonsai-verify-isabelle",
- "bonsai-verify-lean",
- "bonsai-verify-tla",
- "dirs 5.0.1",
- "hex",
- "p2p-core",
- "p2p-crypto",
- "rand 0.8.6",
- "serde",
- "serde_json",
- "sysinfo",
- "tempfile",
- "tokio",
- "tokio-tungstenite 0.21.0",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-hotreload"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dashmap 5.5.3",
- "parking_lot",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "bonsai-ir"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "bonsai-lang-gen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "regex",
- "serde",
- "serde_yaml",
-]
-
-[[package]]
-name = "bonsai-mailbox"
-version = "0.1.0"
-dependencies = [
- "bonsai-relay",
- "dashmap 5.5.3",
- "p2p-core",
- "p2p-crypto",
- "p2p-identity",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-mcp-manager"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "serde",
- "serde_json",
- "tokio",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-model-workshop"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "serde",
- "serde_json",
- "tokio",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-p2p"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "bytes",
- "futures",
- "libp2p",
- "p2p-core",
- "p2p-crypto",
- "p2p-identity",
- "serde",
- "thiserror 1.0.69",
- "tokio",
- "tokio-socks",
- "tracing",
- "webrtc",
-]
-
-[[package]]
-name = "bonsai-query"
-version = "0.1.0"
-dependencies = [
- "bonsai-capability-registry",
- "datafrog",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "bonsai-regex-frontend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "core-ir",
- "language-system",
- "regex",
-]
-
-[[package]]
-name = "bonsai-relay"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "blake3",
- "dashmap 5.5.3",
- "hex",
- "p2p-core",
- "p2p-crypto",
- "p2p-identity",
- "rand 0.8.6",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "bonsai-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempdir",
- "tokio",
- "tracing",
- "wasmtime",
- "wasmtime-wasi",
- "which 6.0.3",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "bonsai-skill-compiler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dirs 5.0.1",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.9",
- "tokio",
- "tracing",
- "uuid",
- "walkdir",
- "wasm-encoder 0.200.0",
-]
-
-[[package]]
-name = "bonsai-skills"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bonsai-skill-compiler",
- "bonsai-tool-registry",
- "notify",
- "serde",
- "serde_json",
- "tracing",
- "wasmtime",
-]
-
-[[package]]
-name = "bonsai-sylva"
-version = "0.1.0"
-dependencies = [
- "bonsai-ir",
- "indexmap 2.14.0",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-tool-registry"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arc-swap",
- "blake3",
- "bonsai-skill-compiler",
- "hex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "bonsai-transfer-ai"
-version = "2.0.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-transfer-store"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "argon2",
- "blake3",
- "dirs 5.0.1",
- "p2p-crypto",
- "rand 0.8.6",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "zeroize",
-]
-
-[[package]]
-name = "bonsai-ui-orchestrator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bonsai-cas",
- "bonsai-runtime",
- "bonsai-ui-utils",
- "rand 0.8.6",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
- "uuid",
- "wasmtime",
- "wasmtime-wasi",
-]
-
-[[package]]
-name = "bonsai-ui-utils"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arc-swap",
- "serde",
-]
-
-[[package]]
-name = "bonsai-verify-agda"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-verify-coq"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-verify-fstar"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-verify-isabelle"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-verify-lean"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "bonsai-verify-tla"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
 name = "bs58"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1615,6 +1121,17 @@ name = "built"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c0e531d93d39c34eef561e929e8a7f86d77a5af08aac4f6d6e39976c51858e9"
+
+[[package]]
+name = "buir"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "serde",
+ "serde_json",
+ "smallvec",
+]
 
 [[package]]
 name = "bumpalo"
@@ -1745,13 +1262,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "capability-registry"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "chrono",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "cargo-bace"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bace-rustc",
- "bonsai-bco",
- "bonsai-compile-cache",
+ "co",
+ "compile-cache",
  "hex",
  "tokio",
 ]
@@ -1776,6 +1305,32 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "cas"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "hex",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "cas-ext"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "buir",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -1900,6 +1455,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ci"
+version = "0.1.0"
+dependencies = [
+ "actors",
+ "anyhow",
+ "blake3",
+ "capability-registry",
+ "cas",
+ "hex",
+ "log",
+ "p2p-crypto",
+ "p2p-identity",
+ "serde",
+ "serde_json",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "ciborium"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1984,6 +1558,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
+name = "co"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "buir",
+ "hex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2048,15 +1634,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "compile-cache"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "buir",
+ "co",
+ "dashmap 5.5.3",
+ "hex",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "compiler-cache"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
  "blake3",
- "bonsai-bco",
- "bonsai-buir",
- "bonsai-cas-ext",
+ "buir",
+ "cas-ext",
+ "co",
  "dashmap 5.5.3",
  "hex",
  "lru",
@@ -2150,8 +1751,8 @@ name = "core-ir"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bonsai-buir",
- "bonsai-ir",
+ "buir",
+ "ir",
  "serde",
  "serde_json",
 ]
@@ -2306,6 +1907,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "creator"
+version = "0.1.0"
+dependencies = [
+ "actors",
+ "anyhow",
+ "async-trait",
+ "bytemuck",
+ "cas",
+ "image",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sylva",
+ "tokio",
+ "tokio-stream",
+ "tool-registry",
+ "tracing",
+ "wgpu",
+]
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2440,6 +2063,51 @@ dependencies = [
  "bitflags 2.11.1",
  "libloading 0.8.9",
  "winapi",
+]
+
+[[package]]
+name = "daemon"
+version = "0.1.0"
+dependencies = [
+ "actors",
+ "anyhow",
+ "arc-swap",
+ "array",
+ "axum",
+ "blake3",
+ "capability-registry",
+ "cas",
+ "ci",
+ "creator",
+ "dirs 5.0.1",
+ "hex",
+ "mailbox",
+ "p2p",
+ "p2p-core",
+ "p2p-crypto",
+ "query",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "skill-compiler",
+ "skills",
+ "sylva",
+ "sysinfo",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite 0.21.0",
+ "tool-registry",
+ "tracing",
+ "tracing-subscriber",
+ "transfer-store",
+ "ui-orchestrator",
+ "uuid",
+ "verify-agda",
+ "verify-coq",
+ "verify-fstar",
+ "verify-isabelle",
+ "verify-lean",
+ "verify-tla",
 ]
 
 [[package]]
@@ -3956,6 +3624,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hotreload"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dashmap 5.5.3",
+ "parking_lot",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "http"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4598,6 +4277,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 
 [[package]]
+name = "ir"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "iri-string"
 version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4829,6 +4516,16 @@ checksum = "07293a4e297ac234359b510362495713f75ea345d5307140414f20c69ffeb087"
 dependencies = [
  "bitflags 2.11.1",
  "libc",
+]
+
+[[package]]
+name = "lang-gen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -5459,6 +5156,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mailbox"
+version = "0.1.0"
+dependencies = [
+ "dashmap 5.5.3",
+ "p2p-core",
+ "p2p-crypto",
+ "p2p-identity",
+ "relay",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5636,6 +5350,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mcp-manager"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5786,6 +5516,22 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "model-workshop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -6425,13 +6171,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "p2p"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "bytes",
+ "futures",
+ "libp2p",
+ "p2p-core",
+ "p2p-crypto",
+ "p2p-identity",
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-socks",
+ "tracing",
+ "webrtc",
+]
+
+[[package]]
 name = "p2p-core"
 version = "2.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "blake3",
- "bonsai-transfer-ai",
  "bytes",
  "dashmap 5.5.3",
  "p2p-crypto",
@@ -6442,6 +6208,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "transfer-ai",
  "uuid",
 ]
 
@@ -6994,6 +6761,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "query"
+version = "0.1.0"
+dependencies = [
+ "capability-registry",
+ "datafrog",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7420,10 +7199,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex-frontend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "core-ir",
+ "language-system",
+ "regex",
+]
+
+[[package]]
 name = "regex-syntax"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
+
+[[package]]
+name = "relay"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "dashmap 5.5.3",
+ "hex",
+ "p2p-core",
+ "p2p-crypto",
+ "p2p-identity",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "remove_dir_all"
@@ -7771,6 +7581,24 @@ dependencies = [
  "serde",
  "syn 2.0.117",
  "toml 0.8.2",
+]
+
+[[package]]
+name = "runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempdir",
+ "tokio",
+ "tracing",
+ "wasmtime",
+ "wasmtime-wasi",
+ "which 6.0.3",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8476,6 +8304,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "skill-compiler"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 5.0.1",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "tokio",
+ "tracing",
+ "uuid",
+ "walkdir",
+ "wasm-encoder 0.200.0",
+]
+
+[[package]]
+name = "skills"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "notify",
+ "serde",
+ "serde_json",
+ "skill-compiler",
+ "tool-registry",
+ "tracing",
+ "wasmtime",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8855,6 +8715,18 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "sylva"
+version = "0.1.0"
+dependencies = [
+ "indexmap 2.14.0",
+ "ir",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
 
 [[package]]
 name = "syn"
@@ -9486,6 +9358,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tool-registry"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "blake3",
+ "hex",
+ "serde",
+ "serde_json",
+ "skill-compiler",
+]
+
+[[package]]
 name = "tower"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9620,6 +9505,33 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "transfer-ai"
+version = "2.0.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "transfer-store"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "argon2",
+ "blake3",
+ "dirs 5.0.1",
+ "p2p-crypto",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "zeroize",
 ]
 
 [[package]]
@@ -9837,6 +9749,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "ui-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cas",
+ "rand 0.8.6",
+ "runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "ui-utils",
+ "uuid",
+ "wasmtime",
+ "wasmtime-wasi",
+]
+
+[[package]]
+name = "ui-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "serde",
+]
+
+[[package]]
 name = "uint"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10016,6 +9956,66 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "verify-agda"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "verify-coq"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "verify-fstar"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "verify-isabelle"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "verify-lean"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "verify-tla"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
 
 [[package]]
 name = "version_check"
