@@ -41,7 +41,7 @@ members = [
     # ========== Legacy Foundation (keep for compatibility) ==========
     "runtime",
     "src-daemon",
-    "bot",
+    "omni-bot",
 
     # ========== Pre-Compilation Fabric ==========
     "crates/compiler-cache",           # Speculative pre-compilation with AI hints
@@ -63,6 +63,10 @@ members = [
 
     # ========== Environment Manager ==========
     "crates/sandbox",                  # Universal dependency and environment manager
+
+    # ========== UI Orchestration ==========
+    "crates/ui-orchestrator",          # UI component management
+    "crates/ui-utils",                 # UI utilities and helpers
 
     # ========== Validation Mesh ==========
     "crates/test-orchestrator",        # Unified Test Orchestration Fabric

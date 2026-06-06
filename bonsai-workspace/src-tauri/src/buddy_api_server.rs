@@ -221,7 +221,7 @@ async fn chat_completions(
         profile.model_id = Some(mid);
     }
 
-    // ── Structured confirmation response (bonsai-bot protocol) ───────────────
+    // ── Structured confirmation response (omni-bot protocol) ───────────────
     // If the last message carries bonsai_ext.type == "confirm_response", resolve
     // the confirmation gate and return the result without a full inference turn.
     if let Some(last) = req.messages.last() {

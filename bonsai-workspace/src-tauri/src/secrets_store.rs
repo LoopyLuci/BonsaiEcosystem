@@ -4,7 +4,7 @@
 // On Linux: libsecret / keyutils
 // All via the `keyring` crate.
 
-const SERVICE: &str = "bonsai-assistant";
+const SERVICE: &str = "assistant";
 
 pub struct SecretsStore;
 

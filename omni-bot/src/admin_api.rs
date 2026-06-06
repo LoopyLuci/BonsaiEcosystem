@@ -13,7 +13,7 @@ use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
-use runtime::{RuntimeManager, RuntimeController};
+use runtime;
 // CORS intentionally omitted — admin API is loopback-only (127.0.0.1) and
 // must never be accessible from browser origins.
 use chrono::{self};
@@ -144,10 +144,10 @@ impl AdminHandle {
         let _ = (&mut self.join).await;
         // Remove persisted port file when shutting down.
         if let Some(dir) = crate::config::config_dir() {
-            let path = dir.join("bonsai-bot-port.json");
+            let path = dir.join("omni-bot-port.json");
             let _ = std::fs::remove_file(path);
         } else {
-            let _ = std::fs::remove_file("bonsai-bot-port.json");
+            let _ = std::fs::remove_file("omni-bot-port.json");
         }
     }
 }
@@ -162,7 +162,7 @@ pub async fn start(
 ) -> Result<AdminHandle, String> {
     // If a persisted port file exists but points to an unhealthy API, remove it
     if let Some(dir) = crate::config::config_dir() {
-        let path = dir.join("bonsai-bot-port.json");
+        let path = dir.join("omni-bot-port.json");
         if path.exists() {
             if let Ok(contents) = std::fs::read_to_string(&path) {
                 if let Ok(val) = serde_json::from_str::<serde_json::Value>(&contents) {
@@ -178,14 +178,14 @@ pub async fn start(
                 }
             }
         }
-    } else if std::path::Path::new("bonsai-bot-port.json").exists() {
-        if let Ok(contents) = std::fs::read_to_string("bonsai-bot-port.json") {
+    } else if std::path::Path::new("omni-bot-port.json").exists() {
+        if let Ok(contents) = std::fs::read_to_string("omni-bot-port.json") {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&contents) {
                 if let Some(p) = val.get("port").and_then(|v| v.as_u64()) {
                     let p = p as u16;
                     if !crate::port_manager::is_api_healthy("127.0.0.1", p).await {
-                        let _ = std::fs::remove_file("bonsai-bot-port.json");
-                        tracing::info!("[admin-api] removed stale local port file bonsai-bot-port.json (port={p})");
+                        let _ = std::fs::remove_file("omni-bot-port.json");
+                        tracing::info!("[admin-api] removed stale local port file omni-bot-port.json (port={p})");
                     }
                 }
             }
@@ -364,7 +364,7 @@ async fn reclaim_listener(
         // If no explicit allowed list, try to include the persisted bot admin port (if present)
         let mut v = Vec::new();
         if let Some(cfg_dir) = crate::config::config_dir() {
-            let path = cfg_dir.join("bonsai").join("bonsai-bot-port.json");
+            let path = cfg_dir.join("bonsai").join("omni-bot-port.json");
             if path.exists() {
                 if let Ok(s2) = std::fs::read_to_string(&path) {
                     if let Ok(vj) = serde_json::from_str::<Value>(&s2) {
@@ -376,7 +376,7 @@ async fn reclaim_listener(
             }
         }
         // fallback to local file
-        let local = PathBuf::from("bonsai-bot-port.json");
+        let local = PathBuf::from("omni-bot-port.json");
         if local.exists() {
             if let Ok(s3) = std::fs::read_to_string(&local) {
                 if let Ok(vj) = serde_json::from_str::<Value>(&s3) {

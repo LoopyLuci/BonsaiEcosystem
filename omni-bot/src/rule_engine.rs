@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 /// Mirrors the subset of SystemEvent variants the bot rule engine reacts to.
-/// Kept local to avoid a hard dep on the Tauri crate from bonsai-bot.
+/// Kept local to avoid a hard dep on the Tauri crate from omni-bot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BotEvent {
     BuildFailed { crate_name: String, error: String },

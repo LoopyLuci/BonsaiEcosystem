@@ -783,7 +783,7 @@ pub fn run() {
             ));
 
             let mut api_config = config::load_config(&app_handle).unwrap_or_default();
-            // Persist the pair token so bonsai-bot and local clients can read it
+            // Persist the pair token so omni-bot and local clients can read it
             // from bonsai-config.json without needing the UI.
             api_config.pair_token = pair_token.clone();
             let _ = config::save_config(&app_handle, &api_config);
@@ -1738,7 +1738,7 @@ pub fn run() {
                         let port = match port { Some(p) => p, None => continue };
 
                         // Read token from keyring (best-effort; empty string if unavailable)
-                        let token = keyring::Entry::new("bonsai-bot", "bot_admin_token")
+                        let token = keyring::Entry::new("omni-bot", "bot_admin_token")
                             .ok()
                             .and_then(|e| e.get_password().ok())
                             .unwrap_or_default();

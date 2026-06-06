@@ -556,7 +556,7 @@ fn extract_pair_token(headers: &HeaderMap, query_token: Option<&str>) -> Option<
     }
 
     headers
-        .get("x-bonsai-token")
+        .get("x-token")
         .and_then(|h| h.to_str().ok())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())

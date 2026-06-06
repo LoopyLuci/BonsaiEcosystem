@@ -7,7 +7,7 @@
 )]
 
 use std::f32::consts::PI;
-/// bonsai-music-worker — persistent music synthesis sidecar.
+/// music-worker — persistent music synthesis sidecar.
 ///
 /// Protocol (stdin → stdout):
 ///   Request line:  `<id>|<duration_f32>|<prompt>\n`

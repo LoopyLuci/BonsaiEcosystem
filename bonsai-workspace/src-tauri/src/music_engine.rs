@@ -1,7 +1,7 @@
 //! BonsAI music generation engine.
 //!
 //! `generate_wav(prompt, duration_secs)` returns raw WAV bytes (IEEE float 32-bit, 44100 Hz, mono).
-//! It tries the `bonsai-music-worker` sidecar first; if the binary is absent it falls back to the
+//! It tries the `music-worker` sidecar first; if the binary is absent it falls back to the
 //! inline Rust synthesizer embedded in the worker (duplicated here so the main app has no hard
 //! dependency on the sidecar being present).
 //!
@@ -35,9 +35,9 @@ fn worker_binary_path() -> Option<std::path::PathBuf> {
     // 1. Same dir as this executable (production / release)
     if let Ok(exe) = std::env::current_exe() {
         let sibling = exe.with_file_name(if cfg!(target_os = "windows") {
-            "bonsai-music-worker.exe"
+            "music-worker.exe"
         } else {
-            "bonsai-music-worker"
+            "music-worker"
         });
         if sibling.exists() {
             return Some(sibling);
@@ -45,9 +45,9 @@ fn worker_binary_path() -> Option<std::path::PathBuf> {
     }
     // 2. Workspace target/debug (dev workflow — Cargo places workspace binaries here)
     let bin_name = if cfg!(target_os = "windows") {
-        "bonsai-music-worker.exe"
+        "music-worker.exe"
     } else {
-        "bonsai-music-worker"
+        "music-worker"
     };
     // Walk up from CARGO_MANIFEST_DIR until we find a target/ dir (handles workspace layout)
     let mut dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -169,7 +169,7 @@ pub async fn generate_wav(prompt: &str, duration_secs: f32) -> Vec<u8> {
         .unwrap_or_default()
 }
 
-// ── Inline synthesizer (mirrors bonsai-music-worker) ─────────────────────────
+// ── Inline synthesizer (mirrors music-worker) ─────────────────────────
 
 fn inline_generate_wav(prompt: &str, duration: f32) -> Vec<u8> {
     use std::f32::consts::PI;

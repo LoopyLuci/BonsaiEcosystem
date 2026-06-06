@@ -5693,9 +5693,9 @@ pub async fn cancel_agent(
 // ─── Messaging bot integration ───────────────────────────────────────────────
 
 const BOT_ADMIN_PORT: u16 = 11666;
-// bonsai-bot stores its admin token under its own keyring service, separate from
-// the workspace's "bonsai-assistant" service used by SecretsStore.
-const BOT_KEYRING_SERVICE: &str = "bonsai-bot";
+// omni-bot stores its admin token under its own keyring service, separate from
+// the workspace's "assistant" service used by SecretsStore.
+const BOT_KEYRING_SERVICE: &str = "omni-bot";
 
 fn bot_admin_token() -> String {
     keyring::Entry::new(BOT_KEYRING_SERVICE, "bot_admin_token")
@@ -5708,9 +5708,9 @@ async fn fetch_from_bot_path(path: &str, token: &str) -> Result<(Value, u16), St
     let client = reqwest::Client::new();
     // Prefer a persisted port file written by the bot when available.
     fn read_persisted_bot_port() -> Option<u16> {
-        // First try the OS config dir: {config_dir}/bonsai/bonsai-bot-port.json
+        // First try the OS config dir: {config_dir}/bonsai/omni-bot-port.json
         if let Some(cfg) = dirs::config_dir() {
-            let path = cfg.join("bonsai").join("bonsai-bot-port.json");
+            let path = cfg.join("bonsai").join("omni-bot-port.json");
             if path.exists() {
                 if let Ok(s) = std::fs::read_to_string(&path) {
                     if let Ok(v) = serde_json::from_str::<Value>(&s) {
@@ -5723,7 +5723,7 @@ async fn fetch_from_bot_path(path: &str, token: &str) -> Result<(Value, u16), St
         }
 
         // Fallback to local workspace file if present
-        let local = std::path::Path::new("bonsai-bot-port.json");
+        let local = std::path::Path::new("omni-bot-port.json");
         if local.exists() {
             if let Ok(s) = std::fs::read_to_string(local) {
                 if let Ok(v) = serde_json::from_str::<Value>(&s) {
@@ -5783,13 +5783,13 @@ async fn fetch_from_bot_path(path: &str, token: &str) -> Result<(Value, u16), St
     Err("Bot server not running".to_string())
 }
 
-/// Read a persisted bonsai-bot port file (if present) from the OS config dir or
+/// Read a persisted omni-bot port file (if present) from the OS config dir or
 /// the local workspace, returning the port number when available.
 #[tauri::command]
 pub fn read_persisted_bot_port() -> Result<Option<u16>, String> {
-    // First try the OS config dir: {config_dir}/bonsai/bonsai-bot-port.json
+    // First try the OS config dir: {config_dir}/bonsai/omni-bot-port.json
     if let Some(cfg) = dirs::config_dir() {
-        let path = cfg.join("bonsai").join("bonsai-bot-port.json");
+        let path = cfg.join("bonsai").join("omni-bot-port.json");
         if path.exists() {
             if let Ok(s) = std::fs::read_to_string(&path) {
                 if let Ok(v) = serde_json::from_str::<Value>(&s) {
@@ -5802,7 +5802,7 @@ pub fn read_persisted_bot_port() -> Result<Option<u16>, String> {
     }
 
     // Fallback to local workspace file if present
-    let local = std::path::Path::new("bonsai-bot-port.json");
+    let local = std::path::Path::new("omni-bot-port.json");
     if local.exists() {
         if let Ok(s) = std::fs::read_to_string(local) {
             if let Ok(v) = serde_json::from_str::<Value>(&s) {
@@ -5867,7 +5867,7 @@ fn bot_config_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String>
         .app_data_dir()
         .map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("bonsai-bot-config.json"))
+    Ok(dir.join("omni-bot-config.json"))
 }
 
 fn read_bot_cfg(path: &std::path::Path) -> Value {

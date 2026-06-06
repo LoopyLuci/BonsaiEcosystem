@@ -28,7 +28,7 @@ pub async fn is_api_healthy(host: &str, port: u16) -> bool {
 /// Attempt to allocate and bind a TcpListener near the preferred port.
 /// Tries preferred_port .. preferred_port+max_delta. On Windows it will
 /// attempt a best-effort reclaim of stale listeners that appear to belong
-/// to a known bonsai-bot process image.
+/// to a known omni-bot process image.
 pub async fn allocate_listener(
     preferred_port: u16,
     max_delta: u16,
@@ -77,7 +77,7 @@ pub async fn allocate_listener(
 }
 
 /// Persist chosen port and metadata atomically with an exclusive lock.
-/// Writes `bonsai-bot-port.json` in config dir `{config_dir}/bonsai` if available,
+/// Writes `omni-bot-port.json` in config dir `{config_dir}/bonsai` if available,
 /// otherwise writes to the current working directory.
 pub fn persist_port(port: u16, admin_token: &str) -> Result<(), String> {
     // Prepare JSON payload
@@ -101,8 +101,8 @@ pub fn persist_port(port: u16, admin_token: &str) -> Result<(), String> {
     if let Err(e) = fs::create_dir_all(&target_dir) {
         return Err(format!("failed to create config dir: {e}"));
     }
-    let target_path = target_dir.join("bonsai-bot-port.json");
-    let lock_path = target_dir.join("bonsai-bot-port.lock");
+    let target_path = target_dir.join("omni-bot-port.json");
+    let lock_path = target_dir.join("omni-bot-port.lock");
 
     // Create/open lock file and acquire exclusive lock
     let lock_file = OpenOptions::new()
@@ -143,7 +143,7 @@ fn try_reclaim_stale_listener(port: u16) -> bool {
     for pid in pids {
         let image = process_image_name(pid);
         let img = image.to_ascii_lowercase();
-        if img != "bonsai-bot.exe" && img != "bonsai-bot" {
+        if img != "omni-bot.exe" && img != "omni-bot" {
             continue;
         }
         if let Ok(out) = Command::new("taskkill")

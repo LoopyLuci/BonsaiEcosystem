@@ -1067,47 +1067,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bot"
-version = "0.1.0"
-dependencies = [
- "async-imap",
- "async-native-tls",
- "async-trait",
- "axum",
- "chrono",
- "dashmap 5.5.3",
- "dirs 5.0.1",
- "fs2",
- "futures",
- "governor",
- "hex",
- "keyring",
- "lettre",
- "matrix-sdk",
- "once_cell",
- "rand 0.8.6",
- "regex",
- "reqwest 0.12.28",
- "runtime",
- "rusqlite",
- "serde",
- "serde_json",
- "serenity",
- "sha2 0.10.9",
- "teloxide",
- "tempfile",
- "tokio",
- "tokio-rusqlite",
- "tokio-util",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "unicode-normalization",
- "uuid",
- "which 4.4.2",
-]
-
-[[package]]
 name = "bs58"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6023,6 +5982,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d8034d9489cdaf79228eb9f6a3b8d7bb32ba00d6645ebd48eef4077ceb5bd9"
 dependencies = [
  "asn1-rs 0.6.2",
+]
+
+[[package]]
+name = "omni-bot"
+version = "0.1.0"
+dependencies = [
+ "async-imap",
+ "async-native-tls",
+ "async-trait",
+ "axum",
+ "chrono",
+ "dashmap 5.5.3",
+ "dirs 5.0.1",
+ "fs2",
+ "futures",
+ "governor",
+ "hex",
+ "keyring",
+ "lettre",
+ "matrix-sdk",
+ "once_cell",
+ "rand 0.8.6",
+ "regex",
+ "reqwest 0.12.28",
+ "runtime",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serenity",
+ "sha2 0.10.9",
+ "teloxide",
+ "tempfile",
+ "tokio",
+ "tokio-rusqlite",
+ "tokio-util",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "unicode-normalization",
+ "uuid",
+ "which 4.4.2",
 ]
 
 [[package]]

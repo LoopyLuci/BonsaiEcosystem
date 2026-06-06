@@ -32,5 +32,5 @@ default = ["wasmtime-host"]
 wasmtime-host = ["wasmtime", "wasmtime-wasi"]
 
 [lib]
-name = "bonsai_runtime"
+name = "runtime"
 path = "src/lib.rs"

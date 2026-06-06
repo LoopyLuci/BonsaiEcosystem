@@ -56,7 +56,7 @@ pub struct AppConfig {
     #[serde(default = "default_inference_mode")]
     pub default_inference_mode: InferenceMode,
     /// Pairing token for the REST management API and QR-code Android pairing.
-    /// Regenerated each launch and persisted here so bonsai-bot can read it.
+    /// Regenerated each launch and persisted here so omni-bot can read it.
     #[serde(default)]
     pub pair_token: String,
     /// Set to true when the GPU driver crashed (0xC0000409 / STATUS_STACK_BUFFER_OVERRUN).

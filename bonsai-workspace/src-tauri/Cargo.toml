@@ -15,32 +15,32 @@ name = "bonsai_workspace_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-coordinator = { path = "../../crates/bonsai-coordinator" }
-credits = { path = "../../crates/bonsai-credits" }
-marketplace = { path = "../../crates/bonsai-marketplace" }
-swarm = { path = "../../crates/bonsai-swarm" }
+coordinator = { path = "../../crates/coordinator" }
+credits = { path = "../../crates/credits" }
+marketplace = { path = "../../crates/marketplace" }
+swarm = { path = "../../crates/swarm" }
 audit-log          = { path = "../../crates/audit-log" }
-fabric = { path = "../../crates/bonsai-fabric" }
-failure-finder = { path = "../../crates/bonsai-failure-finder" }
-sns = { path = "../../crates/bonsai-sns" }
-extensions = { path = "../../crates/bonsai-extensions" }
-skill-compiler = { path = "../../crates/bonsai-skill-compiler" }
+fabric = { path = "../../crates/fabric" }
+failure-finder = { path = "../../crates/failure-finder" }
+sns = { path = "../../crates/sns" }
+extensions = { path = "../../crates/extensions" }
+skill-compiler = { path = "../../crates/skill-compiler" }
 p2p-crypto   = { path = "../../crates/p2p-crypto" }
-transfer-store = { path = "../../crates/bonsai-transfer-store" }
+transfer-store = { path = "../../crates/transfer-store" }
 p2p-core     = { path = "../../crates/p2p-core" }
-mailbox = { path = "../../crates/bonsai-mailbox" }
-capability-registry = { path = "../../crates/bonsai-capability-registry" }
-query = { path = "../../crates/bonsai-query" }
-cas = { path = "../../crates/bonsai-cas" }
-ir = { path = "../../crates/bonsai-ir" }
-crdt = { path = "../../crates/bonsai-crdt" }
-actors = { path = "../../crates/bonsai-actors" }
-chess = { path = "../../crates/bonsai-chess" }
-go = { path = "../../crates/bonsai-go" }
-go-nn = { path = "../../crates/bonsai-go-nn" }
+mailbox = { path = "../../crates/mailbox" }
+capability-registry = { path = "../../crates/capability-registry" }
+query = { path = "../../crates/query" }
+cas = { path = "../../crates/cas" }
+ir = { path = "../../crates/ir" }
+crdt = { path = "../../crates/crdt" }
+actors = { path = "../../crates/actors" }
+chess = { path = "../../crates/chess" }
+go = { path = "../../crates/go" }
+go-nn = { path = "../../crates/go-nn" }
 candle-core     = { version = "0.8" }
-knowledge = { path = "../../crates/bonsai-knowledge" }
-verify = { path = "../../crates/bonsai-verify" }
+knowledge = { path = "../../crates/knowledge" }
+verify = { path = "../../crates/verify" }
 mlua          = { version = "0.10", features = ["lua54", "vendored", "async", "serialize", "send"] }
 tauri                        = { version = "2", features = ["protocol-asset", "devtools", "tray-icon", "custom-protocol"] }
 tauri-plugin-fs              = "2"
@@ -137,12 +137,10 @@ scrap        = "0.5"
 enigo        = "0.0.14"
 
 native = { path = "../../native", optional = true }
-hnsw = { path = "../../crates/bonsai-hnsw" }
-kdb = { path = "../../crates/bonsai-kdb" }
-package = { path = "../../crates/bonsai-package" }
-fabric = { path = "../../crates/bonsai-fabric" }
+hnsw = { path = "../../crates/hnsw" }
+kdb = { path = "../../crates/kdb" }
+package = { path = "../../crates/package" }
 mcp-server = { path = "../../crates/mcp-server" }
-android-bridge = { path = "../../crates/bonsai-android-bridge" }
 
 [[bin]]
 name = "music-worker"

@@ -1,10 +1,10 @@
 [package]
-name    = "bot"
+name    = "omni-bot"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "bonsai_bot"
+name = "omni_bot"
 path = "src/lib.rs"
 
 [features]

@@ -2,7 +2,7 @@
 //!
 //! The workspace exposes every major capability over REST using the same
 //! `Authorization: Bearer <pair_token>` scheme shown in Settings →
-//! Desktop Connection. Set `workspace_pair_token` in bonsai-bot-config.json.
+//! Desktop Connection. Set `workspace_pair_token` in omni-bot-config.json.
 
 use reqwest::Client;
 use serde_json::{json, Value};

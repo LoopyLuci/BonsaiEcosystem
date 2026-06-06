@@ -1,4 +1,4 @@
-use bco::BcoFile;
+use co::BcoFile;
 
 pub struct PartialEvaluator;
 

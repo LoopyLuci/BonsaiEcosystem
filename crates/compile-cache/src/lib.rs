@@ -15,14 +15,14 @@ impl CompilationCache {
         }
     }
 
-    pub async fn get(&self, hash: &FunctionHash) -> Option<bco::BcoFile> {
+    pub async fn get(&self, hash: &FunctionHash) -> Option<co::BcoFile> {
         let hash_str = hex::encode(hash.0);
         if let Some(cas_hash) = self.memory_cache.get(hash) {
-            if let Ok(bco) = bco::BcoFile::load(&cas_hash).await {
+            if let Ok(bco) = co::BcoFile::load(&cas_hash).await {
                 return Some(bco);
             }
         }
-        if let Ok(bco) = bco::BcoFile::load(&hash_str).await {
+        if let Ok(bco) = co::BcoFile::load(&hash_str).await {
             self.memory_cache.insert(*hash, hash_str);
             return Some(bco);
         }
@@ -35,13 +35,13 @@ impl CompilationCache {
         None
     }
 
-    pub async fn put(&self, bco: &bco::BcoFile) -> anyhow::Result<()> {
+    pub async fn put(&self, bco: &co::BcoFile) -> anyhow::Result<()> {
         let cas_hash = bco.store().await?;
         self.memory_cache.insert(bco.function_hash, cas_hash);
         Ok(())
     }
 
-    async fn query_echo(&self, _hash: &FunctionHash) -> Option<bco::BcoFile> {
+    async fn query_echo(&self, _hash: &FunctionHash) -> Option<co::BcoFile> {
         None
     }
 

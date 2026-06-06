@@ -66,7 +66,7 @@ async fn main() {
         )
         .init();
 
-    tracing::info!("[bonsai-bot] Starting v{}", env!("CARGO_PKG_VERSION"));
+    tracing::info!("[omni-bot] Starting v{}", env!("CARGO_PKG_VERSION"));
 
     let cfg = load_config();
 
@@ -82,10 +82,10 @@ async fn main() {
         let any_platform =
             cfg.discord.enabled || cfg.telegram.enabled || cfg.email.enabled || cfg.matrix.enabled;
         if !any_platform {
-            tracing::warn!("[bonsai-bot] No platforms are enabled — bot will not receive messages");
+            tracing::warn!("[omni-bot] No platforms are enabled — bot will not receive messages");
         }
         for e in &errs {
-            tracing::error!("[bonsai-bot] Config error: {e}");
+            tracing::error!("[omni-bot] Config error: {e}");
         }
         if !errs.is_empty() {
             std::process::exit(1);
@@ -97,7 +97,7 @@ async fn main() {
     // Wait for Buddy
     if !wait_for_buddy(&cfg.buddy_api_url, 60).await {
         tracing::warn!(
-            "[bonsai-bot] Buddy not reachable after 60s — starting with circuit breaker open"
+            "[omni-bot] Buddy not reachable after 60s — starting with circuit breaker open"
         );
     }
 
@@ -135,7 +135,7 @@ async fn main() {
     let workspace_url = read_workspace_api_url()
         .or_else(|| (!cfg.workspace_api_url.is_empty()).then(|| cfg.workspace_api_url.clone()))
         .unwrap_or_else(|| "http://127.0.0.1:11369".to_string());
-    tracing::info!("[bonsai-bot] Workspace API URL: {workspace_url}");
+    tracing::info!("[omni-bot] Workspace API URL: {workspace_url}");
 
     // Resolve pair token: prefer live value from bonsai-config.json, fall back to config file.
     let pair_token = read_workspace_pair_token()
@@ -144,10 +144,10 @@ async fn main() {
         })
         .unwrap_or_default();
     if pair_token.is_empty() {
-        tracing::warn!("[bonsai-bot] No workspace pair token found — slash commands disabled. Start Bonsai Workspace first, or set workspace_pair_token in bonsai-bot-config.json");
+        tracing::warn!("[omni-bot] No workspace pair token found — slash commands disabled. Start Bonsai Workspace first, or set workspace_pair_token in omni-bot-config.json");
     } else {
         tracing::info!(
-            "[bonsai-bot] Workspace pair token loaded ({} chars)",
+            "[omni-bot] Workspace pair token loaded ({} chars)",
             pair_token.len()
         );
     }
@@ -196,7 +196,7 @@ async fn main() {
     )
     .await
     .expect("admin API startup");
-    tracing::info!("[bonsai-bot] Admin API on port {}", admin.port);
+    tracing::info!("[omni-bot] Admin API on port {}", admin.port);
 
     // Platform tasks
     let mut platform_list: Vec<Arc<dyn MessagingPlatform>> = Vec::new();
@@ -297,7 +297,7 @@ async fn main() {
     // Pending confirm recovery on startup
     {
         let pending = session::load_unresolved_confirms(&db).await;
-        tracing::info!("[bonsai-bot] {} pending confirms on startup", pending.len());
+        tracing::info!("[omni-bot] {} pending confirms on startup", pending.len());
         for pc in pending {
             if let Ok(nonce) = session::mark_prompted(&db, pc.token.clone()).await {
                 for plat in platforms.iter() {
@@ -367,7 +367,7 @@ async fn main() {
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
-                tracing::info!("[bonsai-bot] SIGINT received — draining queue (30s max)");
+                tracing::info!("[omni-bot] SIGINT received — draining queue (30s max)");
                 drop(rx); // Close the channel so no new messages are accepted
                 let drain_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
                 loop {
@@ -375,7 +375,7 @@ async fn main() {
                         break; // All in-flight tasks finished
                     }
                     if tokio::time::Instant::now() >= drain_deadline {
-                        tracing::warn!("[bonsai-bot] Drain timeout — forcing shutdown");
+                        tracing::warn!("[omni-bot] Drain timeout — forcing shutdown");
                         break;
                     }
                     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -424,5 +424,5 @@ async fn main() {
         }
     }
 
-    tracing::info!("[bonsai-bot] Shutdown complete");
+    tracing::info!("[omni-bot] Shutdown complete");
 }

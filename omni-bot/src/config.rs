@@ -81,8 +81,8 @@ fn default_preferred_model_tags() -> Vec<String> {
 impl Default for BotConfig {
     fn default() -> Self {
         let db_path = config_dir()
-            .map(|d| d.join("bonsai-bot.db").to_string_lossy().into_owned())
-            .unwrap_or_else(|| "bonsai-bot.db".to_string());
+            .map(|d| d.join("omni-bot.db").to_string_lossy().into_owned())
+            .unwrap_or_else(|| "omni-bot.db".to_string());
         Self {
             schema_version: 1,
             buddy_api_url: "http://127.0.0.1:11420".to_string(),
@@ -225,7 +225,7 @@ pub struct SwarmPeer {
 
 // ── Keyring ───────────────────────────────────────────────────────────────────
 
-const KEYRING_SERVICE: &str = "bonsai-bot";
+const KEYRING_SERVICE: &str = "omni-bot";
 
 pub fn keyring_get(account: &str) -> Option<String> {
     keyring::Entry::new(KEYRING_SERVICE, account)
@@ -303,8 +303,8 @@ pub fn config_dir() -> Option<PathBuf> {
 
 pub fn config_path() -> PathBuf {
     config_dir()
-        .map(|d| d.join("bonsai-bot-config.json"))
-        .unwrap_or_else(|| PathBuf::from("bonsai-bot-config.json"))
+        .map(|d| d.join("omni-bot-config.json"))
+        .unwrap_or_else(|| PathBuf::from("omni-bot-config.json"))
 }
 
 pub fn load_config() -> BotConfig {
