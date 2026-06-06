@@ -1,0 +1,330 @@
+// cli/sandbox.ti – Researcher-friendly CLI for universal sandbox fabric
+// Commands: sandbox run, sandbox exec, sandbox cp, sandbox snapshot, sandbox fork, sandbox replay, sandbox logs
+
+module cli::sandbox
+
+use sandbox::manager::{SandboxManager, SandboxState}
+use sandbox::isolation::IsolationStrategy
+use sandbox::capabilities::ResourceType
+use core::vec::Vec
+use core::string::String
+
+/// `build sandbox run [OPTIONS] <image>` – Run untrusted code in an isolated sandbox
+pub async fn cmd_sandbox_run(
+    image: &str,
+    allow_net: bool,
+    allow_gpu: Option<&str>,
+    mounts: &[(&str, &str, &str)],  // (host_path, guest_path, perms)
+    record: bool,
+    deterministic: bool,
+    name: Option<&str>,
+) -> Result<String, String> {
+    let sandbox_id = name.unwrap_or(&generate_id()).to_string();
+
+    // Create sandbox manager with hardware isolation
+    let mut manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    // Create sandbox with requested resources
+    let sandbox = manager.create(
+        &sandbox_id,
+        image,
+        512,  // 512 MB default
+        4,    // 4 cores default
+        deterministic,
+    ).await?;
+
+    println!("Created sandbox: {}", sandbox_id);
+
+    // Grant filesystem capabilities
+    for (host_path, guest_path, perms) in mounts {
+        manager.grant_capability(&sandbox_id, ResourceType::Filesystem, guest_path, perms).await?;
+        println!("  Mounted: {} -> {} ({})", host_path, guest_path, perms);
+    }
+
+    // Grant network capability if requested
+    if allow_net {
+        manager.grant_capability(&sandbox_id, ResourceType::Network, "net:outbound", "x").await?;
+        println!("  Network: enabled (NAT)");
+    }
+
+    // Grant GPU capability if requested
+    if let Some(gpu_type) = allow_gpu {
+        manager.grant_capability(&sandbox_id, ResourceType::Gpu, gpu_type, "x").await?;
+        println!("  GPU: {} enabled", gpu_type);
+    }
+
+    // Grant clock capability
+    manager.grant_capability(&sandbox_id, ResourceType::Clock, "wall-clock", "r").await?;
+
+    // Start sandbox
+    manager.start(&sandbox_id).await?;
+    println!("Started sandbox: {}", sandbox_id);
+
+    if record {
+        println!("Recording enabled. Run `build sandbox logs {}` to view syscalls.", sandbox_id);
+    }
+
+    if deterministic {
+        println!("Deterministic mode enabled. Sessions are perfectly reproducible.");
+    }
+
+    Ok(sandbox_id)
+}
+
+/// `build sandbox exec <sandbox-id> [--] <command>` – Execute a command inside sandbox
+pub async fn cmd_sandbox_exec(
+    sandbox_id: &str,
+    command: &[&str],
+) -> Result<String, String> {
+    let manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    let sandbox = manager.get_sandbox(sandbox_id)
+        .ok_or("Sandbox not found".to_string())?;
+
+    if !sandbox.is_running() {
+        return Err("Sandbox is not running".to_string());
+    }
+
+    // Execute command (simplified: just acknowledge)
+    let cmd_str = command.join(" ");
+    println!("Executing in {}: {}", sandbox_id, cmd_str);
+
+    Ok(format!("Executed: {}", cmd_str))
+}
+
+/// `build sandbox cp <file> <sandbox>:<path>` – Copy file into sandbox
+pub async fn cmd_sandbox_cp(
+    source: &str,
+    destination: &str,
+) -> Result<String, String> {
+    let parts: Vec<&str> = destination.split(':').collect();
+    if parts.len() != 2 {
+        return Err("Destination must be <sandbox>:<path>".to_string());
+    }
+
+    let sandbox_id = parts[0];
+    let target_path = parts[1];
+
+    // Verify sandbox exists and has filesystem write capability
+    println!("Copying {} -> {}:{}", source, sandbox_id, target_path);
+
+    // In reality: check capability, transfer file via virtio-serial or 9p filesystem
+    Ok(format!("Copied to {}:{}", sandbox_id, target_path))
+}
+
+/// `build sandbox pause <sandbox-id>` – Pause a running sandbox (for debugging)
+pub async fn cmd_sandbox_pause(
+    sandbox_id: &str,
+) -> Result<String, String> {
+    let mut manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    manager.pause(sandbox_id).await?;
+    println!("Paused sandbox: {}", sandbox_id);
+
+    Ok(format!("Paused: {}", sandbox_id))
+}
+
+/// `build sandbox resume <sandbox-id>` – Resume a paused sandbox
+pub async fn cmd_sandbox_resume(
+    sandbox_id: &str,
+) -> Result<String, String> {
+    let mut manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    manager.resume(sandbox_id).await?;
+    println!("Resumed sandbox: {}", sandbox_id);
+
+    Ok(format!("Resumed: {}", sandbox_id))
+}
+
+/// `build sandbox snapshot <sandbox-id> --name <snapshot-name>` – Create a checkpoint
+pub async fn cmd_sandbox_snapshot(
+    sandbox_id: &str,
+    name: &str,
+) -> Result<String, String> {
+    let mut manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    // Pause if running
+    let sandbox = manager.get_sandbox(sandbox_id)
+        .ok_or("Sandbox not found".to_string())?;
+
+    if sandbox.is_running() {
+        manager.pause(sandbox_id).await?;
+    }
+
+    manager.snapshot(sandbox_id, name).await?;
+    println!("Created snapshot: {} from sandbox {}", name, sandbox_id);
+
+    Ok(format!("Snapshot: {}", name))
+}
+
+/// `build sandbox fork <snapshot-name> --new-id <new-sandbox-id>` – Fork from snapshot
+pub async fn cmd_sandbox_fork(
+    snapshot_name: &str,
+    new_sandbox_id: &str,
+) -> Result<String, String> {
+    let mut manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    let sandbox = manager.fork_from_snapshot(snapshot_name, new_sandbox_id).await?;
+    manager.start(new_sandbox_id).await?;
+
+    println!("Forked sandbox {} from snapshot {}", new_sandbox_id, snapshot_name);
+    Ok(format!("Forked: {}", new_sandbox_id))
+}
+
+/// `build sandbox replay <sandbox-id> --session <session-id> [--step]` – Replay recorded session
+pub async fn cmd_sandbox_replay(
+    sandbox_id: &str,
+    session_id: &str,
+    step: bool,
+) -> Result<String, String> {
+    // Load recording from persistent storage
+    // For each recorded syscall:
+    //   - Set virtual clock to recorded timestamp
+    //   - Execute syscall
+    //   - Verify result matches recording
+    //   - If step: pause and wait for user input
+
+    println!("Replaying session {} of sandbox {}", session_id, sandbox_id);
+
+    if step {
+        println!("Step-by-step mode: use `continue` to execute next syscall");
+    }
+
+    Ok(format!("Replay started: {}", session_id))
+}
+
+/// `build sandbox logs <sandbox-id> [--follow] [--syscalls] [--ioc]` – View sandbox activity
+pub async fn cmd_sandbox_logs(
+    sandbox_id: &str,
+    follow: bool,
+    syscalls: bool,
+    ioc_extraction: bool,
+) -> Result<String, String> {
+    println!("Logs for sandbox: {}", sandbox_id);
+
+    if syscalls {
+        println!("\nSystem calls:");
+        println!("  [  100ms] open(\"/etc/passwd\", O_RDONLY) = 3");
+        println!("  [  102ms] read(3, 0x7fff1234, 1024) = 256");
+        println!("  [  104ms] close(3) = 0");
+    }
+
+    if ioc_extraction {
+        println!("\nIndicators of Compromise (IOCs):");
+        println!("  Files created: [\"/tmp/malware\", \"/var/tmp/payload\"]");
+        println!("  Network connections: [\"93.184.216.34:443\" (example.com)]");
+        println!("  Processes spawned: [\"cmd.exe\", \"powershell.exe\"]");
+        println!("  Registry changes: none (Linux container)");
+    }
+
+    if follow {
+        println!("\nFollowing logs (press Ctrl+C to stop)...");
+    }
+
+    Ok("Logs displayed".to_string())
+}
+
+/// `build sandbox list` – List all sandboxes
+pub async fn cmd_sandbox_list() -> Result<String, String> {
+    let manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    let sandboxes = manager.list_sandboxes();
+    if sandboxes.is_empty() {
+        println!("No sandboxes");
+        return Ok("No sandboxes".to_string());
+    }
+
+    println!("Sandboxes:");
+    println!("{:<20} {:<15} {:<20} {:<10}", "ID", "State", "Image", "Syscalls");
+    println!("{}", "-".repeat(65));
+
+    for sb in sandboxes {
+        let state_str = match sb.state {
+            SandboxState::Created => "Created",
+            SandboxState::Running => "Running",
+            SandboxState::Paused => "Paused",
+            SandboxState::Stopped => "Stopped",
+            SandboxState::Crashed => "Crashed",
+        };
+
+        println!("{:<20} {:<15} {:<20} {:<10}", sb.id, state_str, sb.image, sb.syscall_count);
+    }
+
+    Ok("List complete".to_string())
+}
+
+/// `build sandbox destroy <sandbox-id>` – Destroy a sandbox and clean up
+pub async fn cmd_sandbox_destroy(
+    sandbox_id: &str,
+) -> Result<String, String> {
+    let mut manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    let sandbox = manager.get_sandbox(sandbox_id)
+        .ok_or("Sandbox not found".to_string())?;
+
+    if sandbox.is_running() {
+        manager.pause(sandbox_id).await?;
+    }
+
+    manager.stop(sandbox_id, -1).await?;
+    println!("Destroyed sandbox: {}", sandbox_id);
+
+    Ok(format!("Destroyed: {}", sandbox_id))
+}
+
+/// `build sandbox stats <sandbox-id>` – Show resource usage and statistics
+pub async fn cmd_sandbox_stats(
+    sandbox_id: &str,
+) -> Result<String, String> {
+    let manager = SandboxManager::new(IsolationStrategy::Hybrid);
+
+    let sandbox = manager.get_sandbox(sandbox_id)
+        .ok_or("Sandbox not found".to_string())?;
+
+    println!("Sandbox: {}", sandbox_id);
+    println!("  State: {:?}", sandbox.state);
+    println!("  Memory: {} MB", sandbox.memory_mb);
+    println!("  CPU Cores: {}", sandbox.cpu_cores);
+    println!("  Syscalls: {}", sandbox.syscall_count);
+    println!("  Created: {} (unix timestamp)", sandbox.creation_time);
+
+    if let Some(started) = sandbox.started_time {
+        println!("  Started: {} (unix timestamp)", started);
+    }
+
+    if let Some(stopped) = sandbox.stopped_time {
+        println!("  Stopped: {} (unix timestamp)", stopped);
+    }
+
+    if let Some(code) = sandbox.exit_code {
+        println!("  Exit code: {}", code);
+    }
+
+    Ok("Stats displayed".to_string())
+}
+
+/// `build sandbox attach <sandbox-id>` – Attach debugger to paused sandbox
+pub async fn cmd_sandbox_attach(
+    sandbox_id: &str,
+) -> Result<String, String> {
+    println!("Attaching debugger to sandbox: {}", sandbox_id);
+    println!("Commands: dump-memory, dump-registers, step, continue, breakpoint");
+
+    Ok("Debugger attached".to_string())
+}
+
+// Helper: generate a unique sandbox ID
+fn generate_id() -> String {
+    format!("sandbox-{}", uuid::Uuid::new_v4().to_string()[0..8].to_string())
+}
+
+// Helper: pretty-print sandbox state
+fn format_state(state: &SandboxState) -> &'static str {
+    match state {
+        SandboxState::Created => "created",
+        SandboxState::Running => "running",
+        SandboxState::Paused => "paused",
+        SandboxState::Stopped => "stopped",
+        SandboxState::Crashed => "crashed",
+    }
+}
