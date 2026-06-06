@@ -1,6 +1,5 @@
 //! Image encoding and decoding operations
 
-use std::ffi::CString;
 use crate::error::{Result, Error};
 use crate::mat::Mat;
 use crate::sys::{CvFFI, MockCvFFI};
@@ -17,8 +16,6 @@ use crate::sys::{CvFFI, MockCvFFI};
 /// let img = imread("image.jpg", 1).unwrap();
 /// ```
 pub fn imread(path: &str, flags: i32) -> Result<Mat> {
-    let _c_path = CString::new(path)?;
-
     let inner = MockCvFFI::imread(path, flags)?;
     if inner.is_null() {
         return Err(Error::FileNotFound(path.to_string()));
@@ -40,8 +37,6 @@ pub fn imread(path: &str, flags: i32) -> Result<Mat> {
 /// imwrite("output.jpg", &img).unwrap();
 /// ```
 pub fn imwrite(path: &str, img: &Mat) -> Result<()> {
-    let _c_path = CString::new(path)?;
-
     let success = MockCvFFI::imwrite(path, img.as_ptr() as *const _)?;
     if success {
         Ok(())

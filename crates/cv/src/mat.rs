@@ -107,12 +107,6 @@ impl Mat {
     pub(crate) fn as_ptr(&self) -> *const SysMat {
         self.inner as *const SysMat
     }
-
-    /// Get mutable pointer for internal use
-    #[allow(dead_code)]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut SysMat {
-        self.inner
-    }
 }
 
 impl Clone for Mat {

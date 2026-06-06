@@ -6223,6 +6223,7 @@ name = "opencv-manifest"
 version = "5.0.0"
 dependencies = [
  "blake3",
+ "chrono",
  "serde",
  "serde_json",
 ]
