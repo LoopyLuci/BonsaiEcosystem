@@ -24,6 +24,9 @@ members = [
     "crates/regex-frontend",           # Regex fallback frontend for languages without LSP
     "lang-gen",                        # Meta-generator tool for creating language crates (root level)
 
+    # ========== Language Runtimes ==========
+    "crates/clojure-jvm",              # Clojure JVM runtime with sandbox
+
     # ========== Compiled Objects ==========
     "crates/co",                       # Compiled Objects (serialized functions)
 
