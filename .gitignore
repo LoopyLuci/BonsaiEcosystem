@@ -37,8 +37,12 @@ bmcs.config.toml
 Dockerfile.bmcs
 docker-compose.bmcs.yml
 
-# Old documentation directory
-docs/
+# Archived files (historical reference only)
+archive/docs/*.md
+archive/logs/
+archive/results/
+
+# Note: /docs/ is kept for active documentation (do not ignore)
 
 # Old extraction and build output directories
 extraction-output/
@@ -131,11 +135,14 @@ bonsai-bot/*.dll
 
 # Logs and local artifacts
 **/*.log
+mcp-server.log
+mcp-server-error.log
 **/build-output.txt
 tool_test/**/latest.json
 tool_test/**/preflight.json
 tool_test/**/preflight-cache.json
 .bonsai-launcher.pid
+.mcp-server-pid
 BonsaiWorkspace.exe
 BonsaiWorkspace-*.exe
 **/__pycache__/

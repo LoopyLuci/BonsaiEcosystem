@@ -1,0 +1,441 @@
+-- UniIR v0.2 — Formal Semantics
+-- Written in Axiom notation (dependent type theory)
+-- This is the single source of truth for all Omni language semantics.
+-- Reference: §N.M notation used in compiler error messages.
+
+-- ═══════════════════════════════════════════════════════════════
+-- §1  Foundations
+-- ═══════════════════════════════════════════════════════════════
+
+-- §1.1  Universe Hierarchy
+-- Type : Type(0), Type(0) : Type(1), ...
+-- We write Type for Type(0) in non-ambiguous contexts.
+
+-- §1.2  Graded Modalities (Quantitative Types)
+-- Every variable binding carries a grade from the semiring (ℕ₃, +, ×, 0, 1):
+--   0  — erased (proof-only, no runtime representation)
+--   1  — linear (must be used exactly once)
+--   ω  — unrestricted (may be used any number of times)
+
+data Grade : Type where
+  | Zero : Grade          -- erased
+  | One  : Grade          -- linear
+  | Many : Grade          -- unrestricted (ω)
+
+-- Grade arithmetic (for type checking rule T-App)
+grade_add : Grade → Grade → Grade
+  | Zero, g    => g
+  | g,    Zero => g
+  | One,  One  => Many    -- two linear uses = unrestricted
+  | _,    _    => Many
+
+grade_mul : Grade → Grade → Grade
+  | Zero, _    => Zero
+  | _,    Zero => Zero
+  | One,  g    => g
+  | Many, _    => Many
+
+-- §1.3  Effects
+-- An effect row is a finite set of effect labels, sorted canonically.
+-- Canonical order: lexicographic on label strings.
+
+data Effect : Type where
+  | Alloc    : Effect                    -- heap allocation
+  | IO       : Effect                    -- general I/O
+  | ReadFS   : String → Effect           -- read path prefix
+  | WriteFS  : String → Effect           -- write path prefix
+  | Network  : String → Effect           -- network endpoint pattern
+  | Panic    : Effect                    -- may diverge/panic
+  | Unsafe   : Effect                    -- bypasses type system guarantees
+  | Telemetry: Effect                    -- emit telemetry events
+  | Device   : DeviceKind → Effect       -- heterogeneous hardware offload
+  | Undefined: Effect                    -- undefined behaviour (from C FFI)
+
+data DeviceKind : Type where
+  | GPU | FPGA | TPU | SIMD
+
+-- An effect row is a list of effects, kept sorted for canonical form.
+EffectRow : Type := List Effect
+
+-- §1.4  Regions
+-- Regions classify memory lifetimes. A region variable 'r is universally
+-- quantified at function boundaries.
+
+data Region : Type where
+  | Static  : Region
+  | Heap    : Region
+  | RegVar  : Name → Region     -- region variable (e.g., 'r)
+  | Stack   : Level → Region    -- stack frame at depth Level
+
+-- ═══════════════════════════════════════════════════════════════
+-- §2  UniIR Types
+-- ═══════════════════════════════════════════════════════════════
+
+-- §2.1  Base Types
+data BaseType : Type where
+  | TUnit   : BaseType
+  | TBool   : BaseType
+  | TInt    : IntWidth → BaseType
+  | TFloat  : FloatWidth → BaseType
+  | TPtr    : Region → BaseType → BaseType   -- *[r] T
+
+data IntWidth   : Type where | I8 | I16 | I32 | I64 | I128 | ISize
+data FloatWidth : Type where | F32 | F64
+
+-- §2.2  Compound Types
+-- UniIR types form a polarised dependent type theory.
+-- Positive types (data): constructed eagerly.
+-- Negative types (co-data / functions): consumed by elimination.
+
+mutual
+  data Ty : Type where
+    -- Primitives
+    | TBase    : BaseType → Ty
+    | TVar     : Name → Ty                   -- type variable
+
+    -- Dependent function: Π(x : A)^q. B[x]  with effect row ε
+    | TFun     : Name → Grade → Ty → EffectRow → Ty → Ty
+
+    -- Dependent pair: Σ(x : A)^q. B[x]
+    | TPair    : Name → Grade → Ty → Ty → Ty
+
+    -- Algebraic data type (nominal): applied to type arguments
+    | TADT     : Name → List Ty → Ty
+
+    -- Reference: &[r]^q T  (borrowed, with region and grade)
+    | TRef     : Region → Grade → Ty → Ty
+
+    -- Boxed heap value: Box[r] T
+    | TBox     : Region → Ty → Ty
+
+    -- Effect-polymorphic: ∀ε. T  (effect abstraction)
+    | TEffPoly : Name → Ty → Ty
+
+    -- Universe: Type(n)
+    | TType    : Nat → Ty
+
+    -- Proof type (Axiom layer, erased at runtime)
+    | TProp    : Ty
+
+-- §2.3  Well-Formedness
+-- Γ ⊢ T : Type(n)  means T is well-formed at universe level n in context Γ.
+-- Γ ⊢ t : T        means term t has type T in context Γ.
+-- (These rules are enforced by the Axiom kernel for Axiom code,
+--  and by the Titan type checker for Titan/Aether code.)
+
+-- ═══════════════════════════════════════════════════════════════
+-- §3  UniIR Terms (SSA Form)
+-- ═══════════════════════════════════════════════════════════════
+
+-- §3.1  Values (atoms — no computation, no effects)
+data Value : Type where
+  | VReg   : Register → Value         -- SSA register
+  | VConst : Literal → Value          -- compile-time constant
+  | VUndef : Ty → Value               -- undefined (FFI boundary only)
+
+data Literal : Type where
+  | LUnit   : Literal
+  | LBool   : Bool → Literal
+  | LInt    : IntWidth → Integer → Literal
+  | LFloat  : FloatWidth → Float → Literal
+  | LStr    : String → Literal
+
+-- Register is a dense natural number (canonical form: 0, 1, 2, …)
+Register : Type := Nat
+
+-- §3.2  Instructions (produce a register, may have effects)
+data Instr : Type where
+  -- §3.2.1  Arithmetic & Logic
+  | Add    : Value → Value → Instr
+  | Sub    : Value → Value → Instr
+  | Mul    : Value → Value → Instr
+  | Div    : Value → Value → Instr    -- effect: Panic (division by zero)
+  | And    : Value → Value → Instr
+  | Or     : Value → Value → Instr
+  | Xor    : Value → Value → Instr
+  | Not    : Value → Instr
+  | Shl    : Value → Value → Instr
+  | Shr    : Value → Value → Instr
+  | ICmp   : ICmpOp → Value → Value → Instr
+  | FCmp   : FCmpOp → Value → Value → Instr
+
+  data ICmpOp : Type where | Eq | Ne | Lt | Le | Gt | Ge | ULt | ULe | UGt | UGe
+  data FCmpOp : Type where | FEq | FNe | FLt | FLe | FGt | FGe | FUnord
+
+  -- §3.2.2  Memory
+  | Alloca  : Ty → Instr              -- effect: Alloc
+  | Load    : Region → Value → Instr
+  | Store   : Region → Value → Value → Instr   -- returns Unit
+  | GetElem : Value → List Value → Instr       -- GEP
+  | CastPtr : Ty → Value → Instr
+
+  -- §3.2.3  Function Calls  (§3.4 T-App)
+  -- Call a function value with graded arguments.
+  | Call    : Value → List (Grade × Value) → EffectRow → Instr
+
+  -- §3.2.4  Aggregates
+  | MkTuple  : List (Grade × Value) → Instr
+  | GetField : Value → Nat → Instr
+  | MkADT    : Name → Nat → List Value → Instr   -- tag, ctor index, fields
+  | GetADT   : Value → Nat → Instr               -- extract field from ADT
+
+  -- §3.2.5  Effects & Capabilities
+  | CheckCap   : Effect → Instr        -- runtime cap check; Panic if denied
+  | EmitTelem  : String → List Value → Instr   -- telemetry emission
+  | Fence      : MemOrder → Instr
+
+  data MemOrder : Type where | SeqCst | Acquire | Release | Relaxed
+
+  -- §3.2.6  Intrinsics
+  | HashContent : Value → Instr        -- Blake3 of canonical bytes
+  | Phi         : List (BasicBlock × Value) → Instr   -- φ-node (canonical SSA)
+
+-- §3.3  Terminators (end of basic block)
+data Terminator : Type where
+  | Ret    : Value → Terminator
+  | Br     : Value → BasicBlock → BasicBlock → Terminator   -- conditional
+  | Jmp    : BasicBlock → Terminator
+  | Switch : Value → BasicBlock → List (Literal × BasicBlock) → Terminator
+  | Unreachable : Terminator           -- required after provably-dead paths
+
+BasicBlock : Type := Nat   -- canonical: dominator order
+
+-- §3.4  T-App — the central typing rule for function application
+-- Γ ⊢ f : Π(x:A)^q. B[x] ! ε₁
+-- Γ' ⊢ v : A            (context Γ' contains q copies of all linear vars)
+-- ─────────────────────────────────────────────────────────────────────
+-- Γ+q·Γ' ⊢ Call f [(q,v)] ε₁ : B[v/x]
+-- Error reference: UniIR_T_App §3.4
+
+-- §3.5  Basic Block (Canonical Form)
+-- A block in canonical form must satisfy:
+--   (a) Registers are dense: 0,1,2,… in definition order
+--   (b) Blocks are in dominator order
+--   (c) Effect rows are sorted (canonical label order)
+--   (d) φ-nodes appear only at the top of a block
+--   (e) Each register defined exactly once (SSA invariant)
+
+record BasicBlockDef : Type where
+  id      : BasicBlock
+  params  : List (Register × Ty)      -- block parameters (= φ sources)
+  instrs  : List (Register × Instr)   -- (dest-reg, instr) pairs
+  term    : Terminator
+
+-- §3.6  Function Definition
+record FunDef : Type where
+  name    : Name
+  params  : List (Register × Grade × Ty)
+  ret_ty  : Ty
+  effects : EffectRow
+  blocks  : List BasicBlockDef        -- blocks[0] is the entry block
+  region_params : List Name           -- universally-quantified region vars
+
+-- §3.7  Module
+-- A module is the unit of content-addressing.
+record Module : Type where
+  name    : Name
+  hash    : Blake3Hash                -- Blake3 of canonical bytes (self-referential)
+  imports : List (Name × Blake3Hash)  -- imported modules with their hashes
+  defs    : List FunDef
+  adts    : List ADTDef
+  caps    : List Effect               -- declared capability requirements
+
+Blake3Hash : Type := Bytes 32        -- 256-bit content hash
+
+record ADTDef : Type where
+  name   : Name
+  params : List Name
+  ctors  : List CtorDef
+
+record CtorDef : Type where
+  name   : Name
+  fields : List (Name × Ty)
+
+-- ═══════════════════════════════════════════════════════════════
+-- §4  Operational Semantics (Small-Step)
+-- ═══════════════════════════════════════════════════════════════
+
+-- §4.1  Machine State
+-- A UniIR machine state is a tuple ⟨H, C, T, S⟩ where:
+--   H : Heap       — content-addressed heap
+--   C : CapTable   — active capability table
+--   T : TelLog     — telemetry event log
+--   S : CallStack  — call stack of (frame, pc) pairs
+
+-- §4.2  Reduction Rules (selected)
+
+-- [R-Alloc]  (requires Cap: Alloc in C)
+-- ⟨H, C, T, S⟩, Alloca τ  ⟶  ⟨H[a↦⊥], C, T, S⟩  with result a
+--   where a is fresh
+
+-- [R-Load]
+-- ⟨H[a↦v], C, T, S⟩, Load r a  ⟶  ⟨H, C, T, S⟩  with result v
+
+-- [R-Store]
+-- ⟨H, C, T, S⟩, Store r a v  ⟶  ⟨H[a↦v], C, T, S⟩  with result ()
+
+-- [R-CheckCap-Ok]
+-- C(ε) = Granted  ⊢  ⟨H, C, T, S⟩, CheckCap ε  ⟶  ⟨H, C, T, S⟩  with result ()
+
+-- [R-CheckCap-Deny]
+-- C(ε) = Denied   ⊢  ⟨H, C, T, S⟩, CheckCap ε  ⟶  PANIC "CapabilityViolation"
+
+-- [R-Telem]
+-- ⟨H, C, T, S⟩, EmitTelem name args  ⟶  ⟨H, C, T·(name,args,ts), S⟩
+
+-- §4.3  Progress and Preservation
+-- Theorem (Progress): If ⊢ s : Σ (well-typed state), then either s is final
+--   (a Ret instruction at the bottom of the call stack) or ∃s'. s ⟶ s'.
+--
+-- Theorem (Preservation): If ⊢ s : Σ and s ⟶ s', then ⊢ s' : Σ.
+--
+-- These are proved in axiom/kernel/ against the kernel axiom set.
+
+-- ═══════════════════════════════════════════════════════════════
+-- §5  Content Addressing
+-- ═══════════════════════════════════════════════════════════════
+
+-- §5.1  Canonical Bytes
+-- The canonical byte representation of a module M is defined by:
+--   canonical(M) := tlv_encode(alpha_rename(sort_effects(M)))
+-- where:
+--   alpha_rename: renames all bound variables to de Bruijn indices
+--   sort_effects: sorts all EffectRow fields lexicographically
+--   tlv_encode:   TLV encoding defined in §5.2
+
+-- §5.2  TLV Binary Format
+-- Each node is encoded as:
+--   tag  : u8         — node type tag (see §5.3)
+--   len  : u32-le     — length of value in bytes
+--   value: bytes[len] — encoded content
+--
+-- Compound nodes encode their children as concatenated TLV blobs.
+-- Strings: UTF-8, no null terminator.
+-- Integers: little-endian.
+
+-- §5.3  TLV Tags (reserved range 0x00–0xFF)
+-- 0x01  Module
+-- 0x02  FunDef
+-- 0x03  BasicBlockDef
+-- 0x04  Instr
+-- 0x05  Terminator
+-- 0x06  Ty
+-- 0x07  Value
+-- 0x08  Effect
+-- 0x09  ADTDef
+-- 0x0A  CtorDef
+-- 0x0B  Literal
+-- 0x0C  String
+-- 0x0D  Bytes
+
+-- §5.4  Hash Computation
+-- hash(M) := blake3(canonical(M))
+-- The hash field in the Module record is computed last and is the hash
+-- of canonical(M) with the hash field set to 32 zero bytes.
+
+-- ═══════════════════════════════════════════════════════════════
+-- §6  Capability Table Semantics
+-- ═══════════════════════════════════════════════════════════════
+
+-- §6.1  Capability States
+data CapState : Type where
+  | Granted  : CapState
+  | Denied   : CapState
+  | Scoped   : Nat → CapState   -- granted until scope depth N is popped
+
+-- §6.2  Capability Table
+CapTable : Type := Map Effect CapState
+
+-- §6.3  Operations
+cap_check  : CapTable → Effect → Bool
+cap_grant  : CapTable → Effect → CapTable
+cap_restrict : CapTable → Effect → CapTable
+cap_scope  : CapTable → Effect → Nat → CapTable   -- grant within scope depth
+
+-- §6.4  Module Capability Declaration
+-- Every module declares the effects it may require (caps field of Module).
+-- OmniCore grants only declared effects; all others are Denied by default.
+-- This is checked at module load time (not just at CheckCap call sites).
+
+-- ═══════════════════════════════════════════════════════════════
+-- §7  Trust Score
+-- ═══════════════════════════════════════════════════════════════
+
+-- §7.1  Trust Level Enum
+data TrustLevel : Type where
+  | Unverified   : TrustLevel   -- no checks beyond parse                (0-19)
+  | Tested       : TrustLevel   -- unit + property tests pass            (20-39)
+  | Fuzzed       : TrustLevel   -- fuzz campaign completed               (40-59)
+  | SymChecked   : TrustLevel   -- symbolic execution (bounded)          (60-79)
+  | Proved       : TrustLevel   -- full Axiom proof                      (80-100)
+
+-- §7.2  Score Calculation
+-- score(M) = sum of component scores, each weighted:
+--   parsing + type-check              : 10 pts
+--   unit tests (>80% coverage)        : 15 pts
+--   property tests (>1000 cases)      : 15 pts
+--   fuzz campaign (>1h, no crashes)   : 20 pts
+--   symbolic execution (no UB)        : 20 pts
+--   full Axiom proof of all specs     : 20 pts
+-- Max: 100.  Gate: --verify=high requires score ≥ 80.
+
+-- ═══════════════════════════════════════════════════════════════
+-- §8  Graded Modality Rules
+-- ═══════════════════════════════════════════════════════════════
+
+-- §8.1  Variable Rule  (T-Var)
+-- x :^q A ∈ Γ
+-- ────────────
+-- Γ ⊢ x : A  (consuming q copies of x)
+-- Error: UniIR_T_Var §8.1
+
+-- §8.2  Weakening  (T-Weak)
+-- Only variables with grade 0 or Many may be weakened (dropped without use).
+-- Grade-1 (linear) variables must be consumed exactly once.
+-- Error: UniIR_Linear_Drop §8.2
+
+-- §8.3  Duplication  (T-Dup)
+-- Only variables with grade Many may be duplicated.
+-- Error: UniIR_Linear_Dup §8.3
+
+-- ═══════════════════════════════════════════════════════════════
+-- §9  Effect Checking Rules
+-- ═══════════════════════════════════════════════════════════════
+
+-- §9.1  Effect Subsumption  (T-Sub-Effect)
+-- If f : Π(x:A). B ! ε₁, and ε₁ ⊆ ε₂, then f may be used where ε₂ is allowed.
+-- Error: UniIR_Effect_Missing §9.1
+
+-- §9.2  Effect Polymorphism
+-- A function may be quantified over an effect variable ε:
+--   f : ∀ε. Π(x:A). B ! {IO} ∪ ε
+-- Effect variables unify with concrete rows at call sites.
+-- Error: UniIR_Effect_Poly §9.2
+
+-- §9.3  Capability Enforcement (Runtime)
+-- At every CheckCap ε instruction, the OmniCore runtime checks C(ε).
+-- If not Granted, execution halts with CapabilityViolation.
+-- The compiler inserts CheckCap at every call site that may require a capability.
+-- Error: UniIR_Cap_Violation §9.3
+
+-- ═══════════════════════════════════════════════════════════════
+-- §10  Module Loading Protocol
+-- ═══════════════════════════════════════════════════════════════
+
+-- §10.1  Load Sequence
+-- 1. Parse TLV binary → Module record
+-- 2. Verify hash: blake3(canonical(M with hash=0…0)) = M.hash
+-- 3. For each import (name, h): verify loaded module has hash h
+-- 4. Check declared caps ⊆ granted caps in current CapTable
+-- 5. Type-check all FunDefs (Axiom kernel for verified modules)
+-- 6. Register in module registry (hash → Module)
+-- 7. Return entry-point reference
+
+-- §10.2  Security Guarantee
+-- No module with a forged hash can be loaded.  Hash collisions would require
+-- breaking Blake3 preimage resistance (security level: 128-bit).
+-- Error: UniIR_Hash_Mismatch §10.2
+
+-- ═══════════════════════════════════════════════════════════════
+-- End of UniIR v0.2
+-- ═══════════════════════════════════════════════════════════════
