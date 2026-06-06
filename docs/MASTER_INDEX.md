@@ -88,6 +88,7 @@
 | **MCP Server** | [20-MCP-SERVER.md](./20-MCP-SERVER.md) | Advanced |
 | **OpenCV Integration** | [docs/OPENCV5_INTEGRATION_PLAN.md](./OPENCV5_INTEGRATION_PLAN.md) | Advanced |
 | **Polyglot Pong** | [docs/POLYGLOT_PONG.md](./POLYGLOT_PONG.md) | Testing Framework |
+| **Clojure Integration** | [specifications/CLOJURE_INTEGRATION_SPECIFICATION.md](./specifications/CLOJURE_INTEGRATION_SPECIFICATION.md) | Advanced |
 
 ### Implementation Guides
 
