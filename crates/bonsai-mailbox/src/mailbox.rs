@@ -2,7 +2,7 @@
 
 use crate::envelope::{AgentId, MailEnvelope};
 use crate::error::{MailboxError, MailboxResult};
-use bonsai_transfer_crypto::identity::BonsaiIdentity;
+use p2p_crypto::BonsaiIdentity;
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -116,7 +116,7 @@ impl Default for AgentMailbox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonsai_transfer_crypto::identity::BonsaiIdentity;
+    use p2p_crypto::BonsaiIdentity;
 
     #[tokio::test]
     async fn local_delivery() {

@@ -11,11 +11,11 @@
 //! The ring implements [`TransportLane`] so it drops directly into the
 //! ECF-RG scheduler alongside TCP and relay lanes.
 
-use bonsai_transfer_core::{
+use p2p_core::{
     error::{TransferError, TransferResult},
     lane::{LaneHealth, LaneKind, TransportLane},
 };
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use p2p_crypto::cipher::ChunkCiphertext;
 use std::sync::Arc;
 
 // ── Platform split ────────────────────────────────────────────────────────────

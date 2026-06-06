@@ -1,6 +1,6 @@
 use tokio::net::TcpListener;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use bonsai_bmf_core::{Message, SmtpConfig, filter::SpamFilter};
+use msg_core::{Message, SmtpConfig, filter::SpamFilter};
 use std::sync::Arc;
 
 pub struct SmtpServer {
@@ -83,7 +83,7 @@ async fn handle_smtp_session(
                 cc: vec![],
                 subject: extract_subject(&data_lines),
                 body,
-                body_type: bonsai_bmf_core::BodyType::Plain,
+                body_type: msg_core::BodyType::Plain,
                 attachments: vec![],
                 in_reply_to: None,
                 references: vec![],

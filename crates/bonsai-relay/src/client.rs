@@ -3,9 +3,9 @@
 use crate::error::{RelayError, RelayResult};
 use crate::token::{RegisterRequest, RelayToken};
 use async_trait::async_trait;
-use bonsai_transfer_core::error::TransferResult;
-use bonsai_transfer_core::lane::{LaneHealth, LaneKind, TransportLane};
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use p2p_core::error::TransferResult;
+use p2p_core::lane::{LaneHealth, LaneKind, TransportLane};
+use p2p_crypto::cipher::ChunkCiphertext;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -116,14 +116,14 @@ impl RelayClient {
         let guard = self.tx.lock().unwrap();
         if let Some(ref tx) = *guard {
             tx.send(data).map_err(|_| {
-                bonsai_transfer_core::error::TransferError::LaneFailed(
+                p2p_core::error::TransferError::LaneFailed(
                     self.name.clone(),
                     "relay channel closed".into(),
                 )
             })?;
             Ok(())
         } else {
-            Err(bonsai_transfer_core::error::TransferError::LaneFailed(
+            Err(p2p_core::error::TransferError::LaneFailed(
                 self.name.clone(),
                 "not connected".into(),
             ))
@@ -145,7 +145,7 @@ impl TransportLane for RelayClient {
 
     async fn send_chunk(&self, chunk: &ChunkCiphertext) -> TransferResult<()> {
         let bytes = serde_json::to_vec(chunk)
-            .map_err(|e| bonsai_transfer_core::error::TransferError::Other(e.to_string()))?;
+            .map_err(|e| p2p_core::error::TransferError::Other(e.to_string()))?;
         self.send_raw(bytes)
     }
 

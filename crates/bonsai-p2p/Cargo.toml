@@ -15,6 +15,7 @@ onion-lane    = ["dep:tokio-socks"]
 [dependencies]
 p2p-core   = { path = "../p2p-core" }
 p2p-crypto = { path = "../p2p-crypto" }
+p2p-identity = { path = "../p2p-identity" }
 
 tokio       = { version = "1", features = ["full"] }
 futures     = "0.3"

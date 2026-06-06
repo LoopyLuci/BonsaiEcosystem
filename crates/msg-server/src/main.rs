@@ -1,4 +1,4 @@
-use bonsai_bmf_core::{SmtpConfig, ImapConfig, Message};
+use msg_core::{SmtpConfig, ImapConfig, Message};
 use bonsai_bmf_smtp::SmtpServer;
 use bonsai_bmf_imap::ImapServer;
 use std::sync::Arc;

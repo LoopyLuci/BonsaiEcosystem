@@ -37,11 +37,11 @@ use webrtc::{
     },
 };
 
-use bonsai_transfer_core::{
+use p2p_core::{
     error::{TransferError, TransferResult},
     lane::{LaneHealth, LaneKind, TransportLane},
 };
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use p2p_crypto::cipher::ChunkCiphertext;
 
 // ── WebRtcLane ────────────────────────────────────────────────────────────────
 

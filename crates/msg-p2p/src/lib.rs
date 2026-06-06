@@ -1,4 +1,4 @@
-use bonsai_bmf_core::Message;
+use msg_core::Message;
 use std::sync::Arc;
 
 pub struct P2pDelivery {

@@ -7,6 +7,7 @@ description = "Zero-copy DMI ring-channel transport lane (Linux-only hugepage-ba
 [dependencies]
 p2p-core   = { path = "../p2p-core" }
 p2p-crypto = { path = "../p2p-crypto" }
+p2p-identity = { path = "../p2p-identity" }
 async-trait = "0.1"
 serde       = { version = "1", features = ["derive"] }
 tokio       = { version = "1", features = ["sync", "rt"] }

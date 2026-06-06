@@ -9,7 +9,7 @@
 //! - **`OnionLane`** — Tor onion routing via `arti-client`. Anonymous, censorship-
 //!   resistant transport. Feature `onion-lane`.
 //!
-//! All three implement [`bonsai_transfer_core::lane::TransportLane`].
+//! All three implement [`p2p_core::lane::TransportLane`].
 
 #[cfg(feature = "onion-lane")]
 pub mod onion;

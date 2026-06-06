@@ -20,5 +20,6 @@ bonsai-capability-registry = { path = "../bonsai-capability-registry" }
 bonsai-actors = { path = "../bonsai-actors" }
 bonsai-cas = { path = "../bonsai-cas" }
 p2p-crypto = { path = "../p2p-crypto" }
+p2p-identity = { path = "../p2p-identity" }
 hex = "0.4"
 walkdir = "2"

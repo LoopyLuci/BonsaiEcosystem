@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
             let bytes = hex::decode(s).ok()?;
             if bytes.len() != 32 { return None; }
             let mut arr = [0u8;32]; arr.copy_from_slice(&bytes);
-            bonsai_transfer_crypto::BonsaiIdentity::from_seed(&arr).ok().map(Arc::new)
+            p2p_identity::BonsaiIdentity::from_seed(&arr).ok().map(Arc::new)
         });
 
         let ci = BonsaiCi::with_cas_and_identity(config, cas, identity);

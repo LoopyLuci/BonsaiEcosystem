@@ -29,11 +29,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tracing::debug;
 
-use bonsai_transfer_core::{
+use p2p_core::{
     error::{TransferError, TransferResult},
     lane::{LaneHealth, LaneKind, TransportLane},
 };
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use p2p_crypto::cipher::ChunkCiphertext;
 
 // ── Wire protocol types ───────────────────────────────────────────────────────
 

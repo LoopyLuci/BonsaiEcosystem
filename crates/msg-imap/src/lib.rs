@@ -1,6 +1,6 @@
 use tokio::net::TcpListener;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use bonsai_bmf_core::{Message, ImapConfig};
+use msg_core::{Message, ImapConfig};
 use std::sync::Arc;
 
 pub struct ImapServer {

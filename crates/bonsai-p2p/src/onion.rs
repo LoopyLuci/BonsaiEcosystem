@@ -21,11 +21,11 @@ use tokio::io::AsyncWriteExt;
 use tokio_socks::tcp::Socks5Stream;
 use tracing::{debug, warn};
 
-use bonsai_transfer_core::{
+use p2p_core::{
     error::{TransferError, TransferResult},
     lane::{LaneHealth, LaneKind, TransportLane},
 };
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use p2p_crypto::cipher::ChunkCiphertext;
 
 // ── Frame tags ────────────────────────────────────────────────────────────────
 

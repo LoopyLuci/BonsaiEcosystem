@@ -5,7 +5,7 @@ use tokio::process::Command;
 use std::path::Path;
 use std::sync::Arc;
 use bonsai_cas::CasStore;
-use bonsai_transfer_crypto::BonsaiIdentity;
+use p2p_crypto::BonsaiIdentity;
 use tokio::io::AsyncReadExt;
 use walkdir::WalkDir;
 use std::ffi::OsStr;

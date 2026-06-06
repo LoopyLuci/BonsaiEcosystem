@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use bonsai_transfer_core::streams::{TaskDefinition, TaskDistributeStream, ResourceRequirements, TaskResult};
+use p2p_core::streams::{TaskDefinition, TaskDistributeStream, ResourceRequirements, TaskResult};
 use serde::{Deserialize, Serialize};
 
 use crate::transfer_client::TransferClientWrapper;

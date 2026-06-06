@@ -7,6 +7,7 @@ description = "Agent-to-agent secure mailbox for Bonsai swarm communication"
 [dependencies]
 p2p-crypto = { path = "../p2p-crypto" }
 p2p-core   = { path = "../p2p-core" }
+p2p-identity = { path = "../p2p-identity" }
 bonsai-relay           = { path = "../bonsai-relay" }
 tokio        = { version = "1", features = ["full"] }
 serde        = { version = "1", features = ["derive"] }
