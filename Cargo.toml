@@ -75,6 +75,29 @@ members = [
     "crates/ubvm-suites",              # 10 comprehensive test suites
     "crates/ubvm-axiom",               # Formal verification with Axiom
     "crates/ubvm-mesh",                # Planet-scale distributed mesh
+
+    # ========== OpenCV 5 Integration ==========
+    # Phase 2: Rust Port
+    "crates/cv",                       # Rust FFI bindings and safe wrappers
+    "crates/cv-async",                 # Async/await integration
+    "crates/cv-tests",                 # UVM test harness
+
+    # Phase 1: Native & Build System
+    "crates/opencv-manifest",          # UMS module manifest definitions
+    "crates/opencv-build",             # Build orchestration
+
+    # Phase 3: Titan Rewrite
+    "crates/titan-opencv",             # Titan core implementation
+    "crates/titan-opencv-imgproc",     # Image processing module
+
+    # Phase 5: Aether Distribution
+    "crates/aether-vision",            # Distributed actor pipelines
+
+    # Phase 6: Axiom Proofs
+    "crates/axiom-opencv",             # Formal specifications
+
+    # Phase 7: Validation & Rollout
+    "crates/cv-uvm",                   # Universal Validation Mesh
 ]
 
 [workspace.lints.rust]

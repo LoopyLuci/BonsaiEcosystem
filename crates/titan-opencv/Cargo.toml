@@ -1,0 +1,6 @@
+[package]
+name = "titan-opencv"
+version = "5.0.0"
+edition = "2021"
+
+[dependencies]
