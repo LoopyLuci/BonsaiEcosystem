@@ -1,10 +1,10 @@
-use bonsai_language_frontend::LanguageFrontend;
+use language_system::LanguageFrontend;
 use frontend::ElixirFrontend;
 
 mod frontend;
 
 inventory::submit! {
-    bonsai_language_frontend::LanguageRegistration {
+    language_system::LanguageRegistration {
         name: "Elixir",
         factory: || Box::new(ElixirFrontend::new()),
     }

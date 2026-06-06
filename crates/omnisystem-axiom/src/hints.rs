@@ -1,5 +1,5 @@
 use crate::VerifiedProperty;
-use bonsai_lair::LairFunction;
+use core_ir::LairFunction;
 
 pub fn generate_hints(func: &LairFunction, properties: &[VerifiedProperty]) -> Vec<OptimizationHint> {
     let mut hints = Vec::new();

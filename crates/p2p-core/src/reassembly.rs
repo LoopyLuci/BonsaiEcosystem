@@ -5,7 +5,7 @@
 //! sender can retransmit on the fastest available lane.
 
 use crate::error::TransferResult;
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use p2p_crypto::cipher::ChunkCiphertext;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
@@ -128,7 +128,7 @@ impl ReassemblyWindow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonsai_transfer_crypto::{
+    use p2p_crypto::{
         cipher::{decrypt_chunk, encrypt_chunk},
         session::SessionKey,
     };

@@ -49,8 +49,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-bonsai-lair = {{ path = "../bonsai-lair" }}
-bonsai-language-frontend = {{ path = "../bonsai-language-frontend" }}
+core-ir = {{ path = "../core-ir" }}
+language-system = {{ path = "../language-system" }}
 async-trait = "0.1"
 tracing = "0.1"
 "#,
@@ -59,13 +59,13 @@ tracing = "0.1"
 
     let lib_rs = if uses_lsp {
         format!(
-            r#"use bonsai_language_frontend::LanguageFrontend;
+            r#"use language_system::LanguageFrontend;
 use frontend::{}Frontend;
 
 mod frontend;
 
 inventory::submit! {{
-    bonsai_language_frontend::LanguageRegistration {{
+    language_system::LanguageRegistration {{
         name: "{}",
         factory: || Box::new({}Frontend::new()),
     }}
@@ -77,11 +77,11 @@ inventory::submit! {{
         )
     } else {
         format!(
-            r#"use bonsai_language_frontend::LanguageFrontend;
+            r#"use language_system::LanguageFrontend;
 use bonsai_regex_frontend::RegexFrontend;
 
 inventory::submit! {{
-    bonsai_language_frontend::LanguageRegistration {{
+    language_system::LanguageRegistration {{
         name: "{}",
         factory: || Box::new(RegexFrontend::new("{}", vec![{}])),
     }}
@@ -95,8 +95,8 @@ inventory::submit! {{
 
     let frontend_rs = if uses_lsp {
         format!(
-            r#"use bonsai_language_frontend::LanguageFrontend;
-use bonsai_lair::*;
+            r#"use language_system::LanguageFrontend;
+use core_ir::*;
 use std::path::Path;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -118,7 +118,7 @@ impl LanguageFrontend for {}Frontend {{
             functions: vec![],
             types: vec![],
             constants: vec![],
-            metadata: bonsai_lair::ModuleMetadata {{
+            metadata: core_ir::ModuleMetadata {{
                 imports: vec![],
                 exports: vec![],
                 source_language: Some("{}".into()),

@@ -1,10 +1,10 @@
-use bonsai_language_frontend::LanguageFrontend;
+use language_system::LanguageFrontend;
 use frontend::KotlinFrontend;
 
 mod frontend;
 
 inventory::submit! {
-    bonsai_language_frontend::LanguageRegistration {
+    language_system::LanguageRegistration {
         name: "Kotlin",
         factory: || Box::new(KotlinFrontend::new()),
     }

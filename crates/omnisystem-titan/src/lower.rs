@@ -1,5 +1,5 @@
 use crate::ast::*;
-use bonsai_lair::{LairModule, ModuleMetadata};
+use core_ir::{LairModule, ModuleMetadata};
 
 pub fn lower_program(_program: &Program) -> LairModule {
     LairModule {

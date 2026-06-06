@@ -1,10 +1,10 @@
-use bonsai_language_frontend::LanguageFrontend;
+use language_system::LanguageFrontend;
 use frontend::MATLABFrontend;
 
 mod frontend;
 
 inventory::submit! {
-    bonsai_language_frontend::LanguageRegistration {
+    language_system::LanguageRegistration {
         name: "MATLAB",
         factory: || Box::new(MATLABFrontend::new()),
     }

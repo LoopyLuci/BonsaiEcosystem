@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use bonsai_lair::{LairModule, LairFunction, LairValueType, LairValue, LairLiteral, ModuleMetadata, Effect};
-use bonsai_language_frontend::{LanguageFrontend, Result};
+use core_ir::{LairModule, LairFunction, LairValueType, LairValue, LairLiteral, ModuleMetadata, Effect};
+use language_system::{LanguageFrontend, Result};
 use regex::Regex;
 use std::path::Path;
 

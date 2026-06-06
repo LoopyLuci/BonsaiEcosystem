@@ -46,7 +46,7 @@ p2p-core = { path = "../p2p-core" }
 p2p-crypto = { path = "../p2p-crypto" }
 bonsai-cas = { path = "../bonsai-cas" }
 audit-log = { path = "../audit-log" }
-bonsai-error = { path = "../bonsai-error" }
+error-types = { path = "../error-types" }
 bonsai-coordinator = { path = "../bonsai-coordinator" }
 
 # UUID generation

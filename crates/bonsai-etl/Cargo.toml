@@ -26,7 +26,7 @@ ndarray = "0.15"
 statrs = "0.16"
 
 # Integration
-bonsai-error = { path = "../bonsai-error" }
+error-types = { path = "../error-types" }
 bonsai-lint = { path = "../bonsai-lint", optional = true }
 
 [dev-dependencies]

@@ -1,10 +1,10 @@
-use bonsai_language_frontend::LanguageFrontend;
+use language_system::LanguageFrontend;
 use frontend::RFrontend;
 
 mod frontend;
 
 inventory::submit! {
-    bonsai_language_frontend::LanguageRegistration {
+    language_system::LanguageRegistration {
         name: "R",
         factory: || Box::new(RFrontend::new()),
     }

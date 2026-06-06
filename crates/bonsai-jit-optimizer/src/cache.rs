@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use dashmap::DashMap;
-use bonsai_lair::LairNode;
+use core_ir::LairNode;
 
 pub struct CodeCache {
     entries: Arc<DashMap<blake3::Hash, Vec<LairNode>>>,

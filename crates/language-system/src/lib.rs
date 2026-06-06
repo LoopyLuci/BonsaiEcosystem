@@ -15,7 +15,7 @@ pub use registry::{LanguageRegistry, LanguageRegistration};
 pub use errors::{FrontendError, Result};
 
 // Re-export for convenience
-pub use bonsai_lair::LairModule;
+pub use core_ir::LairModule;
 use std::path::Path;
 
 /// Global language registry

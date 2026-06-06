@@ -1,7 +1,0 @@
-[package]
-name = "bonsai-error"
-version = "0.1.0"
-edition = "2021"
-description = "Bonsai Ecosystem error type — replaces anyhow/thiserror for internal crates"
-
-[dependencies]

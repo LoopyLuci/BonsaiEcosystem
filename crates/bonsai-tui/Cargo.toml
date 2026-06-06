@@ -10,7 +10,7 @@ path = "src/main.rs"
 [dependencies]
 bonsai-credits    = { path = "../bonsai-credits" }
 bonsai-marketplace = { path = "../bonsai-marketplace" }
-bonsai-error      = { path = "../bonsai-error" }
+error-types      = { path = "../error-types" }
 ratatui           = "0.29"
 crossterm         = { version = "0.28", features = ["event-stream"] }
 tokio             = { version = "1", features = ["full"] }

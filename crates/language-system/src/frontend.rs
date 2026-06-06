@@ -1,7 +1,7 @@
 //! The LanguageFrontend trait — the single integration point for all languages
 
 use async_trait::async_trait;
-use bonsai_lair::LairModule;
+use core_ir::LairModule;
 use std::path::Path;
 use crate::errors::Result;
 

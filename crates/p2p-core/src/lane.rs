@@ -6,7 +6,7 @@
 
 use crate::error::TransferResult;
 use async_trait::async_trait;
-use bonsai_transfer_crypto::cipher::ChunkCiphertext;
+use p2p_crypto::cipher::ChunkCiphertext;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

@@ -122,8 +122,8 @@ pub const SEEDED_FIXES: &[(&str, &str, &str, &str)] = &[
      "Add dirs = \"5\" to [dependencies] in Cargo.toml. The dirs crate provides platform-specific directory paths.",
      "rust", "rust,dependencies,dirs"),
 
-    ("cannot find crate bonsai-error",
-     "Check that bonsai-error is listed in the workspace Cargo.toml members and add bonsai-error = { path = \"../bonsai-error\" } to the crate's Cargo.toml dependencies.",
+    ("cannot find crate error-types",
+     "Check that error-types is listed in the workspace Cargo.toml members and add error-types = { path = \"../error-types\" } to the crate's Cargo.toml dependencies.",
      "rust", "rust,dependencies,workspace"),
 
     ("field timeout_secs not in SwarmSpec",

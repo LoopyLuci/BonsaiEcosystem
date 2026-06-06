@@ -14,7 +14,7 @@ tower = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 lazy_static = "1.4"
 bonsai-capability-registry = { path = "../bonsai-capability-registry" }
-bonsai-error = { path = "../bonsai-error" }
+error-types = { path = "../error-types" }
 clap = { version = "4", features = ["derive"] }
 notify-rust = "4"
 chrono = { version = "0.4", features = ["serde"] }

@@ -10,7 +10,7 @@ description = "Axiom: Formal proof layer for the Bonsai Ecosystem"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-bonsai-lair = { path = "../bonsai-lair" }
-bonsai-language-frontend = { path = "../bonsai-language-frontend" }
+core-ir = { path = "../core-ir" }
+language-system = { path = "../language-system" }
 thiserror = "1"
 tracing = "0.1"

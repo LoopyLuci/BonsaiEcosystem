@@ -9,7 +9,7 @@ name = "bonsai-convert"
 path = "src/bin/cli.rs"
 
 [dependencies]
-bonsai-error = { path = "../bonsai-error" }
+error-types = { path = "../error-types" }
 bonsai-package = { path = "../bonsai-package" }
 
 serde = { version = "1.0", features = ["derive"] }

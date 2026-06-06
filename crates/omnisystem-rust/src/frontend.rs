@@ -1,5 +1,5 @@
-use bonsai_language_frontend::LanguageFrontend;
-use bonsai_lair::*;
+use language_system::LanguageFrontend;
+use core_ir::*;
 use std::path::Path;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -21,7 +21,7 @@ impl LanguageFrontend for RustFrontend {
             functions: vec![],
             types: vec![],
             constants: vec![],
-            metadata: bonsai_lair::ModuleMetadata {
+            metadata: core_ir::ModuleMetadata {
                 imports: vec![],
                 exports: vec![],
                 source_language: Some("Rust".into()),

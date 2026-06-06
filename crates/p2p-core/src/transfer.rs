@@ -4,7 +4,7 @@ use crate::error::TransferResult;
 use crate::gsn::GsnAllocator;
 use crate::lane::TransportLane;
 use crate::scheduler::EcfRgScheduler;
-use bonsai_transfer_crypto::{cipher::encrypt_chunk, session::SessionKey};
+use p2p_crypto::{cipher::encrypt_chunk, session::SessionKey};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;

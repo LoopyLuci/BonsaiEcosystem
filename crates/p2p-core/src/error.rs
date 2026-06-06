@@ -15,7 +15,7 @@ pub enum TransferError {
     #[error("chunk too large: {0} bytes (max {1})")]
     ChunkTooLarge(usize, usize),
     #[error("crypto error: {0}")]
-    Crypto(#[from] bonsai_transfer_crypto::error::CryptoError),
+    Crypto(#[from] p2p_crypto::error::CryptoError),
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("{0}")]

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use bonsai_language_frontend::LanguageFrontend;
-use bonsai_lair::{LairModule, ModuleMetadata};
+use language_system::LanguageFrontend;
+use core_ir::{LairModule, ModuleMetadata};
 use std::path::Path;
 
 #[derive(Clone)]
@@ -15,8 +15,8 @@ impl LanguageFrontend for SylvaFrontend {
     fn language_name(&self) -> &str { "Sylva" }
     fn file_extensions(&self) -> &[&str] { &["syl", "sylva"] }
     
-    async fn parse(&self, source: &str, _path: &Path) -> bonsai_language_frontend::Result<LairModule> {
-        let program = crate::parser::parse(source).map_err(|e| bonsai_language_frontend::FrontendError::ParseError(e.to_string()))?;
+    async fn parse(&self, source: &str, _path: &Path) -> language_system::Result<LairModule> {
+        let program = crate::parser::parse(source).map_err(|e| language_system::FrontendError::ParseError(e.to_string()))?;
         let _bytecode = crate::compiler::compile(&program);
         
         Ok(LairModule {

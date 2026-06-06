@@ -5,7 +5,7 @@ edition = "2021"
 description = "Bonsai Compute Fabric — distributed task orchestration across personal devices"
 
 [dependencies]
-bonsai-error = { path = "../bonsai-error" }
+error-types = { path = "../error-types" }
 p2p-core = { path = "../p2p-core" }
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
 serde = { version = "1", features = ["derive"] }

@@ -1,4 +1,4 @@
-use bonsai_lair::LairFunction;
+use core_ir::LairFunction;
 
 pub struct PassManager;
 

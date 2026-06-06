@@ -1,0 +1,16 @@
+[package]
+name = "core-ir"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Language-Agnostic Intermediate Representation for the Omnisystem"
+
+[dependencies]
+bonsai-ir = { path = "../bonsai-ir" }
+bonsai-buir = { path = "../bonsai-buir" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+
+[dev-dependencies]

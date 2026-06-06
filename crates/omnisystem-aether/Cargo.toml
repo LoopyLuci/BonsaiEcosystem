@@ -7,8 +7,8 @@ license.workspace = true
 description = "Aether: Distributed actor language for the Bonsai Ecosystem"
 
 [dependencies]
-bonsai-language-frontend = { path = "../bonsai-language-frontend" }
-bonsai-lair = { path = "../bonsai-lair" }
+language-system = { path = "../language-system" }
+core-ir = { path = "../core-ir" }
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

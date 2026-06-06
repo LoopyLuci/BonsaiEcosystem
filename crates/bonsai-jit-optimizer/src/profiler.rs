@@ -1,4 +1,4 @@
-use bonsai_lair::{LairFunction, LairNode};
+use core_ir::{LairFunction, LairNode};
 use std::collections::{HashMap, HashSet};
 
 pub struct HotspotProfiler {

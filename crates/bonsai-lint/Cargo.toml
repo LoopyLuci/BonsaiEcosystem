@@ -36,7 +36,7 @@ async-trait = "0.1"
 blake3 = "1"
 crossbeam = "0.8"
 
-bonsai-error = { path = "../bonsai-error" }
+error-types = { path = "../error-types" }
 audit-log = { path = "../audit-log" }
 mcp-server = { path = "../mcp-server", optional = true }
 

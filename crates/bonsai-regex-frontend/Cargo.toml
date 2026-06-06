@@ -7,5 +7,5 @@ edition = "2021"
 anyhow = "1"
 regex = "1"
 async-trait = "0.1"
-bonsai-lair = { path = "../bonsai-lair" }
-bonsai-language-frontend = { path = "../bonsai-language-frontend" }
+core-ir = { path = "../core-ir" }
+language-system = { path = "../language-system" }

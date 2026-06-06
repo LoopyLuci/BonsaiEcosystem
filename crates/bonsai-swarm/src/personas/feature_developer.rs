@@ -35,7 +35,7 @@ PROCESS:
 RULES:
 - Write COMPLETE files. Never leave placeholders or TODOs.
 - Follow existing code style: Rust clippy-clean, Svelte svelte-check-clean.
-- Use bonsai_error::BonsaiError for all error handling.
+- Use error_types::BonsaiError for all error handling.
 - Register all new Tauri commands in lib.rs.
 - Add unit tests for all new public APIs.
 - If changes span multiple crates, implement in dependency order.

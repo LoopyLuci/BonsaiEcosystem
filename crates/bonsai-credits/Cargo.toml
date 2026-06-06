@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bonsai-error = { path = "../bonsai-error" }
+error-types = { path = "../error-types" }
 tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

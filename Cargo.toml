@@ -9,10 +9,9 @@ resolver = "2"
 
 members = [
     # ========== LAIR (Language-Agnostic IR) ==========
-    "crates/bonsai-lair",              # Language-Agnostic Intermediate Representation
+    "crates/core-ir",                  # Language-Agnostic Intermediate Representation
 
     # ========== BACE Foundation (Function-Level Compilation) ==========
-    "crates/bonsai-buir",              # Bonsai Unified Intermediate Representation
     "crates/bonsai-bco",               # Bonsai Compiled Objects (serialized functions)
     "crates/bonsai-compile-cache",     # Local compilation cache
     "crates/bonsai-cas-ext",           # CAS extensions for BACE
@@ -22,7 +21,7 @@ members = [
     "crates/cargo-bace",               # cargo-bace CLI subcommand
 
     # ========== Bonsai Polyglot Language System (BPLIS) ==========
-    "crates/bonsai-language-frontend", # Language frontend trait & registry
+    "crates/language-system",          # Language frontend trait & registry
     "crates/bonsai-regex-frontend",    # Regex fallback frontend for languages without LSP
     "bonsai-lang-gen",                 # Meta-generator tool for creating language crates
 

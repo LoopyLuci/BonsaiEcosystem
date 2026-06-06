@@ -3,7 +3,7 @@ pub mod optimizer;
 pub mod cache;
 pub mod inline;
 
-use bonsai_lair::LairFunction;
+use core_ir::LairFunction;
 
 pub struct JitOptimizer {
     profiler: profiler::HotspotProfiler,
