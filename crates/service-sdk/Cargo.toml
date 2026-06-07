@@ -1,0 +1,22 @@
+[package]
+name = "service-sdk"
+version = "1.0.0"
+edition = "2021"
+authors = ["Omnisystem Architecture Team"]
+license = "Apache-2.0"
+description = "Phase 4: Service SDK - Snapshotable trait and helpers for background services"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

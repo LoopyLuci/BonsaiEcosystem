@@ -29,6 +29,13 @@ members = [
 
     # ========== Service Management ==========
     "crates/service-manager",          # Service Lifecycle Manager (SLM) – Phase 2
+    "crates/kernel-snapshot",          # Phase 1: Kernel extensions (snapshot_vault/restore_vault)
+    "crates/ums-service",              # Phase 3: UMS service integration
+    "crates/service-sdk",              # Phase 4: Service SDK (Snapshotable trait)
+    "crates/buddy-agent",              # Phase 5: Bonsai Buddy integration
+    "crates/hde-orchestrator",         # Phase 6: HDE AI Advisor Orchestrator
+    "crates/model-builder",            # Phase 7: Model Building Framework
+    "crates/axiom-verify",             # Phase 8: Axiom formal verification
 
     # ========== Compiled Objects ==========
     "crates/co",                       # Compiled Objects (serialized functions)

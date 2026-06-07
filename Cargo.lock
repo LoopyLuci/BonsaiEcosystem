@@ -775,6 +775,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "axiom-verify"
+version = "1.0.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "axum"
 version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1099,6 +1108,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
 dependencies = [
  "tinyvec",
+]
+
+[[package]]
+name = "buddy-agent"
+version = "1.0.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -3603,6 +3622,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hde-orchestrator"
+version = "1.0.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "heck"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4587,6 +4616,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68421373957a1593a767013698dbf206e2b221eefe97a44d98d18672ff38423c"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "kernel-snapshot"
+version = "1.0.0"
+dependencies = [
+ "blake3",
+ "env_logger 0.11.10",
+ "libc",
+ "log",
+ "nix 0.27.1",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]
@@ -5688,6 +5734,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "model-builder"
+version = "1.0.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "model-workshop"
 version = "0.1.0"
 dependencies = [
@@ -5952,6 +6008,17 @@ dependencies = [
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
+]
+
+[[package]]
+name = "nix"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+dependencies = [
+ "bitflags 2.11.1",
+ "cfg-if",
+ "libc",
 ]
 
 [[package]]
@@ -8497,6 +8564,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "service-sdk"
+version = "1.0.0"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10133,6 +10212,23 @@ dependencies = [
  "crunchy",
  "hex",
  "static_assertions",
+]
+
+[[package]]
+name = "ums-service"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "dashmap 5.5.3",
+ "env_logger 0.11.10",
+ "log",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]
