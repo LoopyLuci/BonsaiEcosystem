@@ -199,7 +199,7 @@ impl PeakLoadTest {
         tokio::time::sleep(tokio::time::Duration::from_secs(self.config.phase_duration_secs))
             .await;
 
-        let operations = load.stop();
+        let _operations = load.stop();
 
         self.verify_kernel_stability().await?;
 
@@ -232,7 +232,7 @@ impl PeakLoadTest {
         tokio::time::sleep(tokio::time::Duration::from_secs(self.config.phase_duration_secs))
             .await;
 
-        let allocated = load.allocated_bytes();
+        let _allocated = load.allocated_bytes();
         load.stop();
 
         self.verify_kernel_stability().await?;
@@ -284,7 +284,7 @@ impl PeakLoadTest {
         tokio::time::sleep(tokio::time::Duration::from_secs(self.config.phase_duration_secs))
             .await;
 
-        let cpu_ops = cpu_load.stop();
+        let _cpu_ops = cpu_load.stop();
         let io_ops = io_load.stop();
         memory_load.stop();
 

@@ -6,9 +6,8 @@
 pub mod scenarios_impl;
 pub use scenarios_impl::*;
 
-use crate::deterministic_clock::DeterministicClock;
 use crate::error::Result;
-use crate::schedule_generator::{FaultSchedule, ScheduledFault};
+use crate::schedule_generator::FaultSchedule;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 

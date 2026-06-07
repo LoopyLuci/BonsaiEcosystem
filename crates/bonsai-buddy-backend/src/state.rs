@@ -5,7 +5,7 @@
 use crate::error::{Error, Result};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use omni_bot_core::{ServiceInfo, ServiceState, ServiceStatus};
+use omni_bot_core::{ServiceInfo, ServiceState};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;

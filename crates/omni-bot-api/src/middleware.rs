@@ -1,7 +1,6 @@
 //! Middleware for request/response processing, authentication, and logging
 
 use axum::{
-    body::Body,
     extract::Request,
     http::HeaderMap,
     middleware::Next,
@@ -10,7 +9,6 @@ use axum::{
 use log::{debug, info};
 use std::time::Instant;
 use uuid::Uuid;
-use omni_bot_core::CapabilityToken;
 
 /// Request ID middleware
 ///

@@ -3,7 +3,6 @@
 use super::{StressTest, TestContext, TestResult, TestStatus};
 use crate::errors::ApplicationStressResult;
 use async_trait::async_trait;
-use std::sync::Arc;
 use std::time::Instant;
 
 /// Workspace application stress tests

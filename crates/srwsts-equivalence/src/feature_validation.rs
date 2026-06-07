@@ -4,7 +4,6 @@
 
 use crate::{ArchitectureTarget, ArchitectureFeatures, EquivalenceResult, EquivalenceError};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// SIMD test result
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,9 +1,8 @@
 //! State consistency tests: audit log verification and deterministic replay
 
-use crate::errors::{FullStackTestError, FullStackTestResult};
-use crate::vault::{AuditEvent, Vault};
+use crate::errors::FullStackTestResult;
+use crate::vault::Vault;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// State consistency test configuration

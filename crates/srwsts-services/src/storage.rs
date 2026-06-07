@@ -11,7 +11,7 @@ use crate::{ServiceMetricsCollector, ServiceResult, TestReport};
 use sha2::{Sha256, Digest};
 use std::collections::HashMap;
 use std::time::Instant;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Content hash for CAS
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -287,7 +287,7 @@ impl StorageStressTests {
 
         info!("Testing erasure code reconstruction...");
 
-        let total_shards = 10;
+        let _total_shards = 10;
         let data_shards = 6;
         let parity_shards = 4;
 
@@ -361,7 +361,7 @@ impl StorageStressTests {
 
     /// Test concurrent write patterns
     pub async fn test_concurrent_writes(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "storage-concurrent-writes";
 
         info!("Testing concurrent write patterns...");
@@ -466,7 +466,7 @@ impl StorageStressTests {
     pub async fn run_all_tests(&self) -> ServiceResult<TestReport> {
         info!("Running all storage stress tests...");
 
-        let mut results = vec![
+        let results = vec![
             self.test_cas_throughput().await?,
             self.test_deduplication().await?,
             self.test_erasure_reconstruction().await?,

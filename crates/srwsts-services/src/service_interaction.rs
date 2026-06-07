@@ -91,7 +91,7 @@ impl ServiceInteractionTests {
 
     /// Test cross-service communication patterns
     pub async fn test_cross_service_communication(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "service-interaction-cross-service-communication";
 
         info!("Testing cross-service communication patterns...");
@@ -121,7 +121,7 @@ impl ServiceInteractionTests {
         }
 
         // Simulate delivery
-        for msg in &mut message_queue {
+        for _msg in &mut message_queue {
             let delivery_start = Instant::now();
             // Simulate delivery with variable latency
             let latency =
@@ -194,7 +194,7 @@ impl ServiceInteractionTests {
 
     /// Test timeout behavior
     pub async fn test_timeout_behavior(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "service-interaction-timeout-behavior";
 
         info!("Testing timeout behavior...");
@@ -293,7 +293,7 @@ impl ServiceInteractionTests {
 
     /// Test service coordination
     pub async fn test_service_coordination(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "service-interaction-coordination";
 
         info!("Testing service coordination...");
@@ -314,8 +314,8 @@ impl ServiceInteractionTests {
 
         while Instant::now() < deadline {
             // Each service coordinates with others
-            for (name, idx) in &services {
-                for (other_name, other_idx) in &services {
+            for (_name, idx) in &services {
+                for (_other_name, other_idx) in &services {
                     if idx != other_idx {
                         let coord_start = Instant::now();
                         // Simulate coordination
@@ -346,7 +346,7 @@ impl ServiceInteractionTests {
 
     /// Test request/response patterns
     pub async fn test_request_response_patterns(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "service-interaction-request-response";
 
         info!("Testing request/response patterns...");
@@ -397,7 +397,7 @@ impl ServiceInteractionTests {
     pub async fn run_all_tests(&self) -> ServiceResult<TestReport> {
         info!("Running all service interaction tests...");
 
-        let mut results = vec![
+        let results = vec![
             self.test_cross_service_communication().await?,
             self.test_cascading_failures().await?,
             self.test_timeout_behavior().await?,

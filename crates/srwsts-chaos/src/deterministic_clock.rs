@@ -6,7 +6,7 @@
 use crate::error::{ChaosError, Result};
 use parking_lot::RwLock;
 use std::sync::Arc;
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace};
 
 /// Deterministic virtual clock for chaos testing.
 ///

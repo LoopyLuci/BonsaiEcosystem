@@ -1,6 +1,6 @@
 //! Network partition tests: P2P mesh splitting, CRDT drift, eventual consistency
 
-use crate::errors::{FullStackTestError, FullStackTestResult};
+use crate::errors::FullStackTestResult;
 use crate::vault::{ComponentHealth, Vault};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -190,7 +190,7 @@ impl NetworkPartitionTest {
         })
         .await;
 
-        let request_time = request_start.elapsed().as_secs_f64();
+        let _request_time = request_start.elapsed().as_secs_f64();
 
         // Restore services
         for service in &services {

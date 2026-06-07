@@ -3,7 +3,7 @@
 //! Vector clock-based state merging with conflict-free guarantees.
 //! Implements Last-Write-Wins (LWW) semantics with causality tracking.
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};

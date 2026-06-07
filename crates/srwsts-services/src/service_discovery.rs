@@ -5,7 +5,7 @@
 //! - DNS resolution under load
 //! - Health check frequency
 
-use crate::types::{TestConfig, TestResult, TestResultStatus, ServiceId};
+use crate::types::{TestConfig, TestResult, TestResultStatus};
 use crate::{ServiceMetricsCollector, ServiceResult, TestReport};
 use std::collections::HashMap;
 use std::time::Instant;
@@ -170,7 +170,7 @@ impl ServiceDiscoveryTests {
 
     /// Test DNS resolution under load
     pub async fn test_dns_resolution_under_load(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "service-discovery-dns-resolution";
 
         info!("Testing DNS resolution under load...");
@@ -396,7 +396,7 @@ impl ServiceDiscoveryTests {
     pub async fn run_all_tests(&self) -> ServiceResult<TestReport> {
         info!("Running all service discovery tests...");
 
-        let mut results = vec![
+        let results = vec![
             self.test_dynamic_registration().await?,
             self.test_dns_resolution_under_load().await?,
             self.test_health_check_frequency().await?,

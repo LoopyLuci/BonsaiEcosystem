@@ -1,6 +1,5 @@
 //! Service-level fixtures and test helpers
 
-use serde_json::json;
 use std::collections::HashMap;
 
 /// Service fixture for setting up test environments
@@ -152,7 +151,7 @@ impl ServiceFixture {
 
     /// Verify service dependencies are met
     pub fn verify_dependencies(&self) -> bool {
-        for (service_name, service) in &self.services {
+        for (_service_name, service) in &self.services {
             for dep in &service.dependencies {
                 if !self.services.contains_key(dep) {
                     return false;

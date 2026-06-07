@@ -55,7 +55,7 @@ impl FaultScenarioTests {
 
     /// Test killing a service
     pub async fn test_service_kill(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "fault-scenario-service-kill";
 
         info!("Testing service kill scenario...");
@@ -153,7 +153,7 @@ impl FaultScenarioTests {
 
     /// Test storage backend failure
     pub async fn test_storage_failure(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "fault-scenario-storage-failure";
 
         info!("Testing storage backend failure scenario...");
@@ -209,7 +209,7 @@ impl FaultScenarioTests {
 
     /// Test CPU overload
     pub async fn test_cpu_overload(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "fault-scenario-cpu-overload";
 
         info!("Testing CPU overload scenario...");
@@ -261,7 +261,7 @@ impl FaultScenarioTests {
 
     /// Test service timeout
     pub async fn test_service_timeout(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "fault-scenario-service-timeout";
 
         info!("Testing service timeout scenario...");
@@ -315,7 +315,7 @@ impl FaultScenarioTests {
         info!("Testing cascading fault propagation...");
 
         // Service chain: web -> api -> database
-        let services = vec!["web", "api", "database"];
+        let _services = vec!["web", "api", "database"];
         let mut failed_services = Vec::new();
 
         // Fail database first
@@ -355,7 +355,7 @@ impl FaultScenarioTests {
 
     /// Test fault recovery and restart
     pub async fn test_fault_recovery(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "fault-scenario-fault-recovery";
 
         info!("Testing fault recovery and restart...");
@@ -364,7 +364,7 @@ impl FaultScenarioTests {
         let mut recovery_times = Vec::new();
 
         // Simulate multiple fault/recovery cycles
-        for cycle in 0..5 {
+        for _cycle in 0..5 {
             // Inject fault
             let fault_start = Instant::now();
             service_state = "failed";
@@ -411,7 +411,7 @@ impl FaultScenarioTests {
     pub async fn run_all_tests(&self) -> ServiceResult<TestReport> {
         info!("Running all fault scenario tests...");
 
-        let mut results = vec![
+        let results = vec![
             self.test_service_kill().await?,
             self.test_network_partition().await?,
             self.test_storage_failure().await?,

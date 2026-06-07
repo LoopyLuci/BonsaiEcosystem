@@ -5,9 +5,7 @@ use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use async_trait::async_trait;
-use crate::ServiceResult;
+use std::time::Instant;
 
 /// Per-operation metric
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 use std::collections::HashMap;
-use async_trait::async_trait;
 use parking_lot::RwLock;
 
 use crate::helpers::{MockServer, TestClient};

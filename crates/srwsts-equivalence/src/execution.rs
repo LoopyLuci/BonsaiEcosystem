@@ -4,7 +4,6 @@
 //! with detailed trace collection and comparison.
 
 use crate::{ArchitectureTarget, EquivalenceError, EquivalenceResult};
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -425,7 +424,7 @@ impl DeterministicTestHarness {
 
     /// Execute a deterministic test
     async fn execute_deterministic_test(
-        test_name: &str,
+        _test_name: &str,
         seed: u64,
         arch: &ArchitectureTarget,
     ) -> EquivalenceResult<Vec<u8>> {

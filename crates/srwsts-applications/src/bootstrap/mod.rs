@@ -8,10 +8,8 @@ pub use config::BootstrapConfig;
 pub use loader::ApplicationBootstrap;
 pub use state::{EcosystemState, ComponentState, ComponentInfo};
 
-use crate::errors::{ApplicationStressError, ApplicationStressResult};
+use crate::errors::ApplicationStressError;
 use async_trait::async_trait;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Result type for bootstrap operations
 pub type BootstrapResult<T> = Result<T, BootstrapError>;

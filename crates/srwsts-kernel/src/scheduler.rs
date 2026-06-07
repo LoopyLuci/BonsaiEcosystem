@@ -4,14 +4,13 @@
 //! switching under stress with up to 10,000 concurrent tasks. Measures scheduling
 //! latency, context switch overhead, and fairness metrics.
 
-use crate::metrics::{LatencyHistogram, MetricsCollector};
+use crate::metrics::MetricsCollector;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Scheduler test configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -320,7 +319,7 @@ impl EDFScheduler {
 
     async fn calculate_stats(&self) -> Result<SchedulerStats> {
         let tasks = self.tasks.read().await;
-        let metrics = self.metrics.read().await;
+        let _metrics = self.metrics.read().await;
 
         let completed = tasks.iter().filter(|t| t.state == TaskState::Completed).count();
         let failed = tasks.len() - completed;

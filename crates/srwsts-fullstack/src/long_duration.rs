@@ -1,9 +1,9 @@
 //! Long-duration stress tests: 72-hour endurance runs with fault injection
 
-use crate::errors::{FullStackTestError, FullStackTestResult};
+use crate::errors::FullStackTestResult;
 use crate::vault::{ComponentHealth, Vault};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -86,9 +86,9 @@ impl LongDurationTest {
     /// Run continuous load test
     pub async fn test_continuous_load(&self) -> FullStackTestResult<LongDurationMetrics> {
         let start = Instant::now();
-        let mut faults_injected = 0u32;
-        let mut recovery_count = 0u32;
-        let mut service_crashes = 0u32;
+        let faults_injected = 0u32;
+        let recovery_count = 0u32;
+        let service_crashes = 0u32;
 
         let test_duration = std::time::Duration::from_secs(self.config.total_duration_secs);
 
@@ -96,7 +96,7 @@ impl LongDurationTest {
         let vault = self.vault.clone();
         let fault_interval = self.config.fault_injection_interval_secs;
         let measure_perf = self.config.measure_performance;
-        let detect_leaks = self.config.detect_leaks;
+        let _detect_leaks = self.config.detect_leaks;
 
         let monitor_task = tokio::spawn(async move {
             let mut next_fault = std::time::Instant::now() + std::time::Duration::from_secs(fault_interval);
@@ -157,7 +157,7 @@ impl LongDurationTest {
         let start = Instant::now();
         let mut faults_injected = 0u32;
         let mut recovery_count = 0u32;
-        let mut service_crashes = 0u32;
+        let service_crashes = 0u32;
 
         let test_duration = std::time::Duration::from_secs(self.config.total_duration_secs);
         let fault_interval = std::time::Duration::from_secs(self.config.fault_injection_interval_secs);

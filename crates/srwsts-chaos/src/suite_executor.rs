@@ -6,11 +6,10 @@
 //! - Aggregate analysis and reporting
 
 use crate::deterministic_clock::DeterministicClock;
-use crate::error::{ChaosError, Result};
+use crate::error::Result;
 use crate::recovery_validation::{RecoveryMetrics, RecoveryValidator};
 use crate::scenarios::ChaosScenario;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{info, debug};
 use uuid::Uuid;

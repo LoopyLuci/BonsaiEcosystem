@@ -5,7 +5,7 @@
 
 use crate::{
     ArchitectureTarget, ArchitectureTestResults, EquivalenceConfig, EquivalenceResult,
-    EquivalenceValidator, EquivalenceStatus, ValidationResult,
+    EquivalenceValidator, ValidationResult,
 };
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

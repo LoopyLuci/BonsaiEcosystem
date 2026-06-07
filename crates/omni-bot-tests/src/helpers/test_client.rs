@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use serde_json::json;
 
-use omni_bot_core::{ServiceState, ServiceStatus, ServiceInfo};
+use omni_bot_core::{ServiceState, ServiceStatus};
 
 use crate::helpers::MockServer;
 
@@ -178,7 +178,7 @@ impl TestClient {
     pub async fn start_service(
         &self,
         name: &str,
-        config: Option<serde_json::Value>,
+        _config: Option<serde_json::Value>,
     ) -> Result<StartServiceResponse, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -200,8 +200,8 @@ impl TestClient {
     pub async fn stop_service(
         &self,
         name: &str,
-        graceful: Option<bool>,
-        timeout: Option<u64>,
+        _graceful: Option<bool>,
+        _timeout: Option<u64>,
     ) -> Result<StopServiceResponse, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -220,7 +220,7 @@ impl TestClient {
     pub async fn restart_service(
         &self,
         name: &str,
-        graceful: Option<bool>,
+        _graceful: Option<bool>,
     ) -> Result<RestartServiceResponse, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -303,7 +303,7 @@ impl TestClient {
         &self,
         name: &str,
         config: serde_json::Value,
-        merge: Option<bool>,
+        _merge: Option<bool>,
     ) -> Result<ConfigureServiceResponse, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -343,8 +343,8 @@ impl TestClient {
     pub async fn get_service_logs(
         &self,
         name: &str,
-        lines: Option<u32>,
-        filter: Option<String>,
+        _lines: Option<u32>,
+        _filter: Option<String>,
     ) -> Result<LogsResponse, Box<dyn std::error::Error>> {
         let response = LogsResponse {
             name: name.to_string(),
@@ -370,8 +370,8 @@ impl TestClient {
     // Environment APIs
     pub async fn create_environment(
         &self,
-        name: &str,
-        config: serde_json::Value,
+        _name: &str,
+        _config: serde_json::Value,
     ) -> Result<String, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -381,7 +381,7 @@ impl TestClient {
         Ok(env_id)
     }
 
-    pub async fn delete_environment(&self, env_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn delete_environment(&self, _env_id: &str) -> Result<(), Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
         }
@@ -405,8 +405,8 @@ impl TestClient {
 
     pub async fn migrate_environment(
         &self,
-        from_env: &str,
-        to_env: &str,
+        _from_env: &str,
+        _to_env: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -418,8 +418,8 @@ impl TestClient {
     // Module APIs
     pub async fn install_module(
         &self,
-        name: &str,
-        version: &str,
+        _name: &str,
+        _version: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -428,7 +428,7 @@ impl TestClient {
         Ok(uuid::Uuid::new_v4().to_string())
     }
 
-    pub async fn remove_module(&self, module_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn remove_module(&self, _module_id: &str) -> Result<(), Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
         }
@@ -438,8 +438,8 @@ impl TestClient {
 
     pub async fn update_module(
         &self,
-        module_id: &str,
-        version: &str,
+        _module_id: &str,
+        _version: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -451,8 +451,8 @@ impl TestClient {
     // Asset APIs
     pub async fn generate_asset(
         &self,
-        name: &str,
-        config: serde_json::Value,
+        _name: &str,
+        _config: serde_json::Value,
     ) -> Result<String, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -461,11 +461,11 @@ impl TestClient {
         Ok(uuid::Uuid::new_v4().to_string())
     }
 
-    pub async fn get_asset_progress(&self, job_id: &str) -> Result<u32, Box<dyn std::error::Error>> {
+    pub async fn get_asset_progress(&self, _job_id: &str) -> Result<u32, Box<dyn std::error::Error>> {
         Ok(100)
     }
 
-    pub async fn publish_asset(&self, job_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn publish_asset(&self, _job_id: &str) -> Result<(), Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
         }
@@ -476,7 +476,7 @@ impl TestClient {
     // Validation APIs
     pub async fn run_validation_test(
         &self,
-        test_name: &str,
+        _test_name: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -500,7 +500,7 @@ impl TestClient {
     // Workflow APIs
     pub async fn execute_workflow(
         &self,
-        workflow: serde_json::Value,
+        _workflow: serde_json::Value,
     ) -> Result<String, Box<dyn std::error::Error>> {
         if self.server.is_error_mode() {
             return Err(self.server.get_error_message().unwrap_or_default().into());
@@ -511,7 +511,7 @@ impl TestClient {
 
     pub async fn get_workflow_status(
         &self,
-        workflow_id: &str,
+        _workflow_id: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         Ok("completed".to_string())
     }

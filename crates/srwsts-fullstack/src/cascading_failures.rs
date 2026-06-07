@@ -1,6 +1,6 @@
 //! Cascading failure tests: component isolation under failures
 
-use crate::errors::{FullStackTestError, FullStackTestResult};
+use crate::errors::FullStackTestResult;
 use crate::vault::{ComponentHealth, Vault};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -53,7 +53,7 @@ impl CascadingFailureTest {
     /// Test kernel thread failure handling
     pub async fn test_kernel_thread_failure(&self) -> FullStackTestResult<CascadingFailureMetrics> {
         let mut kernel = self.vault.kernel_state().await?;
-        let original_threads = kernel.thread_count;
+        let _original_threads = kernel.thread_count;
 
         // Simulate kernel thread failure
         kernel.thread_count = kernel.thread_count.saturating_sub(1);

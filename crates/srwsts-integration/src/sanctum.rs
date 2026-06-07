@@ -3,7 +3,6 @@
 //! Interface to Sanctum for hardware-based vault isolation and sandboxing.
 
 use crate::SrwstsResult;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;

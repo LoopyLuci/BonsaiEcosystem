@@ -129,7 +129,7 @@ pub async fn install_module(
         ));
     }
 
-    let mut registry_lock = registry.write().await;
+    let registry_lock = registry.write().await;
 
     let version = req.version.unwrap_or_else(|| "1.0.0".to_string());
 

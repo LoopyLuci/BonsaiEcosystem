@@ -104,7 +104,7 @@ impl CompositorStressTests {
 
     /// Test 60FPS rendering with 100 concurrent windows
     pub async fn test_60fps_rendering(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "compositor-60fps-rendering";
 
         info!("Testing 60FPS rendering with 100 concurrent windows...");
@@ -192,7 +192,7 @@ impl CompositorStressTests {
         let mut exhaustion_occurred = false;
 
         // Allocate until exhaustion
-        for i in 0..1000 {
+        for _i in 0..1000 {
             let size = 100; // 100 MB per allocation
             if !gpu.allocate_texture(size) {
                 exhaustion_occurred = true;
@@ -278,7 +278,7 @@ impl CompositorStressTests {
 
     /// Test concurrent window composition
     pub async fn test_concurrent_composition(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "compositor-concurrent-composition";
 
         info!("Testing concurrent window composition...");
@@ -420,7 +420,7 @@ impl CompositorStressTests {
     pub async fn run_all_tests(&self) -> ServiceResult<TestReport> {
         info!("Running all compositor stress tests...");
 
-        let mut results = vec![
+        let results = vec![
             self.test_60fps_rendering().await?,
             self.test_gpu_memory_exhaustion().await?,
             self.test_gpu_reset_recovery().await?,

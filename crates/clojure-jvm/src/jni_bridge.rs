@@ -115,7 +115,7 @@ impl UABIBridge {
     }
 
     /// Call a Sylva function from Clojure
-    pub fn call_sylva(&self, function_name: &str, args: Vec<Term>) -> Result<Term> {
+    pub fn call_sylva(&self, function_name: &str, _args: Vec<Term>) -> Result<Term> {
         log::debug!("Calling Sylva function: {}", function_name);
 
         // Similar to Titan but routes to Sylva
@@ -134,7 +134,7 @@ impl UABIBridge {
     }
 
     /// Handle a callback from Titan
-    pub fn handle_callback(&self, name: &str, args: Vec<Term>) -> Result<Term> {
+    pub fn handle_callback(&self, name: &str, _args: Vec<Term>) -> Result<Term> {
         log::debug!("Handling callback from Titan: {}", name);
 
         let cache = self.function_cache.read()
@@ -163,7 +163,7 @@ impl UABIBridge {
     }
 
     /// Zero-copy data passing via shared heap
-    pub fn share_memory(&self, data: &[u8]) -> Result<u64> {
+    pub fn share_memory(&self, _data: &[u8]) -> Result<u64> {
         // In real implementation:
         // 1. Allocate memory in shared heap
         // 2. Copy data
@@ -174,7 +174,7 @@ impl UABIBridge {
     }
 
     /// Get data from shared memory
-    pub fn get_shared_memory(&self, ptr: u64) -> Result<Vec<u8>> {
+    pub fn get_shared_memory(&self, _ptr: u64) -> Result<Vec<u8>> {
         // In real implementation:
         // 1. Retrieve data from shared memory at pointer
         // 2. Return as Vec<u8>

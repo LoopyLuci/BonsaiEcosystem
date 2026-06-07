@@ -3,7 +3,6 @@
 //! Supports deterministic, random, and AI-guided schedule generation for
 //! reproducible and targeted chaos engineering.
 
-use crate::advanced_faults::*;
 use crate::error::{ChaosError, Result};
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;

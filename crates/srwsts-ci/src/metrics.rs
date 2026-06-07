@@ -4,7 +4,7 @@ use crate::errors::{CIError, CIResult};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Single performance metrics snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]

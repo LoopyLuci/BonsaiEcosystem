@@ -3,7 +3,6 @@
 use crate::errors::{FullStackTestError, FullStackTestResult};
 use crate::vault::{BonsaiApplication, OmnisystemService, Vault, VaultConfig};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Configuration for bootstrap process
 #[derive(Debug, Clone, Serialize, Deserialize)]

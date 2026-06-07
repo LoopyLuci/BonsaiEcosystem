@@ -8,7 +8,6 @@
 
 use crate::types::{TestConfig, TestResult, TestResultStatus};
 use crate::{ServiceMetricsCollector, ServiceResult, TestReport};
-use std::collections::HashMap;
 use std::time::Instant;
 use tracing::info;
 
@@ -421,7 +420,7 @@ impl NetworkStressTests {
 
     /// Test connection establishment under load
     pub async fn test_connection_establishment(&self) -> ServiceResult<TestResult> {
-        let start = Instant::now();
+        let _start = Instant::now();
         let test_id = "network-connection-establishment";
 
         info!("Testing connection establishment under load...");
@@ -465,7 +464,7 @@ impl NetworkStressTests {
     pub async fn run_all_tests(&self) -> ServiceResult<TestReport> {
         info!("Running all network stress tests...");
 
-        let mut results = vec![
+        let results = vec![
             self.test_tcp_high_throughput().await?,
             self.test_firewall_matching().await?,
             self.test_packet_reordering().await?,

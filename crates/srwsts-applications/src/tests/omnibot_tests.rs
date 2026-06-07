@@ -18,14 +18,14 @@ impl OmniBotStressTest {
         let mut handles = Vec::new();
 
         // Create 1,000 concurrent chat sessions
-        for session_id in 0..1000 {
+        for _session_id in 0..1000 {
             let metrics = metrics.clone();
 
             let handle = tokio::spawn(async move {
                 let mut message_count = 0;
 
                 // Each session exchanges 10 messages
-                for msg in 0..10 {
+                for _msg in 0..10 {
                     let msg_start = Instant::now();
 
                     // Simulate message send
@@ -94,7 +94,7 @@ impl OmniBotStressTest {
         let mut correct_parses = 0;
 
         for _ in 0..100 {
-            for input in &test_inputs {
+            for _input in &test_inputs {
                 // Simulate NLP parsing
                 let parse_start = Instant::now();
 
@@ -140,7 +140,7 @@ impl OmniBotStressTest {
         let mut handles = Vec::new();
 
         // Create 10,000 concurrent tasks
-        for task_id in 0..10000 {
+        for _task_id in 0..10000 {
             let metrics = metrics.clone();
 
             let handle = tokio::spawn(async move {
@@ -196,7 +196,7 @@ impl OmniBotStressTest {
         let mut inference_count = 0;
 
         // Run inference batches until approaching limit
-        for batch in 0..20 {
+        for _batch in 0..20 {
             let batch_start = Instant::now();
 
             // Simulate model loading and inference

@@ -15,7 +15,6 @@ pub use runner::ApplicationTestRunner;
 use crate::errors::ApplicationStressResult;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Test result
 #[derive(Debug, Clone, Serialize, Deserialize)]

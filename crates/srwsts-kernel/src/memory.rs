@@ -4,12 +4,12 @@
 //! huge pages, and swap pressure. Validates memory management subsystem under stress.
 
 use crate::metrics::MetricsCollector;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Memory test configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -245,9 +245,9 @@ impl MemoryTest {
         let mut handles = vec![];
         let migration_count = Arc::new(AtomicU64::new(0));
 
-        for i in 0..100 {
+        for _i in 0..100 {
             let count = Arc::clone(&migration_count);
-            let num_nodes = self.config.numa_nodes;
+            let _num_nodes = self.config.numa_nodes;
 
             let handle = tokio::spawn(async move {
                 // Simulate NUMA migration
@@ -370,7 +370,7 @@ impl MemoryTest {
 
     async fn calculate_memory_stats(&self) -> Result<MemoryStats> {
         let allocations = self.allocations.read().await;
-        let metrics = self.metrics.read().await;
+        let _metrics = self.metrics.read().await;
 
         let total_alloc = allocations.iter().map(|a| a.size_bytes).sum::<u64>();
 

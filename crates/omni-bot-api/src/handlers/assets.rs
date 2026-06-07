@@ -9,7 +9,7 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

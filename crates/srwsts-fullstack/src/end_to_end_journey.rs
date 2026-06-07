@@ -1,7 +1,7 @@
 //! End-to-end user journey tests: real-world workflows
 
 use crate::errors::{FullStackTestError, FullStackTestResult};
-use crate::vault::{BonsaiApplication, ComponentHealth, OmnisystemService, Vault};
+use crate::vault::{ComponentHealth, Vault};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

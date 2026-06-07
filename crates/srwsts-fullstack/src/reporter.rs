@@ -3,7 +3,6 @@
 use crate::runner::FullStackTestResults;
 use crate::vault::Vault;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Comprehensive test report
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,7 +141,7 @@ impl TestReporter {
     }
 
     fn generate_system_health(vault: &Vault) -> SystemHealthReport {
-        let services = std::sync::Arc::new(tokio::runtime::Handle::current());
+        let _services = std::sync::Arc::new(tokio::runtime::Handle::current());
         SystemHealthReport {
             overall_health: "unknown".to_string(),
             kernel_health: "operational".to_string(),

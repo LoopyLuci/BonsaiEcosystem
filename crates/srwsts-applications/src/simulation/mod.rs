@@ -88,7 +88,7 @@ impl InputSimulator {
         let mut index = self.replay_index.write().await;
 
         let mut count = 0;
-        for event in events {
+        for _event in events {
             // Simulate event processing
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 

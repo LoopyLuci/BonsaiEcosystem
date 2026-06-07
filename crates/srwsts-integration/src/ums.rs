@@ -48,7 +48,7 @@ impl UMSBridge {
         &self,
         module_name: &str,
         module_type: ModuleType,
-        data: Vec<u8>,
+        _data: Vec<u8>,
     ) -> SrwstsResult<ModuleHandle> {
         info!("Publishing {:?} module: {}", module_type, module_name);
 

@@ -3,7 +3,6 @@
 //! Memory-safe matrix implementation with capability-based access control
 
 use std::fmt;
-use crate::capabilities::Capability;
 
 /// A Titan-native Mat (matrix) for image data
 /// Guarantees memory safety through Rust's ownership model

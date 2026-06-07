@@ -1,7 +1,7 @@
 //! Nominal load tests: baseline throughput under normal workload
 
 use crate::errors::{FullStackTestError, FullStackTestResult};
-use crate::vault::{BonsaiApplication, ComponentHealth, OmnisystemService, Vault};
+use crate::vault::{ComponentHealth, Vault};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

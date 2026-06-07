@@ -6,11 +6,10 @@
 //! - Bandwidth scaling from 1MB/s to 10GB/s
 
 use crate::types::{TestConfig, TestResult, TestResultStatus};
-use crate::{ServiceMetricsCollector, ServiceResult, ServiceError, TestReport};
+use crate::{ServiceMetricsCollector, ServiceResult, TestReport};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// P2P mesh node
 #[derive(Debug, Clone)]
@@ -433,7 +432,7 @@ impl P2PStressTests {
     pub async fn run_all_tests(&self) -> ServiceResult<TestReport> {
         info!("Running all P2P stress tests...");
 
-        let mut results = vec![
+        let results = vec![
             self.test_mesh_convergence().await?,
             self.test_multipath_bonding().await?,
             self.test_bandwidth_scaling().await?,

@@ -1,10 +1,9 @@
 //! Ecosystem loader and initialization
 
-use super::{BootstrapConfig, BootstrapError, BootstrapResult, ComponentInfo, EcosystemState};
-use async_trait::async_trait;
+use super::{BootstrapConfig, BootstrapError, BootstrapResult, EcosystemState};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Application bootstrap orchestrator
 pub struct ApplicationBootstrap {

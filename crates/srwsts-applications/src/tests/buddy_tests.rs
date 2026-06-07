@@ -65,15 +65,15 @@ impl BuddyStressTest {
         let metrics = ctx.metrics.clone();
 
         // Simulate 10 concurrent writers
-        for writer_id in 0..10 {
-            let ctx = ctx.clone();
+        for _writer_id in 0..10 {
+            let _ctx = ctx.clone();
             let metrics = metrics.clone();
 
             let handle = tokio::spawn(async move {
                 let mut merge_count = 0;
 
                 // Each writer makes 100 updates
-                for update_id in 0..100 {
+                for _update_id in 0..100 {
                     let merge_start = Instant::now();
 
                     // Simulate CRDT merge operation
@@ -141,14 +141,14 @@ impl BuddyStressTest {
 
             let handle = tokio::spawn(async move {
                 // Simulate 1GB file in chunks
-                let chunk_size = 1024 * 1024; // 1MB chunks
+                let _chunk_size = 1024 * 1024; // 1MB chunks
                 let total_chunks = 1024; // 1GB total
 
                 let mut synced_chunks = 0;
 
                 for chunk in 0..total_chunks {
                     // Simulate chunk compression
-                    let compressed_ratio = 0.7; // 30% compression
+                    let _compressed_ratio = 0.7; // 30% compression
 
                     // Simulate network transfer
                     tokio::time::sleep(tokio::time::Duration::from_micros(100)).await;
@@ -206,7 +206,7 @@ impl BuddyStressTest {
         // Simulate 1,000 concurrent queries
         let mut handles = Vec::new();
 
-        for query_id in 0..1000 {
+        for _query_id in 0..1000 {
             let metrics = metrics.clone();
 
             let handle = tokio::spawn(async move {

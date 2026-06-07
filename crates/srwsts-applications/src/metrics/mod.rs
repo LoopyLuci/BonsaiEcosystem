@@ -11,7 +11,6 @@ pub use performance::PerformanceMetrics;
 pub use ui::UIMetrics;
 
 use dashmap::DashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 

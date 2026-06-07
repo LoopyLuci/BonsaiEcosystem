@@ -1,7 +1,7 @@
 //! Regression detection with configurable thresholds and statistical analysis
 
 use crate::baseline::Baseline;
-use crate::errors::{CIError, CIResult};
+use crate::errors::CIResult;
 use crate::metrics::PerformanceMetrics;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

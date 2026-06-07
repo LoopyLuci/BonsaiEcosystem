@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use log::{info, warn, error};
+use log::{info, warn};
 
 use crate::models::*;
 use crate::error::ApiResult;
@@ -67,7 +67,7 @@ pub async fn run_validation(
             .into_response());
     }
 
-    let mut results = ValidationResults {
+    let results = ValidationResults {
         run_id,
         name: req.name.clone(),
         status: ValidationStatus::Running,
@@ -95,7 +95,7 @@ pub async fn run_validation(
 
     let mut details = HashMap::new();
     details.insert("name".to_string(), json!(&req.name));
-    let mut trace = ExecutionTrace {
+    let trace = ExecutionTrace {
         run_id,
         events: vec![TraceEvent {
             timestamp: Utc::now(),
@@ -401,7 +401,7 @@ async fn spawn_validation_task(
     state: Arc<ValidationState>,
     run_id: ValidationRunId,
     req: ValidationRunRequest,
-    parallelism: ParallelismSettings,
+    _parallelism: ParallelismSettings,
     mut results: ValidationResults,
     mut trace: ExecutionTrace,
 ) {

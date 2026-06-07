@@ -251,7 +251,7 @@ impl MessagePassingTest {
         };
 
         let p50 = if !lats.is_empty() {
-            lats[(lats.len() / 2)]
+            lats[lats.len() / 2]
         } else {
             0.0
         };

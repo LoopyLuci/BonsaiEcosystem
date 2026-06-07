@@ -2,7 +2,6 @@
 
 use crate::error::{KernelError, Result};
 use crate::snapshot::Snapshot;
-use crate::restore::RestoreContext;
 use crate::capability_table::CapabilityTable;
 use blake3::Hash;
 use log::{debug, info};

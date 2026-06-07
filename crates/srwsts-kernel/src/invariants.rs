@@ -3,12 +3,12 @@
 //! Verifies Axiom-proven invariants hold under stress. Tests for corruption,
 //! deadlocks, memory safety violations, and logical consistency violations.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Invariant test configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -246,7 +246,7 @@ impl InvariantTest {
         // Create a set of locks in circular order (potential for deadlock)
         let locks: Arc<Vec<Mutex<u64>>> = Arc::new((0..4).map(|_| Mutex::new(0)).collect());
 
-        for task_id in 0..self.config.num_tasks {
+        for _task_id in 0..self.config.num_tasks {
             let lck = Arc::clone(&locks);
             let tot = Arc::clone(&total);
             let pass = Arc::clone(&passed);
@@ -339,7 +339,7 @@ impl InvariantTest {
             let recv_count = Arc::clone(&received_counter);
 
             let handle = tokio::spawn(async move {
-                for i in 0..1000 {
+                for _i in 0..1000 {
                     tot.fetch_add(1, Ordering::Relaxed);
 
                     // Send message
@@ -382,7 +382,7 @@ impl InvariantTest {
 
         let mut handles = vec![];
 
-        for task_id in 0..self.config.num_tasks {
+        for _task_id in 0..self.config.num_tasks {
             let tot = Arc::clone(&total);
             let pass = Arc::clone(&passed);
             let val = Arc::clone(&shared_value);
@@ -421,7 +421,7 @@ impl InvariantTest {
         for task_id in 0..self.config.num_tasks {
             let tot = Arc::clone(&total);
             let pass = Arc::clone(&passed);
-            let numa_node = task_id % 4;
+            let _numa_node = task_id % 4;
 
             let handle = tokio::spawn(async move {
                 // Allocate memory

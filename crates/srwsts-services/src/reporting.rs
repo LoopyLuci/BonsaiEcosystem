@@ -6,7 +6,7 @@
 //! - Failure recovery times
 //! - Dependency impact analysis
 
-use crate::types::{TestResult, TestResultStatus};
+use crate::types::TestResult;
 use crate::ServiceMetrics;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

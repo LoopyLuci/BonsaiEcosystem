@@ -46,7 +46,7 @@ impl HDEBridge {
     /// Detect anomalies in test results
     pub async fn detect_anomalies(
         &self,
-        suite_id: &str,
+        _suite_id: &str,
         results: Vec<serde_json::Value>,
     ) -> SrwstsResult<Vec<AnomalyReport>> {
         info!("Analyzing {} results for anomalies", results.len());
@@ -57,8 +57,8 @@ impl HDEBridge {
     /// Get recommendations for test optimization
     pub async fn get_optimization_recommendations(
         &self,
-        suite_id: &str,
-        performance_data: serde_json::Value,
+        _suite_id: &str,
+        _performance_data: serde_json::Value,
     ) -> SrwstsResult<Vec<Recommendation>> {
         info!("Computing test optimization recommendations");
 

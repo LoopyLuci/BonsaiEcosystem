@@ -35,7 +35,6 @@ pub use hde::HDEBridge;
 pub use srwsts_core::{SrwstsError, SrwstsResult};
 
 use std::sync::Arc;
-use async_trait::async_trait;
 
 /// Central integration orchestrator
 pub struct IntegrationOrchestrator {

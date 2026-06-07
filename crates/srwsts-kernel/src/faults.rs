@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Fault scenario configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,7 +197,7 @@ impl FaultScenario {
 
         for i in 0..100 {
             let f = Arc::clone(&faults);
-            let skew = self.config.clock_skew_us;
+            let _skew = self.config.clock_skew_us;
 
             let handle = tokio::spawn(async move {
                 let start = std::time::Instant::now();

@@ -10,7 +10,7 @@ use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use log::{info, warn};
+use log::info;
 
 use crate::models::*;
 use crate::error::ApiResult;
@@ -146,7 +146,7 @@ pub async fn promote_model(
     let shadow_reports = state.shadow_reports.read().await;
 
     let shadow_key = format!("{}-shadow", model_name);
-    let model = models
+    let _model = models
         .get_mut(&shadow_key)
         .ok_or(crate::error::ApiError::InvalidRequest(
             format!("Shadow model not found: {}", shadow_key),

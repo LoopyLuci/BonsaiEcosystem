@@ -1,9 +1,8 @@
 //! Full-stack test runner: orchestrates all test categories
 
-use crate::bootstrap::{BootstrapBuilder, FullStackBootstrap};
 use crate::cascading_failures::{CascadingFailureConfig, CascadingFailureTest};
 use crate::end_to_end_journey::{EndToEndConfig, DeveloperJourneyTest};
-use crate::errors::{FullStackTestError, FullStackTestResult};
+use crate::errors::FullStackTestResult;
 use crate::long_duration::{LongDurationConfig, LongDurationTest};
 use crate::network_partitions::{NetworkPartitionConfig, NetworkPartitionTest};
 use crate::nominal_loads::{NominalLoadConfig, NominalLoadTest};
@@ -210,7 +209,7 @@ impl FullStackTestRunner {
         let elapsed = start.elapsed().as_secs_f64();
 
         // Verify final system health
-        let final_vault = self.vault.snapshot().await;
+        let _final_vault = self.vault.snapshot().await;
         let system_health = if failed == 0 {
             "healthy".to_string()
         } else if failed < 4 {

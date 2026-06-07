@@ -50,7 +50,7 @@ impl AuditLogBridge {
     pub async fn log_event(
         &self,
         event_type: EventType,
-        details: serde_json::Value,
+        _details: serde_json::Value,
     ) -> SrwstsResult<String> {
         info!("Logging event: {:?}", event_type);
 

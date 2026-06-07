@@ -3,9 +3,7 @@
 //! 40+ pre-defined scenarios covering real-world failure modes.
 
 use crate::error::Result;
-use crate::schedule_generator::{FaultSchedule, ScheduledFault, ScheduleGenerator, ScheduleStrategy};
-use serde_json::json;
-use tracing::info;
+use crate::schedule_generator::{ScheduleGenerator, ScheduleStrategy};
 
 use super::{ChaosScenario, ImpactLevel, ScenarioCategory};
 

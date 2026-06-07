@@ -1,12 +1,11 @@
 //! Equivalence reporting and root cause analysis
 
 use crate::{
-    ArchitectureTestResults, EquivalenceReport, ExecutionTrace, RootCauseAnalysis, ValidationResult,
+    ArchitectureTestResults, EquivalenceReport,
     TraceComparator,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt;
 
 /// Detailed equivalence report with root cause analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,7 +1,6 @@
 //! Error types for service stress testing
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use thiserror::Error;
 
 /// Result type for service operations

@@ -41,7 +41,7 @@ macro_rules! assert_eq_with_msg {
 /// Assert response structure
 pub fn assert_response_valid<T: fmt::Debug>(
     response: &T,
-    message: &str,
+    _message: &str,
 ) -> AssertionResult {
     eprintln!("Response: {:?}", response);
     Ok(())

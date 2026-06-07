@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
@@ -308,7 +307,7 @@ impl SnapshotTest {
                         tokio::task::yield_now().await;
                     }
 
-                    let elapsed = start.elapsed().as_millis() as f64;
+                    let _elapsed = start.elapsed().as_millis() as f64;
 
                     let mut s = stats.write().await;
                     s.total_restores += 1;

@@ -1,6 +1,6 @@
 //! Core equivalence validation and reporting
 
-use crate::{ArchitectureTestResults, EquivalenceConfig, EquivalenceError, EquivalenceResult};
+use crate::{ArchitectureTestResults, EquivalenceConfig, EquivalenceResult};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::fmt;

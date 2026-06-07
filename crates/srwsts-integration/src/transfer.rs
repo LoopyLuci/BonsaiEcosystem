@@ -47,7 +47,7 @@ impl TransferDaemonBridge {
     pub async fn send_results(
         &self,
         destination: &str,
-        data: Vec<u8>,
+        _data: Vec<u8>,
         protocol: TransferProtocol,
     ) -> SrwstsResult<TransferHandle> {
         info!("Sending results to {} via {:?}", destination, protocol);

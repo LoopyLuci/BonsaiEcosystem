@@ -1,16 +1,14 @@
 //! Multi-tier CI pipeline: smoke tests, full suite, nightly validation
 
 use crate::artifacts::ArtifactCollector;
-use crate::baseline::BaselineManager;
 use crate::detection::RegressionDetector;
 use crate::errors::{CIError, CIResult};
 use crate::metrics::PerformanceMetrics;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::time::Duration;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 /// Pipeline stage type
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

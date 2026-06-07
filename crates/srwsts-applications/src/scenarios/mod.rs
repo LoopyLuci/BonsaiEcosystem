@@ -6,8 +6,6 @@ mod interaction;
 pub use fault::{FaultScenario, FaultScenarioExecutor};
 pub use interaction::{InteractionScenario, InteractionScenarioExecutor};
 
-use crate::errors::ApplicationStressResult;
-use std::sync::Arc;
 
 /// Scenario execution result
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
