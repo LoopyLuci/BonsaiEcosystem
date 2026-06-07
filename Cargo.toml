@@ -40,11 +40,15 @@ members = [
     "crates/hde-safety-envelope",      # Component 2: Safety Envelope
     "crates/hde-model-framework",      # Component 3: Model Framework
     "crates/hde-shadow-mode",          # Component 4: Shadow Mode Validation
+    "crates/hde-runtime",              # Integrated HDE runtime combining all components
 
     # ========== Wave 4: Bonsai Buddy ==========
     "crates/bonsai-buddy-agent",       # Component 1: Standalone Agent
     "crates/bonsai-buddy-offline-sync", # Component 2: Offline Sync
     "crates/bonsai-buddy-crdt",        # Component 3: CRDT Snapshot Merging
+
+    # ========== Integration & System Testing ==========
+    "crates/omnisystem-integration-tests", # Full system integration tests
 
     # ========== Service Management ==========
     "crates/service-manager",          # Service Lifecycle Manager (SLM) – Phase 2

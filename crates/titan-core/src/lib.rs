@@ -11,10 +11,12 @@ pub mod vector;
 pub mod hashmap;
 pub mod concurrency;
 pub mod proofs;
+pub mod var;
 
 pub use vector::PersistentVector;
 pub use hashmap::PersistentHashMap;
 pub use concurrency::{Atom, Ref, Agent};
+pub use var::Var;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

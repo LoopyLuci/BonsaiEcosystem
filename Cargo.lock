@@ -3913,6 +3913,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hde-runtime"
+version = "1.0.0"
+dependencies = [
+ "hde-ai-advisor",
+ "hde-model-framework",
+ "hde-safety-envelope",
+ "hde-shadow-mode",
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "hde-safety-envelope"
 version = "1.0.0"
 dependencies = [
@@ -6643,6 +6656,26 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "omnisystem-integration-tests"
+version = "1.0.0"
+dependencies = [
+ "axiom-verify",
+ "bonsai-buddy-agent",
+ "bonsai-buddy-crdt",
+ "bonsai-buddy-offline-sync",
+ "buddy-agent",
+ "clojure-ecosystem",
+ "hde-ai-advisor",
+ "hde-model-framework",
+ "hde-orchestrator",
+ "hde-safety-envelope",
+ "hde-shadow-mode",
+ "model-builder",
+ "titan-core",
+ "tokio",
 ]
 
 [[package]]
