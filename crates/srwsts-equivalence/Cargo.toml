@@ -1,0 +1,36 @@
+[package]
+name = "srwsts-equivalence"
+version = "0.1.0"
+edition = "2021"
+authors = ["Bonsai Team <team@bonsai.sh>"]
+license = "Apache-2.0"
+description = "SRWSTS Hardware Equivalence Validation - Multi-architecture behavior equivalence testing"
+repository = "https://github.com/bonsai/bonsai-bedf"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+anyhow = "1"
+futures = "0.3"
+async-trait = "0.1"
+dashmap = "5"
+parking_lot = "0.12"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+num-traits = "0.2"
+num-derive = "0.4"
+
+# SRWSTS integration
+srwsts-core = { path = "../srwsts-core" }
+srwsts-emulation = { path = "../srwsts-emulation" }
+srwsts-test-harness = { path = "../srwsts-test-harness" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+criterion = "0.5"

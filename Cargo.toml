@@ -146,6 +146,23 @@ members = [
     "crates/omni-bot-api",             # REST/WebSocket API layer
     "crates/omni-bot",                 # Main application
     "crates/omni-bot-tests",           # Comprehensive integration test suite
+
+    # ========== SRWSTS (Stress, Resilience, Workload System Test Suite) ==========
+    "crates/srwsts-core",              # Core types, traits, and error handling
+    "crates/srwsts-schemas",           # YAML schema and parsing
+    "crates/srwsts-orchestrator",      # Test execution and coordination
+    "crates/srwsts-fault-injection",   # System fault simulation and recovery
+    "crates/srwsts-chaos",             # Comprehensive chaos engineering framework
+    "crates/srwsts-test-suites",       # Comprehensive modular test suites
+    "crates/srwsts-integration",       # Integration with ecosystem components
+    "crates/srwsts-emulation",         # Hardware and peripheral emulation engine
+    "crates/srwsts-test-harness",      # Test execution harness with vault isolation
+    "crates/srwsts-applications",      # Bonsai Ecosystem application stress testing
+    "crates/srwsts-equivalence",       # Hardware equivalence validation system
+    "crates/srwsts-kernel",            # UOSC kernel independent stress testing system
+    "crates/srwsts-services",          # Omnisystem core services stress testing (P2P, Storage, Network, Compositor, etc.)
+    "crates/srwsts-fullstack",         # Full-stack integrated testing system for Omnisystem
+    "crates/srwsts-ci",                # CI/CD regression detection pipeline
 ]
 
 [workspace.lints.rust]
@@ -163,6 +180,7 @@ repository = "https://github.com/bonsai/bonsai-bedf"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_yaml = "0.9"
 blake3 = "1"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }

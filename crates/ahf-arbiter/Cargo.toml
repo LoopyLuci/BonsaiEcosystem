@@ -1,0 +1,29 @@
+[package]
+name = "ahf-arbiter"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Arbiter Phase 3: Decision engine and safety envelope application for Anti-Hallucination Framework"
+
+[dependencies]
+ahf-core = { path = "../ahf-core" }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"

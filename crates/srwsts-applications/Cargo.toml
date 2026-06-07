@@ -1,0 +1,59 @@
+[package]
+name = "srwsts-applications"
+version = "0.1.0"
+edition = "2021"
+authors = ["Bonsai Team <team@bonsai.sh>"]
+license = "Apache-2.0"
+description = "SRWSTS Applications - Comprehensive stress testing for Bonsai Workspace, Buddy, and Omni-Bot within Omnisystem"
+repository = "https://github.com/bonsai/bonsai-bedf"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+anyhow = "1"
+futures = "0.3"
+async-trait = "0.1"
+dashmap = "5"
+parking_lot = "0.12"
+rand = "0.8"
+metrics = "0.20"
+metrics-exporter-prometheus = "0.13"
+arc-swap = "1"
+bytes = "1"
+num_cpus = "1"
+sysinfo = "0.30"
+
+# SRWSTS core components
+srwsts-core = { path = "../srwsts-core" }
+srwsts-orchestrator = { path = "../srwsts-orchestrator" }
+srwsts-schemas = { path = "../srwsts-schemas" }
+srwsts-test-harness = { path = "../srwsts-test-harness" }
+srwsts-fault-injection = { path = "../srwsts-fault-injection" }
+srwsts-emulation = { path = "../srwsts-emulation" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+mockall = "0.11"
+criterion = "0.5"
+
+[features]
+default = ["full"]
+full = ["workspace-tests", "buddy-tests", "omnibot-tests", "interaction-tests", "fault-scenarios", "metrics"]
+workspace-tests = []
+buddy-tests = []
+omnibot-tests = []
+interaction-tests = []
+fault-scenarios = []
+metrics = []
+
+[[bench]]
+name = "application_benchmarks"
+harness = false
