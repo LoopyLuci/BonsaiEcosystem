@@ -23,7 +23,7 @@ dashmap.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 
-[[lib]]
+[lib]
 name = "bonsai_bedf"
 path = "src/lib.rs"
 

@@ -21,8 +21,8 @@ anyhow.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 
-[[lib]]
-name = "bonsai_bedf_concurrency"
+[lib]
+name = "bedf_concurrency"
 path = "src/lib.rs"
 
 [lints]

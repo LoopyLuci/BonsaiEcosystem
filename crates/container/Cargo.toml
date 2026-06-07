@@ -33,7 +33,6 @@ thiserror = "1.0"
 anyhow = "1.0"
 
 # Storage & data structures
-dashmap.workspace = true
 skiplist = "0.5"
 
 # Networking

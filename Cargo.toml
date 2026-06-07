@@ -163,6 +163,154 @@ members = [
     "crates/srwsts-services",          # Omnisystem core services stress testing (P2P, Storage, Network, Compositor, etc.)
     "crates/srwsts-fullstack",         # Full-stack integrated testing system for Omnisystem
     "crates/srwsts-ci",                # CI/CD regression detection pipeline
+
+    # ========== UNREGISTERED IMPLEMENTATIONS (Phase 1 Registration - 127 crates) ==========
+    "crates/actors",                   # Actor system primitives
+    "crates/adaptive-benchmarks",      # Adaptive performance benchmarking
+    "crates/ahf-arbiter",              # AHF arbitration framework
+    "crates/ahf-bias-detector",        # AHF bias detection and mitigation
+    "crates/ahf-core",                 # AHF core infrastructure
+    "crates/ahf-formal-verification",  # AHF formal verification engine
+    "crates/ahf-formal-verifier",      # AHF formal verification implementation
+    "crates/ahf-gateway",              # AHF gateway and routing
+    "crates/ahf-integration-tests",    # AHF integration tests
+    "crates/ahf-knowledge-grounding",  # AHF knowledge grounding
+    "crates/ai-advisor",               # AI advisor and recommendations
+    "crates/algorithm-optimization",   # Algorithm optimization framework
+    "crates/android-bridge",           # Android FFI bridge
+    "crates/api-bridge",               # API bridging and adapters
+    "crates/api-gateway",              # API gateway and routing
+    "crates/app-menu",                 # Application menu system
+    "crates/array",                    # Array utilities and extensions
+    "crates/audit-log",                # Audit logging framework
+    "crates/auth",                     # Authentication and authorization
+    "crates/bat",                      # Batch processing framework
+    "crates/bedf-concurrency",         # BEDF concurrency utilities
+    "crates/bedf-enhancements",        # BEDF enhancements
+    "crates/bedf-fuzzing",             # BEDF fuzzing framework
+    "crates/bedf-mcp",                 # BEDF MCP integration
+    "crates/bedf-pentest",             # BEDF penetration testing
+    "crates/bedf-property",            # BEDF property-based testing
+    "crates/bedf-sandbox",             # BEDF sandboxing
+    "crates/bedf-sanitizers",          # BEDF sanitizers
+    "crates/bedf-triage",              # BEDF triage and diagnostics
+    "crates/bedf.disabled",            # BEDF disabled/legacy code
+    "crates/bkp",                      # Backup and recovery
+    "crates/bmcs-empathy",             # BMCS empathy modeling
+    "crates/bmcs-gateway",             # BMCS gateway
+    "crates/bmcs-retriever",           # BMCS information retrieval
+    "crates/bmcs-server",              # BMCS server
+    "crates/bmn-ai-enhance",           # BMN AI enhancements
+    "crates/bmn-cli",                  # BMN CLI
+    "crates/bmn-common",               # BMN common utilities
+    "crates/bmn-compositor",           # BMN compositor
+    "crates/bmn-dashboard",            # BMN dashboard
+    "crates/bmn-encoder",              # BMN encoder
+    "crates/bmn-orchestrator",         # BMN orchestrator
+    "crates/bmn-sources",              # BMN data sources
+    "crates/bmn-transport",            # BMN transport layer
+    "crates/bug-hunt",                 # Bug hunting utilities
+    "crates/bug-hunter",               # Bug hunter framework
+    "crates/buir",                     # Bytecode UIR
+    "crates/buse-core",                # BUSE core
+    "crates/bwe-core",                 # BWE core
+    "crates/capability-registry",      # Capability registry
+    "crates/cas",                      # Content-addressable storage
+    "crates/chess",                    # Chess engine and utilities
+    "crates/ci",                       # CI/CD integration
+    "crates/cli",                      # Command-line interface
+    "crates/clojure-ecosystem",        # Clojure ecosystem integration
+    "crates/clojure-formal-verify",    # Clojure formal verification
+    "crates/clojure-wasm",             # Clojure WASM compilation
+    "crates/collaboration",            # Collaboration framework
+    "crates/container",                # Container runtime
+    "crates/coordinator",              # Coordination framework
+    "crates/coverage",                 # Code coverage tracking
+    "crates/crdt",                     # Conflict-free replicated data types
+    "crates/creator",                  # Creation framework
+    "crates/credits",                  # Credits and attribution
+    "crates/dataframe",                # DataFrame implementation
+    "crates/echo-ext",                 # Echo protocol extensions
+    "crates/emulator",                 # Emulation framework
+    "crates/error-types",              # Error type definitions
+    "crates/eternal-workshop",         # Eternal workshop framework
+    "crates/etl",                      # Extract-Transform-Load
+    "crates/extension-converter",      # Extension format converter
+    "crates/extensions",               # Extension framework
+    "crates/fabric",                   # Fabric protocol
+    "crates/failure-finder",           # Failure detection and analysis
+    "crates/go",                       # Go language integration
+    "crates/go-nn",                    # Go neural network bindings
+    "crates/hdl",                      # Hardware description language
+    "crates/hnsw",                     # Hierarchical navigable small world
+    "crates/inference",                # Inference engine
+    "crates/inference-telemetry",      # Inference telemetry
+    "crates/ir",                       # Intermediate representation
+    "crates/jit-optimizer",            # JIT optimization
+    "crates/kdb",                      # Knowledge database
+    "crates/kdb-ext",                  # KDB extensions
+    "crates/kdb-sync",                 # KDB synchronization
+    "crates/kef",                      # Knowledge exploration framework
+    "crates/kernel",                   # Kernel integration
+    "crates/knowledge",                # Knowledge framework
+    "crates/kv-cache",                 # Key-value caching
+    "crates/lint",                     # Linting framework
+    "crates/lint-treesitter-aether",   # Aether linting via tree-sitter
+    "crates/lint-treesitter-axiom",    # Axiom linting via tree-sitter
+    "crates/lint-treesitter-sylva",    # Sylva linting via tree-sitter
+    "crates/lint-treesitter-titan",    # Titan linting via tree-sitter
+    "crates/mailbox",                  # Message mailbox
+    "crates/marketplace",              # Marketplace framework
+    "crates/mcp-server",               # MCP server implementation
+    "crates/mobile-ffi",               # Mobile FFI bindings
+    "crates/model-converter",          # Model format converter
+    "crates/model-registry",           # Model registry
+    "crates/model-scanner",            # Model scanning and analysis
+    "crates/moe",                      # Mixture of Experts
+    "crates/observability",            # Observability framework (metrics, logging, tracing)
+    "crates/omnibot",                  # Omni-Bot main application
+    "crates/omnisystem-axiom",         # Axiom language for Omnisystem
+    "crates/p2p",                      # P2P protocol
+    "crates/package",                  # Package management
+    "crates/poe-bonsai-bridge",        # POE to Bonsai integration
+    "crates/poe-boot",                 # POE bootstrap
+    "crates/poe-bush-sim",             # POE simulation
+    "crates/poe-core",                 # POE core
+    "crates/poe-manifestation",        # POE manifestation
+    "crates/poe-mesh",                 # POE mesh networking
+    "crates/profiler",                 # Profiling framework
+    "crates/query",                    # Query engine
+    "crates/relay",                    # Relay framework
+    "crates/remote-desktop",           # Remote desktop protocol
+    "crates/resilience",               # Resilience and fault tolerance
+    "crates/ring",                     # Ring cryptography
+    "crates/root",                     # Root framework
+    "crates/safety",                   # Safety utilities
+    "crates/security-hardening",       # Security hardening
+    "crates/skill-compiler",           # Skill compiler
+    "crates/skills",                   # Skills framework
+    "crates/sns",                      # SNS integration
+    "crates/structured-output",        # Structured output formatting
+    "crates/survival-system-ext",      # Survival system extensions
+    "crates/swarm",                    # Swarm robotics/coordination
+    "crates/sylva",                    # Sylva language runtime
+    "crates/tdl",                      # Task description language
+    "crates/testing",                  # Testing framework
+    "crates/tool-registry",            # Tool registry
+    "crates/tool-registry-vault",      # Tool registry vault
+    "crates/trainer-orchestrator",     # Model trainer orchestration
+    "crates/transfer-client",          # Transfer client
+    "crates/transfer-store",           # Transfer storage
+    "crates/trmkd",                    # Trademark utilities
+    "crates/tui",                      # Terminal user interface
+    "crates/verify",                   # Verification framework
+    "crates/verify-agda",              # Agda verification
+    "crates/verify-coq",               # Coq verification
+    "crates/verify-fstar",             # F* verification
+    "crates/verify-isabelle",          # Isabelle verification
+    "crates/verify-lean",              # Lean verification
+    "crates/verify-tla",               # TLA+ verification
+    "crates/watchdog",                 # System watchdog and health monitoring
 ]
 
 [workspace.lints.rust]
@@ -195,6 +343,8 @@ clap = { version = "4", features = ["derive"] }
 async-trait = "0.1"
 handlebars = "4"
 zstd = "0.13"
+futures = "0.3"
+rand = "0.8"
 
 # ============================================================================
 # Release Profile — Optimized for deployment
