@@ -10,15 +10,15 @@ use crate::state::DaemonState;
 
 use array::AplEval;
 use capability_registry::{DeploymentGate, TrustScore};
-use ci::{OrchestratorActor, PipelineDef};
-use ui_orchestrator::{UIOrchestrator, ComponentManifest};
+use bonsai_ci::{OrchestratorActor, PipelineDef};
+use bonsai_ui_orchestrator::{UIOrchestrator, ComponentManifest};
 use sylva::SylvaVm;
-use transfer_core::{
+use p2p_core::{
     lane::{InProcessLane, TransportLane},
     scheduler::EcfRgScheduler,
     transfer::{Transfer, TransferStatus},
 };
-use transfer_crypto::{
+use p2p_crypto::{
     identity::BonsaiIdentity,
     kdf::{kdf_phrase_to_seed, ARGON2_PARAMS_TEST},
     session::SessionKey,
@@ -190,7 +190,7 @@ pub async fn dispatch(
             // Build in-process lanes + scheduler
             let (lane, _rx) = InProcessLane::new_pair("loopback");
             let mut lanes_map = std::collections::HashMap::new();
-            let lane_arc: Arc<dyn transfer_core::lane::TransportLane> = Arc::new(lane);
+            let lane_arc: Arc<dyn p2p_core::lane::TransportLane> = Arc::new(lane);
             lanes_map.insert("loopback".to_string(), lane_arc);
             let lanes = Arc::new(lanes_map);
 
@@ -202,8 +202,8 @@ pub async fn dispatch(
             let scheduler = Arc::new(tokio::sync::Mutex::new(sched));
 
             let cs = chunk_size
-                .unwrap_or(transfer_core::transfer::DEFAULT_CHUNK_SIZE)
-                .min(transfer_core::transfer::MAX_CHUNK_SIZE)
+                .unwrap_or(p2p_core::transfer::DEFAULT_CHUNK_SIZE)
+                .min(p2p_core::transfer::MAX_CHUNK_SIZE)
                 .max(1);
 
             let transfer = Transfer::new();
@@ -221,13 +221,13 @@ pub async fn dispatch(
             // Insert initial status and handle into state maps
             let initial_status = TransferStatus {
                 id: handle.id,
-                direction: transfer_core::transfer::TransferDirection::Send,
+                direction: p2p_core::transfer::TransferDirection::Send,
                 total_bytes: data.len() as u64,
                 transferred_bytes: handle.bytes_sent(),
                 chunk_count: (data.len().saturating_add(cs - 1) / cs) as u64,
                 chunks_done: (handle.bytes_sent().saturating_add(cs as u64 - 1) / cs as u64),
                 active_lanes: vec!["loopback".to_string()],
-                state: transfer_core::transfer::TransferState::Active,
+                state: p2p_core::transfer::TransferState::Active,
                 bytes_per_sec: 0.0,
             };
 
@@ -288,7 +288,7 @@ pub async fn dispatch(
                 handle.cancel();
                 // Update status map
                 if let Some(status) = state.transfers.lock().await.get_mut(id) {
-                    status.state = transfer_core::transfer::TransferState::Cancelled;
+                    status.state = p2p_core::transfer::TransferState::Cancelled;
                 }
                 Ok(serde_json::json!({"ok": true}))
             } else {

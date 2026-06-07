@@ -4,16 +4,16 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use ci::OrchestratorActor;
-use ui_orchestrator::UIOrchestrator;
+use bonsai_ci::OrchestratorActor;
+use bonsai_ui_orchestrator::UIOrchestrator;
 use creator::CreatorOrchestrator;
 use mailbox::AgentMailbox;
 use p2p::WebRtcLane;
 use query::sql::SqlEngine;
 use tool_registry::ToolRegistry;
-use transfer_core::lane::TransportLane;
-use transfer_core::transfer::{TransferHandle, TransferStatus};
-use transfer_crypto::identity::BonsaiIdentity;
+use p2p_core::lane::TransportLane;
+use p2p_core::transfer::{TransferHandle, TransferStatus};
+use p2p_crypto::identity::BonsaiIdentity;
 use transfer_store::EncryptedStore;
 
 pub struct DaemonState {

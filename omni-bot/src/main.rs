@@ -7,7 +7,7 @@
 )]
 
 // All modules are declared in lib.rs; import them here
-use bot::{
+use omni_bot::{
     admin_api, buddy_client, config, dedup, health, metrics, mgmt_client, platforms, router,
     scheduler, session, swarm_client,
 };

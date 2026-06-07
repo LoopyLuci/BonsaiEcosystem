@@ -1,5 +1,5 @@
 /// UBVM Test Suites – 10 comprehensive subsystem test suites
-use ubvm_core::{TestJob, TestResult};
+use ubvm_core::{TestJob, TestResult, TestId};
 
 /// Language Equivalence Suite – Polyglot Pong + extended algorithms
 pub async fn language_suite(job: &TestJob) -> TestResult {

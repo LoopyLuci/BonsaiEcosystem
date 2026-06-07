@@ -27,7 +27,7 @@ pub async fn restore(state: &Arc<DaemonState>, cas: &CasStore, key: &CasKey) -> 
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| format!("checkpoint key not found: {key}"))?;
-    let map: std::collections::HashMap<String, transfer_core::transfer::TransferStatus> =
+    let map: std::collections::HashMap<String, p2p_core::transfer::TransferStatus> =
         serde_json::from_slice(&data).map_err(|e| e.to_string())?;
     *state.transfers.lock().await = map;
     info!(cas_key = %key, "daemon state restored from checkpoint");

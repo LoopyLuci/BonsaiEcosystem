@@ -53,8 +53,8 @@ use tracing::{info, warn};
 
 use actors::supervisor::{ChildSpec, Supervisor};
 use cas::CasStore;
-use bonsai_skill_compiler;
-use bonsai_skills;
+use skill_compiler;
+use skills;
 use state::DaemonState;
 
 // ── Entry point ───────────────────────────────────────────────────────────────
