@@ -6659,6 +6659,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnisystem-examples"
+version = "1.0.0"
+dependencies = [
+ "axiom-verify",
+ "bonsai-buddy-crdt",
+ "buddy-agent",
+ "hde-ai-advisor",
+ "hde-runtime",
+ "model-builder",
+ "serde",
+ "serde_json",
+ "titan-core",
+ "tokio",
+]
+
+[[package]]
 name = "omnisystem-integration-tests"
 version = "1.0.0"
 dependencies = [
