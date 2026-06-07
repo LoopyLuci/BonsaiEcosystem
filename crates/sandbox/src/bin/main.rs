@@ -9,7 +9,7 @@
 //!   enclave run <command>
 
 use anyhow::Result;
-use enclave::{Enclave, EnclaveConfig};
+use bonsai_enclave::{Enclave, EnclaveConfig};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 

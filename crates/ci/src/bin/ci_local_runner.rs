@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ci::{BonsaiCi, CiConfig};
+use bonsai_ci::{BonsaiCi, CiConfig};
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -25,7 +25,10 @@ async fn main() -> Result<()> {
             let bytes = hex::decode(s).ok()?;
             if bytes.len() != 32 { return None; }
             let mut arr = [0u8;32]; arr.copy_from_slice(&bytes);
-            p2p_identity::BonsaiIdentity::from_seed(&arr).ok().map(Arc::new)
+            // TODO: wire up real identity from p2p_identity crate
+            // p2p_identity::NodeId::from_seed(&arr).ok().map(Arc::new)
+            let _ = arr;  // suppress unused warning
+            None
         });
 
         let ci = BonsaiCi::with_cas_and_identity(config, cas, identity);
