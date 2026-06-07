@@ -409,7 +409,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_snapshot_creation() {
+    async fn test_async_snapshot_creation() {
         let config = SnapshotConfig {
             num_snapshots: 5,
             snapshot_size_bytes: 10_000,
