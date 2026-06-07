@@ -8474,6 +8474,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "service-manager"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "blake3",
+ "chrono",
+ "dashmap 5.5.3",
+ "env_logger 0.11.10",
+ "futures",
+ "log",
+ "mockall",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

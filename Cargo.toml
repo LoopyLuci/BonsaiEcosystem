@@ -27,6 +27,9 @@ members = [
     # ========== Language Runtimes ==========
     "crates/clojure-jvm",              # Clojure JVM runtime with sandbox
 
+    # ========== Service Management ==========
+    "crates/service-manager",          # Service Lifecycle Manager (SLM) – Phase 2
+
     # ========== Compiled Objects ==========
     "crates/co",                       # Compiled Objects (serialized functions)
 

@@ -22,27 +22,48 @@ set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "Supported architectures
 # DriverKit Extension Target
 # ============================================================================
 
-add_library(BrotherFAXDriver MODULE
+add_library(BrotherFAXDriver BUNDLE
     BrotherFAXDriver.cpp
     BrotherFAXDriver.hpp
 )
 
-# DriverKit framework location (typically in Xcode)
-set(DRIVERKIT_FRAMEWORK_PATH
-    "/Applications/Xcode.app/Contents/Developer/Platforms/DriverKit.platform/Developer/SDKs/DriverKit.sdk"
-    CACHE PATH "Path to DriverKit SDK"
-)
+# DriverKit framework location (try Xcode, then fall back to Xcode Command Line Tools)
+if(NOT DEFINED DRIVERKIT_FRAMEWORK_PATH)
+    execute_process(
+        COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE DRIVERKIT_SDK_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(DRIVERKIT_FRAMEWORK_PATH
+        "${DRIVERKIT_SDK_PATH}/System/Library/Frameworks"
+        CACHE PATH "Path to DriverKit frameworks"
+    )
+endif()
+
+if(NOT DEFINED CMAKE_OSX_SYSROOT)
+    execute_process(
+        COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE CMAKE_OSX_SYSROOT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(CMAKE_OSX_SYSROOT "${CMAKE_OSX_SYSROOT}" CACHE PATH "OS X sysroot")
+endif()
 
 target_include_directories(BrotherFAXDriver PRIVATE
-    ${DRIVERKIT_FRAMEWORK_PATH}/usr/include
+    ${DRIVERKIT_FRAMEWORK_PATH}/DriverKit.framework/Headers
 )
 
 target_link_directories(BrotherFAXDriver PRIVATE
-    ${DRIVERKIT_FRAMEWORK_PATH}/usr/lib
+    ${DRIVERKIT_FRAMEWORK_PATH}
 )
 
 target_link_libraries(BrotherFAXDriver PRIVATE
     DriverKit
+)
+
+target_compile_options(BrotherFAXDriver PRIVATE
+    -isysroot
+    ${CMAKE_OSX_SYSROOT}
 )
 
 # Compiler flags for DriverKit
@@ -76,7 +97,8 @@ set_target_properties(BrotherFAXDriver PROPERTIES
 
 install(
     TARGETS BrotherFAXDriver
-    BUNDLE DESTINATION "Library/SystemExtensions"
+    LIBRARY DESTINATION "Library/SystemExtensions"
+    RUNTIME DESTINATION "Library/SystemExtensions"
 )
 
 # ============================================================================
