@@ -50,6 +50,7 @@ members = [
     # ========== Integration & System Testing ==========
     "crates/omnisystem-integration-tests", # Full system integration tests
     "crates/omnisystem-examples",         # Usage examples and patterns
+    "crates/omnisystem-config",           # Configuration and builder framework
 
     # ========== Service Management ==========
     "crates/service-manager",          # Service Lifecycle Manager (SLM) – Phase 2

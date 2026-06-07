@@ -6659,6 +6659,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnisystem-config"
+version = "1.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml 0.8.2",
+]
+
+[[package]]
 name = "omnisystem-examples"
 version = "1.0.0"
 dependencies = [
