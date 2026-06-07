@@ -1,0 +1,98 @@
+[package]
+name = "omni-bot-tests"
+version = "0.1.0"
+edition = "2021"
+authors = ["Omnisystem Team"]
+license = "Apache-2.0"
+description = "Comprehensive integration test suite for Omni-Bot APIs"
+publish = false
+
+[dependencies]
+omni-bot-core = { path = "../omni-bot-core" }
+
+tokio = { version = "1.0", features = ["full"] }
+tokio-test = "0.4"
+tokio-util = { version = "0.7", features = ["codec"] }
+
+# HTTP/REST testing
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# WebSocket testing
+tokio-tungstenite = "0.21"
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Testing utilities
+proptest = "1.4"
+quickcheck = "1.0"
+quickcheck_macros = "1.0"
+criterion = "0.5"
+tempfile = "3.8"
+
+# Logging & Tracing
+log = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+lazy_static = "1.4"
+parking_lot = "0.12"
+regex = "1.10"
+once_cell = "1.19"
+bytes = "1.5"
+
+# For chaos testing
+rand = "0.8"
+
+[[test]]
+name = "api_services_integration"
+path = "tests/api/services_test.rs"
+
+[[test]]
+name = "api_environments_integration"
+path = "tests/api/environments_test.rs"
+
+[[test]]
+name = "api_modules_integration"
+path = "tests/api/modules_test.rs"
+
+[[test]]
+name = "api_assets_integration"
+path = "tests/api/assets_test.rs"
+
+[[test]]
+name = "api_validation_integration"
+path = "tests/api/validation_test.rs"
+
+[[test]]
+name = "api_workflows_integration"
+path = "tests/api/workflows_test.rs"
+
+[[test]]
+name = "capability_security"
+path = "tests/capability_test.rs"
+
+[[test]]
+name = "offline_operations"
+path = "tests/offline_test.rs"
+
+[profile.test]
+opt-level = 1
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

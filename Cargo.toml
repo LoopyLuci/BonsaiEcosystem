@@ -43,6 +43,7 @@ members = [
     "crates/hde-runtime",              # Integrated HDE runtime combining all components
 
     # ========== Wave 4: Bonsai Buddy ==========
+    "crates/bonsai-buddy-backend",     # Tauri app backend foundation (IPC, API client, state, sync)
     "crates/bonsai-buddy-agent",       # Component 1: Standalone Agent
     "crates/bonsai-buddy-offline-sync", # Component 2: Offline Sync
     "crates/bonsai-buddy-crdt",        # Component 3: CRDT Snapshot Merging
@@ -144,6 +145,7 @@ members = [
     "crates/omni-bot-actors",          # Aether actor implementations
     "crates/omni-bot-api",             # REST/WebSocket API layer
     "crates/omni-bot",                 # Main application
+    "crates/omni-bot-tests",           # Comprehensive integration test suite
 ]
 
 [workspace.lints.rust]
