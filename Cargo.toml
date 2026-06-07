@@ -79,7 +79,6 @@ members = [
     # ========== Legacy Foundation (keep for compatibility) ==========
     "runtime",
     "src-daemon",
-    "omni-bot",
 
     # ========== Pre-Compilation Fabric ==========
     "crates/compiler-cache",           # Speculative pre-compilation with AI hints
@@ -139,6 +138,12 @@ members = [
 
     # Phase 7: Validation & Rollout
     "crates/cv-uvm",                   # Universal Validation Mesh
+
+    # ========== Omni-Bot (New Generation Control Agent) ==========
+    "crates/omni-bot-core",            # Core types and traits
+    "crates/omni-bot-actors",          # Aether actor implementations
+    "crates/omni-bot-api",             # REST/WebSocket API layer
+    "crates/omni-bot",                 # Main application
 ]
 
 [workspace.lints.rust]

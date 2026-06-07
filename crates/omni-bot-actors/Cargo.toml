@@ -1,0 +1,16 @@
+[package]
+name = "omni-bot-actors"
+version = "0.1.0"
+edition = "2021"
+authors = ["Omnisystem Team"]
+license = "Apache-2.0"
+description = "Omni-Bot Aether actor implementations"
+
+[dependencies]
+omni-bot-core = { path = "../omni-bot-core" }
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true

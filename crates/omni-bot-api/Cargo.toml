@@ -1,0 +1,20 @@
+[package]
+name = "omni-bot-api"
+version = "0.1.0"
+edition = "2021"
+authors = ["Omnisystem Team"]
+license = "Apache-2.0"
+description = "Omni-Bot REST/WebSocket API layer"
+
+[dependencies]
+omni-bot-core = { path = "../omni-bot-core" }
+tokio = { version = "1.0", features = ["full"] }
+axum = "0.7"
+tower = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
