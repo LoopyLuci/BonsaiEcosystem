@@ -281,6 +281,7 @@ impl MonitoringAgent {
         self.metrics.total_collections += 1;
     }
 
+    #[allow(dead_code)]
     fn get_health_status(&self) -> Option<HealthStatus> {
         self.latest_health.as_ref().map(|h| h.status)
     }

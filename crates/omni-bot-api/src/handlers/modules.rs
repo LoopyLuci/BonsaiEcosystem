@@ -73,8 +73,7 @@ pub async fn search_modules(
                 }
             }
             if let Some(ref tags) = params.tags {
-                let search_tags: Vec<&str> = tags.split(',').map(|s| s.trim()).collect();
-                if !search_tags.iter().any(|t| m.tags.contains(&t.to_string())) {
+                if !tags.iter().any(|t| m.tags.contains(t)) {
                     return false;
                 }
             }
@@ -149,7 +148,7 @@ pub async fn install_module(
     Ok((
         StatusCode::ACCEPTED,
         Json(AsyncOperationResponse {
-            task_id,
+            task_id: task_id.clone(),
             status: "queued".to_string(),
             created_at: Utc::now(),
             progress_url: Some(format!("/api/operations/{}/progress", task_id)),
@@ -174,7 +173,7 @@ pub async fn update_module(
     let task_id = format!("update-{}-{}", name, Uuid::new_v4().to_string()[..8].to_string());
 
     Ok(Json(AsyncOperationResponse {
-        task_id,
+        task_id: task_id.clone(),
         status: "queued".to_string(),
         created_at: Utc::now(),
         progress_url: Some(format!("/api/operations/{}/progress", task_id)),

@@ -2,15 +2,11 @@
 
 use std::sync::Arc;
 use std::collections::HashMap;
-use async_trait::async_trait;
 use serde_json::json;
 
-use omni_bot_core::*;
+use omni_bot_core::{ServiceState, ServiceStatus, ServiceInfo};
 
 use crate::helpers::MockServer;
-
-// Type aliases for API responses
-pub type ApiResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StartServiceRequest {
@@ -247,13 +243,29 @@ impl TestClient {
         }
 
         let services = self.server.list_services();
+        let service_count = services.len();
         let summaries = services
             .into_iter()
             .map(|s| ServiceSummary {
                 name: s.name,
                 version: s.version,
-                state: s.state.to_string(),
-                status: s.status.to_string(),
+                state: match s.state {
+                    ServiceState::Running => "running".to_string(),
+                    ServiceState::Stopped => "stopped".to_string(),
+                    ServiceState::Booting => "booting".to_string(),
+                    ServiceState::Stopping => "stopping".to_string(),
+                    ServiceState::Paused => "paused".to_string(),
+                    ServiceState::Pausing => "pausing".to_string(),
+                    ServiceState::Unstarted => "unstarted".to_string(),
+                    ServiceState::Failed => "failed".to_string(),
+                    ServiceState::Archived => "archived".to_string(),
+                },
+                status: match s.status {
+                    ServiceStatus::Healthy => "healthy".to_string(),
+                    ServiceStatus::Degraded => "degraded".to_string(),
+                    ServiceStatus::Unhealthy => "unhealthy".to_string(),
+                    ServiceStatus::Unknown => "unknown".to_string(),
+                },
                 uptime_seconds: s.uptime_seconds,
                 pid: s.pid,
             })
@@ -261,7 +273,7 @@ impl TestClient {
 
         Ok(ServiceListResponse {
             services: summaries,
-            total_count: services.len(),
+            total_count: service_count,
         })
     }
 

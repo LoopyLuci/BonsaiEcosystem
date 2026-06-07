@@ -13,6 +13,7 @@ use chrono::{DateTime, Duration, Utc};
 use dashmap::DashMap;
 use omni_bot_core::SessionId;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Session state container
 #[derive(Debug, Clone, Serialize, Deserialize)]

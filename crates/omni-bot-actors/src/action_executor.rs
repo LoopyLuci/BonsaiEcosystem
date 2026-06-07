@@ -454,7 +454,7 @@ mod tests {
             config: None,
         };
 
-        let req = ExecutionRequest::new("req-1".to_string(), action)
+        let req = ExecutionRequest::new(action, "req-1".to_string())
             .with_timeout(10000);
 
         assert_eq!(req.timeout_ms, 10000);

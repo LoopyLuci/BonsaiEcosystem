@@ -5820,8 +5820,6 @@ dependencies = [
  "futures",
  "lazy_static",
  "log",
- "omni-bot-actors",
- "omni-bot-api",
  "omni-bot-core",
  "once_cell",
  "parking_lot",

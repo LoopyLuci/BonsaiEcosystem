@@ -37,7 +37,7 @@
 //!     let ref_ = handle.actor_ref();
 //!     ref_.send(ChatGatewayMessage::IncomingMessage {
 //!         platform: Platform::Slack,
-//!         raw: serde_json::json!({ }),
+//!         raw: serde_json::json!({ /* ... */ }),
 //!     }).ok();
 //!
 //!     // Wait for actor to stop
@@ -52,6 +52,9 @@ pub mod action_executor;
 pub mod session_manager;
 pub mod policy_enforcer;
 pub mod monitoring;
+pub mod parse_error;
+pub mod nl;
+pub mod parser;
 
 pub use actor::{Actor, ActorId, ActorRef, ActorHandle, Snapshot, SupervisionEvent, spawn_actor};
 pub use chat_gateway::{ChatGateway, ChatGatewayMessage, NormalizedMessage, Platform, ChatMetrics};
@@ -60,6 +63,9 @@ pub use action_executor::{ActionExecutor, ActionExecutorMessage, ExecutionResult
 pub use session_manager::{SessionManager, SessionManagerMessage, SessionState, SessionMetrics};
 pub use policy_enforcer::{PolicyEnforcer, PolicyEnforcerMessage, PolicyViolation, ViolationType, ViolationSeverity, PolicyMetrics};
 pub use monitoring::{MonitoringAgent, MonitoringAgentMessage, SystemMetrics, HealthReport, HealthStatus, Alert, AlertSeverity, MonitoringMetrics};
+pub use parse_error::ParseError;
+pub use nl::{IntentClassifier, EntityExtractor, CommandTemplates};
+pub use parser::KeywordParser;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

@@ -11,6 +11,7 @@ use crate::actor::{Actor, ActorId, Snapshot};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// Platform where message originated

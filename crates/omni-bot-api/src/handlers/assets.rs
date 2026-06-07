@@ -383,7 +383,7 @@ fn infer_format(asset_type: &str) -> String {
 fn apply_batch_operation(
     asset: &mut AssetInfo,
     operation: &BatchOperation,
-    params: &HashMap<String, serde_json::Value>,
+    _params: &HashMap<String, serde_json::Value>,
 ) -> Result<(), String> {
     match operation {
         BatchOperation::Resize { width, height } => {
@@ -420,7 +420,7 @@ fn apply_batch_operation(
 }
 
 /// Generate preview thumbnail data
-fn generate_preview_data(asset: &AssetInfo) -> Vec<u8> {
+fn generate_preview_data(_asset: &AssetInfo) -> Vec<u8> {
     // Simulate preview generation - return minimal PNG header
     vec![
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature

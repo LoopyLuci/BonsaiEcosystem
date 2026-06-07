@@ -318,7 +318,7 @@ pub async fn migrate_environment(
     let task_id = format!("migrate-{}-{}", id, Uuid::new_v4().to_string()[..8].to_string());
 
     Ok(Json(AsyncOperationResponse {
-        task_id,
+        task_id: task_id.clone(),
         status: "started".to_string(),
         created_at: Utc::now(),
         progress_url: Some(format!("/api/operations/{}/progress", task_id)),

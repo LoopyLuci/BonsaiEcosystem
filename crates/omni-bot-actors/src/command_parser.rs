@@ -419,7 +419,7 @@ mod tests {
         let parser = CommandParser::new();
 
         let cmd = parser.parse_deterministic("install mymodule --version 2.0.1");
-        assert_eq!(cmd.intent, Intent::ServiceStart);
+        assert_eq!(cmd.intent, Intent::ModuleInstall);
         assert_eq!(
             cmd.parameters.get("version").map(|s| s.as_str()),
             Some("2.0.1")

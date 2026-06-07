@@ -9,6 +9,7 @@ use axum::{
 use chrono::Utc;
 use serde_json::json;
 use std::sync::Arc;
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 use log::{info, warn, error};
@@ -49,7 +50,7 @@ pub async fn run_validation(
     info!("Starting validation run: {}", req.name);
 
     let run_id = ValidationRunId::new();
-    let parallelism = req.parallelism.unwrap_or_default();
+    let parallelism = req.parallelism.clone().unwrap_or_default();
 
     let total_combinations = req
         .matrix
@@ -92,12 +93,14 @@ pub async fn run_validation(
         runs.insert(run_id, results.clone());
     }
 
+    let mut details = HashMap::new();
+    details.insert("name".to_string(), json!(&req.name));
     let mut trace = ExecutionTrace {
         run_id,
         events: vec![TraceEvent {
             timestamp: Utc::now(),
             event_type: "validation_started".to_string(),
-            details: serde_json::to_value(&req).unwrap_or(json!({})),
+            details,
         }],
         total_events: 1,
     };
@@ -455,14 +458,14 @@ async fn spawn_validation_task(
                 metrics,
             });
 
+            let mut details = HashMap::new();
+            details.insert("test_id".to_string(), json!(format!("test_{:04}", i)));
+            details.insert("status".to_string(), json!(format!("{:?}", status)));
+            details.insert("duration_ms".to_string(), json!(duration_ms));
             trace.events.push(TraceEvent {
                 timestamp: Utc::now(),
                 event_type: "test_completed".to_string(),
-                details: json!({
-                    "test_id": format!("test_{:04}", i),
-                    "status": format!("{:?}", status),
-                    "duration_ms": duration_ms,
-                }),
+                details,
             });
             trace.total_events += 1;
         }
@@ -485,14 +488,14 @@ async fn spawn_validation_task(
             success_rate_percent: (results.passed as f64 / results.total_tests as f64) * 100.0,
         };
 
+        let mut details = HashMap::new();
+        details.insert("passed".to_string(), json!(results.passed));
+        details.insert("failed".to_string(), json!(results.failed));
+        details.insert("total".to_string(), json!(results.total_tests));
         trace.events.push(TraceEvent {
             timestamp: Utc::now(),
             event_type: "validation_completed".to_string(),
-            details: json!({
-                "passed": results.passed,
-                "failed": results.failed,
-                "total": results.total_tests,
-            }),
+            details,
         });
 
         {

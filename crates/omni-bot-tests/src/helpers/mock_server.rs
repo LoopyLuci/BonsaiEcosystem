@@ -6,8 +6,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use omni_bot_core::{ServiceState, ServiceStatus, ServiceInfo, ResourceUsage};
-use omni_bot_api::ApiResponse;
+use omni_bot_core::{ServiceState, ServiceStatus};
 
 /// Mock service state in-memory storage
 #[derive(Debug, Clone)]

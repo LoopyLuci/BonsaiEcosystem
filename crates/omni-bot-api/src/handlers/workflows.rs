@@ -420,9 +420,7 @@ async fn execute_step_action(
     // Substitute parameters in config
     let mut config = step.config.clone();
     for (key, value) in parameters {
-        if let serde_json::Value::Object(ref mut obj) = config {
-            obj.insert(key.clone(), value.clone());
-        }
+        config.insert(key.clone(), value.clone());
     }
 
     // Simulate action execution (would be actual service calls)
