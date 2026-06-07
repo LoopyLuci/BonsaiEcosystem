@@ -1,0 +1,16 @@
+[package]
+name = "clojure-formal-verify"
+version = "1.0.0"
+edition = "2021"
+authors = ["Omnisystem Architecture Team"]
+license = "Apache-2.0"
+description = "Wave 2, Phase 6: Formal verification for Clojure with Axiom"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+thiserror = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = true

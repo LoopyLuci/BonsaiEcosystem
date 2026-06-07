@@ -27,6 +27,25 @@ members = [
     # ========== Language Runtimes ==========
     "crates/clojure-jvm",              # Clojure JVM runtime with sandbox
 
+    # ========== Wave 2: Clojure Integration ==========
+    "crates/titan-core",               # Phase 2: Verified Titan core (persistent data structures)
+    "crates/clojurescript-compiler",   # Phase 3: ClojureScript compiler
+    "crates/clojure-wasm",             # Phase 4: Clojure WASM
+    "crates/aether-clojure",           # Phase 5: Aether distributed agents
+    "crates/clojure-formal-verify",    # Phase 6: Clojure formal verification
+    "crates/clojure-ecosystem",        # Phase 7: Clojure ecosystem & documentation
+
+    # ========== Wave 3: HDE (Hybrid Determinism Engine) ==========
+    "crates/hde-ai-advisor",           # Component 1: AI Advisor Orchestrator
+    "crates/hde-safety-envelope",      # Component 2: Safety Envelope
+    "crates/hde-model-framework",      # Component 3: Model Framework
+    "crates/hde-shadow-mode",          # Component 4: Shadow Mode Validation
+
+    # ========== Wave 4: Bonsai Buddy ==========
+    "crates/bonsai-buddy-agent",       # Component 1: Standalone Agent
+    "crates/bonsai-buddy-offline-sync", # Component 2: Offline Sync
+    "crates/bonsai-buddy-crdt",        # Component 3: CRDT Snapshot Merging
+
     # ========== Service Management ==========
     "crates/service-manager",          # Service Lifecycle Manager (SLM) – Phase 2
     "crates/kernel-snapshot",          # Phase 1: Kernel extensions (snapshot_vault/restore_vault)
