@@ -29,21 +29,21 @@ unicode-segmentation = "1"  # for chunking
 
 # Compression
 zstd = "0.13"
-buce = { path = "../compression", optional = true }  # placeholder
+# buce = { path = "../compression", optional = true }  # NOT AVAILABLE
 
 # Content addressing & CAS
 blake3 = "1"
-cas = { path = "../cas", optional = true }  # placeholder
+# cas = { path = "../cas", optional = true }  # COMMENTED OUT - use workspace dep instead
 
 # Distributed coordination
-echo = { path = "../discovery", optional = true }  # P2P mesh
-transfer-daemon = { path = "../p2p-core", optional = true }
+# echo = { path = "../discovery", optional = true }  # NOT AVAILABLE
+# transfer-daemon = { path = "../p2p-core", optional = true }  # Use p2p-core directly
 
 # Database for metadata
-aridb = { path = "../aridb", optional = true }  # placeholder
+# aridb = { path = "../aridb", optional = true }  # NOT AVAILABLE
 
 # AI-optional fallback
-ai-advisor = { path = "../ai-advisor", optional = true }
+# ai-advisor = { path = "../ai-advisor", optional = true }  # Use workspace dep if needed
 
 # Logging & observability
 tracing = "0.1"
@@ -66,12 +66,12 @@ criterion = "0.5"
 [features]
 default = ["deterministic-core"]
 deterministic-core = []
-ai-enhancements = ["ai-advisor"]
-distributed = ["echo", "transfer-daemon"]
-cas-integration = ["cas"]
-compression-integration = ["buce"]
-metadata-db = ["aridb"]
-all-features = ["ai-enhancements", "distributed", "cas-integration", "compression-integration", "metadata-db"]
+# ai-enhancements = ["ai-advisor"]  # DISABLED - dependency not available
+# distributed = ["echo", "transfer-daemon"]  # DISABLED - dependencies not available
+# cas-integration = ["cas"]  # DISABLED - dependency not available
+# compression-integration = ["buce"]  # DISABLED - dependency not available
+# metadata-db = ["aridb"]  # DISABLED - dependency not available
+# all-features = ["ai-enhancements", "distributed", "cas-integration", "compression-integration", "metadata-db"]  # DISABLED
 
 [[bench]]
 name = "retrieval_benchmarks"
