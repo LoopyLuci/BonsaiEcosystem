@@ -36,13 +36,5 @@ anyhow = "1.0"
 tokio = { workspace = true, features = ["full"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 
-[[bench]]
-name = "lock_free_benchmarks"
-harness = false
-
-[[bench]]
-name = "simd_benchmarks"
-harness = false
-
 [lints]
 workspace = true

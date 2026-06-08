@@ -15,8 +15,8 @@ ndarray = "0.15"
 ndarray-stats = "0.5"
 rand = "0.8"
 # Benchmarking utilities
-flame = "0.2.5"
-pprof = { version = "0.13", features = ["flamegraph"], optional = true }
+# flame = "0.2.5"  # REMOVED - unavailable in registry
+# pprof = { version = "0.13", features = ["flamegraph"], optional = true }  # REMOVED - optional profiler
 # Testing utilities
 approx = "0.5"
 tempfile = "3.0"
