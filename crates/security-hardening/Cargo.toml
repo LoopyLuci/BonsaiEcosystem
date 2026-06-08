@@ -27,11 +27,10 @@ serde_json.workspace = true
 toml = "0.8"
 
 # CycloneDX SBOM support
-cyclonedx = "0.3"
-cargo-metadata = "0.18"
+# cyclonedx = "0.3"  # REMOVED
 
 # Vulnerability database
-rustsec = "0.18"
+# rustsec = "0.18"  # REMOVED
 
 # Secret detection
 regex = "1.10"

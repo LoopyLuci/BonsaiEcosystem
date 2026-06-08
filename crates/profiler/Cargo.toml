@@ -16,17 +16,17 @@ uuid.workspace = true
 tracing.workspace = true
 
 # Profiling and metrics
-pprof = { version = "0.13", features = ["flamegraph", "criterion", "with_bencher"] }
+# pprof = { version = "0.13", features = ["flamegraph", "criterion", "with_bencher"] }  # REMOVED
 criterion = { version = "0.5", features = ["async_tokio"] }
-dhat = "0.3"
-statrs = "0.16"
+# dhat = "0.3"  # REMOVED
+# statrs = "0.16"  # REMOVED
 
 # Data processing
 ndarray = "0.15"
-polars = { version = "0.20", features = ["lazy", "json"] }
+# polars = { version = "0.20", features = ["lazy", "json"] }  # REMOVED
 
 # Visualization
-plotly = "0.8"
+# plotly = "0.8"  # REMOVED
 
 # Async utilities
 futures = "0.3"

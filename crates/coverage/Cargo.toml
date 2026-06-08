@@ -15,8 +15,8 @@ tracing.workspace = true
 uuid.workspace = true
 
 # Coverage analysis
-tarpaulin-api = "0.1"
-coverage-parser = "0.1"
+# tarpaulin-api = "0.1"  # REMOVED
+# coverage-parser = "0.1"  # REMOVED
 
 # Data structures
 dashmap.workspace = true

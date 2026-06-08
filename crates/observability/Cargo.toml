@@ -15,14 +15,14 @@ tracing.workspace = true
 uuid.workspace = true
 
 # OpenTelemetry
-opentelemetry = { version = "0.21", features = ["rt-tokio"] }
-opentelemetry-jaeger = "0.21"
-opentelemetry-prometheus = "0.13"
-prometheus = "0.13"
-tracing-opentelemetry = "0.21"
+# opentelemetry = { version = "0.21", features = ["rt-tokio"] }  # REMOVED
+# opentelemetry-jaeger = "0.21"  # REMOVED
+# opentelemetry-prometheus = "0.13"  # REMOVED
+# prometheus = "0.13"  # REMOVED
+# tracing-opentelemetry = "0.21"  # REMOVED
 
 # Metrics
-statrs = "0.16"
+# statrs = "0.16"  # REMOVED
 ndarray = "0.15"
 
 # Utilities
