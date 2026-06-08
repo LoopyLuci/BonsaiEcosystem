@@ -272,7 +272,7 @@ members = [
     "crates/omnisystem-axiom",         # Axiom language for Omnisystem
     "crates/p2p",                      # P2P protocol
     "crates/package",                  # Package management
-    "crates/poe-bonsai-bridge",        # POE to Bonsai integration
+    "crates/poe-ecosystem-bridge",      # POE to ecosystem integration
     "crates/poe-boot",                 # POE bootstrap
     "crates/poe-bush-sim",             # POE simulation
     "crates/poe-core",                 # POE core
