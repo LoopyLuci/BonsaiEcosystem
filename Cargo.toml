@@ -314,7 +314,7 @@ members = [
 
     # ========== REMAINING UNREGISTERED STUBS (Phase 2 Registration - 59 crates) ==========
     "crates/buse-mcp",                 # BUSE MCP integration
-    "crates/icds",                     # Integrated Code Distribution System
+    # "crates/icds",                   # TEMPORARILY DISABLED - complex external dependencies (hnswlib, tantivy)
     "crates/clojure-aether",           # Clojure Aether - Distributed agents
     "crates/clojure-core-titan",       # Clojure Titan core - Persistent data structures
     "crates/multistream-moe",          # Multi-stream Mixture of Experts

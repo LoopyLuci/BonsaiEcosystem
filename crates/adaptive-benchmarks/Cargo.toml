@@ -52,6 +52,3 @@ harness = false
 [[bench]]
 name = "regression_bench"
 harness = false
-
-[[test]]
-name = "unit_tests"
