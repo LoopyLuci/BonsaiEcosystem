@@ -1,6 +1,7 @@
 .claude/
 memory/
 Omnisystem/docs/memory/
+Omnisystem/docs/archive_stale/
 
 # ============================================================================
 # BUILD ARTIFACTS (CRITICAL: never commit)
