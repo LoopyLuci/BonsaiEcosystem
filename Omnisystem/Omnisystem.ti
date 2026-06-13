@@ -1,58 +1,78 @@
-// Omnisystem.ti
-import "titan/ui/omni_ui_master.ti"
-import "titan/ui/ring_buffer.ti"
-import "titan/ui/error_boundary.ti"
-import "titan/ui/lenses/router_lens.ti"
-import "titan/ui/lenses/compiler_lens.ti"
-import "titan/ui/lenses/splat_lens.ti"
-import "titan/omnicore/events.ti"
-
+// Omnisystem.ti — GUI entry point with live dashboard
 extern "titan" {
     fn heap_alloc_term() -> i64;
     fn heap_set_body(a: i64, b: i64);
     fn window_create(w: i64, h: i64, x: i64, y: i64) -> i64;
     fn window_show(wid: i64);
-    fn window_poll_quit(wid: i64) -> i64;
+    fn window_set_title(wid: i64, title: i64);
+    fn window_poll_event(wid: i64) -> i64;
     fn window_destroy(wid: i64);
     fn surface_create(wid: i64, w: i64, h: i64) -> i64;
-    fn surface_begin_frame(sid: i64);
     fn surface_clear(sid: i64, color: i64);
-    fn surface_fill_rect(sid: i64, x: i64, y: i64, w: i64, h: i64, color: i64);
+    fn surface_draw_rect(sid: i64, x: i64, y: i64, w: i64, h: i64, color: i64);
+    fn surface_draw_str(sid: i64, x: i64, y: i64, text: String, color: i64);
     fn surface_present(sid: i64);
     fn window_sleep(ms: i64);
 }
 
+const COL_BG: i64 = 1052688;
+const COL_PANEL: i64 = 2105376;
+const COL_HEADER: i64 = 459008;
+const COL_ACCENT: i64 = 52224;
+const COL_WHITE: i64 = 16777215;
+const COL_DARK: i64 = 526344;
+const COL_RED: i64 = 12582912;
+
+pub fn os_render_frame(sid: i64, frame: i64) {
+    surface_clear(sid, COL_BG);
+
+    // Header panel
+    surface_draw_rect(sid, 0, 0, 1100, 38, COL_HEADER);
+    surface_draw_str(sid, 12, 11, "Omnisystem — Live Dashboard", COL_WHITE);
+
+    // Status panels
+    surface_draw_rect(sid, 8, 46, 260, 220, COL_PANEL);
+    surface_draw_str(sid, 18, 56, "Networking", COL_ACCENT);
+    surface_draw_rect(sid, 18, 92, 230, 12, COL_ACCENT);
+
+    surface_draw_rect(sid, 276, 46, 260, 220, COL_PANEL);
+    surface_draw_str(sid, 286, 56, "Threading", COL_ACCENT);
+    surface_draw_rect(sid, 286, 92, 230, 12, COL_ACCENT);
+
+    surface_draw_rect(sid, 544, 46, 260, 220, COL_PANEL);
+    surface_draw_str(sid, 554, 56, "Audio", COL_ACCENT);
+    surface_draw_rect(sid, 554, 92, 230, 12, COL_ACCENT);
+
+    surface_draw_rect(sid, 812, 46, 280, 220, COL_PANEL);
+    surface_draw_str(sid, 822, 56, "UI Stack", COL_ACCENT);
+    surface_draw_rect(sid, 822, 92, 230, 12, COL_ACCENT);
+
+    surface_present(sid);
+}
+
 pub fn main() -> i64 {
-    let rb = rb_create(32);
-    let eb = eb_create();
-    let m = heap_alloc_term();
-    heap_set_body(m, 0);
-    
-    rb_push(rb, evt_create(12, 0, 8, 100));
+    let w = window_create(1100, 660, 80, 60);
+    if w == 0 { return 1; }
 
-    let w = window_create(1620, 1080, 10, 10);
-    if w < 0 { return 1; }
-    let s = surface_create(w, 1620, 1080);
-    if s < 0 { return 2; }
     window_show(w);
+    window_set_title(w, 7);
 
-    let mut running: i64 = 1;
-    while running == 1 {
-        if window_poll_quit(w) == 1 { running = 0; }
-        
-        let ui_state: i64 = ui_master_tick_live(m, rb, eb);
-        rb_push(rb, 100);
-        
-        surface_begin_frame(s);
-        surface_clear(s, 1973780);
-        surface_fill_rect(s, 10, 10, 400, 200, 2960703);
-        surface_fill_rect(s, 420, 10, 400, 200, 2960703);
-        surface_fill_rect(s, 10, 220, 810, 200, 2960703);
-        surface_present(s);
-        
+    let s = surface_create(w, 1100, 660);
+    if s == 0 { window_destroy(w); return 2; }
+
+    let mut quit: i64 = 0;
+    let mut frame: i64 = 0;
+
+    while quit == 0 {
+        os_render_frame(s, frame);
+
+        let evt = window_poll_event(w);
+        if evt != 0 { quit = 1; }
+
         window_sleep(16);
+        frame = frame + 1;
     }
-    
+
     window_destroy(w);
     return 111;
 }
