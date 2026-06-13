@@ -1,0 +1,424 @@
+# PATHFINDER Learning Platform - Build & Deployment Makefile
+# Phase 0-1: Foundation + Core MVP
+
+.PHONY: help setup dev-up dev-down build test ci lint format clean docs k8s-deploy
+
+# Color output
+BLUE=\033[0;34m
+GREEN=\033[0;32m
+YELLOW=\033[0;33m
+RED=\033[0;31m
+NC=\033[0m # No Color
+
+SHELL := /bin/bash
+PROJECT_NAME := pathfinder
+ENV := development
+VERSION := 0.1.0
+DOCKER_REGISTRY := ghcr.io/pathfinder-learning
+
+# ============================================================================
+# HELP
+# ============================================================================
+
+help:
+	@echo "$(BLUE)═══════════════════════════════════════════════════════════════════$(NC)"
+	@echo "$(BLUE)  PATHFINDER Learning Platform - Build & Deployment$(NC)"
+	@echo "$(BLUE)═══════════════════════════════════════════════════════════════════$(NC)"
+	@echo ""
+	@echo "$(GREEN)Development$(NC)"
+	@echo "  make setup              Install dependencies and configure environment"
+	@echo "  make dev-up             Start local development environment (docker-compose)"
+	@echo "  make dev-down           Stop development environment"
+	@echo "  make dev-logs           View logs from all services"
+	@echo "  make dev-shell-postgres Connect to PostgreSQL shell"
+	@echo ""
+	@echo "$(GREEN)Building$(NC)"
+	@echo "  make build              Build all backend services"
+	@echo "  make build-backend      Build backend Go services only"
+	@echo "  make build-frontend     Build React web frontend"
+	@echo "  make build-mobile       Build Flutter mobile app"
+	@echo "  make docker-build       Build all Docker images"
+	@echo ""
+	@echo "$(GREEN)Testing$(NC)"
+	@echo "  make test               Run all tests"
+	@echo "  make test-backend       Run backend unit tests"
+	@echo "  make test-integration   Run integration tests"
+	@echo "  make test-e2e           Run end-to-end tests"
+	@echo "  make test-coverage      Run tests with coverage report"
+	@echo "  make load-test          Run load testing (100K concurrent users)"
+	@echo ""
+	@echo "$(GREEN)Quality$(NC)"
+	@echo "  make lint               Run linters (Go, JS/TS)"
+	@echo "  make lint-go            Run Go linter (golangci-lint)"
+	@echo "  make lint-js            Run JS/TS linter (ESLint)"
+	@echo "  make format             Format code (Go, JS/TS)"
+	@echo "  make format-go          Format Go code (gofmt)"
+	@echo "  make format-js          Format JS/TS code (prettier)"
+	@echo ""
+	@echo "$(GREEN)Infrastructure$(NC)"
+	@echo "  make k8s-deploy-local   Deploy to local Kubernetes (minikube)"
+	@echo "  make k8s-deploy-staging Deploy to staging Kubernetes cluster"
+	@echo "  make k8s-deploy-prod    Deploy to production Kubernetes cluster"
+	@echo "  make k8s-rollback       Rollback to previous deployment"
+	@echo "  make k8s-logs           View logs from Kubernetes services"
+	@echo ""
+	@echo "$(GREEN)Documentation$(NC)"
+	@echo "  make docs-serve         Start documentation server (port 3001)"
+	@echo "  make docs-build         Build documentation"
+	@echo "  make api-docs           Generate OpenAPI documentation"
+	@echo ""
+	@echo "$(GREEN)Maintenance$(NC)"
+	@echo "  make clean              Remove all build artifacts"
+	@echo "  make db-reset           Reset database (CAUTION: deletes all data)"
+	@echo "  make db-migrate         Run database migrations"
+	@echo "  make db-seed            Seed database with initial data"
+	@echo ""
+
+# ============================================================================
+# SETUP & ENVIRONMENT
+# ============================================================================
+
+setup:
+	@echo "$(BLUE)Setting up PATHFINDER development environment...$(NC)"
+	@echo ""
+	@echo "Checking dependencies..."
+	@command -v docker >/dev/null 2>&1 || { echo "$(RED)Docker not found. Please install Docker.$(NC)"; exit 1; }
+	@command -v docker-compose >/dev/null 2>&1 || { echo "$(RED)Docker Compose not found. Please install Docker Compose.$(NC)"; exit 1; }
+	@command -v go >/dev/null 2>&1 || { echo "$(RED)Go not found. Please install Go 1.21+.$(NC)"; exit 1; }
+	@command -v node >/dev/null 2>&1 || { echo "$(RED)Node.js not found. Please install Node.js 18+.$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ All dependencies found$(NC)"
+	@echo ""
+
+	@echo "Creating .env file..."
+	@if [ ! -f .env ]; then cp .env.example .env; echo "$(GREEN)✓ .env created$(NC)"; else echo "$(YELLOW)⊘ .env already exists$(NC)"; fi
+	@echo ""
+
+	@echo "Installing Go dependencies..."
+	@cd backend && go mod download && go mod verify
+	@echo "$(GREEN)✓ Go dependencies installed$(NC)"
+	@echo ""
+
+	@echo "Installing Node dependencies..."
+	@cd frontend/web && npm install
+	@echo "$(GREEN)✓ Node dependencies installed$(NC)"
+	@echo ""
+
+	@echo "$(GREEN)═══════════════════════════════════════════════════════════════════$(NC)"
+	@echo "$(GREEN)✓ Setup complete! Run 'make dev-up' to start development environment$(NC)"
+	@echo "$(GREEN)═══════════════════════════════════════════════════════════════════$(NC)"
+
+# ============================================================================
+# DEVELOPMENT
+# ============================================================================
+
+dev-up:
+	@echo "$(BLUE)Starting PATHFINDER development environment...$(NC)"
+	docker-compose -f docker-compose.yml up -d
+	@echo ""
+	@echo "$(GREEN)✓ Services starting...$(NC)"
+	@echo ""
+	@echo "Services:"
+	@echo "  PostgreSQL       → localhost:5432"
+	@echo "  Redis            → localhost:6379"
+	@echo "  Neo4j            → localhost:7687 (bolt) / localhost:7474 (http)"
+	@echo "  Kafka            → localhost:9092"
+	@echo "  API Gateway      → localhost:8000"
+	@echo "  User Service     → localhost:8001"
+	@echo "  Content Service  → localhost:8002"
+	@echo "  Personalization  → localhost:8003"
+	@echo "  Progress Service → localhost:8004"
+	@echo "  Web Frontend     → localhost:3000"
+	@echo "  Prometheus       → localhost:9090"
+	@echo "  Grafana          → localhost:3001 (admin/admin)"
+	@echo "  Loki             → localhost:3100"
+	@echo ""
+	@echo "Run 'make dev-logs' to see service logs"
+	@echo "Run 'make dev-down' to stop services"
+
+dev-down:
+	@echo "$(BLUE)Stopping PATHFINDER development environment...$(NC)"
+	docker-compose -f docker-compose.yml down
+	@echo "$(GREEN)✓ Services stopped$(NC)"
+
+dev-logs:
+	docker-compose -f docker-compose.yml logs -f
+
+dev-shell-postgres:
+	docker-compose -f docker-compose.yml exec postgres psql -U pathfinder -d pathfinder
+
+dev-shell-redis:
+	docker-compose -f docker-compose.yml exec redis redis-cli
+
+dev-shell-neo4j:
+	docker-compose -f docker-compose.yml exec neo4j cypher-shell -u neo4j
+
+# ============================================================================
+# BUILDING
+# ============================================================================
+
+build: build-backend build-frontend
+	@echo "$(GREEN)✓ All builds complete$(NC)"
+
+build-backend:
+	@echo "$(BLUE)Building backend services...$(NC)"
+	cd backend && go build -o bin/user-service ./services/user-service/cmd
+	cd backend && go build -o bin/content-service ./services/content-service/cmd
+	cd backend && go build -o bin/personalization-service ./services/personalization-service/cmd
+	cd backend && go build -o bin/progress-service ./services/progress-service/cmd
+	@echo "$(GREEN)✓ Backend built$(NC)"
+
+build-frontend:
+	@echo "$(BLUE)Building React frontend...$(NC)"
+	cd frontend/web && npm run build
+	@echo "$(GREEN)✓ Frontend built$(NC)"
+
+build-mobile:
+	@echo "$(BLUE)Building Flutter mobile app...$(NC)"
+	cd frontend/mobile && flutter build apk
+	cd frontend/mobile && flutter build ios
+	@echo "$(GREEN)✓ Mobile app built$(NC)"
+
+docker-build:
+	@echo "$(BLUE)Building Docker images...$(NC)"
+	docker-compose -f docker-compose.yml build
+	@echo "$(GREEN)✓ Docker images built$(NC)"
+
+docker-push:
+	@echo "$(BLUE)Pushing Docker images to registry...$(NC)"
+	docker tag pathfinder_user-service:latest $(DOCKER_REGISTRY)/user-service:$(VERSION)
+	docker tag pathfinder_content-service:latest $(DOCKER_REGISTRY)/content-service:$(VERSION)
+	docker tag pathfinder_personalization-service:latest $(DOCKER_REGISTRY)/personalization-service:$(VERSION)
+	docker tag pathfinder_progress-service:latest $(DOCKER_REGISTRY)/progress-service:$(VERSION)
+	docker push $(DOCKER_REGISTRY)/user-service:$(VERSION)
+	docker push $(DOCKER_REGISTRY)/content-service:$(VERSION)
+	docker push $(DOCKER_REGISTRY)/personalization-service:$(VERSION)
+	docker push $(DOCKER_REGISTRY)/progress-service:$(VERSION)
+	@echo "$(GREEN)✓ Images pushed$(NC)"
+
+# ============================================================================
+# TESTING
+# ============================================================================
+
+test: test-backend test-integration
+	@echo "$(GREEN)✓ All tests passed$(NC)"
+
+test-backend:
+	@echo "$(BLUE)Running backend unit tests...$(NC)"
+	cd backend && go test -v -race ./...
+	@echo "$(GREEN)✓ Backend tests passed$(NC)"
+
+test-integration:
+	@echo "$(BLUE)Running integration tests...$(NC)"
+	cd backend && go test -v -race -tags=integration ./tests/integration/...
+	@echo "$(GREEN)✓ Integration tests passed$(NC)"
+
+test-e2e:
+	@echo "$(BLUE)Running end-to-end tests...$(NC)"
+	cd tests/e2e && npm test
+	@echo "$(GREEN)✓ E2E tests passed$(NC)"
+
+test-coverage:
+	@echo "$(BLUE)Running tests with coverage...$(NC)"
+	cd backend && go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+	cd backend && go tool cover -html=coverage.out -o coverage.html
+	@echo "$(GREEN)✓ Coverage report generated → backend/coverage.html$(NC)"
+
+load-test:
+	@echo "$(BLUE)Running load test (100K concurrent users)...$(NC)"
+	cd tests/load-testing && go run main.go \
+	  -users=100000 \
+	  -duration=300 \
+	  -rampup=60 \
+	  -api-url=http://localhost:8000
+	@echo "$(GREEN)✓ Load test complete$(NC)"
+
+# ============================================================================
+# CODE QUALITY
+# ============================================================================
+
+lint: lint-go lint-js
+	@echo "$(GREEN)✓ All linting passed$(NC)"
+
+lint-go:
+	@echo "$(BLUE)Linting Go code...$(NC)"
+	cd backend && golangci-lint run ./...
+	@echo "$(GREEN)✓ Go linting passed$(NC)"
+
+lint-js:
+	@echo "$(BLUE)Linting JavaScript/TypeScript...$(NC)"
+	cd frontend/web && npm run lint
+	@echo "$(GREEN)✓ JS/TS linting passed$(NC)"
+
+format: format-go format-js
+	@echo "$(GREEN)✓ Code formatted$(NC)"
+
+format-go:
+	@echo "$(BLUE)Formatting Go code...$(NC)"
+	cd backend && gofmt -w .
+	cd backend && goimports -w .
+	@echo "$(GREEN)✓ Go code formatted$(NC)"
+
+format-js:
+	@echo "$(BLUE)Formatting JavaScript/TypeScript...$(NC)"
+	cd frontend/web && npm run format
+	@echo "$(GREEN)✓ JS/TS code formatted$(NC)"
+
+# ============================================================================
+# KUBERNETES
+# ============================================================================
+
+k8s-deploy-local:
+	@echo "$(BLUE)Deploying to local Kubernetes (minikube)...$(NC)"
+	@command -v minikube >/dev/null 2>&1 || { echo "$(RED)Minikube not found. Installing...$(NC)"; exit 1; }
+	minikube start
+	kubectl create namespace pathfinder || true
+	kubectl config set-context --current --namespace=pathfinder
+	kubectl apply -f infrastructure/kubernetes/
+	@echo "$(GREEN)✓ Deployed to local Kubernetes$(NC)"
+	kubectl get pods -n pathfinder
+
+k8s-deploy-staging:
+	@echo "$(BLUE)Deploying to staging Kubernetes...$(NC)"
+	kubectl config use-context staging
+	kubectl apply -f infrastructure/kubernetes/
+	kubectl rollout status deployment -n pathfinder
+	@echo "$(GREEN)✓ Deployed to staging$(NC)"
+
+k8s-deploy-prod:
+	@echo "$(BLUE)Deploying to production Kubernetes...$(NC)"
+	@echo "$(YELLOW)⚠ Production deployment requires approval$(NC)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		kubectl config use-context production; \
+		kubectl apply -f infrastructure/kubernetes/; \
+		kubectl rollout status deployment -n pathfinder; \
+		echo "$(GREEN)✓ Deployed to production$(NC)"; \
+	else \
+		echo "$(YELLOW)Deployment cancelled$(NC)"; \
+	fi
+
+k8s-rollback:
+	@echo "$(BLUE)Rolling back to previous deployment...$(NC)"
+	kubectl rollout undo deployment/user-service -n pathfinder
+	kubectl rollout undo deployment/content-service -n pathfinder
+	kubectl rollout undo deployment/personalization-service -n pathfinder
+	kubectl rollout undo deployment/progress-service -n pathfinder
+	@echo "$(GREEN)✓ Rollback complete$(NC)"
+
+k8s-logs:
+	@echo "Fetching logs from all services..."
+	kubectl logs -f -n pathfinder deployment/user-service
+	kubectl logs -f -n pathfinder deployment/content-service
+	kubectl logs -f -n pathfinder deployment/personalization-service
+	kubectl logs -f -n pathfinder deployment/progress-service
+
+k8s-shell:
+	@echo "Available pods:"
+	@kubectl get pods -n pathfinder
+	@read -p "Enter pod name: " POD; \
+	kubectl exec -it $$POD -n pathfinder -- /bin/sh
+
+# ============================================================================
+# DATABASE
+# ============================================================================
+
+db-migrate:
+	@echo "$(BLUE)Running database migrations...$(NC)"
+	cd backend && go run ./cmd/migrate/main.go
+	@echo "$(GREEN)✓ Migrations complete$(NC)"
+
+db-seed:
+	@echo "$(BLUE)Seeding database...$(NC)"
+	cd backend && go run ./cmd/seed/main.go
+	@echo "$(GREEN)✓ Database seeded$(NC)"
+
+db-reset:
+	@echo "$(RED)⚠ This will delete ALL data from the database$(NC)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		docker-compose exec postgres psql -U pathfinder -d pathfinder -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"; \
+		$(MAKE) db-migrate; \
+		$(MAKE) db-seed; \
+		echo "$(GREEN)✓ Database reset and seeded$(NC)"; \
+	else \
+		echo "$(YELLOW)Reset cancelled$(NC)"; \
+	fi
+
+# ============================================================================
+# DOCUMENTATION
+# ============================================================================
+
+docs-serve:
+	@echo "$(BLUE)Serving documentation...$(NC)"
+	@echo "Documentation available at http://localhost:8080"
+	cd docs && npx docsify serve
+
+docs-build:
+	@echo "$(BLUE)Building documentation...$(NC)"
+	mkdir -p docs/_build
+	@echo "$(GREEN)✓ Documentation built$(NC)"
+
+api-docs:
+	@echo "$(BLUE)Generating OpenAPI documentation...$(NC)"
+	cd backend && go run ./cmd/gendocs/main.go
+	@echo "$(GREEN)✓ OpenAPI docs generated → docs/openapi.yaml$(NC)"
+
+# ============================================================================
+# CLEANUP
+# ============================================================================
+
+clean:
+	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
+	rm -rf backend/bin/
+	rm -rf frontend/web/build/
+	rm -rf frontend/mobile/build/
+	rm -f backend/coverage.out backend/coverage.html
+	docker-compose -f docker-compose.yml down -v
+	@echo "$(GREEN)✓ Cleanup complete$(NC)"
+
+clean-docker:
+	@echo "$(BLUE)Removing Docker images and containers...$(NC)"
+	docker-compose -f docker-compose.yml down -v --remove-orphans
+	docker image rm pathfinder_user-service pathfinder_content-service pathfinder_personalization-service pathfinder_progress-service || true
+	@echo "$(GREEN)✓ Docker cleanup complete$(NC)"
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+
+ci: lint test
+	@echo "$(GREEN)✓ CI pipeline complete$(NC)"
+
+ci-docker: lint test docker-build
+	@echo "$(GREEN)✓ CI+Docker pipeline complete$(NC)"
+
+# ============================================================================
+# VERSION & INFO
+# ============================================================================
+
+version:
+	@echo "PATHFINDER Version: $(VERSION)"
+	@echo "Environment: $(ENV)"
+	@go version
+	@node --version
+	@docker --version
+	@docker-compose --version
+
+info:
+	@echo "$(BLUE)PATHFINDER Information$(NC)"
+	@echo ""
+	@echo "Project: $(PROJECT_NAME)"
+	@echo "Version: $(VERSION)"
+	@echo "Environment: $(ENV)"
+	@echo ""
+	@echo "Services:"
+	@docker-compose -f docker-compose.yml ps
+	@echo ""
+	@echo "Disk usage:"
+	@docker system df
+
+# ============================================================================
+# DEFAULT TARGET
+# ============================================================================
+
+.DEFAULT_GOAL := help

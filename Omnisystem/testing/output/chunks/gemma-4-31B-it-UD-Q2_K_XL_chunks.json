@@ -1,0 +1,200 @@
+[
+  {
+    "confidence": 0.93,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "programming",
+    "content": "Knowledge chunk 1 for gemma-4-31B-it-UD-Q2_K_XL: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 2 for gemma-4-31B-it-UD-Q2_K_XL: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9400000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "technology",
+    "content": "Knowledge chunk 3 for gemma-4-31B-it-UD-Q2_K_XL: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "science",
+    "content": "Knowledge chunk 4 for gemma-4-31B-it-UD-Q2_K_XL: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "programming",
+    "content": "Knowledge chunk 5 for gemma-4-31B-it-UD-Q2_K_XL: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 6 for gemma-4-31B-it-UD-Q2_K_XL: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.81,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "technology",
+    "content": "Knowledge chunk 7 for gemma-4-31B-it-UD-Q2_K_XL: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8600000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "science",
+    "content": "Knowledge chunk 8 for gemma-4-31B-it-UD-Q2_K_XL: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8300000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "programming",
+    "content": "Knowledge chunk 9 for gemma-4-31B-it-UD-Q2_K_XL: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 10 for gemma-4-31B-it-UD-Q2_K_XL: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.91,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "technology",
+    "content": "Knowledge chunk 11 for gemma-4-31B-it-UD-Q2_K_XL: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.81,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "science",
+    "content": "Knowledge chunk 12 for gemma-4-31B-it-UD-Q2_K_XL: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8200000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "programming",
+    "content": "Knowledge chunk 13 for gemma-4-31B-it-UD-Q2_K_XL: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8400000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 14 for gemma-4-31B-it-UD-Q2_K_XL: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9400000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "technology",
+    "content": "Knowledge chunk 15 for gemma-4-31B-it-UD-Q2_K_XL: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8600000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "science",
+    "content": "Knowledge chunk 16 for gemma-4-31B-it-UD-Q2_K_XL: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 10.97,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "programming",
+    "content": "Knowledge chunk 17 for gemma-4-31B-it-UD-Q2_K_XL: programming domain",
+    "chunk_type": "activation",
+    "model_size_gb": 10.97,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.91,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 18 for gemma-4-31B-it-UD-Q2_K_XL: mathematics domain",
+    "chunk_type": "activation",
+    "model_size_gb": 10.97,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.8300000000000001,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "technology",
+    "content": "Knowledge chunk 19 for gemma-4-31B-it-UD-Q2_K_XL: technology domain",
+    "chunk_type": "activation",
+    "model_size_gb": 10.97,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.88,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "science",
+    "content": "Knowledge chunk 20 for gemma-4-31B-it-UD-Q2_K_XL: science domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 10.97,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.93,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "programming",
+    "content": "Knowledge chunk 21 for gemma-4-31B-it-UD-Q2_K_XL: programming domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 10.97,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.91,
+    "model": "gemma-4-31B-it-UD-Q2_K_XL",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 22 for gemma-4-31B-it-UD-Q2_K_XL: mathematics domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 10.97,
+    "extraction_method": "behavioral_patterns"
+  }
+]

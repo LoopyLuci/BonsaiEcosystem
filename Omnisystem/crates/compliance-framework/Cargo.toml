@@ -1,0 +1,25 @@
+[package]
+name = "compliance-framework"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "compliance_framework"
+path = "src/lib.rs"
+
+[[bin]]
+name = "compliance_framework_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

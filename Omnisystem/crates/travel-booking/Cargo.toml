@@ -1,0 +1,25 @@
+[package]
+name = "travel-booking"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "travel_booking"
+path = "src/lib.rs"
+
+[[bin]]
+name = "travel_booking_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

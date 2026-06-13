@@ -1,0 +1,350 @@
+# PATHFINDER Learning Platform - Local Development Environment
+# Docker Compose: All services for local testing
+# Phase 0-1: Foundation + Core MVP
+
+version: '3.9'
+
+services:
+  # =========================================================================
+  # CORE DATABASES
+  # =========================================================================
+
+  # PostgreSQL (primary datastore)
+  postgres:
+    image: postgres:16-alpine
+    container_name: pathfinder_postgres
+    environment:
+      POSTGRES_USER: pathfinder
+      POSTGRES_PASSWORD: pathfinder_dev_password
+      POSTGRES_DB: pathfinder
+      POSTGRES_INITDB_ARGS: "-c max_connections=200 -c shared_buffers=256MB"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pathfinder"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pathfinder
+
+  # Redis (caching & session store)
+  redis:
+    image: redis:7-alpine
+    container_name: pathfinder_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pathfinder
+
+  # Neo4j (skill graph database)
+  neo4j:
+    image: neo4j:5-community
+    container_name: pathfinder_neo4j
+    environment:
+      NEO4J_AUTH: neo4j/pathfinder_dev_password
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    volumes:
+      - neo4j_data:/var/lib/neo4j/data
+      - neo4j_logs:/var/lib/neo4j/logs
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -a neo4j://localhost -u neo4j -p pathfinder_dev_password 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pathfinder
+
+  # =========================================================================
+  # MESSAGE QUEUE & STREAMING
+  # =========================================================================
+
+  # Kafka (event streaming for async operations)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: pathfinder_kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    depends_on:
+      - zookeeper
+    networks:
+      - pathfinder
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: pathfinder_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - pathfinder
+
+  # =========================================================================
+  # BACKEND SERVICES
+  # =========================================================================
+
+  # API Gateway (Envoy)
+  api-gateway:
+    image: envoyproxy/envoy:v1.27-latest
+    container_name: pathfinder_api_gateway
+    ports:
+      - "8000:8000"
+      - "9901:9901"
+    volumes:
+      - ./infrastructure/envoy/envoy.yaml:/etc/envoy/envoy.yaml
+    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml
+    depends_on:
+      - user-service
+      - content-service
+      - personalization-service
+      - progress-service
+    networks:
+      - pathfinder
+
+  # User Service
+  user-service:
+    build:
+      context: ./backend/services/user-service
+      dockerfile: Dockerfile
+    container_name: pathfinder_user_service
+    environment:
+      DATABASE_URL: "postgres://pathfinder:pathfinder_dev_password@postgres:5432/pathfinder"
+      REDIS_URL: "redis://redis:6379"
+      PORT: 8001
+      ENV: "development"
+      LOG_LEVEL: "debug"
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/services/user-service:/app
+    networks:
+      - pathfinder
+
+  # Content Service
+  content-service:
+    build:
+      context: ./backend/services/content-service
+      dockerfile: Dockerfile
+    container_name: pathfinder_content_service
+    environment:
+      DATABASE_URL: "postgres://pathfinder:pathfinder_dev_password@postgres:5432/pathfinder"
+      NEO4J_URL: "neo4j://neo4j:pathfinder_dev_password@neo4j:7687"
+      REDIS_URL: "redis://redis:6379"
+      PORT: 8002
+      ENV: "development"
+      LOG_LEVEL: "debug"
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/services/content-service:/app
+    networks:
+      - pathfinder
+
+  # Personalization Service (BKT, spaced repetition)
+  personalization-service:
+    build:
+      context: ./backend/services/personalization-service
+      dockerfile: Dockerfile
+    container_name: pathfinder_personalization_service
+    environment:
+      DATABASE_URL: "postgres://pathfinder:pathfinder_dev_password@postgres:5432/pathfinder"
+      REDIS_URL: "redis://redis:6379"
+      KAFKA_BROKERS: "kafka:29092"
+      PORT: 8003
+      ENV: "development"
+      LOG_LEVEL: "debug"
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    volumes:
+      - ./backend/services/personalization-service:/app
+    networks:
+      - pathfinder
+
+  # Progress Service (analytics, metrics)
+  progress-service:
+    build:
+      context: ./backend/services/progress-service
+      dockerfile: Dockerfile
+    container_name: pathfinder_progress_service
+    environment:
+      DATABASE_URL: "postgres://pathfinder:pathfinder_dev_password@postgres:5432/pathfinder"
+      REDIS_URL: "redis://redis:6379"
+      KAFKA_BROKERS: "kafka:29092"
+      PORT: 8004
+      ENV: "development"
+      LOG_LEVEL: "debug"
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    volumes:
+      - ./backend/services/progress-service:/app
+    networks:
+      - pathfinder
+
+  # =========================================================================
+  # FRONTEND
+  # =========================================================================
+
+  # React Web Frontend (development)
+  web-frontend:
+    build:
+      context: ./frontend/web
+      dockerfile: Dockerfile.dev
+    container_name: pathfinder_web_frontend
+    environment:
+      REACT_APP_API_BASE_URL: "http://localhost:8000"
+      REACT_APP_ENV: "development"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/web/src:/app/src
+      - ./frontend/web/public:/app/public
+    depends_on:
+      - api-gateway
+    networks:
+      - pathfinder
+
+  # =========================================================================
+  # MONITORING & LOGGING
+  # =========================================================================
+
+  # Prometheus (metrics collection)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pathfinder_prometheus
+    environment:
+      TZ: UTC
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    networks:
+      - pathfinder
+
+  # Grafana (visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pathfinder_grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel"
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    depends_on:
+      - prometheus
+    networks:
+      - pathfinder
+
+  # Loki (log aggregation)
+  loki:
+    image: grafana/loki:latest
+    container_name: pathfinder_loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infrastructure/monitoring/loki-config.yml:/etc/loki/local-config.yml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yml
+    networks:
+      - pathfinder
+
+  # Promtail (log shipper)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: pathfinder_promtail
+    volumes:
+      - ./infrastructure/monitoring/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - pathfinder
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  pathfinder:
+    driver: bridge

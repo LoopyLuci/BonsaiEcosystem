@@ -1,0 +1,11 @@
+{
+  "ts": 1779722360154,
+  "node_exec": "C:\\nvm4w\\nodejs\\node.exe",
+  "npm_execpath": "",
+  "versions": {
+    "node": "v24.11.1",
+    "npm": "11.15.0",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "tauri": "tauri-cli 2.10.1"
+  }
+}

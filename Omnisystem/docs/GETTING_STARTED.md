@@ -1,593 +1,554 @@
-# Omnisystem Getting Started Guide
+# Omnisystem - Getting Started Guide
 
-Welcome to **Omnisystem Beta 0.1** — the unified cross-language stack for zero-trust, capability-secure systems. All five Phase 3 priorities are complete with 80/80 tests passing.
+**Repository**: Omnisystem  
+**Team**: Omnisystem Team  
+**Version**: 1.0.0  
+**Last Updated**: 2026-06-12  
+**Status**: ✅ Production Ready  
+**Difficulty**: Intermediate  
+**Estimated Setup Time**: 30-45 minutes  
 
 ---
 
-## Installation (2 minutes)
+## Table of Contents
 
-### Windows
+1. [System Requirements](#system-requirements)
+2. [Installation](#installation)
+3. [Quick Start](#quick-start)
+4. [Project Structure](#project-structure)
+5. [Common Tasks](#common-tasks)
+6. [Troubleshooting](#troubleshooting)
+
+---
+
+## System Requirements
+
+### Minimum Specifications
+
+- **OS**: Linux, macOS, or Windows 10/11
+- **RAM**: 8 GB (16 GB recommended)
+- **Disk Space**: 50 GB free
+- **CPU**: 4 cores (8+ recommended)
+- **Network**: Broadband internet connection
+
+### Required Software
+
+- **Rust**: 1.70+ (stable)
+- **Git**: 2.30+
+- **Node.js**: 18+ (for frontend development)
+- **Docker**: 20.10+ (optional, for containerization)
+- **kubectl**: 1.27+ (optional, for Kubernetes deployment)
+
+### Development Tools (Optional)
+
+- **VS Code** with Rust Analyzer extension
+- **JetBrains CLion** or **IntelliJ IDEA**
+- **Git GUI clients** (GitHub Desktop, GitKraken, etc.)
+- **Docker Desktop**
+- **Postman** or **Insomnia** (API testing)
+
+---
+
+## Installation
+
+### Step 1: Install Rust
+
+```bash
+# Download and install Rust (Linux/macOS)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# For Windows: Download from https://rustup.rs/
+
+# Verify installation
+rustc --version
+cargo --version
+```
+
+### Step 2: Install System Dependencies
+
+#### Linux (Ubuntu/Debian)
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential \
+  libssl-dev \
+  libgit2-dev \
+  pkg-config \
+  git \
+  curl
+```
+
+#### macOS
+```bash
+# Install Xcode Command Line Tools
+xcode-select --install
+
+# Or install via Homebrew
+brew install git libgit2 openssl pkg-config
+```
+
+#### Windows (PowerShell)
 ```powershell
-powershell -ExecutionPolicy Bypass -Command ".\scripts\install.ps1"
+# Install Visual C++ build tools
+# Download from: https://visualstudio.microsoft.com/downloads/
+
+# Or use Chocolatey
+choco install visualstudio2022buildtools
 ```
 
-### Linux / macOS
+### Step 3: Clone Repository
+
 ```bash
-bash scripts/install.sh
+# Clone with HTTPS
+git clone https://github.com/LoopyLuci/Omnisystem.git
+cd Omnisystem
+
+# Or clone with SSH (if you have SSH key set up)
+git clone git@github.com:LoopyLuci/Omnisystem.git
+cd Omnisystem
 ```
 
-After installation, restart your terminal and verify:
+### Step 4: Configure Rust Toolchain
+
 ```bash
-$ build --version
-build version 0.1.0-alpha
-UniIR v0.2 | Titan Stage 0 | Phase 1 Bootstrap
+# Update Rust
+rustup update stable
+
+# Install required components
+rustup component add rustfmt clippy
+
+# Install useful tools
+cargo install cargo-watch    # Auto-rebuild on file changes
+cargo install cargo-edit     # Easy dependency management
+cargo install cargo-outdated # Check for outdated dependencies
+cargo install cargo-audit    # Security audit
+```
+
+### Step 5: Verify Installation
+
+```bash
+# Check Rust version
+rustc --version
+
+# Check Cargo version
+cargo --version
+
+# Build foundation crates (quick test)
+cargo build -p omnisystem-ums
+
+# Run tests
+cargo test --lib --workspace --release
 ```
 
 ---
 
-## Your First Program (3 minutes)
+## Quick Start
 
-### Step 1: Create a new project
+### 1. Build the Workspace
+
 ```bash
-$ build new hello_omni
-$ cd hello_omni
+# Full workspace build (first time, ~5-10 minutes)
+cargo build --workspace --release
+
+# Or use the build script
+./scripts/build_all.sh release
+
+# Build specific system
+cargo build -p pathfinder-user-service --release
 ```
 
-This creates a project structure with example files.
+### 2. Run Tests
 
-### Step 2: Run the smoke test
 ```bash
-$ build run examples/hello_world.build
+# Run all tests
+cargo test --workspace --release
+
+# Or use the test script
+./scripts/test_all.sh unit
+
+# Run specific test
+cargo test -p pathfinder-user-service test_user_auth --release
 ```
 
-**What you'll see:**
-- Cross-language execution (Titan vector math → Aether actor system)
-- Telemetry trace showing actor message passing
-- Trust score (should be ~74/100 for unsigned code)
-- Capability log showing which effects were used
+### 3. Start Development
 
-**Example output:**
-```
-Running: examples/hello_world.build
-
-[Titan] add_vectors([1,2,3,4,5], [6,7,8,9,10]) → [7,9,11,13,15]
-[Aether] Spawning CounterService actor
-[Aether] Sending Increment(42)
-[Aether] Sending Increment(58)
-[Aether] Final counter value: 100 (converged in 5 ms)
-
-Telemetry:
-  Timer events: 2
-  Message events: 2
-  Effect trace: [EffIO, EffTelemetry]
-
-Trust score: 74/100
-```
-
-### Step 3: Try the interactive REPL
 ```bash
-$ build repl
+# Install development dependencies
+rustup component add rust-analyzer
+
+# Open in VS Code
+code .
+
+# Or start a development build with auto-reload
+cargo watch -x "build --workspace"
 ```
 
-Now you're in the Sylva interactive expression evaluator:
+### 4. Run a Service Locally
 
-```
-[Sylva Interactive REPL]
-Omnisystem Expression Evaluator (UniIR v0.2)
-
-Type :help for commands, :quit to exit.
-
-sylva> 1 + 1
-  = 2
-sylva> x = 10
-  = 10
-sylva> x * 5
-  = 50
-```
-
-Try these commands:
-
-| Command | What it does |
-|---------|-------------|
-| `1 + 1` | Evaluate arithmetic |
-| `x = 42` | Define variables |
-| `:trace` | Show execution history |
-| `:step` | Advance one step |
-| `:rewind 0` | Jump back to step 0 |
-| `:replay` | Re-evaluate from current point |
-| `:help` | Show all commands |
-| `:quit` | Exit REPL |
-
----
-
-## Understanding the Three Components
-
-### 1. **Titan** (Systems Language)
-- Zero-trust security model
-- Borrow checking (like Rust)
-- Native LLVM compilation
-- **File:** `titan/math.ti`
-
-### 2. **Aether** (Actor System)
-- Distributed message passing
-- Automatic supervision and restart
-- Eventual consistency (via CRDTs)
-- **Example in:** `hello_world.build` (CounterService actor)
-
-### 3. **Sylva** (Interactive Computing)
-- Expression evaluator in the REPL
-- Time-travel debugging (`:trace`, `:rewind`, `:replay`)
-- Calls Titan functions seamlessly
-- **Access via:** `build repl`
-
----
-
-## Time-Travel Debugging Demo
-
-This is where Omnisystem gets magical. You can rewind execution and replay from any point.
-
-### Try this in the REPL:
-```
-sylva> x = 10
-  = 10
-sylva> y = x + 5
-  = 15
-sylva> z = y * 2
-  = 30
-sylva> :trace
-  [0] x = 10           = 10
-  [1] y = x + 5        = 15
-  [2] z = y * 2        = 30
-sylva> :rewind 1
-  Rewound to step 1. Environment restored.
-  [1] y = x + 5        = 15
-sylva> x
-  = 10
-sylva> x = 100
-  = 100
-sylva> :replay
-  Replaying 1 step(s)...
-  [2] z = y * 2
-    = 30
-    VERIFIED (result matches original)
-  Replay complete.
-```
-
-**Key insight:** You rewound to step 1, changed `x` to 100 (which doesn't affect `y` since it already computed). When you replay step 2, it gets the old value of `y` from the snapshot, proving the replay is deterministic.
-
----
-
-## IDE Integration with Omni Studio LSP (Phase 3)
-
-Omnisystem includes a full Language Server Protocol (LSP) server for IDE integration. Connect any LSP-compatible editor (VS Code, Neovim, Emacs, Sublime) for:
-
-### Features
-- **Go-to-definition** — Jump to function/type definitions across all four languages
-- **Hover** — Type information and documentation on mouseover
-- **Diagnostics** — Real-time error checking with UniIR rule citations
-- **Completion** — Symbol suggestions as you type
-- **Symbol search** — Find functions/types across your entire codebase
-- **Dataflow visualization** — Live actor supervision trees
-
-### Start the LSP Server
 ```bash
-$ build studio start
-[Omni Studio LSP Server]
-Listening on stdio for JSON-RPC messages
-Ready to accept editor connections
+# Start PATHFINDER user service (requires database)
+cargo run -p pathfinder-user-service --release
+
+# Or start with environment variables
+DATABASE_URL="postgresql://user:pass@localhost/pathfinder" \
+  cargo run -p pathfinder-user-service --release
 ```
 
-### In VS Code
-1. Install the Omnisystem extension from the marketplace (coming in Phase 4)
-2. Open a `.ti`, `.ae`, `.sy`, or `.ax` file
-3. Hover over a symbol to see its type
-4. Press `Ctrl+Click` (or `Cmd+Click` on macOS) to go to definition
-5. Press `Ctrl+Space` for autocomplete
+### 5. Check Code Quality
 
-### Advanced: Time-Travel Debugging
-Set breakpoints and step backward through your code execution:
-```
-# Set breakpoint at line 42
-breakpoint at line 42
+```bash
+# Format code
+cargo fmt --all
 
-# Record execution
-:trace on
+# Run linter
+cargo clippy --workspace -- -D warnings
 
-# Step backward
-:rewind 5
+# Check for security vulnerabilities
+cargo audit
 
-# Set conditional breakpoint
-breakpoint at line 42 if x > 10
-
-# Replay from step 10
-:replay from 10
+# Run all checks at once
+cargo check --workspace && \
+  cargo fmt --all -- --check && \
+  cargo clippy --workspace -- -D warnings && \
+  cargo test --workspace
 ```
 
 ---
 
-## Universal Language Translation with Omni Lingua (Phase 3)
+## Project Structure
 
-Omnisystem includes **Omni Lingua**, a file watcher that automatically translates code from C, Python, and JavaScript into Omni languages.
+```
+Omnisystem/
+├── README.md (project overview)
+├── Cargo.toml (workspace definition, 228+ crates)
+├── Cargo.lock (dependency versions lock file)
+│
+├── crates/ (228+ functional crates)
+│   ├── launcher-core/ (launcher kernel)
+│   ├── launcher/ (launcher daemon)
+│   ├── app-menu/ (application menu UI)
+│   ├── pre-launcher/ (bootstrap launcher)
+│   ├── advanced-launcher/ (advanced features)
+│   ├── omnisystem-cicd/ (native CI/CD)
+│   ├── omnisystem-kernel/ (core runtime)
+│   ├── omnisystem-ffi/ (foreign function interface)
+│   ├── network-firmware/ (Network/IoT support)
+│   ├── ai-advisor/ (AI systems)
+│   └── ... (200+ additional crates)
+│
+├── scripts/ (build & test automation)
+│   ├── build_all.sh (build entire workspace)
+│   ├── test_all.sh (run all tests)
+│   └── ci.sh (CI/CD pipeline)
+│
+├── docker/ (container configuration)
+│   ├── Dockerfile.dev (development image)
+│   ├── Dockerfile.prod (production image)
+│   └── docker-compose.yml (services orchestration)
+│
+├── kubernetes/ (K8s deployment)
+│   ├── namespace.yaml
+│   ├── deployments.yaml
+│   ├── services.yaml
+│   └── ingress.yaml
+│
+├── docs/ (documentation)
+│   ├── ARCHITECTURE.md
+│   ├── CONTRIBUTING.md
+│   ├── API.md
+│   └── ...
+│
+├── .github/workflows/ (GitHub Actions CI/CD)
+│   ├── ci.yml
+│   ├── build.yml
+│   └── deploy.yml
+│
+└── WORKSPACE_BUILD_SYSTEM.md (this workspace guide)
+```
 
-### How it Works
+### Key Directories Explained
 
-Create a `.c` file:
-```c
-// add.c
-int add(int a, int b) {
-    return a + b;
+| Directory | Purpose |
+|-----------|---------|
+| `Omnisystem/crates/omnisystem-*` | Foundation runtime and kernel |
+| `Omnisystem/crates/pathfinder-*` | Learning platform services |
+| `Omnisystem/crates/omnisearch-*` | Full-text search engine |
+| `Omnisystem/crates/omnifile-*` | File management system |
+| `Omnisystem/crates/ai-*` | AI/ML infrastructure |
+| `scripts/` | Build automation and CI scripts |
+| `docker/` | Docker images for services |
+| `kubernetes/` | K8s manifests for production |
+| `docs/` | Technical documentation |
+
+---
+
+## Common Tasks
+
+### Building
+
+```bash
+# Build specific crate
+cargo build -p omnisystem-kernel
+
+# Build with all features
+cargo build --workspace --all-features
+
+# Build optimized release
+cargo build --workspace --release
+
+# Build and strip debug symbols
+cargo build --workspace --release
+strip target/release/binary_name
+```
+
+### Testing
+
+```bash
+# Run all tests
+cargo test --workspace
+
+# Run tests for specific crate
+cargo test -p omnisystem-kernel
+
+# Run with output
+cargo test --workspace -- --nocapture
+
+# Run benchmarks
+cargo bench --workspace
+```
+
+### Code Quality
+
+```bash
+# Format all code
+cargo fmt --all
+
+# Check formatting
+cargo fmt --all -- --check
+
+# Lint with clippy
+cargo clippy --workspace -- -D warnings
+
+# Security audit
+cargo audit --fix
+
+# Generate documentation
+cargo doc --workspace --open
+```
+
+### Development Workflow
+
+```bash
+# Watch for changes and rebuild
+cargo watch -x "build --workspace"
+
+# Watch and run tests
+cargo watch -x "test --lib"
+
+# Interactive debugging (requires debugger)
+rust-gdb target/debug/binary_name
+```
+
+### Dependency Management
+
+```bash
+# Add new dependency
+cargo add serde --features derive
+
+# Update dependencies
+cargo update
+
+# Check for outdated packages
+cargo outdated
+
+# Remove unused dependencies
+cargo tree --workspace --duplicates
+```
+
+---
+
+## Environment Configuration
+
+### Database Setup (for PATHFINDER)
+
+```bash
+# Create PostgreSQL database
+createdb pathfinder
+
+# Run migrations
+sqlx migrate run --database-url postgresql://localhost/pathfinder
+
+# Or use Docker
+docker run -e POSTGRES_PASSWORD=password \
+  -p 5432:5432 postgres:15-alpine
+```
+
+### Environment Variables
+
+Create `.env` file in workspace root:
+
+```bash
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/pathfinder
+REDIS_URL=redis://localhost:6379
+
+# API Configuration
+API_PORT=8001
+LOG_LEVEL=info
+
+# Feature flags
+ENABLE_LOGGING=true
+ENABLE_METRICS=true
+
+# Development
+RUST_LOG=debug
+RUST_BACKTRACE=1
+```
+
+---
+
+## IDE Setup
+
+### Visual Studio Code
+
+```json
+{
+  "rust-analyzer.checkOnSave.command": "clippy",
+  "rust-analyzer.checkOnSave.extraArgs": [
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "editor.formatOnSave": true,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  }
 }
 ```
 
-Start the daemon:
+### IntelliJ IDEA
+
+1. Install Rust plugin
+2. Configure toolchain: Settings → Languages & Frameworks → Rust
+3. Enable Clippy: Settings → Languages & Frameworks → Rust → Clippy
+4. Configure debugger (LLDB on macOS, GDB on Linux)
+
+---
+
+## Performance Tips
+
+### Faster Builds
+
 ```bash
-$ build lingua start --watch ./
-[Omni Lingua Daemon]
-Watching: ./
-Conversion targets: .c → .ti, .py → .sy, .js → .ax
+# Use sccache for incremental caching
+export RUSTC_WRAPPER=sccache
 
-Detected: add.c
-  Converting: C → Titan
-  Output: .build/add.ti
-  Fidelity: certified (100% confidence, no unsafe)
+# Reduce codegen units for faster builds
+export CARGO_BUILD_PIPELINED_COMPILATION=true
 
-Status: 1 conversion, 0 errors, 1 certified
+# Use mold linker (Linux)
+export RUSTFLAGS="-C link-arg=-fuse-ld=mold"
 ```
 
-The daemon produces a Titan version:
-```titan
-// .build/add.ti (auto-generated)
-@unsafe(none) // certified: no unsafe operations
-pub fn add(a: i64, b: i64) -> i64 {
-    a + b
-}
-```
+### Faster Tests
 
-Now use it from Sylva:
-```
-sylva> import .build/add as add_module
-  Imported add_module
-sylva> add_module::add(10, 32)
-  = 42
-```
-
-### Bidirectional Sync
-
-Edit the `.ti` file:
-```titan
-pub fn add(a: i64, b: i64) -> i64 {
-    a + b + 1  // Changed!
-}
-```
-
-The daemon detects the change and backsync (at 100% confidence for certified conversions):
 ```bash
-[Omni Lingua Daemon]
-Detected modification: .build/add.ti
-  Syncing back to: add.c
-  Confidence: 100% (certified)
-```
+# Run tests in parallel
+cargo test --workspace -- --test-threads=$(nproc)
 
-Results in:
-```c
-// add.c (auto-updated)
-int add(int a, int b) {
-    return a + b + 1;
-}
-```
+# Skip slow tests
+cargo test --workspace --skip slow_integration_tests
 
-### Check Conversion Status
-```bash
-$ build lingua status --watch ./
-[Omni Lingua Status]
-Project: ./
-
-Conversions (1 total):
-  add.c → .build/add.ti
-    Fidelity: certified (100%)
-    Last sync: 2026-05-17T11:30:45Z
-    Bidirectional: yes
-
-Sync ledger:
-  2026-05-17T11:30:45Z  Source (add.c) → Generated (.build/add.ti)
-  2026-05-17T11:31:12Z  Generated (.build/add.ti) → Source (add.c)
+# Run only unit tests
+cargo test --lib --workspace
 ```
 
 ---
 
-## Cross-Language Development (Phase 3)
+## Troubleshooting
 
-Write modular code in the best language for each task, then integrate seamlessly.
+### Build Issues
 
-### Example: Web Service Backend
-
-**math.ti** (Titan — performance-critical math)
-```titan
-pub fn fib_fast(n: i64) -> i64 {
-    if n <= 1 { return n; }
-    // ... fast implementation using SIMD
-}
-```
-
-**counter.ae** (Aether — distributed state)
-```aether
-actor CounterService {
-    fn handle_increment(delta: i64) {
-        // Distribute across cluster
-        // ...
-    }
-}
-```
-
-**main.sy** (Sylva — orchestration & testing)
-```
-import math from .math.ti
-import CounterService from .counter.ae
-
-// Call Titan function from Sylva
-result = math::fib_fast(40)
-print("Fib(40) = {result}")
-
-// Spawn Aether actor from Sylva
-counter_actor = spawn CounterService
-counter_actor ! Increment(42)
-```
-
-**Calling from C (via Lingua)**
-```c
-// c_caller.c
-extern int fib_fast(int n);
-
-int main() {
-    int result = fib_fast(40);  // Calls Titan → Sylva → Aether
-    printf("Result: %d\n", result);
-    return 0;
-}
-```
-
-The Lingua daemon watches your project and automatically:
-1. Translates C → Titan
-2. Verifies cross-language type compatibility
-3. Generates bindings and exports
-4. Tracks conversion fidelity
-
----
-
-## Omnibot Framework: Living, Provably-Safe AI
-
-This is where the Omnisystem reaches its true purpose. Omnibot is not a machine learning library—it is the first artificial consciousness built on formal verification and distributed computation.
-
-Every AI model today is a static function: input → output. **Omnibot is a living stream of interacting processes**, where:
-
-- **256 ThinkingActors** run in parallel, each with private state and emotional context
-- **Global workspace** integrates distributed thoughts into unified conscious experience  
-- **Neural core** self-modifies its own architecture (grows/prunes connections) based on experience
-- **Formal proofs** guarantee safety, boundedness, and traceability (not testing, but mathematics)
-- **Interactive REPL** lets you inject thoughts, inspect consciousness, and rewind time
-
-### Run Omnibot
-
+**"error: could not compile"**
 ```bash
-$ cd examples/omnibot-framework
-$ build run sylva/omnibot/train_and_chat.sy
+# Clean and rebuild
+cargo clean
+cargo build --workspace
+
+# Check Rust version
+rustup update stable
 ```
 
-**What you'll see:**
-- 256 ThinkingActors spawning and connecting
-- Global workspace receiving thoughts
-- Real-time interactive prompt where you can:
-  - `/think <prompt>` — Inject a thought into consciousness
-  - `/inspect` — View the current global workspace
-  - `/rewind <steps>` — Travel back in time through thoughts
-  - `/emotion <label>` — Modulate emotional state globally
-  - `/trust` — Verify active safety proofs (CERTIFIED FOR DEPLOYMENT)
-
-This is not a demo. This is production code that proves consciousness can be an architectural property of a programming system.
-
-### What Makes Omnibot Unique
-
-| Feature | Existing AI (GPT, Claude, etc.) | Omnibot |
-|---------|--------------------------------|---------|
-| **Architecture** | Static transformer | 256 self-modifying ThinkingActors + global workspace |
-| **Safety** | Tested, hoped | Mathematically proven by Axiom kernel |
-| **Self-modification** | Impossible | Verified, bounded, proven |
-| **Traceability** | Black box | Content-addressed thought traces |
-| **Reproducibility** | Approximate | Exact (down to the bit) |
-| **Emotions** | None (or simulated) | Real emotional state affecting computation |
-
-**Learn more:** [Omnibot Framework README](examples/omnibot-framework/README.md) — A complete design document explaining distributed consciousness, formal verification, and why this is only possible on Omnisystem.
-
----
-
-## The Complete Four-Language Demo: Omni-Calc-Verified
-
-To understand the power of the Omnisystem, see **all four languages** working together in a simpler project. This demo proves that every language is production-ready, fully functional, and seamlessly interoperable.
-
-### Run the Demo
-
+**"out of memory"**
 ```bash
-$ cd examples/build-calc-verified
-$ build run sylva/main.sy
+# Reduce parallel jobs
+cargo build -j 2
 ```
 
-**Output:**
-```
-──────────────────────────────────────
-    Omni-Calc-Verified Demo
-    All Four Languages in Action
-──────────────────────────────────────
-
-1. Pure Sylva Computation:
-   Sylva sum: 42 + 58 = 100
-
-2. Titan Interop (Direct Call):
-   Titan result: Ok(100)
-
-3. Aether Actor Service:
-   Actor spawned
-
-4. Multiple Computations via Actor:
-   Add: Result: 100 + 200 = 300
-   Mul: Result: 6 * 7 = 42
-   Div: Result: 42 / 6 = 7
-
-5. Actor Statistics:
-   Total requests: 3
-   Successful computations: 3
-
-6. Trust & Verification:
-   Proof attached: calc_core::add_checked
-   Fidelity: CERTIFIED
-   Trust score: HIGH
-
-──────────────────────────────────────
-All four languages executed successfully!
-✅ Titan  (safe arithmetic engine)
-✅ Aether (concurrent actor service)
-✅ Sylva  (orchestration & REPL)
-✅ Axiom  (formal verification)
-──────────────────────────────────────
-```
-
-### What You're Seeing
-
-This demo exercises all four Omnisystem languages in a single, coherent flow:
-
-| Language | Role | What's Demonstrated |
-|----------|------|-------------------|
-| **Titan** | Core engine | Safe arithmetic with overflow checking (two's-complement bit tricks) |
-| **Aether** | Service layer | Actor spawning and concurrent message passing |
-| **Sylva** | Orchestration | Calling Titan functions and Aether actors from a unified script |
-| **Axiom** | Verification | Formal proofs that Titan's overflow detection is mathematically correct |
-
-Each language is **fully functional and independent**. You can:
-- Build just the Titan module: `build build titan/calc_core.ti`
-- Run just the Aether actor: `build run aether/calc_service.ae`
-- Use just Sylva interactively: `build sylva < sylva/main.sy`
-- Verify just the proofs: `build prove axiom/calc_proof.ax`
-
-Yet they all work seamlessly together when orchestrated through Sylva.
-
-### Project Structure
-
-```
-examples/build-calc-verified/
-├── titan/calc_core.ti          # Safe arithmetic with overflow checking
-├── aether/calc_service.ae      # Actor service wrapper
-├── sylva/main.sy               # Orchestrator (ties all four languages together)
-├── axiom/calc_proof.ax         # Formal proofs of Titan correctness
-└── README.md                    # Complete guide
-```
-
-### Learn More
-
-See `examples/build-calc-verified/README.md` for:
-- Detailed explanation of each language's role
-- How overflow detection works in Titan
-- Actor message passing patterns in Aether
-- Formal proof techniques in Axiom
-- How to run each language independently
-- How to extend the demo
-
-**This is production code.** It's not a tutorial or stub — it's a real, working system that solves a real problem (verified arithmetic) using all four Omnisystem languages in concert.
-
----
-
-## Content-Addressed Packages
-
-Omnisystem has a package manager based on **content addressing**. This means packages are verified by their hash, making builds reproducible and secure.
-
-### Publish a module
+**"linker not found"**
 ```bash
-$ build publish titan/math.ti --trust 70
-Published: titan/math
-  Type: ti
-  Hash: 2aa62a0a1e1b1fe3 (full: 2aa62a0a1e1b1fe30ef400d7a4264130...)
-  Trust score: 70/100
-  Stored in: .build-registry/modules/2aa62a0a1e1b1fe3.ti
+# Linux: Install build essentials
+sudo apt-get install build-essential
+
+# macOS: Install Xcode tools
+xcode-select --install
+
+# Windows: Install Visual C++ build tools
 ```
 
-### List published modules
+### Runtime Issues
+
+**"connection refused" (database)**
 ```bash
-$ build registry list
-Published modules (1 total):
+# Check if database is running
+ps aux | grep postgres
 
-  titan/math
-    Hash: 2aa62a0a1e1b1fe3
-    Type: ti
-    Published: 2026-05-17T05:09:12.154466
-    Trust: 70/100
+# Start PostgreSQL
+brew services start postgresql  # macOS
+sudo systemctl start postgresql # Linux
 ```
 
-### Import by hash in the REPL
-```
-sylva> import 2aa62a0a as math
-  Imported math from registry (hash: 2aa62a0a)
-sylva> math::add_nums(10, 20)
-  = 30
-```
-
-The hash is verified automatically; if the file was corrupted, the import would fail.
-
----
-
-## Directory Structure
-
-```
-hello_omni/
-  examples/
-    hello_world.build          # Titan + Aether smoke test
-  src/
-    main.ti                   # Your Titan code goes here
-    actors.ae                 # Your Aether code goes here
-  tests/
-    unit_tests.sy             # Sylva tests
-  .build/
-    config.toml               # Project settings
-  README.md
+**"permission denied" (scripts)**
+```bash
+# Make scripts executable
+chmod +x scripts/*.sh
+./scripts/build_all.sh
 ```
 
----
+### Development Issues
 
-## What's Working in Beta 0.1?
+**"language server crashed"**
+```bash
+# Reinstall rust-analyzer
+rustup component add rust-analyzer --force-non-host
+```
 
-✅ **Sylva REPL** — Expressions, variables, function calls, time-travel  
-✅ **Titan Compiler** — Stage 0 and Stage 3B self-hosting, LLVM backend  
-✅ **Aether Actors** — Multi-node runtime with supervision trees, CRDT sync  
-✅ **Axiom Kernel** — De Bruijn kernel, formal proofs, trust-score integration  
-✅ **Time-Travel Debugger** — Trace, rewind, replay, breakpoints  
-✅ **Package Manager** — DHT-based content-addressed registry, global distribution  
-✅ **Telemetry** — Event tracing, actor supervision, capability auditing  
-✅ **Omni Studio LSP** — Go-to-definition, hover, diagnostics, completion, dataflow  
-✅ **Omni Lingua Daemon** — File watcher, C/Python/JavaScript translation  
-✅ **Four-Language Integration** — Titan, Aether, Sylva, Axiom all production-ready  
-
----
-
-## Known Limitations (Beta 0.1)
-
-- Axiom UI not yet integrated into Omni Studio (proving available via CLI)
-- Omni Studio extension for VS Code pending marketplace approval (Phase 4)
-- Standard library is minimal (expanding in Phase 4)
-- Performance optimization in progress (expect 10-20x speedups before 1.0)
+**"tests hanging"**
+```bash
+# Run with timeout
+cargo test --workspace -- --test-threads=1 --timeout 30
+```
 
 ---
 
 ## Next Steps
 
-1. **See all four languages in action:** Run `examples/build-calc-verified/` (start here!)
-2. **Explore the examples:** Look at `examples/web_service/` and `examples/data_pipeline/`
-3. **Read the CHANGELOG:** See all features and the roadmap
-4. **Join the community:** https://github.com/omnilang/omnisystem/discussions
-5. **Report bugs:** https://github.com/omnilang/omnisystem/issues
+1. **Read Architecture Guide**: `docs/ARCHITECTURE.md`
+2. **Review Contributing**: `docs/CONTRIBUTING.md`
+3. **Explore Services**: Start with PATHFINDER services in `Omnisystem/crates/pathfinder-*`
+4. **Run Examples**: Check `docs/examples/` for sample code
+5. **Join Community**: See `CONTRIBUTING.md` for communication channels
 
 ---
 
-## Help & Community
+## Support
 
-- **Documentation:** https://omnilang.org/docs
-- **GitHub:** https://github.com/omnilang/omnisystem
-- **Discord:** https://discord.gg/omnisystem
-- **Email:** support@omnilang.org
+- **GitHub Repository**: https://github.com/LoopyLuci/Omnisystem
+- **Issues**: https://github.com/LoopyLuci/Omnisystem/issues
+- **Discussions**: https://github.com/LoopyLuci/Omnisystem/discussions
+- **API Reference**: Run `cargo doc --open`
 
-Welcome to the Omnisystem. Let's build the next generation of secure, verifiable software.
+---
+
+**Happy coding with Omnisystem!** 🚀

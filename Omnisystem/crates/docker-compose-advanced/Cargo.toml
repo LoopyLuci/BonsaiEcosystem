@@ -1,0 +1,25 @@
+[package]
+name = "docker-compose-advanced"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "docker_compose_advanced"
+path = "src/lib.rs"
+
+[[bin]]
+name = "docker_compose_advanced_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

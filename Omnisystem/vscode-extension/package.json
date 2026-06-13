@@ -1,0 +1,201 @@
+{
+  "name": "omnisystem-polyglot",
+  "displayName": "Omnisystem Polyglot",
+  "description": "Multi-language development for 750+ programming languages with unified polyglot support",
+  "version": "1.0.0",
+  "publisher": "omnisystem",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "polyglot",
+    "multi-language",
+    "omnisystem",
+    "750-languages",
+    "language-server"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omnisystem/vscode-polyglot"
+  },
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguage:assembly",
+    "onLanguage:c",
+    "onLanguage:cpp",
+    "onLanguage:python",
+    "onLanguage:javascript",
+    "onLanguage:rust",
+    "onLanguage:java",
+    "onLanguage:go",
+    "*"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "omnisystem.selectLanguage",
+        "title": "Omnisystem: Select Language",
+        "category": "Omnisystem"
+      },
+      {
+        "command": "omnisystem.executePolyglot",
+        "title": "Omnisystem: Execute Polyglot Code",
+        "category": "Omnisystem"
+      },
+      {
+        "command": "omnisystem.showLanguageChain",
+        "title": "Omnisystem: Show Language Chain",
+        "category": "Omnisystem"
+      },
+      {
+        "command": "omnisystem.searchMarketplace",
+        "title": "Omnisystem: Search Module Marketplace",
+        "category": "Omnisystem"
+      },
+      {
+        "command": "omnisystem.convertLanguage",
+        "title": "Omnisystem: Convert Code Between Languages",
+        "category": "Omnisystem"
+      },
+      {
+        "command": "omnisystem.showDocumentation",
+        "title": "Omnisystem: Show Language Documentation",
+        "category": "Omnisystem"
+      }
+    ],
+    "languages": [
+      {
+        "id": "omnisystem-polyglot",
+        "aliases": [
+          "Omnisystem Polyglot",
+          "polyglot"
+        ],
+        "extensions": [
+          ".polyglot",
+          ".omni"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "omnisystem-polyglot",
+        "scopeName": "source.polyglot",
+        "path": "./syntaxes/polyglot.tmLanguage.json"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "omnisystemLanguages",
+          "name": "Languages (750+)",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "id": "omnisystemModules",
+          "name": "Polyglot Modules",
+          "when": "workspaceFolderCount > 0"
+        }
+      ],
+      "activitybar": [
+        {
+          "id": "omnisystem",
+          "title": "Omnisystem",
+          "icon": "resources/omnisystem.svg"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "omnisystem",
+          "title": "Omnisystem",
+          "icon": "resources/omnisystem.svg"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Omnisystem Polyglot",
+      "properties": {
+        "omnisystem.enableAutoComplete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable autocomplete across all 750+ languages"
+        },
+        "omnisystem.enableLinting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time linting for all languages"
+        },
+        "omnisystem.enableFormatting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable code formatting for all languages"
+        },
+        "omnisystem.defaultLanguage": {
+          "type": "string",
+          "default": "assembly",
+          "description": "Default language for new polyglot files"
+        },
+        "omnisystem.marketplaceUrl": {
+          "type": "string",
+          "default": "https://marketplace.omnisystem.dev",
+          "description": "URL of the polyglot module marketplace"
+        },
+        "omnisystem.enableDebugger": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable debugger for all 750+ languages"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "omnisystem.executePolyglot",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "omnisystem.showLanguageChain",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "omnisystem.convertLanguage",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  }
+}

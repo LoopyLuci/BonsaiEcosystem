@@ -1,0 +1,29 @@
+[module]
+name = "omnisystem-messaging"
+version = "1.0.0"
+description = "Sovereign messaging framework - SMTP/IMAP/P2P email with encryption and spam filtering"
+author = "Omnisystem Team"
+
+[module.capabilities]
+"messaging:smtp" = { enabled = true, description = "SMTP server" }
+"messaging:imap" = { enabled = true, description = "IMAP server" }
+"messaging:p2p" = { enabled = true, description = "P2P messaging" }
+"messaging:encryption" = { enabled = true, description = "End-to-end encryption" }
+"messaging:spam-filter" = { enabled = true, description = "Spam filtering" }
+
+[omnios_mode]
+p2p_delivery = true
+remote_storage = true
+
+[bonsai_mode]
+p2p_delivery = false
+remote_storage = false
+
+[module.config]
+smtp_enabled = true
+imap_enabled = true
+p2p_enabled = true
+smtp_port = 25
+imap_port = 143
+encryption_enabled = true
+spam_filter_enabled = true

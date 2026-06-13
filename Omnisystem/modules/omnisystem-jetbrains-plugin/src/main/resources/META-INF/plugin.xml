@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idea-plugin>
+  <id>com.omnisystem.ideaplugin</id>
+  <name>Omnisystem Module Manager</name>
+  <vendor>Omnisystem</vendor>
+  <description>Omnisystem module management and real-time monitoring for JetBrains IDEs</description>
+  <version>1.0.0</version>
+
+  <idea-version since-build="213.0"/>
+
+  <depends>com.intellij.modules.platform</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Tool Window for Status Display -->
+    <toolWindow
+        id="Omnisystem"
+        secondary="false"
+        icon="AllIcons.General.Settings"
+        anchor="right"
+        factoryClass="com.omnisystem.ideaplugin.OmnisystemToolWindowFactory"/>
+
+    <!-- Status Bar Widget -->
+    <statusBarWidgetFactory
+        implementation="com.omnisystem.ideaplugin.OmnisystemStatusBarWidgetFactory"
+        id="OmnisystemStatus"
+        order="before editorPosition"/>
+
+    <!-- Settings Page -->
+    <projectConfigurable
+        instance="com.omnisystem.ideaplugin.OmnisystemSettings"
+        parentId="tools"
+        displayName="Omnisystem"/>
+
+    <!-- Project Service -->
+    <projectService
+        serviceImplementation="com.omnisystem.ideaplugin.OmnisystemService"/>
+  </extensions>
+
+  <actions>
+    <!-- Module Management Actions -->
+    <action
+        id="Omnisystem.ShowDashboard"
+        class="com.omnisystem.ideaplugin.actions.ShowDashboardAction"
+        text="Show Omnisystem Dashboard"
+        description="Show Omnisystem status dashboard"
+        icon="AllIcons.General.Settings">
+      <keyboard-shortcut keymap="$default" first-keystroke="alt shift O"/>
+    </action>
+
+    <action
+        id="Omnisystem.ListModules"
+        class="com.omnisystem.ideaplugin.actions.ListModulesAction"
+        text="List Modules"
+        description="List all Omnisystem modules"/>
+
+    <action
+        id="Omnisystem.ToggleModule"
+        class="com.omnisystem.ideaplugin.actions.ToggleModuleAction"
+        text="Toggle Module"
+        description="Enable/disable a module"/>
+
+    <action
+        id="Omnisystem.ListCapabilities"
+        class="com.omnisystem.ideaplugin.actions.ListCapabilitiesAction"
+        text="List Capabilities"
+        description="List all capabilities"/>
+
+    <action
+        id="Omnisystem.ToggleCapability"
+        class="com.omnisystem.ideaplugin.actions.ToggleCapabilityAction"
+        text="Toggle Capability"
+        description="Enable/disable a capability"/>
+
+    <action
+        id="Omnisystem.SwitchMode"
+        class="com.omnisystem.ideaplugin.actions.SwitchModeAction"
+        text="Switch Mode"
+        description="Switch between OmniOS and Bonsai mode"/>
+
+    <action
+        id="Omnisystem.HealthCheck"
+        class="com.omnisystem.ideaplugin.actions.HealthCheckAction"
+        text="Health Check"
+        description="Run Omnisystem health check"/>
+
+    <!-- Add to Tools menu -->
+    <group id="Omnisystem.ToolsMenu" text="Omnisystem" popup="true">
+      <reference ref="Omnisystem.ShowDashboard"/>
+      <reference ref="Omnisystem.ListModules"/>
+      <reference ref="Omnisystem.ToggleModule"/>
+      <separator/>
+      <reference ref="Omnisystem.ListCapabilities"/>
+      <reference ref="Omnisystem.ToggleCapability"/>
+      <separator/>
+      <reference ref="Omnisystem.SwitchMode"/>
+      <reference ref="Omnisystem.HealthCheck"/>
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+    </group>
+  </actions>
+
+  <listeners>
+    <listener
+        class="com.omnisystem.ideaplugin.OmnisystemProjectListener"
+        topic="com.intellij.openapi.project.ProjectManagerListener"/>
+  </listeners>
+</idea-plugin>

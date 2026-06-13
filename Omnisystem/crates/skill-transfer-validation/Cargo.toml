@@ -1,0 +1,25 @@
+[package]
+name = "skill-transfer-validation"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "skill_transfer_validation"
+path = "src/lib.rs"
+
+[[bin]]
+name = "skill_transfer_validation_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

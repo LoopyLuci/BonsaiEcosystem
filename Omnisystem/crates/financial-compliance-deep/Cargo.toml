@@ -1,0 +1,25 @@
+[package]
+name = "financial-compliance-deep"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "financial_compliance_deep"
+path = "src/lib.rs"
+
+[[bin]]
+name = "financial_compliance_deep_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

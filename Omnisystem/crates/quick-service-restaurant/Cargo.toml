@@ -1,0 +1,25 @@
+[package]
+name = "quick-service-restaurant"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "quick_service_restaurant"
+path = "src/lib.rs"
+
+[[bin]]
+name = "quick_service_restaurant_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

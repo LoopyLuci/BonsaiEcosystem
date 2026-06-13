@@ -1,0 +1,8 @@
+{"domain":"programming","hash":"7a0ecbe69cc3497cabcf041c52513f93df6bc1c64e30d726ff3b9eb98ed69ca3","quality_score":0.9,"content":"Recursion is a technique where a function calls itself","confidence":0.85}
+{"domain":"science","hash":"3eca2dc2e1ec41effd0fcca9597318ac71a126057bb52afb64eb2a3c985412fc","quality_score":0.97,"content":"Photosynthesis is the process by which plants convert light energy into chemical energy","confidence":0.92}
+{"domain":"science","hash":"d48a0463cce001d55e6a4b1889a4e1f244071cc70d73dfef056844a6c1d3a375","quality_score":0.99,"content":"DNA carries genetic information in living organisms","confidence":0.94}
+{"domain":"programming","hash":"d89a9e096a6c57306be8b8e5e713a3cf0a305d9f0b33a4e9cc507885fe82b703","quality_score":0.93,"content":"Object-oriented programming uses classes and objects to structure code","confidence":0.88}
+{"confidence":0.85,"content":"Recursion is a technique where a function calls itself","hash":"7a0ecbe69cc3497cabcf041c52513f93df6bc1c64e30d726ff3b9eb98ed69ca3","quality_score":0.9,"domain":"programming"}
+{"confidence":0.94,"content":"DNA carries genetic information in living organisms","hash":"d48a0463cce001d55e6a4b1889a4e1f244071cc70d73dfef056844a6c1d3a375","quality_score":0.99,"domain":"science"}
+{"confidence":0.88,"content":"Object-oriented programming uses classes and objects to structure code","hash":"d89a9e096a6c57306be8b8e5e713a3cf0a305d9f0b33a4e9cc507885fe82b703","quality_score":0.93,"domain":"programming"}
+{"confidence":0.92,"content":"Photosynthesis is the process by which plants convert light energy into chemical energy","hash":"3eca2dc2e1ec41effd0fcca9597318ac71a126057bb52afb64eb2a3c985412fc","quality_score":0.97,"domain":"science"}

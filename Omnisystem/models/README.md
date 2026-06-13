@@ -1,354 +1,228 @@
-# Omnisystem Models
+# BonsAI Models
 
-Complete reference guide to all models within the Omnisystem ecosystem.
+Unified model system integrating Octopus AI, Poe AI, and the BonsAI Foundation model registry.
 
----
+## Quick Start
 
-## AI Model Inventory
+### List All Available Models
 
-| Model | Type | Status | Location |
-|-------|------|--------|----------|
-| **Octopus** | Vision-Language Fine-tuned | ✅ Ready | `Z:\Projects\BonsaiWorkspace\models\trained-models\octopus-ai/` |
-| **Poe** | Personality-based Agent | 🔄 Training | `Z:\Projects\BonsaiWorkspace\models\trained-models\poe-ai/` |
-| **Omni-AI Registry** | Model Management System | ✅ Ready | `Omnisystem/build-ai/registry/` |
-
----
-
-## 1. Octopus
-
-### Overview
-Fine-tuned vision-language model based on instruction-following architecture. Originally trained as part of the Bonsai ecosystem, now integrated as **Omni-AI Octopus** within the Omnisystem.
-
-### Files & Location
-```
-Bonsai Ecosystem (workspace-local):
-  Z:\Projects\BonsaiWorkspace\models\trained-models\octopus-ai/
-    ├── pytorch_model.bin         (312 MB)
-    ├── config.json               (Model config)
-    ├── tokenizer.json            (BPE tokenizer)
-    ├── special_tokens_map.json   (Special tokens)
-    └── training_args.bin         (Training metadata)
-
-Public Reference (in repo):
-  Omnisystem/models/octopus-ai/
-    └── README.md                 (Instructions to access model)
+```bash
+python models/model_selector.py summary
 ```
 
-### Training Specification
-- **Base Model**: Llama-2 7B
-- **Training Data**: 9,000 instruction-response pairs
-- **Validation Data**: 1,000 examples
-- **Fine-tuning Method**: LoRA (Low-Rank Adaptation)
-- **LoRA Rank**: 16
-- **LoRA Alpha**: 32
-- **Merged**: Yes (adapter merged into base model)
+### Get Model Info
 
-### Capabilities
-✅ Visual reasoning and understanding  
-✅ Instruction following with high fidelity  
-✅ Context-aware responses  
-✅ Domain-specific knowledge (training corpus)
-
-### Integration with Omnisystem
-Within the Omnisystem, Octopus is used as:
-- **Language model component** for natural language processing in `sylva/` runtime
-- **Knowledge base** for fact retrieval in `axiom/` proof tactics
-- **Decision engine** for `uvm/` validation mesh strategies
-
-### Using Omni-AI Octopus
-
-**In Titan code:**
-```titan
-extern "build-ai" {
-    fn octopus_infer(prompt: i64, max_tokens: i64) -> i64;
-    fn octopus_load_context(context_hash: i64) -> i64;
-}
-
-pub fn perform_reasoning(query_hash: i64) -> i64 {
-    // Dispatch to Omni-AI Octopus
-    let response = octopus_infer(query_hash, 256);
-    return response;
-}
+```bash
+python models/model_selector.py info --model octopus-ai
 ```
 
-**In Python (for training):**
-```python
-from omnisystem.omni_ai.octopus import OctopusModel
+### Find Model Path
 
-model = OctopusModel.load("Z:\\Projects\\BonsaiWorkspace\\models\\trained-models\\octopus-ai")
-output = model.infer("What is the Omnisystem?", max_tokens=256)
+```bash
+python models/model_selector.py path --model octopus-ai
 ```
 
-### Files
-- `Omnisystem/models/octopus-ai/README.md` – Access instructions
-- `Omnisystem/models/configs/omnisystem-octopus-config.json` – Configuration
+### Filter by Type
 
----
-
-## 2. Poe
-
-### Overview
-Personality-based AI agent for collaborative reasoning within the Omnisystem. Originally developed as **Poe** in the Bonsai ecosystem, now branded as **Omni-AI Poe** for consistency.
-
-### Architecture
-```
-Omni-AI Poe System:
-├── Personality Module       (AC_POE_PERSONALITY.md)
-├── Knowledge Database       (kdb-modules/)
-├── Reasoning Engine         (crates/poe-core/)
-├── Bonsai Bridge           (Now: Omnisystem integration)
-├── Mesh Networking         (crates/poe-mesh/)
-└── Manifestation Layer     (crates/poe-manifestation/)
+```bash
+python models/model_selector.py list --type octopus
+python models/model_selector.py list --type poe
+python models/model_selector.py list --type bonsai
 ```
 
-### Components
+## Available Models
 
-**Personality Definition**
-- **Name**: Poe (within Omnisystem context: Omni-AI Poe)
-- **Role**: Collaborative research agent
-- **Communication Style**: Socratic, question-driven
-- **Knowledge Base**: Integrated with Omnisystem proof tactics
+### Octopus AI
+**Server Management Assistant**
 
-**Knowledge Modules** (`Z:\Projects\BonsaiWorkspace\models\trained-models\poe-ai\kdb-modules/`)
-- Axiom proof techniques
-- Formal verification patterns
-- Distributed system reasoning
-- Security properties verification
+- **Base**: DistilGPT-2 (82M parameters)
+- **Fine-tuning**: LoRA (rank-4, alpha-8)
+- **Size**: 312 MB
+- **Status**: Production-ready
+- **Capabilities**: Server administration, system Q&A, configuration guidance, troubleshooting
+- **Location**: See [models/trained-models/octopus-ai/README.md](trained-models/octopus-ai/README.md)
 
-**Core Implementation** (`Z:\Projects\BonsaiWorkspace\models\trained-models\poe-ai\src/`)
-- Reasoning pipeline
-- Context management
-- Response generation
+### Poe AI
+**Pattern of Expression Model**
 
-### Integration with Omnisystem
-Omni-AI Poe is used as:
-- **Proof assistant** for `axiom/` theorem proving
-- **Validator** for `uvm/` chaos testing strategies
-- **Analyst** for service correctness in `titan/axlib/`
+- **Type**: Personality-driven expression architecture
+- **Framework**: Hybrid Rust implementation
+- **Components**: Core, Boot, Mesh, Manifestation, BonsAI Bridge, Simulation
+- **Status**: Architecture-ready, training in development
+- **Capabilities**: Nuanced expression, context understanding, multi-domain knowledge
+- **Location**: See [models/trained-models/poe-ai/README.md](trained-models/poe-ai/README.md)
 
-### Using Omni-AI Poe
+### BonsAI Foundation
+**Model Registry & Inference System**
 
-**In Axiom proofs:**
-```axiom
-theorem service_safety :
-  (let poe_analysis := omni_ai_poe.analyze_service(service_spec)
-   in poe_analysis.is_safe)
-```
-
-**In UVM validation:**
-```titan
-pub fn validate_with_poe(test_case: i64) -> i64 {
-    let poe_verdict = omni_ai_poe_perform(test_case);
-    if poe_verdict == SAFE { return 1; }
-    return 0;
-}
-```
-
-### Status
-- ✅ Personality defined
-- ✅ Architecture documented
-- ✅ Core modules implemented
-- 🔄 Full model training in progress
-- 🔄 Omnisystem integration in progress
-
-### Files
-- `Omnisystem/build-ai/poe/AC_POE_PERSONALITY.md` – Personality definition
-- `Omnisystem/build-ai/poe/context.md` – Philosophy and approach
-- `Omnisystem/build-ai/poe/src/` – Source code
-- `Omnisystem/build-ai/poe/kdb-modules/` – Knowledge base
-- `Omnisystem/build-ai/poe/config/` – Configuration
-
----
-
-## 3. Omni-AI Registry & Management
-
-### Overview
-Central model discovery, registration, and management system for all AI models within the Omnisystem. Renamed from **BonsAI Model System** to **Omni-AI Registry** for consistency.
-
-### Components
-
-**Omni-AI Registry** (`Omnisystem/build-ai/registry/`)
-- Model registration and discovery
-- Version tracking
-- Hardware requirement specification
-- Metadata management
-
-**Omni-AI Scanner** (`Omnisystem/build-ai/scanner/`)
-- Automatically discovers available models
-- Catalogs models with metadata
-- Validates model integrity
-
-**Omni-AI Converter** (`Omnisystem/build-ai/converter/`)
-- Format conversion (PyTorch ↔ ONNX ↔ GGUF ↔ SPIR-V)
-- Quantization (FP32 → FP16 → INT8)
-- Model optimization for target hardware
-
-### Model Registry Schema
-
-```json
-{
-  "model_id": "build-ai-octopus-v1",
-  "name": "Omni-AI Octopus",
-  "type": "vision-language-model",
-  "version": "1.0.0",
-  "size_mb": 312,
-  "base_model": "llama-2-7b",
-  "fine_tuning": {
-    "method": "lora",
-    "rank": 16,
-    "alpha": 32
-  },
-  "hardware_requirements": {
-    "vram_gb": 16,
-    "cpu_gb": 8,
-    "preferred_device": "nvidia-gpu"
-  },
-  "formats": ["pytorch", "gguf", "spir-v"],
-  "training_data": "9000 instruction-response pairs",
-  "validation_data": "1000 examples",
-  "status": "ready"
-}
-```
-
-### Using Omni-AI Registry
-
-**Discover models:**
-```python
-from omnisystem.omni_ai.registry import OmniAIRegistry
-
-registry = OmniAIRegistry()
-models = registry.list_models()
-octopus = registry.get_model("build-ai-octopus-v1")
-```
-
-**Register new model:**
-```python
-registry.register_model(
-    model_id="build-ai-custom-v1",
-    metadata={...},
-    model_path="/path/to/model"
-)
-```
-
-**Convert formats:**
-```python
-from omnisystem.omni_ai.converter import OmniAIConverter
-
-converter = OmniAIConverter()
-spir_v_model = converter.to_spirv(
-    "omnisystem/models/octopus-ai-model",
-    optimization="max-speed"
-)
-```
-
-### Files
-- `Omnisystem/build-ai/registry/` – Registry implementation
-- `Omnisystem/build-ai/scanner/` – Model discovery
-- `Omnisystem/build-ai/converter/` – Format conversion
-- `Omnisystem/models/MODEL_MANIFEST.json` – Global model manifest
-
----
+- **Components**: Registry, Scanner, Converter, Inference, Telemetry
+- **Framework**: Rust
+- **Status**: Production-ready
+- **Capabilities**: Model discovery, registration, format conversion, hardware-aware allocation
+- **Supported Formats**: PyTorch, ONNX, GGUF, TensorFlow Lite, TensorRT
 
 ## Model Directory Structure
 
 ```
-Omnisystem/
-├── models/
-│   ├── README.md (THIS FILE)
-│   │
-│   ├── octopus-ai/
-│   │   └── README.md (Reference to D:\Models\Custom\octopus-ai-model)
-│   │
-│   ├── poe-ai/
-│   │   └── README.md (Reference to build-ai/poe)
-│   │
-│   ├── configs/
-│   │   ├── omnisystem-octopus-config.json
-│   │   └── omnisystem-poe-config.json
-│   │
-│   ├── quantized/
-│   │   ├── README.md
-│   │   └── [GGUF quantized versions]
-│   │
-│   └── MODEL_MANIFEST.json (Global registry)
+models/
+├── README.md (this file)
+├── ORGANIZATION.md
+├── MODEL_MANIFEST.json
+├── model_selector.py
 │
-├── build-ai/
-│   ├── README.md (Omni-AI system overview)
-│   │
-│   ├── registry/
-│   │   ├── lib.rs (Rust implementation)
-│   │   ├── src/
-│   │   └── tests/
-│   │
-│   ├── scanner/
-│   │   ├── lib.rs
-│   │   └── src/
-│   │
-│   ├── converter/
-│   │   ├── lib.rs
-│   │   └── src/
-│   │
-│   ├── octopus/
-│   │   ├── src/
-│   │   └── tests/
-│   │
-│   └── poe/
-│       ├── AC_POE_PERSONALITY.md
-│       ├── context.md
-│       ├── src/
-│       ├── kdb-modules/
-│       ├── config/
-│       └── tests/
+├── base-models/
+│   └── README.md - Pre-trained base models
 │
-└── training-data/
-    ├── README.md
-    ├── train.jsonl (9,000 examples)
-    ├── validation.jsonl (1,000 examples)
-    └── test.jsonl
+├── quantized/
+│   ├── README.md
+│   └── [19 GGUF vocabulary files - 35 MB total]
+│
+├── configs/
+│   ├── README.md
+│   └── octopus-v1-config.json
+│
+├── checkpoints/
+│   └── [Training checkpoints and intermediate models]
+│
+└── trained-models/
+    ├── README.md - Master index of all trained models
+    ├── octopus-ai/README.md
+    └── poe-ai/README.md
 ```
 
----
+## Integration Points
 
-## AI Model Status Summary
+All models integrate seamlessly with:
 
-| Model | Original Name | Omnisystem Name | Status | Readiness |
-|-------|---------------|-----------------|--------|-----------|
-| Vision-Language | Octopus AI | **Omni-AI Octopus** | ✅ Complete | Production ready |
-| Personality Agent | Poe AI | **Omni-AI Poe** | 🔄 In Progress | Beta (architecture ready) |
-| Model System | BonsAI Model System | **Omni-AI Registry** | ✅ Complete | Production ready |
+- **BUEB**: Hardware-aware device allocation (CPU, GPU, multi-GPU)
+- **KDB**: Knowledge database integration
+- **BMF**: BonsAI messaging framework
+- **Model Selector**: Unified discovery and loading interface
 
----
+## Using Models
 
-## Migration from Bonsai to Omnisystem
+### Python Integration
 
-### Naming Convention
+```python
+from models.model_selector import ModelSelector
+
+selector = ModelSelector("models/")
+models = selector.list_all_models()
+
+octopus = selector.get_model("octopus-ai")
+print(f"Found: {octopus.name}")
+print(f"Capabilities: {octopus.capabilities}")
 ```
-Bonsai Ecosystem:          Omnisystem:
-├── Octopus AI       →     Omni-AI Octopus
-├── Poe AI           →     Omni-AI Poe
-├── BonsAI System    →     Omni-AI Registry/Scanner/Converter
-└── BonsAI Bridge    →     Omnisystem Integration Layer
+
+### Load Model with BUEB
+
+```python
+from bonsai_backend import initialize, allocate, TaskType, TaskRequirements
+from models.model_selector import ModelSelector
+
+initialize()
+requirements = TaskRequirements(task_type=TaskType.Inference)
+allocation = allocate(requirements)
+
+selector = ModelSelector("models/")
+model_path = selector.get_model_path("octopus-ai")
+# Load model using allocation device
 ```
 
-### Code Migration Path
-1. **Pure Titan integration** – All models integrated via effect system
-2. **FFI to external models** – Octopus AI loaded from `D:\Models\Custom\`
-3. **Native support** – Poe AI fully integrated within Omnisystem
-4. **Registry system** – Omni-AI Registry manages all models
+### Command Line
 
----
+```bash
+# List all models with detailed info
+python models/model_selector.py summary
+
+# Get specific model config
+python models/model_selector.py info --model octopus-ai --json
+
+# Get model location
+python models/model_selector.py path --model poe-ai
+```
+
+## Model Configuration Files
+
+Metadata files are stored in each crate's directory:
+
+- `crates/octopus-ai/model.json` - Octopus AI specifications
+- `crates/poe-ai/model.json` - Poe AI specifications (if available)
+- `crates/bonsai-model-registry/model.json` - BonsAI Foundation system
+
+Central manifest: `models/MODEL_MANIFEST.json`
+
+## Training Data
+
+Located in the repository:
+
+- `training-data/train.jsonl` - 9,000 training examples
+- `training-data/validation.jsonl` - 1,000 validation examples
+- `data/octopus-corpus/` - Domain-specific training corpus
+
+Format: JSONL (Hugging Face compatible)
+
+## Quantized Models
+
+19 pre-quantized GGUF vocabulary files available in `models/quantized/`:
+
+- CPU-optimized inference
+- ~35 MB total size
+- Ready for immediate use
+- Support for llama.cpp and GGML-based inference
+
+## Model Manifest
+
+The `MODEL_MANIFEST.json` contains:
+
+- Model definitions (name, version, location, capabilities)
+- Framework and format information
+- Hardware requirements and performance metrics
+- Integration status
+- Security metadata (public vs. private models)
+
+To regenerate or update: Edit `MODEL_MANIFEST.json` directly or use the model registry components.
+
+## Security & Privacy
+
+- **Public Models**: Stored in repository (`models/`)
+- **Private Models**: External storage (`D:\Models\Custom\`)
+- **GitHub Safe**: No sensitive locations or private paths in tracked files
+- **Protected**: `.gitignore` prevents accidental uploads
+
+For more details, see [models/trained-models/README.md](trained-models/README.md#security--storage)
+
+## Performance Benchmarks
+
+### Octopus AI (DistilGPT-2 + LoRA)
+
+**CPU (Ryzen 9 5900X, 24 cores)**
+- Latency: 200-500ms per request
+- Throughput: 2-5 queries/second
+
+**GPU (Single)**
+- Latency: 20-50ms per request
+- Throughput: 20-50 queries/second
+
+**Multi-GPU**
+- Throughput: 50-100+ queries/second
 
 ## Next Steps
 
-- [ ] Migrate Octopus AI model reference to Omnisystem
-- [ ] Complete Poe AI training with Omnisystem corpus
-- [ ] Integrate Omni-AI Registry into Omnisystem build system
-- [ ] Create Omni-AI Octopus effect handler for Titan
-- [ ] Add Omni-AI models to validation mesh (UVM)
-- [ ] Document Omni-AI API for external users
+1. **Explore Models**: Run `python models/model_selector.py summary`
+2. **Load a Model**: Use the Python API or command line
+3. **Use with BUEB**: Allocate hardware and load models dynamically
+4. **Extend System**: Add new models via `bonsai-model-registry`
+
+## Support
+
+For issues or questions:
+- Check [models/trained-models/README.md](trained-models/README.md)
+- Review individual model documentation in respective crates
+- Consult `MODEL_MANIFEST.json` for complete metadata
 
 ---
 
-**Last Updated:** 2026-06-05  
-**All Models Renamed to Omni-AI within Omnisystem Context** ✅  
-**Migration Status:** In progress
+**Last Updated**: June 3, 2026  
+**Model System Version**: 1.0  
+**Status**: Production-ready

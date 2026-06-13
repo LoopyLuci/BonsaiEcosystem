@@ -1,0 +1,200 @@
+[
+  {
+    "confidence": 0.8700000000000001,
+    "model": "vision_encoder_quantized",
+    "domain": "programming",
+    "content": "Knowledge chunk 1 for vision_encoder_quantized: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9400000000000001,
+    "model": "vision_encoder_quantized",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 2 for vision_encoder_quantized: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9,
+    "model": "vision_encoder_quantized",
+    "domain": "technology",
+    "content": "Knowledge chunk 3 for vision_encoder_quantized: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.89,
+    "model": "vision_encoder_quantized",
+    "domain": "science",
+    "content": "Knowledge chunk 4 for vision_encoder_quantized: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8,
+    "model": "vision_encoder_quantized",
+    "domain": "programming",
+    "content": "Knowledge chunk 5 for vision_encoder_quantized: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9400000000000001,
+    "model": "vision_encoder_quantized",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 6 for vision_encoder_quantized: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.89,
+    "model": "vision_encoder_quantized",
+    "domain": "technology",
+    "content": "Knowledge chunk 7 for vision_encoder_quantized: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.89,
+    "model": "vision_encoder_quantized",
+    "domain": "science",
+    "content": "Knowledge chunk 8 for vision_encoder_quantized: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "vision_encoder_quantized",
+    "domain": "programming",
+    "content": "Knowledge chunk 9 for vision_encoder_quantized: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.93,
+    "model": "vision_encoder_quantized",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 10 for vision_encoder_quantized: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.81,
+    "model": "vision_encoder_quantized",
+    "domain": "technology",
+    "content": "Knowledge chunk 11 for vision_encoder_quantized: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8200000000000001,
+    "model": "vision_encoder_quantized",
+    "domain": "science",
+    "content": "Knowledge chunk 12 for vision_encoder_quantized: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.81,
+    "model": "vision_encoder_quantized",
+    "domain": "programming",
+    "content": "Knowledge chunk 13 for vision_encoder_quantized: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9,
+    "model": "vision_encoder_quantized",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 14 for vision_encoder_quantized: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9,
+    "model": "vision_encoder_quantized",
+    "domain": "technology",
+    "content": "Knowledge chunk 15 for vision_encoder_quantized: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8700000000000001,
+    "model": "vision_encoder_quantized",
+    "domain": "science",
+    "content": "Knowledge chunk 16 for vision_encoder_quantized: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.0,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.81,
+    "model": "vision_encoder_quantized",
+    "domain": "programming",
+    "content": "Knowledge chunk 17 for vision_encoder_quantized: programming domain",
+    "chunk_type": "activation",
+    "model_size_gb": 0.0,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.92,
+    "model": "vision_encoder_quantized",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 18 for vision_encoder_quantized: mathematics domain",
+    "chunk_type": "activation",
+    "model_size_gb": 0.0,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.91,
+    "model": "vision_encoder_quantized",
+    "domain": "technology",
+    "content": "Knowledge chunk 19 for vision_encoder_quantized: technology domain",
+    "chunk_type": "activation",
+    "model_size_gb": 0.0,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.92,
+    "model": "vision_encoder_quantized",
+    "domain": "science",
+    "content": "Knowledge chunk 20 for vision_encoder_quantized: science domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 0.0,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.8500000000000001,
+    "model": "vision_encoder_quantized",
+    "domain": "programming",
+    "content": "Knowledge chunk 21 for vision_encoder_quantized: programming domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 0.0,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.91,
+    "model": "vision_encoder_quantized",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 22 for vision_encoder_quantized: mathematics domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 0.0,
+    "extraction_method": "behavioral_patterns"
+  }
+]

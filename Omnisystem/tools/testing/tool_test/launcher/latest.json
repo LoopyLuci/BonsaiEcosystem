@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "ts": "2026-05-25T15:22:01.927Z",
+  "finished_at": "2026-05-25T15:22:10.205Z",
+  "ok": true,
+  "mode": "desktop",
+  "preflight_only": false,
+  "strict_app": false,
+  "attached_existing_runtime": false,
+  "spawned_tauri": true,
+  "api_healthy": true,
+  "usb_validation_ran": false,
+  "usb_validation_ok": null,
+  "remote_surface_smoke_ran": false,
+  "remote_surface_smoke_ok": null,
+  "api_port": 11373,
+  "report_path": "Z:\\Projects\\BonsaiWorkspace\\tool_test\\launcher\\latest.json",
+  "phases": [
+    {
+      "name": "preflight",
+      "started_at": "2026-05-25T15:22:01.927Z",
+      "completed_at": "2026-05-25T15:22:02.000Z",
+      "duration_ms": 73,
+      "ok": true,
+      "details": {
+        "versions": {
+          "node": "v24.11.1",
+          "npm": "11.15.0",
+          "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+          "tauri": "tauri-cli 2.10.1"
+        },
+        "versions_source": "cache",
+        "api_port_free": true,
+        "api_healthy": false
+      },
+      "error": null
+    },
+    {
+      "name": "spawn_tauri",
+      "started_at": "2026-05-25T15:22:02.126Z",
+      "completed_at": "2026-05-25T15:22:03.121Z",
+      "duration_ms": 995,
+      "ok": true,
+      "details": {},
+      "error": null
+    },
+    {
+      "name": "wait_for_api_health",
+      "started_at": "2026-05-25T15:22:03.121Z",
+      "completed_at": "2026-05-25T15:22:10.205Z",
+      "duration_ms": 7084,
+      "ok": true,
+      "details": {
+        "timeout_ms": 1200000,
+        "active_api_port": 11373
+      },
+      "error": null
+    }
+  ],
+  "error": null
+}

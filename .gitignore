@@ -1,6 +1,21 @@
 .claude/
 
 # ============================================================================
+# BUILD ARTIFACTS (CRITICAL: never commit)
+# ============================================================================
+/target/
+**/target/
+*.pdb
+*.rlib
+*.rmeta
+/build/
+/dist/
+
+# Test results and artifacts
+Omnisystem/archive/results/
+**/polyglot-pong-results*.json
+
+# ============================================================================
 # OBSOLETE FILES & DIRECTORIES (from prior phases, no longer maintained)
 # ============================================================================
 
@@ -121,33 +136,36 @@ todo.md
 **/.vite/
 **/.vitest/
 
-# Rust / Tauri build outputs
-/target/
-bonsai-workspace/src-tauri/target/
-bonsai-workspace/src-tauri/target-ci-local/
+# Legacy/duplicate workspace folder (use workspace/ instead)
+BonsaiEcosystem/bonsai-workspace/
 
-# bonsai-bot build outputs
-bonsai-bot/target/
-bonsai-bot/target-ci-local/
-bonsai-bot/*.exe
-bonsai-bot/*.dll
+# ============================================================================
+# TEMPORARY & BUILD FILES (should not be committed)
+# ============================================================================
 
+# Temporary documentation (outdated build/test reports)
+BUILD_AND_RUN_GUIDE.md
+BUILD_TEST_REPORT.md
+IMPLEMENTATION_PROGRESS.md
+IMPLEMENTATION_SUMMARY.md
+LOCAL_TESTING_GUIDE.md
+MODULAR_CONFIG_SYSTEM_PLAN.md
+COMPLETE_DELIVERY_SUMMARY.md
+
+# Temporary Cargo files
+Omnisystem/Cargo.new.toml
+
+# Legacy root folder (locked, should be deleted manually)
+bonsai-workspace/
+bonsai-workspace.old/
+
+# Build outputs are now in layer-specific folders
+# See Omnisystem/.gitignore and BonsaiEcosystem/.gitignore
 
 # Logs and local artifacts
 **/*.log
-mcp-server.log
-mcp-server-error.log
-**/build-output.txt
-tool_test/**/latest.json
-tool_test/**/preflight.json
-tool_test/**/preflight-cache.json
-.bonsai-launcher.pid
-.mcp-server-pid
-BonsaiWorkspace.exe
-BonsaiWorkspace-*.exe
 **/__pycache__/
 **/*.pyc
-runtimes/python/__pycache__/
 
 # Stray tool-generated files
 hello.py
@@ -174,9 +192,7 @@ Thumbs.db
 **/.env.local
 **/.cache/
 **/.tmp/
-target/
 .venv/
-.venv-*/
 venv/
 env/
 

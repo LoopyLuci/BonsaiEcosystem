@@ -1,0 +1,25 @@
+[package]
+name = "data-processor-enrichment"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "data_processor_enrichment"
+path = "src/lib.rs"
+
+[[bin]]
+name = "data_processor_enrichment_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

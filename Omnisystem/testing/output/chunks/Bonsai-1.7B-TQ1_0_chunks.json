@@ -1,0 +1,200 @@
+[
+  {
+    "confidence": 0.9,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "programming",
+    "content": "Knowledge chunk 1 for Bonsai-1.7B-TQ1_0: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8600000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 2 for Bonsai-1.7B-TQ1_0: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.89,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "technology",
+    "content": "Knowledge chunk 3 for Bonsai-1.7B-TQ1_0: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.93,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "science",
+    "content": "Knowledge chunk 4 for Bonsai-1.7B-TQ1_0: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "programming",
+    "content": "Knowledge chunk 5 for Bonsai-1.7B-TQ1_0: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.91,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 6 for Bonsai-1.7B-TQ1_0: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8700000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "technology",
+    "content": "Knowledge chunk 7 for Bonsai-1.7B-TQ1_0: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "science",
+    "content": "Knowledge chunk 8 for Bonsai-1.7B-TQ1_0: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "programming",
+    "content": "Knowledge chunk 9 for Bonsai-1.7B-TQ1_0: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8500000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 10 for Bonsai-1.7B-TQ1_0: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.93,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "technology",
+    "content": "Knowledge chunk 11 for Bonsai-1.7B-TQ1_0: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8600000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "science",
+    "content": "Knowledge chunk 12 for Bonsai-1.7B-TQ1_0: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8200000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "programming",
+    "content": "Knowledge chunk 13 for Bonsai-1.7B-TQ1_0: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.89,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 14 for Bonsai-1.7B-TQ1_0: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "technology",
+    "content": "Knowledge chunk 15 for Bonsai-1.7B-TQ1_0: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8400000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "science",
+    "content": "Knowledge chunk 16 for Bonsai-1.7B-TQ1_0: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 0.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9400000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "programming",
+    "content": "Knowledge chunk 17 for Bonsai-1.7B-TQ1_0: programming domain",
+    "chunk_type": "activation",
+    "model_size_gb": 0.34,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.9,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 18 for Bonsai-1.7B-TQ1_0: mathematics domain",
+    "chunk_type": "activation",
+    "model_size_gb": 0.34,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.93,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "technology",
+    "content": "Knowledge chunk 19 for Bonsai-1.7B-TQ1_0: technology domain",
+    "chunk_type": "activation",
+    "model_size_gb": 0.34,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.91,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "science",
+    "content": "Knowledge chunk 20 for Bonsai-1.7B-TQ1_0: science domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 0.34,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.93,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "programming",
+    "content": "Knowledge chunk 21 for Bonsai-1.7B-TQ1_0: programming domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 0.34,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.8300000000000001,
+    "model": "Bonsai-1.7B-TQ1_0",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 22 for Bonsai-1.7B-TQ1_0: mathematics domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 0.34,
+    "extraction_method": "behavioral_patterns"
+  }
+]

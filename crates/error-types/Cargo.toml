@@ -1,7 +1,0 @@
-[package]
-name = "error-types"
-version = "0.1.0"
-edition = "2021"
-description = "Universal error types for the Omnisystem — replaces anyhow/thiserror for internal crates"
-
-[dependencies]

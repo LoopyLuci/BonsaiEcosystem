@@ -1,0 +1,25 @@
+[package]
+name = "alerting-configuration-ui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "alerting_configuration_ui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "alerting_configuration_ui_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

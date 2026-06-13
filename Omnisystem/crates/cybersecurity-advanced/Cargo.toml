@@ -1,0 +1,25 @@
+[package]
+name = "cybersecurity-advanced"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "cybersecurity_advanced"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cybersecurity_advanced_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

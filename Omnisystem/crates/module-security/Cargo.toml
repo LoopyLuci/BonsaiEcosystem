@@ -1,0 +1,23 @@
+[package]
+name = "module-security"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+module-interfaces = { path = "../module-interfaces" }
+universal-module-registry = { path = "../universal-module-registry" }
+tokio = { workspace = true, features = ["full"] }
+dashmap = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+chrono = { workspace = true, features = ["serde"] }
+tracing = { workspace = true }
+async-trait = "0.1"
+sha2 = "0.10"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

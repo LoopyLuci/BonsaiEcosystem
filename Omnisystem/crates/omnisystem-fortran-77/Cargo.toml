@@ -1,0 +1,25 @@
+[package]
+name = "omnisystem-fortran-77"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "omnisystem_fortran_77"
+path = "src/lib.rs"
+
+[[bin]]
+name = "omnisystem_fortran_77_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

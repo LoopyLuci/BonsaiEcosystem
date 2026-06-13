@@ -1,0 +1,25 @@
+[package]
+name = "supply-chain-analytics"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "supply_chain_analytics"
+path = "src/lib.rs"
+
+[[bin]]
+name = "supply_chain_analytics_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

@@ -1,0 +1,25 @@
+[package]
+name = "lint-treesitter-titan"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+dashmap = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[lib]
+name = "lint_treesitter_titan"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lint_treesitter_titan_cli"
+path = "src/bin/cli.rs"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+

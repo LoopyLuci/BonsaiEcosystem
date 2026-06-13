@@ -1,0 +1,200 @@
+[
+  {
+    "confidence": 0.91,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "programming",
+    "content": "Knowledge chunk 1 for sd_xl_base_1.0_Q5_K_S: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8500000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 2 for sd_xl_base_1.0_Q5_K_S: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8400000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "technology",
+    "content": "Knowledge chunk 3 for sd_xl_base_1.0_Q5_K_S: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "science",
+    "content": "Knowledge chunk 4 for sd_xl_base_1.0_Q5_K_S: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8300000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "programming",
+    "content": "Knowledge chunk 5 for sd_xl_base_1.0_Q5_K_S: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8500000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 6 for sd_xl_base_1.0_Q5_K_S: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "technology",
+    "content": "Knowledge chunk 7 for sd_xl_base_1.0_Q5_K_S: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8400000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "science",
+    "content": "Knowledge chunk 8 for sd_xl_base_1.0_Q5_K_S: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "programming",
+    "content": "Knowledge chunk 9 for sd_xl_base_1.0_Q5_K_S: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8400000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 10 for sd_xl_base_1.0_Q5_K_S: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "technology",
+    "content": "Knowledge chunk 11 for sd_xl_base_1.0_Q5_K_S: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8700000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "science",
+    "content": "Knowledge chunk 12 for sd_xl_base_1.0_Q5_K_S: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.91,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "programming",
+    "content": "Knowledge chunk 13 for sd_xl_base_1.0_Q5_K_S: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8300000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 14 for sd_xl_base_1.0_Q5_K_S: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8400000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "technology",
+    "content": "Knowledge chunk 15 for sd_xl_base_1.0_Q5_K_S: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.9400000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "science",
+    "content": "Knowledge chunk 16 for sd_xl_base_1.0_Q5_K_S: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.68,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.91,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "programming",
+    "content": "Knowledge chunk 17 for sd_xl_base_1.0_Q5_K_S: programming domain",
+    "chunk_type": "activation",
+    "model_size_gb": 1.68,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.88,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 18 for sd_xl_base_1.0_Q5_K_S: mathematics domain",
+    "chunk_type": "activation",
+    "model_size_gb": 1.68,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.8600000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "technology",
+    "content": "Knowledge chunk 19 for sd_xl_base_1.0_Q5_K_S: technology domain",
+    "chunk_type": "activation",
+    "model_size_gb": 1.68,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.8200000000000001,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "science",
+    "content": "Knowledge chunk 20 for sd_xl_base_1.0_Q5_K_S: science domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 1.68,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.91,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "programming",
+    "content": "Knowledge chunk 21 for sd_xl_base_1.0_Q5_K_S: programming domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 1.68,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.81,
+    "model": "sd_xl_base_1.0_Q5_K_S",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 22 for sd_xl_base_1.0_Q5_K_S: mathematics domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 1.68,
+    "extraction_method": "behavioral_patterns"
+  }
+]

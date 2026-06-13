@@ -1,0 +1,26 @@
+[module]
+name = "omnisystem-storage"
+version = "1.0.0"
+description = "Content-addressed storage with distributed replication"
+author = "Omnisystem Team"
+
+[module.capabilities]
+"storage:cas" = { enabled = true, description = "Content-addressed storage" }
+"storage:replication" = { enabled = true, description = "Distributed replication" }
+"storage:p2p-sync" = { enabled = true, description = "P2P synchronization" }
+"storage:compression" = { enabled = true, description = "Compression support" }
+
+[omnios_mode]
+replication_factor = 3
+p2p_replication = true
+
+[bonsai_mode]
+replication_factor = 1
+p2p_replication = false
+
+[module.config]
+cas_enabled = true
+replication_factor = 3
+storage_path = "~/.omnisystem/modules/storage/objects"
+max_object_size_mb = 1024
+p2p_replication = true

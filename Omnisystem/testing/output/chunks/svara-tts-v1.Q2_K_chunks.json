@@ -1,0 +1,200 @@
+[
+  {
+    "confidence": 0.8200000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "programming",
+    "content": "Knowledge chunk 1 for svara-tts-v1.Q2_K: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 2 for svara-tts-v1.Q2_K: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.89,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "technology",
+    "content": "Knowledge chunk 3 for svara-tts-v1.Q2_K: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.93,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "science",
+    "content": "Knowledge chunk 4 for svara-tts-v1.Q2_K: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.93,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "programming",
+    "content": "Knowledge chunk 5 for svara-tts-v1.Q2_K: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8600000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 6 for svara-tts-v1.Q2_K: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8200000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "technology",
+    "content": "Knowledge chunk 7 for svara-tts-v1.Q2_K: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "science",
+    "content": "Knowledge chunk 8 for svara-tts-v1.Q2_K: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.89,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "programming",
+    "content": "Knowledge chunk 9 for svara-tts-v1.Q2_K: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8400000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 10 for svara-tts-v1.Q2_K: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8300000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "technology",
+    "content": "Knowledge chunk 11 for svara-tts-v1.Q2_K: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "science",
+    "content": "Knowledge chunk 12 for svara-tts-v1.Q2_K: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "programming",
+    "content": "Knowledge chunk 13 for svara-tts-v1.Q2_K: programming domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.88,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 14 for svara-tts-v1.Q2_K: mathematics domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.8700000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "technology",
+    "content": "Knowledge chunk 15 for svara-tts-v1.Q2_K: technology domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "science",
+    "content": "Knowledge chunk 16 for svara-tts-v1.Q2_K: science domain",
+    "chunk_type": "qa",
+    "model_size_gb": 1.34,
+    "extraction_method": "synthetic_qa"
+  },
+  {
+    "confidence": 0.92,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "programming",
+    "content": "Knowledge chunk 17 for svara-tts-v1.Q2_K: programming domain",
+    "chunk_type": "activation",
+    "model_size_gb": 1.34,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.9400000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 18 for svara-tts-v1.Q2_K: mathematics domain",
+    "chunk_type": "activation",
+    "model_size_gb": 1.34,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.8500000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "technology",
+    "content": "Knowledge chunk 19 for svara-tts-v1.Q2_K: technology domain",
+    "chunk_type": "activation",
+    "model_size_gb": 1.34,
+    "extraction_method": "activation_clustering"
+  },
+  {
+    "confidence": 0.8700000000000001,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "science",
+    "content": "Knowledge chunk 20 for svara-tts-v1.Q2_K: science domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 1.34,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.8,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "programming",
+    "content": "Knowledge chunk 21 for svara-tts-v1.Q2_K: programming domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 1.34,
+    "extraction_method": "behavioral_patterns"
+  },
+  {
+    "confidence": 0.89,
+    "model": "svara-tts-v1.Q2_K",
+    "domain": "mathematics",
+    "content": "Knowledge chunk 22 for svara-tts-v1.Q2_K: mathematics domain",
+    "chunk_type": "behavioral",
+    "model_size_gb": 1.34,
+    "extraction_method": "behavioral_patterns"
+  }
+]
