@@ -1,4 +1,5 @@
 .claude/
+memory/
 
 # ============================================================================
 # BUILD ARTIFACTS (CRITICAL: never commit)
