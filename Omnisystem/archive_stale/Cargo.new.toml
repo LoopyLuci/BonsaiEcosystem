@@ -1,0 +1,8 @@
+[workspace]
+# Minimal workspace for UX Foundation crates during development
+resolver = "2"
+
+members = [
+    "crates/app-registry",
+    "crates/error-registry",
+]
