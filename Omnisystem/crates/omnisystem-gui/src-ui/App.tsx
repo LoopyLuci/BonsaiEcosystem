@@ -81,6 +81,52 @@ interface CodeFile {
   content?: string;
 }
 
+interface MenuItem {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: string;
+  status: string;
+}
+
+interface FeatureModule {
+  name: string;
+  category: string;
+  features: string[];
+  enabled: boolean;
+  status: string;
+}
+
+interface LintFinding {
+  file: string;
+  line: number;
+  severity: string;
+  message: string;
+}
+
+interface StubFinding {
+  file: string;
+  line: number;
+  stub_type: string;
+  severity: number;
+}
+
+interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  status: string;
+}
+
+interface AdvisorInfo {
+  id: string;
+  name: string;
+  domain: string;
+  health: string;
+  request_count: number;
+}
+
 // ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
@@ -100,17 +146,31 @@ export default function App() {
   const [codeFiles, setCodeFiles] = useState<CodeFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<CodeFile | null>(null);
 
+  // Feature state
+  const [appMenu, setAppMenu] = useState<MenuItem[]>([]);
+  const [featureModules, setFeatureModules] = useState<FeatureModule[]>([]);
+  const [lintFindings, setLintFindings] = useState<LintFinding[]>([]);
+  const [stubFindings, setStubFindings] = useState<StubFinding[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [advisors, setAdvisors] = useState<AdvisorInfo[]>([]);
+
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [m, h, e, c, t, l] = await Promise.all([
+        const [m, h, e, c, t, l, menu, features, lints, stubs, team, adv] = await Promise.all([
           invoke<SystemMetrics>("get_system_metrics"),
           invoke<HardwareInfo>("get_hardware_info"),
           invoke<APIEndpoint[]>("get_api_endpoints"),
           invoke<AppConfig>("get_configuration"),
           invoke<TestResult[]>("get_test_results"),
           invoke<string[]>("get_system_logs"),
+          invoke<MenuItem[]>("get_app_menu").catch(() => []),
+          invoke<FeatureModule[]>("get_feature_modules").catch(() => []),
+          invoke<LintFinding[]>("get_linting_results").catch(() => []),
+          invoke<StubFinding[]>("get_stub_detection_results").catch(() => []),
+          invoke<TeamMember[]>("get_team_members").catch(() => []),
+          invoke<AdvisorInfo[]>("get_advisors_status").catch(() => []),
         ]);
         setMetrics(m);
         setHardware(h);
@@ -118,6 +178,12 @@ export default function App() {
         setConfig(c);
         setTests(t);
         setLogs(l);
+        setAppMenu(menu);
+        setFeatureModules(features);
+        setLintFindings(lints);
+        setStubFindings(stubs);
+        setTeamMembers(team);
+        setAdvisors(adv);
 
         // Initialize mock data for compiler/builder
         initializeMockData();
@@ -804,6 +870,341 @@ export default function App() {
     </div>
   );
 
+  const renderLinting = () => (
+    <div className="linting-section">
+      <h2>🔍 Code Linting</h2>
+      <div className="lint-controls">
+        <button className="action-btn">📁 Lint File</button>
+        <button className="action-btn">📂 Lint Repository</button>
+        <button className="action-btn">🔧 Configure Rules</button>
+        <button className="action-btn">📊 Generate Report</button>
+      </div>
+      <div className="lint-results">
+        <h3>Linting Results ({lintFindings.length} issues)</h3>
+        {lintFindings.length > 0 ? (
+          <div className="findings-list">
+            {lintFindings.map((finding, idx) => (
+              <div key={idx} className={`finding-card ${finding.severity}`}>
+                <div className="finding-header">
+                  <span className="severity-badge">{finding.severity.toUpperCase()}</span>
+                  <span className="file-info">{finding.file}:{finding.line}</span>
+                </div>
+                <div className="finding-message">{finding.message}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="no-findings">✅ No linting issues found</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderStubDetection = () => (
+    <div className="stub-detection-section">
+      <h2>⚠️ Stub Detection</h2>
+      <div className="stub-controls">
+        <button className="action-btn">🔍 Scan Repository</button>
+        <button className="action-btn">🔧 Configure Patterns</button>
+        <button className="action-btn">🔄 Auto-Fix Stubs</button>
+        <button className="action-btn">📊 Severity Report</button>
+      </div>
+      <div className="stub-results">
+        <h3>Detected Stubs ({stubFindings.length} total)</h3>
+        {stubFindings.length > 0 ? (
+          <div className="findings-list">
+            {stubFindings.map((finding, idx) => (
+              <div key={idx} className={`stub-card severity-${finding.severity}`}>
+                <div className="stub-header">
+                  <span className="stub-type">{finding.stub_type}</span>
+                  <span className="severity-score">Severity: {finding.severity}/10</span>
+                </div>
+                <div className="stub-location">{finding.file}:{finding.line}</div>
+                <div className="stub-actions">
+                  <button className="mini-btn">✏️ Fix</button>
+                  <button className="mini-btn">🔍 Details</button>
+                  <button className="mini-btn">⏭️ Ignore</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="no-findings">✅ No stubs detected</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderBugHunting = () => (
+    <div className="bug-hunting-section">
+      <h2>🐛 Bug Hunting</h2>
+      <div className="hunt-controls">
+        <button className="action-btn">🔍 Start Hunt</button>
+        <button className="action-btn">📊 Analytics</button>
+        <button className="action-btn">🎯 Prioritize</button>
+        <button className="action-btn">📈 Trends</button>
+      </div>
+      <div className="hunt-stats">
+        <div className="stat-card">
+          <span className="stat-label">Critical Bugs</span>
+          <span className="stat-value critical">5</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">High Priority</span>
+          <span className="stat-value high">12</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Medium Priority</span>
+          <span className="stat-value medium">28</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Detection Rate</span>
+          <span className="stat-value">94.2%</span>
+        </div>
+      </div>
+      <div className="bug-list">
+        <h3>Recent Findings</h3>
+        <div className="bug-item critical">
+          <span className="bug-id">#BH-001</span>
+          <span className="bug-title">Memory leak in async handler</span>
+          <span className="bug-priority">CRITICAL</span>
+        </div>
+        <div className="bug-item high">
+          <span className="bug-id">#BH-002</span>
+          <span className="bug-title">Race condition in database sync</span>
+          <span className="bug-priority">HIGH</span>
+        </div>
+        <div className="bug-item medium">
+          <span className="bug-id">#BH-003</span>
+          <span className="bug-title">Missing null check on API response</span>
+          <span className="bug-priority">MEDIUM</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTeamManagement = () => (
+    <div className="team-management-section">
+      <h2>👥 Team Management</h2>
+      <div className="team-controls">
+        <button className="action-btn">➕ Add Member</button>
+        <button className="action-btn">🔄 Sync Teams</button>
+        <button className="action-btn">📊 Reports</button>
+        <button className="action-btn">⚙️ Settings</button>
+      </div>
+      <div className="team-members">
+        <h3>Team Members</h3>
+        {teamMembers.length > 0 ? (
+          <div className="members-grid">
+            {teamMembers.map((member) => (
+              <div key={member.id} className="member-card">
+                <div className="member-header">
+                  <span className="member-name">{member.name}</span>
+                  <span className={`status-badge ${member.status.toLowerCase()}`}>{member.status}</span>
+                </div>
+                <div className="member-role">{member.role}</div>
+                <div className="member-actions">
+                  <button className="mini-btn">👁️ View</button>
+                  <button className="mini-btn">✏️ Edit</button>
+                  <button className="mini-btn">🗑️ Remove</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No team members found</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderAdvisors = () => (
+    <div className="advisors-section">
+      <h2>🤖 AI Advisors</h2>
+      <div className="advisor-controls">
+        <button className="action-btn">➕ Register Advisor</button>
+        <button className="action-btn">📊 Metrics</button>
+        <button className="action-btn">⚙️ Configuration</button>
+        <button className="action-btn">🔄 Sync</button>
+      </div>
+      <div className="advisors-list">
+        <h3>Active Advisors</h3>
+        {advisors.length > 0 ? (
+          <div className="advisors-grid">
+            {advisors.map((advisor) => (
+              <div key={advisor.id} className={`advisor-card ${advisor.health.toLowerCase()}`}>
+                <div className="advisor-header">
+                  <span className="advisor-name">{advisor.name}</span>
+                  <span className={`health-badge ${advisor.health.toLowerCase()}`}>
+                    {advisor.health === 'Healthy' && '✅'}
+                    {advisor.health === 'Degraded' && '⚠️'}
+                    {advisor.health === 'Offline' && '❌'}
+                    {advisor.health}
+                  </span>
+                </div>
+                <div className="advisor-domain">Domain: {advisor.domain}</div>
+                <div className="advisor-stats">
+                  <span className="stat">Requests: {advisor.request_count}</span>
+                </div>
+                <div className="advisor-actions">
+                  <button className="mini-btn">📊 Details</button>
+                  <button className="mini-btn">🔧 Config</button>
+                  <button className="mini-btn">🔄 Restart</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No advisors registered</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderVoting = () => (
+    <div className="voting-section">
+      <h2>🗳️ Voting & Proposals</h2>
+      <div className="voting-controls">
+        <button className="action-btn">➕ New Proposal</button>
+        <button className="action-btn">📊 Results</button>
+        <button className="action-btn">📜 Rules</button>
+        <button className="action-btn">📈 Analytics</button>
+      </div>
+      <div className="proposals">
+        <h3>Active Proposals</h3>
+        <div className="proposal-card">
+          <div className="proposal-title">Add strict mode linting rules</div>
+          <div className="proposal-meta">
+            <span className="proposer">Proposed by: Alice Johnson</span>
+            <span className="votes">Votes: 12/25</span>
+          </div>
+          <div className="proposal-voting">
+            <button className="vote-btn yes">👍 Yes (8)</button>
+            <button className="vote-btn no">👎 No (2)</button>
+            <button className="vote-btn abstain">⏸️ Abstain (2)</button>
+          </div>
+          <div className="proposal-progress">
+            <div className="progress-bar">
+              <div className="progress-yes" style={{ width: '67%' }}></div>
+            </div>
+          </div>
+        </div>
+        <div className="proposal-card">
+          <div className="proposal-title">Implement new performance metrics</div>
+          <div className="proposal-meta">
+            <span className="proposer">Proposed by: Bob Smith</span>
+            <span className="votes">Votes: 18/25</span>
+          </div>
+          <div className="proposal-voting">
+            <button className="vote-btn yes">👍 Yes (15)</button>
+            <button className="vote-btn no">👎 No (1)</button>
+            <button className="vote-btn abstain">⏸️ Abstain (2)</button>
+          </div>
+          <div className="proposal-progress">
+            <div className="progress-bar">
+              <div className="progress-yes" style={{ width: '83%' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMarketplace = () => (
+    <div className="marketplace-section">
+      <h2>🛒 Plugin Marketplace</h2>
+      <div className="marketplace-search">
+        <input type="text" placeholder="Search plugins..." className="search-input" />
+        <select className="category-filter">
+          <option>All Categories</option>
+          <option>Code Analysis</option>
+          <option>Visualization</option>
+          <option>Integration</option>
+          <option>Performance</option>
+        </select>
+      </div>
+      <div className="plugins-grid">
+        <div className="plugin-card">
+          <div className="plugin-header">
+            <h3>Performance Analyzer</h3>
+            <span className="rating">⭐⭐⭐⭐⭐ (245)</span>
+          </div>
+          <p className="plugin-desc">Advanced performance analysis and profiling tools</p>
+          <div className="plugin-meta">
+            <span className="category">Code Analysis</span>
+            <span className="version">v2.1.0</span>
+          </div>
+          <button className="install-btn">📦 Install</button>
+        </div>
+        <div className="plugin-card">
+          <div className="plugin-header">
+            <h3>Visual Debugger</h3>
+            <span className="rating">⭐⭐⭐⭐ (189)</span>
+          </div>
+          <p className="plugin-desc">Interactive debugging with visual breakpoints and watches</p>
+          <div className="plugin-meta">
+            <span className="category">Debugging</span>
+            <span className="version">v1.8.3</span>
+          </div>
+          <button className="install-btn">📦 Install</button>
+        </div>
+        <div className="plugin-card">
+          <div className="plugin-header">
+            <h3>Data Visualizer</h3>
+            <span className="rating">⭐⭐⭐⭐⭐ (342)</span>
+          </div>
+          <p className="plugin-desc">Beautiful charts and graphs for data visualization</p>
+          <div className="plugin-meta">
+            <span className="category">Visualization</span>
+            <span className="version">v3.0.1</span>
+          </div>
+          <button className="install-btn">📦 Install</button>
+        </div>
+        <div className="plugin-card">
+          <div className="plugin-header">
+            <h3>API Tester</h3>
+            <span className="rating">⭐⭐⭐⭐ (198)</span>
+          </div>
+          <p className="plugin-desc">Comprehensive API testing and monitoring suite</p>
+          <div className="plugin-meta">
+            <span className="category">Integration</span>
+            <span className="version">v2.5.0</span>
+          </div>
+          <button className="install-btn">📦 Install</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderFeatureModules = () => (
+    <div className="feature-modules-section">
+      <h2>📦 Feature Modules</h2>
+      <div className="modules-grid">
+        {featureModules.map((module) => (
+          <div key={module.name} className={`module-card ${module.enabled ? 'enabled' : 'disabled'}`}>
+            <div className="module-header">
+              <h3>{module.name}</h3>
+              <span className={`status-badge ${module.status.toLowerCase()}`}>{module.status}</span>
+            </div>
+            <div className="module-category">{module.category}</div>
+            <div className="module-features">
+              <h4>Features:</h4>
+              <ul>
+                {module.features.map((feature, idx) => (
+                  <li key={idx}>✓ {feature}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="module-actions">
+              <button className="mini-btn">{module.enabled ? '⏸️ Disable' : '▶️ Enable'}</button>
+              <button className="mini-btn">⚙️ Config</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   // =========================================================================
   // MAIN RENDER
   // =========================================================================
@@ -839,9 +1240,17 @@ export default function App() {
         {[
           { id: "home", label: "Home", icon: "🏠" },
           { id: "dashboard", label: "Dashboard", icon: "📊" },
+          { id: "linting", label: "Linting", icon: "🔍" },
+          { id: "stub-detection", label: "Stubs", icon: "⚠️" },
+          { id: "bug-hunting", label: "Bugs", icon: "🐛" },
+          { id: "team", label: "Team", icon: "👥" },
+          { id: "advisors", label: "Advisors", icon: "🤖" },
+          { id: "voting", label: "Voting", icon: "🗳️" },
+          { id: "marketplace", label: "Market", icon: "🛒" },
+          { id: "modules", label: "Modules", icon: "📦" },
           { id: "compiler", label: "Compiler", icon: "⚙️" },
           { id: "builder", label: "Builder", icon: "🔨" },
-          { id: "editor", label: "Code Editor", icon: "✏️" },
+          { id: "editor", label: "Editor", icon: "✏️" },
           { id: "api", label: "API", icon: "🔌" },
           { id: "tests", label: "Tests", icon: "✅" },
           { id: "config", label: "Config", icon: "⚙️" },
@@ -863,6 +1272,14 @@ export default function App() {
       <main className="app-main">
         {activeTab === "home" && renderHome()}
         {activeTab === "dashboard" && renderDashboard()}
+        {activeTab === "linting" && renderLinting()}
+        {activeTab === "stub-detection" && renderStubDetection()}
+        {activeTab === "bug-hunting" && renderBugHunting()}
+        {activeTab === "team" && renderTeamManagement()}
+        {activeTab === "advisors" && renderAdvisors()}
+        {activeTab === "voting" && renderVoting()}
+        {activeTab === "marketplace" && renderMarketplace()}
+        {activeTab === "modules" && renderFeatureModules()}
         {activeTab === "compiler" && renderCompiler()}
         {activeTab === "builder" && renderBuilder()}
         {activeTab === "editor" && renderEditor()}
