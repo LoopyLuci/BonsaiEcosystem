@@ -17163,6 +17163,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnisystem-async-runtime"
+version = "1.0.0"
+
+[[package]]
 name = "omnisystem-audit-manager"
 version = "0.1.0"
 dependencies = [
@@ -17425,6 +17429,10 @@ dependencies = [
  "tokio",
  "tracing",
 ]
+
+[[package]]
+name = "omnisystem-collections"
+version = "1.0.0"
 
 [[package]]
 name = "omnisystem-collector-core"
@@ -19800,6 +19808,13 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "omnisystem-web-framework"
+version = "1.0.0"
+dependencies = [
+ "omnisystem-async-runtime",
 ]
 
 [[package]]

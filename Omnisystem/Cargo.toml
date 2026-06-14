@@ -2415,6 +2415,9 @@ members = [
     "crates/zoning-management",
     "crates/omnisystem-app",
     "crates/omnisystem-gui",
+    "crates/omnisystem-async-runtime",
+    "crates/omnisystem-collections",
+    "crates/omnisystem-web-framework",
 ]
 
 [workspace.package]
