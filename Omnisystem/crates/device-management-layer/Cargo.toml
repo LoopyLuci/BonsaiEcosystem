@@ -11,6 +11,9 @@ serde = { workspace = true }
 dashmap = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+arc-swap = { workspace = true }
 
 [lib]
 name = "device_management_layer"

@@ -2413,6 +2413,8 @@ members = [
     "crates/zero-knowledge-proofs",
     "crates/zero-trust-enforcement",
     "crates/zoning-management",
+    "crates/omnisystem-app",
+    "crates/omnisystem-gui",
 ]
 
 [workspace.package]
@@ -2441,6 +2443,7 @@ axum = "0.7"
 tower = "0.4"
 http = "1.0"
 parking_lot = "0.12"
+arc-swap = "1.9"
 
 [profile.release]
 opt-level = 3

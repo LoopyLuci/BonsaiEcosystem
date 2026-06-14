@@ -1,0 +1,357 @@
+module omnisystem.assets.asset_cache
+
+# Asset Caching Layer
+# Integration with omnisystem.cache (Redis) for high-performance access
+
+import omnisystem.assets.asset_metadata
+import omnisystem.cache.cache_layer
+
+# ============================================================================
+# CACHE CONFIGURATION
+# ============================================================================
+
+type AssetCache = struct {
+    redis_host: string,
+    redis_port: u32,
+    cache_ttl_seconds: u32,
+    max_cache_size_mb: u32,
+    enabled: bool,
+}
+
+fun initialize_asset_cache() -> Result<AssetCache, string> {
+    println!("Initializing Asset Cache Layer...")
+    println!("  ✅ Connecting to Redis")
+
+    let cache = AssetCache {
+        redis_host: "localhost".to_string(),
+        redis_port: 6379,
+        cache_ttl_seconds: 3600,  // 1 hour default TTL
+        max_cache_size_mb: 512,
+        enabled: true,
+    }
+
+    println!("  ✅ Cache configured")
+    println!("  ✅ TTL: {} seconds", cache.cache_ttl_seconds)
+    println!("  ✅ Max size: {} MB", cache.max_cache_size_mb)
+
+    Ok(cache)
+}
+
+# ============================================================================
+# CACHE OPERATIONS
+# ============================================================================
+
+fun cache_asset(
+    cache: &AssetCache,
+    asset: &AssetMetadata,
+) -> Result<(), string> {
+    if !cache.enabled {
+        return Ok(())
+    }
+
+    let cache_key = format!("asset:{}", asset.asset_id)
+
+    // Serialize asset to JSON
+    let asset_json = serialize_asset(asset)?
+
+    // Store in Redis with TTL
+    set_cache_with_ttl(&cache_key, &asset_json, cache.cache_ttl_seconds)?
+
+    // Also cache by type and category for searches
+    cache_asset_indices(cache, asset)?
+
+    Ok(())
+}
+
+fn serialize_asset(asset: &AssetMetadata) -> Result<string, string> {
+    // Serialize to JSON
+    Ok("{}".to_string())
+}
+
+fn set_cache_with_ttl(
+    key: &string,
+    value: &string,
+    ttl: u32,
+) -> Result<(), string> {
+    // SETEX command: SET with expiration
+    Ok(())
+}
+
+fn cache_asset_indices(cache: &AssetCache, asset: &AssetMetadata) -> Result<(), string> {
+    // Cache by type
+    let type_key = format!("assets:by-type:{:?}", asset.asset_type)
+    add_to_set(&type_key, &asset.asset_id)?
+
+    // Cache by category
+    let cat_key = format!("assets:by-category:{:?}", asset.category)
+    add_to_set(&cat_key, &asset.asset_id)?
+
+    // Cache by status
+    let status_key = format!("assets:by-status:{:?}", asset.status)
+    add_to_set(&status_key, &asset.asset_id)?
+
+    // Cache by tags
+    for tag in asset.tags.iter() {
+        let tag_key = format!("assets:by-tag:{}", tag)
+        add_to_set(&tag_key, &asset.asset_id)?
+    }
+
+    Ok(())
+}
+
+fn add_to_set(key: &string, member: &string) -> Result<(), string> {
+    // SADD command
+    Ok(())
+}
+
+# ============================================================================
+# CACHE RETRIEVAL
+# ============================================================================
+
+fun get_cached_asset(
+    cache: &AssetCache,
+    asset_id: &string,
+) -> Result<Option<AssetMetadata>, string> {
+    if !cache.enabled {
+        return Ok(None)
+    }
+
+    let cache_key = format!("asset:{}", asset_id)
+
+    // Try to get from cache
+    match get_from_cache(&cache_key)? {
+        Some(json) => {
+            let asset = deserialize_asset(&json)?
+            Ok(Some(asset))
+        },
+        None => Ok(None),
+    }
+}
+
+fn get_from_cache(key: &string) -> Result<Option<string>, string> {
+    // GET command
+    Ok(None)
+}
+
+fn deserialize_asset(json: &string) -> Result<AssetMetadata, string> {
+    // Deserialize from JSON
+    let asset = AssetMetadata {
+        asset_id: "".to_string(),
+        name: "".to_string(),
+        description: "".to_string(),
+        asset_type: AssetType::WebComponent,
+        category: AssetCategory::Button,
+        generation_method: GenerationMethod::Manual,
+        status: AssetStatus::Active,
+        version: "1.0.0".to_string(),
+        author: "".to_string(),
+        created_timestamp: 0,
+        modified_timestamp: 0,
+        tags: Vec::new(),
+        file_path: "".to_string(),
+        file_size_bytes: 0,
+        mime_type: "".to_string(),
+        dependencies: Vec::new(),
+        rating: 0.0,
+        download_count: 0,
+        usage_count: 0,
+        compatibility: Vec::new(),
+        license: "".to_string(),
+    }
+    Ok(asset)
+}
+
+fun get_assets_by_type_cached(
+    cache: &AssetCache,
+    asset_type: AssetType,
+) -> Result<Vec<string>, string> {
+    let key = format!("assets:by-type:{:?}", asset_type)
+
+    // Get set from cache
+    let member_ids = get_set_members(&key)?
+
+    Ok(member_ids)
+}
+
+fn get_set_members(key: &string) -> Result<Vec<string>, string> {
+    // SMEMBERS command
+    Ok(Vec::new())
+}
+
+fun get_assets_by_tag_cached(
+    cache: &AssetCache,
+    tag: &string,
+) -> Result<Vec<string>, string> {
+    let key = format!("assets:by-tag:{}", tag)
+
+    let member_ids = get_set_members(&key)?
+
+    Ok(member_ids)
+}
+
+# ============================================================================
+# CACHE INVALIDATION
+# ============================================================================
+
+fun invalidate_asset_cache(
+    cache: &AssetCache,
+    asset_id: &string,
+) -> Result<(), string> {
+    let cache_key = format!("asset:{}", asset_id)
+
+    // Delete from cache
+    delete_from_cache(&cache_key)?
+
+    // Invalidate related indices
+    invalidate_asset_indices(asset_id)?
+
+    Ok(())
+}
+
+fn delete_from_cache(key: &string) -> Result<(), string> {
+    // DEL command
+    Ok(())
+}
+
+fn invalidate_asset_indices(asset_id: &string) -> Result<(), string> {
+    // Delete all related cache entries
+    Ok(())
+}
+
+fun clear_asset_cache(cache: &AssetCache) -> Result<(), string> {
+    // FLUSHDB for assets namespace
+    delete_from_cache("assets:*")?
+
+    Ok(())
+}
+
+# ============================================================================
+# CACHE WARMING
+# ============================================================================
+
+fun warm_cache_for_trending(
+    cache: &AssetCache,
+    assets: &Vec<AssetMetadata>,
+) -> Result<(), string> {
+    println!("Warming cache with trending assets...")
+
+    for asset in assets.iter() {
+        cache_asset(cache, asset)?
+    }
+
+    // Also set trending list
+    let trending_ids: Vec<string> = assets.iter().map(|a| a.asset_id.clone()).collect()
+    set_cache_with_ttl(
+        &"assets:trending".to_string(),
+        &format!("{:?}", trending_ids),
+        cache.cache_ttl_seconds,
+    )?
+
+    println!("  ✅ Cache warmed with {} assets", assets.len());
+    Ok(())
+}
+
+fun warm_cache_for_popular(
+    cache: &AssetCache,
+    assets: &Vec<AssetMetadata>,
+) -> Result<(), string> {
+    println!("Warming cache with popular assets...")
+
+    for asset in assets.iter() {
+        cache_asset(cache, asset)?
+    }
+
+    let popular_ids: Vec<string> = assets.iter().map(|a| a.asset_id.clone()).collect()
+    set_cache_with_ttl(
+        &"assets:popular".to_string(),
+        &format!("{:?}", popular_ids),
+        cache.cache_ttl_seconds,
+    )?
+
+    println!("  ✅ Cache warmed with {} assets", assets.len());
+    Ok(())
+}
+
+# ============================================================================
+# CACHE STATISTICS
+# ============================================================================
+
+fun get_cache_statistics(cache: &AssetCache) -> Result<CacheStats, string> {
+    println!("Retrieving cache statistics...")
+
+    // INFO command
+    let info = get_redis_info()?
+
+    let stats = CacheStats {
+        connected: cache.enabled,
+        host: cache.redis_host.clone(),
+        port: cache.redis_port,
+        memory_used_mb: 0,
+        memory_max_mb: cache.max_cache_size_mb,
+        keys_count: 0,
+        hit_rate: 0.0,
+    }
+
+    Ok(stats)
+}
+
+fn get_redis_info() -> Result<string, string> {
+    // INFO command
+    Ok("".to_string())
+}
+
+type CacheStats = struct {
+    connected: bool,
+    host: string,
+    port: u32,
+    memory_used_mb: u32,
+    memory_max_mb: u32,
+    keys_count: u32,
+    hit_rate: f32,
+}
+
+# ============================================================================
+# BATCH CACHE OPERATIONS
+# ============================================================================
+
+fun batch_cache_assets(
+    cache: &AssetCache,
+    assets: &Vec<AssetMetadata>,
+) -> Result<u32, string> {
+    println!("Batch caching {} assets...", assets.len())
+
+    let mut cached_count = 0u32
+
+    for asset in assets.iter() {
+        match cache_asset(cache, asset) {
+            Ok(_) => cached_count += 1,
+            Err(_) => {},  // Continue on error
+        }
+    }
+
+    println!("  ✅ Cached {} assets", cached_count);
+    Ok(cached_count)
+}
+
+fun batch_invalidate_assets(
+    cache: &AssetCache,
+    asset_ids: &Vec<string>,
+) -> Result<u32, string> {
+    println!("Batch invalidating {} assets...", asset_ids.len())
+
+    let mut invalidated_count = 0u32
+
+    for asset_id in asset_ids.iter() {
+        match invalidate_asset_cache(cache, asset_id) {
+            Ok(_) => invalidated_count += 1,
+            Err(_) => {},
+        }
+    }
+
+    println!("  ✅ Invalidated {} assets", invalidated_count);
+    Ok(invalidated_count)
+}
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================

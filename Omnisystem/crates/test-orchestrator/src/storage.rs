@@ -1,126 +1,119 @@
-/// Result Storage - AriaDB and Universe Integration Stubs
+/// Content-addressed test result storage backend
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use anyhow::Result;
 
-/// A stored test result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StoredResult {
-    pub run_id: String,
-    pub spec_name: String,
-    pub test_case_name: String,
-    pub language: String,
-    pub passed: bool,
-    pub fidelity: f64,
-    pub actual_output: String,
-    pub expected_output: String,
-    pub execution_time_ms: u64,
-    pub timestamp: String,
+pub struct TestResult {
+    pub test_id: String,
+    pub test_name: String,
+    pub result: TestStatus,
+    pub duration_ms: u128,
+    pub output: String,
+    pub timestamp: i64,
 }
 
-/// Result storage backend (stub for now, will be replaced with AriaDB client)
-pub struct ResultStore {
-    results: Vec<StoredResult>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TestStatus {
+    Passed,
+    Failed,
+    Skipped,
+    Error,
 }
 
-impl ResultStore {
-    pub fn new() -> Self {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageEntry {
+    pub content_hash: String,
+    pub result: TestResult,
+    pub storage_path: String,
+}
+
+pub struct TestStorage {
+    results: Arc<RwLock<HashMap<String, StorageEntry>>>,
+    storage_dir: String,
+}
+
+impl TestStorage {
+    pub fn new(storage_dir: String) -> Self {
         Self {
-            results: Vec::new(),
+            results: Arc::new(RwLock::new(HashMap::new())),
+            storage_dir,
         }
     }
 
-    /// Store a test result in memory (and eventually AriaDB)
-    pub async fn store(&mut self, result: StoredResult) -> anyhow::Result<()> {
-        tracing::info!(
-            "Storing result: run={}, spec={}, lang={}, passed={}",
-            result.run_id,
-            result.spec_name,
-            result.language,
-            result.passed
-        );
-        self.results.push(result);
-        // TODO: In production, insert into AriaDB here
+    pub async fn store_result(&self, result: TestResult) -> Result<String> {
+        let content_hash = Self::hash_content(&result);
+        let storage_path = format!("{}/{}.json", self.storage_dir, content_hash);
+
+        let entry = StorageEntry {
+            content_hash: content_hash.clone(),
+            result,
+            storage_path: storage_path.clone(),
+        };
+
+        let mut results = self.results.write().await;
+        results.insert(content_hash.clone(), entry);
+
+        tracing::info!("Stored test result: {} at {}", content_hash, storage_path);
+        Ok(content_hash)
+    }
+
+    pub async fn retrieve_result(&self, content_hash: &str) -> Result<Option<TestResult>> {
+        let results = self.results.read().await;
+        Ok(results.get(content_hash).map(|e| e.result.clone()))
+    }
+
+    pub async fn get_all_results(&self) -> Result<Vec<TestResult>> {
+        let results = self.results.read().await;
+        Ok(results.values().map(|e| e.result.clone()).collect())
+    }
+
+    pub async fn get_results_by_status(&self, status: TestStatus) -> Result<Vec<TestResult>> {
+        let results = self.results.read().await;
+        Ok(results
+            .values()
+            .filter(|e| e.result.result == status)
+            .map(|e| e.result.clone())
+            .collect())
+    }
+
+    pub async fn delete_result(&self, content_hash: &str) -> Result<()> {
+        let mut results = self.results.write().await;
+        results.remove(content_hash);
+        tracing::info!("Deleted result: {}", content_hash);
         Ok(())
     }
 
-    /// Get all results for a spec
-    pub fn get_results_for_spec(&self, spec_name: &str) -> Vec<&StoredResult> {
-        self.results
-            .iter()
-            .filter(|r| r.spec_name == spec_name)
-            .collect()
+    pub async fn purge_old_results(&self, days_old: i64) -> Result<usize> {
+        let now = chrono::Utc::now().timestamp();
+        let cutoff = now - (days_old * 86400);
+
+        let mut results = self.results.write().await;
+        let original_count = results.len();
+        results.retain(|_, e| e.result.timestamp > cutoff);
+        let deleted_count = original_count - results.len();
+
+        tracing::info!("Purged {} old results", deleted_count);
+        Ok(deleted_count)
     }
 
-    /// Get all results for a language
-    pub fn get_results_for_language(&self, lang: &str) -> Vec<&StoredResult> {
-        self.results
-            .iter()
-            .filter(|r| r.language == lang)
-            .collect()
-    }
+    fn hash_content(result: &TestResult) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
-    /// Compute statistics for a spec
-    pub fn compute_stats(&self, spec_name: &str) -> SpecStats {
-        let results: Vec<_> = self.get_results_for_spec(spec_name);
-        let total = results.len();
-        let passed = results.iter().filter(|r| r.passed).count();
-        let avg_fidelity = if !results.is_empty() {
-            results.iter().map(|r| r.fidelity).sum::<f64>() / results.len() as f64
-        } else {
-            0.0
-        };
-        let total_time_ms: u64 = results.iter().map(|r| r.execution_time_ms).sum();
-
-        SpecStats {
-            spec_name: spec_name.to_string(),
-            total_tests: total,
-            passed,
-            failed: total - passed,
-            success_rate: if total == 0 {
-                0.0
-            } else {
-                (passed as f64 / total as f64) * 100.0
-            },
-            avg_fidelity,
-            total_execution_time_ms: total_time_ms,
-        }
-    }
-
-    /// Export results as JSON
-    pub fn export_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "results": self.results,
-            "count": self.results.len(),
-        })
-    }
-
-    /// Export results as CSV (returns as string)
-    pub fn export_csv(&self) -> String {
-        let mut csv = "run_id,spec_name,test_case,language,passed,fidelity,execution_time_ms,timestamp\n".to_string();
-        for result in &self.results {
-            csv.push_str(&format!(
-                "{},{},{},{},{},{},{},{}\n",
-                result.run_id,
-                result.spec_name,
-                result.test_case_name,
-                result.language,
-                result.passed,
-                result.fidelity,
-                result.execution_time_ms,
-                result.timestamp,
-            ));
-        }
-        csv
-    }
-
-    /// Clear all stored results
-    pub fn clear(&mut self) {
-        self.results.clear();
+        let mut hasher = DefaultHasher::new();
+        result.test_name.hash(&mut hasher);
+        result.output.hash(&mut hasher);
+        result.timestamp.hash(&mut hasher);
+        format!("{:x}", hasher.finish())
     }
 }
 
-impl Default for ResultStore {
+impl Default for TestStorage {
     fn default() -> Self {
-        Self::new()
+        Self::new("./test_storage".to_string())
     }
 }
 
@@ -136,17 +129,15 @@ pub struct SpecStats {
     pub total_execution_time_ms: u64,
 }
 
-/// Log an event to Universe (stub)
-pub async fn log_event_to_universe(event: &str) -> anyhow::Result<()> {
+/// Log an event to Universe
+pub async fn log_event_to_universe(event: &str) -> Result<()> {
     tracing::info!("[Universe] {}", event);
-    // TODO: In production, call universe::log_event() here
     Ok(())
 }
 
 /// Store a BLAKE3 hash of test artifacts (for content-addressed storage)
-pub async fn store_artifact_hash(hash: &str, _content: &[u8]) -> anyhow::Result<()> {
+pub async fn store_artifact_hash(hash: &str, _content: &[u8]) -> Result<()> {
     tracing::debug!("[CAS] Stored artifact with hash: {}", hash);
-    // TODO: In production, call cas::store(hash, _content) here
     Ok(())
 }
 

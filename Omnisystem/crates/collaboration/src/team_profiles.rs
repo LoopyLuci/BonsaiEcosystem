@@ -104,8 +104,8 @@ impl TeamProfileManager {
         // Store in cache
         self.profiles_cache.insert(profile.profile_id.clone(), profile.clone());
 
-        // TODO: Persist to database
-        // self.persist_profile(&profile).await?;
+        // Persist to database
+        self.persist_profile(&profile).await?;
 
         tracing::info!("Created team profile: {}", profile.profile_id);
         Ok(profile)
@@ -118,8 +118,11 @@ impl TeamProfileManager {
             return Ok(Some(profile.clone()));
         }
 
-        // TODO: Load from database
-        // let profile = self.load_profile(profile_id).await?;
+        // Load from database
+        if let Some(profile) = self.load_profile(profile_id).await? {
+            self.profiles_cache.insert(profile_id.to_string(), profile.clone());
+            return Ok(Some(profile));
+        }
 
         Ok(None)
     }
@@ -141,8 +144,8 @@ impl TeamProfileManager {
         self.profiles_cache
             .insert(profile.profile_id.clone(), profile.clone());
 
-        // TODO: Persist to database
-        // self.persist_profile(&profile).await?;
+        // Persist to database
+        self.persist_profile(&profile).await?;
 
         tracing::info!("Updated profile: {}", profile.profile_id);
         Ok(())
@@ -152,10 +155,44 @@ impl TeamProfileManager {
     pub async fn delete_profile(&self, profile_id: &str) -> Result<()> {
         self.profiles_cache.remove(profile_id);
 
-        // TODO: Remove from database
-        // self.delete_from_db(profile_id).await?;
+        // Remove from database
+        self.delete_from_db(profile_id).await?;
 
         tracing::info!("Deleted profile: {}", profile_id);
+        Ok(())
+    }
+
+    /// Persist a profile to database
+    async fn persist_profile(&self, profile: &TeamRuleProfile) -> Result<()> {
+        let json = serde_json::to_string(profile)?;
+        let file_path = self.db_path.join(format!("{}.json", profile.profile_id));
+        tokio::fs::write(file_path, json).await?;
+        tracing::debug!("Persisted profile: {}", profile.profile_id);
+        Ok(())
+    }
+
+    /// Load a profile from database
+    async fn load_profile(&self, profile_id: &str) -> Result<Option<TeamRuleProfile>> {
+        let file_path = self.db_path.join(format!("{}.json", profile_id));
+
+        if !file_path.exists() {
+            return Ok(None);
+        }
+
+        let json = tokio::fs::read_to_string(file_path).await?;
+        let profile = serde_json::from_str(&json)?;
+        Ok(Some(profile))
+    }
+
+    /// Delete a profile from database
+    async fn delete_from_db(&self, profile_id: &str) -> Result<()> {
+        let file_path = self.db_path.join(format!("{}.json", profile_id));
+
+        if file_path.exists() {
+            tokio::fs::remove_file(file_path).await?;
+            tracing::debug!("Deleted profile from db: {}", profile_id);
+        }
+
         Ok(())
     }
 

@@ -1,0 +1,332 @@
+module omnisystem.testing.integration_tests
+
+# Integration Tests - Cross-module validation
+# Tests interactions between major components
+
+import omnisystem.hardware_detection
+import omnisystem.gpu_abstraction
+import omnisystem.hybrid_executor
+import omnisystem.unified_memory_manager
+
+# ============================================================================
+# INTEGRATION TEST SUITE
+# ============================================================================
+
+type IntegrationTest = struct {
+    name: string,
+    description: string,
+    test_fn: fn() -> Result<(), string>,
+    critical: bool,
+}
+
+type IntegrationTestResult = struct {
+    test_name: string,
+    passed: bool,
+    duration_ms: u64,
+    error: Option<string>,
+    assertions: AssertionStats,
+}
+
+type AssertionStats = struct {
+    total: u32,
+    passed: u32,
+    failed: u32,
+}
+
+# ============================================================================
+# HARDWARE + GPU ABSTRACTION INTEGRATION
+# ============================================================================
+
+fun test_hardware_gpu_integration() -> Result<(), string> {
+    // Test that hardware detection properly identifies GPU and GPU abstraction can use it
+    let hardware = omnisystem::hardware_detection::detect_hardware()?
+
+    if hardware.gpu_available {
+        // Verify GPU type is recognized
+        match hardware.gpu_type {
+            omnisystem::hardware_detection::GpuType::Nvidia => {
+                println!("✅ NVIDIA GPU detected and recognized")
+            },
+            omnisystem::hardware_detection::GpuType::Amd => {
+                println!("✅ AMD GPU detected and recognized")
+            },
+            omnisystem::hardware_detection::GpuType::Intel => {
+                println!("✅ Intel GPU detected and recognized")
+            },
+            omnisystem::hardware_detection::GpuType::Apple => {
+                println!("✅ Apple GPU detected and recognized")
+            },
+            _ => {}
+        }
+
+        // Verify GPU capabilities are reasonable
+        assert!(hardware.gpu_vram_mb > 0)?
+        println!("✅ GPU VRAM properly detected: {} MB", hardware.gpu_vram_mb)
+    } else {
+        println!("⚠️  No GPU detected, running in CPU-only mode")
+    }
+
+    Ok(())
+}
+
+fun test_hardware_memory_integration() -> Result<(), string> {
+    // Test that hardware detection properly sizes memory for the system
+    let hardware = omnisystem::hardware_detection::detect_hardware()?
+
+    // Verify memory detection
+    assert!(hardware.system_ram_mb > 512)?  // At least 512MB
+    println!("✅ System RAM detected: {} MB", hardware.system_ram_mb)
+
+    // Verify computed optimal mode considers memory
+    println!("✅ Optimal mode selected: {:?}", hardware.optimal_mode)
+
+    Ok(())
+}
+
+# ============================================================================
+# HYBRID EXECUTOR + MEMORY MANAGER INTEGRATION
+# ============================================================================
+
+fun test_executor_memory_integration() -> Result<(), string> {
+    let hardware = omnisystem::hardware_detection::detect_hardware()?
+    let mut executor = omnisystem::hybrid_executor::HybridExecutor::new(hardware.cpu_count, None)
+    let mut memory_mgr = omnisystem::unified_memory_manager::UnifiedMemoryManager::new(
+        256 * 1024 * 1024,   // 256MB VRAM
+        2 * 1024 * 1024 * 1024,  // 2GB RAM
+        10 * 1024 * 1024 * 1024, // 10GB NVMe
+        50 * 1024 * 1024 * 1024, // 50GB SSD
+    )
+
+    // Submit tasks and verify memory allocation
+    for i in 0..10 {
+        let task = omnisystem::hybrid_executor::ExecutionTask {
+            id: i as u64,
+            name: format!("Integration-Test-{}", i),
+            target: omnisystem::hybrid_executor::TaskTarget::CpuOnly,
+            workload_estimate: 50,
+            data_input: (),
+            affinity: None,
+        }
+
+        executor.submit_task(task)?
+    }
+
+    // Allocate memory for tasks
+    let (_, _) = memory_mgr.allocate(512 * 1024 * 1024, omnisystem::unified_memory_manager::MemoryTier::Ram)?
+    println!("✅ Tasks submitted and memory allocated")
+
+    // Verify load balancing
+    let overall_util = executor.get_overall_utilization()
+    assert!(overall_util >= 0.0 && overall_util <= 1.0)?
+    println!("✅ Load balancing functional: {:.1}% utilization", overall_util * 100.0)
+
+    Ok(())
+}
+
+# ============================================================================
+# END-TO-END WORKFLOW INTEGRATION
+# ============================================================================
+
+fun test_full_workflow_integration() -> Result<(), string> {
+    println!("\n--- Testing Full Workflow Integration ---")
+
+    // Step 1: Detect hardware
+    let hardware = omnisystem::hardware_detection::detect_hardware()?
+    println!("✅ Step 1: Hardware detected")
+    println!("   - CPU cores: {}", hardware.cpu_count)
+    println!("   - GPU available: {}", hardware.gpu_available)
+    println!("   - RAM: {} MB", hardware.system_ram_mb)
+
+    // Step 2: Initialize executor
+    let mut executor = omnisystem::hybrid_executor::HybridExecutor::new(hardware.cpu_count, None)
+    println!("✅ Step 2: Hybrid executor initialized")
+
+    // Step 3: Initialize memory manager
+    let mut memory_mgr = omnisystem::unified_memory_manager::UnifiedMemoryManager::new(
+        256 * 1024 * 1024,
+        2 * 1024 * 1024 * 1024,
+        10 * 1024 * 1024 * 1024,
+        50 * 1024 * 1024 * 1024,
+    )
+    println!("✅ Step 3: Memory manager initialized");
+
+    // Step 4: Allocate memory
+    let (_, tier) = memory_mgr.allocate(1024 * 1024 * 1024, omnisystem::unified_memory_manager::MemoryTier::Ram)?
+    println!("✅ Step 4: Memory allocated in {:?}", tier);
+
+    // Step 5: Submit tasks
+    for i in 0..5 {
+        let task = omnisystem::hybrid_executor::ExecutionTask {
+            id: i as u64,
+            name: format!("Task-{}", i),
+            target: omnisystem::hybrid_executor::TaskTarget::Automatic,
+            workload_estimate: 30 + (i as u32 * 10),
+            data_input: (),
+            affinity: None,
+        }
+
+        executor.submit_task(task)?
+    }
+    println!("✅ Step 5: 5 tasks submitted");
+
+    // Step 6: Execute all tasks
+    let results = executor.execute_all()?
+    println!("✅ Step 6: All tasks executed");
+    println!("   - Total execution time: {:.2} ms", results.iter().sum::<f64>());
+
+    // Step 7: Verify results
+    assert!(results.len() == 5)?
+    println!("✅ Step 7: Results verified");
+
+    println!("✅ FULL WORKFLOW COMPLETED SUCCESSFULLY\n");
+
+    Ok(())
+}
+
+# ============================================================================
+# STRESS INTEGRATION TEST
+# ============================================================================
+
+fun test_concurrent_integration() -> Result<(), string> {
+    println!("\n--- Testing Concurrent Integration ---")
+
+    let hardware = omnisystem::hardware_detection::detect_hardware()?
+    let mut executor = omnisystem::hybrid_executor::HybridExecutor::new(hardware.cpu_count, None)
+
+    // Submit 50 concurrent tasks
+    for i in 0..50 {
+        let task = omnisystem::hybrid_executor::ExecutionTask {
+            id: i as u64,
+            name: format!("Concurrent-{}", i),
+            target: omnisystem::hybrid_executor::TaskTarget::Automatic,
+            workload_estimate: 40,
+            data_input: (),
+            affinity: None,
+        }
+
+        executor.submit_task(task)?
+    }
+
+    let results = executor.execute_all()?
+    assert!(results.len() == 50)?
+    println!("✅ 50 concurrent tasks executed successfully");
+
+    // Verify performance
+    let avg_time = results.iter().sum::<f64>() / (results.len() as f64)
+    println!("✅ Average task execution: {:.2} ms", avg_time);
+
+    Ok(())
+}
+
+# ============================================================================
+# MEMORY SCALING INTEGRATION
+# ============================================================================
+
+fun test_memory_scaling_integration() -> Result<(), string> {
+    println!("\n--- Testing Memory Scaling Integration ---")
+
+    let mut manager = omnisystem::unified_memory_manager::UnifiedMemoryManager::new(
+        64 * 1024 * 1024,    // Small VRAM
+        256 * 1024 * 1024,   // Small RAM
+        1024 * 1024 * 1024,  // NVMe
+        10 * 1024 * 1024 * 1024, // SSD
+    )
+
+    // Test allocation at different utilization levels
+    println!("Testing at 25% utilization...");
+    let (_, _) = manager.allocate(64 * 1024 * 1024, omnisystem::unified_memory_manager::MemoryTier::Ram)?
+    let (vram, ram, _, _) = manager.get_utilization()
+    println!("✅ VRAM: {:.1}%, RAM: {:.1}%", vram * 100.0, ram * 100.0);
+
+    println!("Testing at 50% utilization...");
+    let (_, _) = manager.allocate(64 * 1024 * 1024, omnisystem::unified_memory_manager::MemoryTier::Ram)?
+    let (vram, ram, _, _) = manager.get_utilization()
+    println!("✅ VRAM: {:.1}%, RAM: {:.1}%", vram * 100.0, ram * 100.0);
+
+    println!("Testing at 75% utilization...");
+    let (_, _) = manager.allocate(64 * 1024 * 1024, omnisystem::unified_memory_manager::MemoryTier::Ram)?
+    let (vram, ram, _, _) = manager.get_utilization()
+    println!("✅ VRAM: {:.1}%, RAM: {:.1}%", vram * 100.0, ram * 100.0);
+
+    println!("✅ Memory scaling verified across all utilization levels\n");
+
+    Ok(())
+}
+
+# ============================================================================
+# RUN ALL INTEGRATION TESTS
+# ============================================================================
+
+fun run_all_integration_tests() -> Result<IntegrationSummary, string> {
+    println!("═════════════════════════════════════════════════════");
+    println!("OMNISYSTEM INTEGRATION TEST SUITE");
+    println!("═════════════════════════════════════════════════════\n");
+
+    let mut results = Vec::new()
+    let mut passed = 0u32
+    let mut failed = 0u32
+
+    // Run all integration tests
+    match test_hardware_gpu_integration() {
+        Ok(()) => { passed += 1; println!("✅ Hardware-GPU Integration: PASSED\n") },
+        Err(e) => { failed += 1; println!("❌ Hardware-GPU Integration: FAILED - {}\n", e) },
+    }
+
+    match test_hardware_memory_integration() {
+        Ok(()) => { passed += 1; println!("✅ Hardware-Memory Integration: PASSED\n") },
+        Err(e) => { failed += 1; println!("❌ Hardware-Memory Integration: FAILED - {}\n", e) },
+    }
+
+    match test_executor_memory_integration() {
+        Ok(()) => { passed += 1; println!("✅ Executor-Memory Integration: PASSED\n") },
+        Err(e) => { failed += 1; println!("❌ Executor-Memory Integration: FAILED - {}\n", e) },
+    }
+
+    match test_full_workflow_integration() {
+        Ok(()) => { passed += 1; println!("✅ Full Workflow Integration: PASSED\n") },
+        Err(e) => { failed += 1; println!("❌ Full Workflow Integration: FAILED - {}\n", e) },
+    }
+
+    match test_concurrent_integration() {
+        Ok(()) => { passed += 1; println!("✅ Concurrent Integration: PASSED\n") },
+        Err(e) => { failed += 1; println!("❌ Concurrent Integration: FAILED - {}\n", e) },
+    }
+
+    match test_memory_scaling_integration() {
+        Ok(()) => { passed += 1; println!("✅ Memory Scaling Integration: PASSED\n") },
+        Err(e) => { failed += 1; println!("❌ Memory Scaling Integration: FAILED - {}\n", e) },
+    }
+
+    let total = passed + failed
+    let pass_rate = if total > 0 { ((passed as f64) / (total as f64)) * 100.0 } else { 0.0 }
+
+    println!("═════════════════════════════════════════════════════");
+    println!("INTEGRATION TEST SUMMARY");
+    println!("═════════════════════════════════════════════════════");
+    println!("Total: {}  Passed: {} ✅  Failed: {} ❌", total, passed, failed);
+    println!("Pass Rate: {:.1}%", pass_rate);
+    println!("═════════════════════════════════════════════════════\n");
+
+    Ok(IntegrationSummary {
+        total_tests: total,
+        passed_tests: passed,
+        failed_tests: failed,
+        pass_rate,
+    })
+}
+
+type IntegrationSummary = struct {
+    total_tests: u32,
+    passed_tests: u32,
+    failed_tests: u32,
+    pass_rate: f64,
+}
+
+# Helper assertion macro
+fn assert(condition: bool) -> Result<(), string> {
+    if condition {
+        Ok(())
+    } else {
+        Err("Assertion failed".to_string())
+    }
+}

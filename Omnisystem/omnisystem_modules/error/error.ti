@@ -1,0 +1,381 @@
+module omnisystem.error
+
+# Comprehensive error handling system
+# Pure Titan implementation - Zero dependencies
+# Replaces thiserror and error handling patterns
+
+import system.string
+
+# Error trait definition
+trait Error {
+    fun message(&self) -> string
+    fun code(&self) -> ErrorCode
+    fun source(&self) -> Option<&dyn Error>
+    fun backtrace(&self) -> Option<&Backtrace>
+    fun is_retryable(&self) -> bool {
+        false  # Override in implementations for retryable errors
+    }
+}
+
+# Standard error codes
+enum ErrorCode {
+    NotFound = 404,
+    InvalidInput = 400,
+    Unauthorized = 401,
+    Forbidden = 403,
+    Conflict = 409,
+    InternalError = 500,
+    ServiceUnavailable = 503,
+    Timeout = 504,
+    Unknown = 999,
+}
+
+# Simple error type
+type SimpleError = struct {
+    message: string
+    code: ErrorCode
+    context: Option<Box<dyn Error>>,
+}
+
+impl Error for SimpleError {
+    fun message(&self) -> string {
+        self.message.clone()
+    }
+
+    fun code(&self) -> ErrorCode {
+        self.code
+    }
+
+    fun source(&self) -> Option<&dyn Error> {
+        match &self.context {
+            Some(err) => Some(&**err),
+            None => None,
+        }
+    }
+
+    fun backtrace(&self) -> Option<&Backtrace> {
+        None
+    }
+}
+
+# Error builder pattern
+type ErrorBuilder = struct {
+    message: string
+    code: ErrorCode
+    context: Option<Box<dyn Error>>,
+}
+
+impl ErrorBuilder {
+    fun new(message: string) -> Self {
+        ErrorBuilder {
+            message,
+            code: ErrorCode::InternalError,
+            context: None,
+        }
+    }
+
+    fun with_code(mut self, code: ErrorCode) -> Self {
+        self.code = code
+        self
+    }
+
+    fun with_context<E: Error + 'static>(mut self, err: E) -> Self {
+        self.context = Some(Box::new(err))
+        self
+    }
+
+    fun build(self) -> SimpleError {
+        SimpleError {
+            message: self.message,
+            code: self.code,
+            context: self.context,
+        }
+    }
+}
+
+# Result type
+type Result<T, E = SimpleError> = std::result::Result<T, E>
+
+# Wrap result type for common patterns
+type Fallible<T> = Result<T, SimpleError>
+
+# Error context extension
+fun with_context<T, E: Error>(result: Result<T, E>, context: string) -> Result<T, SimpleError> {
+    match result {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            let msg = e.message() + " (" + context + ")"
+            Err(ErrorBuilder::new(msg)
+                .with_code(e.code())
+                .build())
+        }
+    }
+}
+
+# Error mapping
+fun map_error<T, E: Error, F: Error>(result: Result<T, E>, f: impl Fn(E) -> F) -> Result<T, F> {
+    match result {
+        Ok(v) => Ok(v),
+        Err(e) => Err(f(e)),
+    }
+}
+
+# Common error constructors
+fun not_found(resource: string) -> SimpleError {
+    ErrorBuilder::new("Resource not found: " + resource)
+        .with_code(ErrorCode::NotFound)
+        .build()
+}
+
+fun invalid_input(reason: string) -> SimpleError {
+    ErrorBuilder::new("Invalid input: " + reason)
+        .with_code(ErrorCode::InvalidInput)
+        .build()
+}
+
+fun unauthorized() -> SimpleError {
+    ErrorBuilder::new("Unauthorized")
+        .with_code(ErrorCode::Unauthorized)
+        .build()
+}
+
+fun forbidden() -> SimpleError {
+    ErrorBuilder::new("Forbidden")
+        .with_code(ErrorCode::Forbidden)
+        .build()
+}
+
+fun conflict(reason: string) -> SimpleError {
+    ErrorBuilder::new("Conflict: " + reason)
+        .with_code(ErrorCode::Conflict)
+        .build()
+}
+
+fun internal_error(reason: string) -> SimpleError {
+    ErrorBuilder::new("Internal error: " + reason)
+        .with_code(ErrorCode::InternalError)
+        .build()
+}
+
+fun service_unavailable() -> SimpleError {
+    ErrorBuilder::new("Service unavailable")
+        .with_code(ErrorCode::ServiceUnavailable)
+        .build()
+}
+
+fun timeout() -> SimpleError {
+    ErrorBuilder::new("Operation timeout")
+        .with_code(ErrorCode::Timeout)
+        .build()
+}
+
+# Backtrace information
+type Backtrace = struct {
+    frames: Vec<StackFrame>,
+    timestamp: i64,
+}
+
+type StackFrame = struct {
+    file: string,
+    line: u32,
+    column: u32,
+    function: string,
+}
+
+# Get current backtrace
+fun capture_backtrace() -> Backtrace {
+    // Implementation would capture actual stack frames
+    // For now, return empty backtrace
+    Backtrace {
+        frames: Vec::new(),
+        timestamp: system::time::now(),
+    }
+}
+
+# Format error with full context
+fun format_error_chain(err: &dyn Error) -> string {
+    let mut output = String::new()
+    let mut current: Option<&dyn Error> = Some(err)
+    let mut depth = 0
+
+    while let Some(e) = current {
+        if depth > 0 {
+            output.push_str("\n  caused by: ")
+        }
+        output.push_str(&e.message())
+        current = e.source()
+        depth += 1
+    }
+
+    output
+}
+
+# Error reporting system
+type ErrorReporter = struct {
+    handlers: Vec<Box<dyn ErrorHandler>>,
+}
+
+trait ErrorHandler {
+    fun handle(&self, err: &dyn Error)
+}
+
+impl ErrorReporter {
+    fun new() -> Self {
+        ErrorReporter {
+            handlers: Vec::new(),
+        }
+    }
+
+    fun add_handler<H: ErrorHandler + 'static>(&mut self, handler: H) {
+        self.handlers.push(Box::new(handler))
+    }
+
+    fun report(&self, err: &dyn Error) {
+        for handler in &self.handlers {
+            handler.handle(err)
+        }
+    }
+}
+
+# Log error handler
+type LogErrorHandler = struct {
+    log_level: LogLevel,
+}
+
+enum LogLevel {
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl ErrorHandler for LogErrorHandler {
+    fun handle(&self, err: &dyn Error) {
+        let formatted = format_error_chain(err)
+        // Log based on error code
+        match err.code() {
+            ErrorCode::NotFound => log::warn(&formatted),
+            ErrorCode::InvalidInput => log::warn(&formatted),
+            _ => log::error(&formatted),
+        }
+    }
+}
+
+# Panic error handler
+type PanicErrorHandler
+
+impl ErrorHandler for PanicErrorHandler {
+    fun handle(&self, err: &dyn Error) {
+        panic!("{}", format_error_chain(err))
+    }
+}
+
+# Custom error type macro
+macro error_type(name, code) {
+    pub struct name {
+        pub message: String,
+    }
+
+    impl Error for name {
+        fn message(&self) -> String {
+            self.message.clone()
+        }
+
+        fn code(&self) -> ErrorCode {
+            code
+        }
+
+        fn source(&self) -> Option<&(dyn Error)> {
+            None
+        }
+    }
+
+    impl From<String> for name {
+        fn from(msg: String) -> Self {
+            name { message: msg }
+        }
+    }
+
+    impl From<&str> for name {
+        fn from(msg: &str) -> Self {
+            name { message: msg.to_string() }
+        }
+    }
+}
+
+# Retry helper
+fun retry<T, E: Error>(
+    mut op: impl FnMut() -> Result<T, E>,
+    max_attempts: u32,
+) -> Result<T, E> {
+    for attempt in 0..max_attempts {
+        match op() {
+            Ok(v) => return Ok(v),
+            Err(e) if attempt + 1 < max_attempts && e.is_retryable() => {
+                // Sleep with exponential backoff
+                let backoff_ms = 100 * (2 ^ attempt)
+                system::time::sleep(system::time::duration_milliseconds(backoff_ms))
+                continue
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    unreachable!()
+}
+
+# Option conversion
+fun ok_or<T, E: Error>(opt: Option<T>, err: E) -> Result<T, E> {
+    match opt {
+        Some(v) => Ok(v),
+        None => Err(err),
+    }
+}
+
+fun ok_or_else<T, E: Error>(opt: Option<T>, f: impl FnOnce() -> E) -> Result<T, E> {
+    match opt {
+        Some(v) => Ok(v),
+        None => Err(f()),
+    }
+}
+
+# Testing utilities
+#[cfg(test)]
+mod tests {
+    use super::*
+
+    #[test]
+    fun test_error_builder() {
+        let err = ErrorBuilder::new("test error")
+            .with_code(ErrorCode::NotFound)
+            .build()
+
+        assert_eq!(err.message(), "test error")
+        assert_eq!(err.code(), ErrorCode::NotFound)
+    }
+
+    #[test]
+    fun test_error_chain_formatting() {
+        let base = not_found("resource")
+        let chain = format_error_chain(&base)
+        assert!(chain.contains("not found"))
+        assert!(chain.contains("resource"))
+    }
+
+    #[test]
+    fun test_retry_logic() {
+        let mut attempts = 0
+        let result: Result<i32> = retry(
+            || {
+                attempts += 1
+                if attempts < 3 {
+                    Err(ErrorBuilder::new("retryable").build())
+                } else {
+                    Ok(42)
+                }
+            },
+            5
+        )
+        assert!(result.is_ok())
+        assert_eq!(attempts, 3)
+    }
+}

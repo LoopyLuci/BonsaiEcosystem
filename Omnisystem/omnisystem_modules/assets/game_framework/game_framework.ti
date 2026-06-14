@@ -1,0 +1,410 @@
+module omnisystem.assets.game_framework.game_framework
+
+# Game Asset Framework - 3D models, textures, animations, physics
+# Supports multiple game engines: Unity, Unreal, Godot
+
+import omnisystem.assets.asset_metadata
+
+# ============================================================================
+# GAME ENGINE SUPPORT
+# ============================================================================
+
+enum GameEngine {
+    Unity,
+    Unreal,
+    Godot,
+    Custom,
+}
+
+enum AssetSubType {
+    Model3D,
+    Texture,
+    Material,
+    Animation,
+    Sprite,
+    Effect,
+    Sound,
+    PhysicsBody,
+    Prefab,
+}
+
+# ============================================================================
+# 3D MODEL ASSETS
+# ============================================================================
+
+type Model3D = struct {
+    id: string,
+    name: string,
+    file_format: string,
+    file_size_bytes: u64,
+    polygon_count: u32,
+    vertex_count: u32,
+    has_skeleton: bool,
+    has_blend_shapes: bool,
+    materials: Vec<string>,
+    textures: Vec<TextureReference>,
+    lod_versions: Vec<string>,
+    physics_meshes: Vec<string>,
+    bounds: BoundingBox,
+}
+
+type TextureReference = struct {
+    texture_id: string,
+    texture_type: TextureType,
+    file_path: string,
+    resolution: (u32, u32),
+}
+
+enum TextureType {
+    Diffuse,
+    Normal,
+    Roughness,
+    Metallic,
+    AmbientOcclusion,
+    Emissive,
+    Height,
+}
+
+type BoundingBox = struct {
+    min_x: f32,
+    min_y: f32,
+    min_z: f32,
+    max_x: f32,
+    max_y: f32,
+    max_z: f32,
+}
+
+# ============================================================================
+# TEXTURE ASSETS
+# ============================================================================
+
+type TextureAsset = struct {
+    id: string,
+    name: string,
+    width: u32,
+    height: u32,
+    format: TextureFormat,
+    file_size_bytes: u64,
+    color_space: ColorSpace,
+    tiling_mode: TilingMode,
+    filtering: FilteringMode,
+    mipmap_levels: u32,
+}
+
+enum TextureFormat {
+    PNG,
+    JPG,
+    EXR,
+    TGA,
+    DDS,
+    ASTC,
+    BC1,
+    BC2,
+    BC3,
+}
+
+enum ColorSpace {
+    Linear,
+    sRGB,
+}
+
+enum TilingMode {
+    Clamp,
+    Repeat,
+    Mirror,
+}
+
+enum FilteringMode {
+    Point,
+    Bilinear,
+    Trilinear,
+}
+
+# ============================================================================
+# ANIMATION ASSETS
+# ============================================================================
+
+type AnimationAsset = struct {
+    id: string,
+    name: string,
+    duration_seconds: f32,
+    frame_count: u32,
+    fps: u32,
+    skeleton_reference: Option<string>,
+    keyframes: Vec<Keyframe>,
+    loop: bool,
+    root_motion: bool,
+}
+
+type Keyframe = struct {
+    frame_number: u32,
+    bone_id: string,
+    position: (f32, f32, f32),
+    rotation: (f32, f32, f32, f32),
+    scale: (f32, f32, f32),
+}
+
+# ============================================================================
+# PHYSICS ASSETS
+# ============================================================================
+
+type PhysicsBody = struct {
+    id: string,
+    name: string,
+    body_type: PhysicsBodyType,
+    shape: CollisionShape,
+    mass: f32,
+    friction: f32,
+    restitution: f32,
+    drag: f32,
+    angular_drag: f32,
+    use_gravity: bool,
+    is_kinematic: bool,
+}
+
+enum PhysicsBodyType {
+    Static,
+    Dynamic,
+    Kinematic,
+}
+
+enum CollisionShape {
+    Box,
+    Sphere,
+    Capsule,
+    Cylinder,
+    Mesh,
+}
+
+# ============================================================================
+# SPRITE ASSETS
+# ============================================================================
+
+type SpriteAsset = struct {
+    id: string,
+    name: string,
+    sheet_width: u32,
+    sheet_height: u32,
+    sprite_width: u32,
+    sprite_height: u32,
+    frame_count: u32,
+    texture_id: string,
+    pivot_x: f32,
+    pivot_y: f32,
+    frames: Vec<SpriteFrame>,
+}
+
+type SpriteFrame = struct {
+    frame_number: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
+# ============================================================================
+# MATERIAL ASSETS
+# ============================================================================
+
+type MaterialAsset = struct {
+    id: string,
+    name: string,
+    shader: string,
+    textures: Vec<TextureReference>,
+    properties: Vec<(string, MaterialProperty)>,
+    render_queue: u32,
+}
+
+enum MaterialProperty {
+    ColorValue(string),
+    FloatValue(f32),
+    IntegerValue(i32),
+    TextureReference(string),
+}
+
+# ============================================================================
+# GAME ASSET BUILDER
+# ============================================================================
+
+type GameAssetBuilder = struct {
+    asset_type: AssetSubType,
+    name: string,
+    game_engine: GameEngine,
+    description: string,
+    metadata: Vec<(string, string)>,
+}
+
+fun create_game_asset_builder(
+    asset_type: AssetSubType,
+    name: string,
+    engine: GameEngine,
+) -> GameAssetBuilder {
+    GameAssetBuilder {
+        asset_type,
+        name,
+        game_engine: engine,
+        description: "".to_string(),
+        metadata: Vec::new(),
+    }
+}
+
+# ============================================================================
+# MODEL IMPORT & OPTIMIZATION
+# ============================================================================
+
+fun import_model(
+    file_path: string,
+    engine: GameEngine,
+) -> Result<Model3D, string> {
+    // Parse model file (FBX, GLTF, OBJ, etc.)
+    let model = Model3D {
+        id: generate_model_id(),
+        name: "Imported Model".to_string(),
+        file_format: "FBX".to_string(),
+        file_size_bytes: 1024000,
+        polygon_count: 50000,
+        vertex_count: 100000,
+        has_skeleton: true,
+        has_blend_shapes: false,
+        materials: Vec::new(),
+        textures: Vec::new(),
+        lod_versions: Vec::new(),
+        physics_meshes: Vec::new(),
+        bounds: BoundingBox {
+            min_x: -1.0,
+            min_y: -1.0,
+            min_z: -1.0,
+            max_x: 1.0,
+            max_y: 1.0,
+            max_z: 1.0,
+        },
+    }
+
+    Ok(model)
+}
+
+fun optimize_model(mut model: Model3D) -> Result<Model3D, string> {
+    // Generate LOD versions
+    // Optimize polygon count
+    // Compress textures
+    // Generate physics meshes
+
+    model.lod_versions.push("LOD1".to_string())
+    model.lod_versions.push("LOD2".to_string())
+
+    Ok(model)
+}
+
+# ============================================================================
+# TEXTURE GENERATION & CONVERSION
+# ============================================================================
+
+fun generate_texture(
+    width: u32,
+    height: u32,
+    texture_type: TextureType,
+) -> Result<TextureAsset, string> {
+    let texture = TextureAsset {
+        id: generate_texture_id(),
+        name: format!("{:?} Texture", texture_type),
+        width,
+        height,
+        format: TextureFormat::PNG,
+        file_size_bytes: (width * height * 4) as u64,
+        color_space: ColorSpace::sRGB,
+        tiling_mode: TilingMode::Repeat,
+        filtering: FilteringMode::Trilinear,
+        mipmap_levels: 8,
+    }
+
+    Ok(texture)
+}
+
+fun convert_texture(
+    mut texture: TextureAsset,
+    target_format: TextureFormat,
+) -> Result<TextureAsset, string> {
+    texture.format = target_format
+    Ok(texture)
+}
+
+# ============================================================================
+# ANIMATION GENERATION
+# ============================================================================
+
+fun create_animation(
+    name: string,
+    duration_seconds: f32,
+    fps: u32,
+) -> Result<AnimationAsset, string> {
+    let frame_count = (duration_seconds * fps as f32) as u32
+
+    let animation = AnimationAsset {
+        id: generate_animation_id(),
+        name,
+        duration_seconds,
+        frame_count,
+        fps,
+        skeleton_reference: None,
+        keyframes: Vec::new(),
+        loop: false,
+        root_motion: false,
+    }
+
+    Ok(animation)
+}
+
+# ============================================================================
+# ENGINE-SPECIFIC EXPORT
+# ============================================================================
+
+enum ExportFormat {
+    FBX,
+    GLTF,
+    OBJ,
+    UnityPackage,
+    UnrealAsset,
+    GodotScene,
+}
+
+fun export_for_engine(
+    model: &Model3D,
+    engine: GameEngine,
+) -> Result<string, string> {
+    let format = match engine {
+        GameEngine::Unity => ExportFormat::UnityPackage,
+        GameEngine::Unreal => ExportFormat::UnrealAsset,
+        GameEngine::Godot => ExportFormat::GodotScene,
+        GameEngine::Custom => ExportFormat::GLTF,
+    }
+
+    let export_path = format!("/exports/{}_{}", model.id, format_to_extension(format))
+    Ok(export_path)
+}
+
+fn format_to_extension(format: ExportFormat) -> string {
+    match format {
+        ExportFormat::FBX => ".fbx",
+        ExportFormat::GLTF => ".gltf",
+        ExportFormat::OBJ => ".obj",
+        ExportFormat::UnityPackage => ".unitypackage",
+        ExportFormat::UnrealAsset => ".uasset",
+        ExportFormat::GodotScene => ".tscn",
+    }.to_string()
+}
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+fn generate_model_id() -> string {
+    "model_".to_string() + "3d_001"
+}
+
+fn generate_texture_id() -> string {
+    "texture_".to_string() + "001"
+}
+
+fn generate_animation_id() -> string {
+    "animation_".to_string() + "001"
+}
