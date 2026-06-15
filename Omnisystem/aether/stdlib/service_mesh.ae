@@ -1,0 +1,417 @@
+// aether/stdlib/service_mesh.ae
+// Service mesh and sidecar patterns for Aether
+
+type ServiceId = String
+type EndpointId = String
+
+enum TrafficPolicy {
+    | LoadBalancer(LoadBalancingStrategy)
+    | CircuitBreaker(CircuitBreakerConfig)
+    | Retry(RetryPolicy)
+    | Timeout(TimeoutPolicy)
+    | RateLimit(RateLimitPolicy)
+}
+
+enum LoadBalancingStrategy {
+    | RoundRobin
+    | LeastConnections
+    | Random
+    | ConsistentHash
+    | LocalityAware
+}
+
+type CircuitBreakerConfig = {
+    failure_threshold: Int
+    success_threshold: Int
+    timeout_seconds: Int
+}
+
+type RetryPolicy = {
+    max_retries: Int
+    backoff_ms: Int
+    retry_on_codes: List[Int]
+}
+
+type TimeoutPolicy = {
+    connect_timeout_ms: Int
+    request_timeout_ms: Int
+}
+
+type RateLimitPolicy = {
+    requests_per_second: Int
+    burst_size: Int
+}
+
+-- Service Registry in Mesh
+struct MeshServiceRegistry {
+    services: Map[ServiceId, MeshService]
+    endpoints: Map[EndpointId, MeshEndpoint]
+    traffic_policies: Map[ServiceId, List[TrafficPolicy]]
+
+    fn new() -> MeshServiceRegistry {
+        return MeshServiceRegistry {
+            services: Map::new(),
+            endpoints: Map::new(),
+            traffic_policies: Map::new(),
+        }
+    }
+
+    fn register_service(
+        id: ServiceId,
+        name: String,
+        port: Int,
+        labels: Map[String, String]
+    ) {
+        let service = MeshService {
+            id: id,
+            name: name,
+            port: port,
+            endpoints: List::new(),
+            labels: labels,
+            status: ServiceStatus::Healthy,
+        }
+
+        this.services[id] = service
+        this.traffic_policies[id] = List::new()
+    }
+
+    fn register_endpoint(
+        service_id: ServiceId,
+        id: EndpointId,
+        address: String,
+        port: Int,
+        weight: Float
+    ) {
+        let endpoint = MeshEndpoint {
+            id: id,
+            service_id: service_id,
+            address: address,
+            port: port,
+            weight: weight,
+            status: EndpointStatus::Ready,
+            latency_ms: 0,
+            error_rate: 0.0,
+        }
+
+        this.endpoints[id] = endpoint
+
+        if this.services.get(service_id).is_some() {
+            this.services[service_id].endpoints.push(id)
+        }
+    }
+
+    fn add_traffic_policy(service_id: ServiceId, policy: TrafficPolicy) {
+        if this.traffic_policies.get(service_id).is_some() {
+            this.traffic_policies[service_id].push(policy)
+        }
+    }
+
+    fn get_endpoints(service_id: ServiceId) -> List[MeshEndpoint] {
+        let mut result = List::new()
+
+        if this.services.get(service_id).is_some() {
+            let service = this.services[service_id]
+
+            for endpoint_id in service.endpoints {
+                if this.endpoints.get(endpoint_id).is_some() {
+                    let ep = this.endpoints[endpoint_id]
+                    result.push(ep)
+                }
+            }
+        }
+
+        return result
+    }
+
+    fn select_endpoint(service_id: ServiceId, strategy: LoadBalancingStrategy) -> Option[MeshEndpoint] {
+        let endpoints = this.get_endpoints(service_id)
+
+        if endpoints.len() == 0 {
+            return None
+        }
+
+        match strategy {
+            LoadBalancingStrategy::RoundRobin => {
+                return Some(endpoints[0])
+            }
+
+            LoadBalancingStrategy::LeastConnections => {
+                let mut best_endpoint = endpoints[0]
+                let mut min_connections = 999999
+
+                for ep in endpoints {
+                    if ep.latency_ms < min_connections {
+                        min_connections = ep.latency_ms
+                        best_endpoint = ep
+                    }
+                }
+
+                return Some(best_endpoint)
+            }
+
+            LoadBalancingStrategy::Random => {
+                let idx = random_int(0, endpoints.len() - 1)
+                return Some(endpoints[idx])
+            }
+
+            LoadBalancingStrategy::LocalityAware => {
+                -- Prefer local endpoints
+                for ep in endpoints {
+                    if is_local(ep.address) {
+                        return Some(ep)
+                    }
+                }
+
+                return Some(endpoints[0])
+            }
+
+            _ => {
+                return Some(endpoints[0])
+            }
+        }
+    }
+
+    fn update_endpoint_metrics(
+        endpoint_id: EndpointId,
+        latency_ms: Int,
+        error_rate: Float
+    ) {
+        if this.endpoints.get(endpoint_id).is_some() {
+            this.endpoints[endpoint_id].latency_ms = latency_ms
+            this.endpoints[endpoint_id].error_rate = error_rate
+        }
+    }
+}
+
+type MeshService = {
+    id: ServiceId
+    name: String
+    port: Int
+    endpoints: List[EndpointId]
+    labels: Map[String, String]
+    status: ServiceStatus
+}
+
+type MeshEndpoint = {
+    id: EndpointId
+    service_id: ServiceId
+    address: String
+    port: Int
+    weight: Float
+    status: EndpointStatus
+    latency_ms: Int
+    error_rate: Float
+}
+
+enum ServiceStatus {
+    | Healthy
+    | Degraded
+    | Unhealthy
+    | Offline
+}
+
+enum EndpointStatus {
+    | Ready
+    | NotReady
+    | Draining
+    | Unavailable
+}
+
+-- Sidecar proxy
+struct SidecarProxy {
+    service_id: ServiceId
+    registry: MeshServiceRegistry
+    request_count: Int
+    error_count: Int
+    metrics: ProxyMetrics
+
+    fn new(service_id: ServiceId, registry: MeshServiceRegistry) -> SidecarProxy {
+        return SidecarProxy {
+            service_id: service_id,
+            registry: registry,
+            request_count: 0,
+            error_count: 0,
+            metrics: ProxyMetrics::new(),
+        }
+    }
+
+    fn handle_request(
+        target_service: ServiceId,
+        request: Any
+    ) -> Result[Any] {
+        -- Select endpoint
+        let endpoint = this.registry.select_endpoint(
+            target_service,
+            LoadBalancingStrategy::RoundRobin
+        )
+
+        if endpoint.is_none() {
+            return Result::Err("No available endpoints")
+        }
+
+        let ep = endpoint.unwrap()
+
+        -- Apply traffic policies
+        let policies = this.registry.traffic_policies.get(target_service)
+
+        if policies.is_some() {
+            for policy in policies.unwrap() {
+                match policy {
+                    TrafficPolicy::CircuitBreaker(config) => {
+                        if this.is_circuit_open(ep.id) {
+                            return Result::Err("Circuit breaker open")
+                        }
+                    }
+
+                    TrafficPolicy::RateLimit(config) => {
+                        if !this.check_rate_limit(ep.id, config) {
+                            return Result::Err("Rate limit exceeded")
+                        }
+                    }
+
+                    _ => {}
+                }
+            }
+        }
+
+        -- Forward request
+        let start_time = now_ms()
+
+        let result = forward_request(ep, request)
+
+        let latency = now_ms() - start_time
+
+        -- Update metrics
+        this.request_count = this.request_count + 1
+        this.metrics.record_request(ep.id, latency, result.is_ok())
+
+        this.registry.update_endpoint_metrics(ep.id, latency as Int, 0.0)
+
+        if !result.is_ok() {
+            this.error_count = this.error_count + 1
+        }
+
+        return result
+    }
+
+    fn is_circuit_open(endpoint_id: EndpointId) -> Bool {
+        return false
+    }
+
+    fn check_rate_limit(endpoint_id: EndpointId, policy: RateLimitPolicy) -> Bool {
+        return true
+    }
+
+    fn get_metrics() -> ProxyMetrics {
+        return this.metrics
+    }
+}
+
+type ProxyMetrics = {
+    requests_total: Int
+    requests_success: Int
+    requests_failed: Int
+    latency_p50_ms: Int
+    latency_p95_ms: Int
+    latency_p99_ms: Int
+    error_rate: Float
+
+    fn new() -> ProxyMetrics {
+        return ProxyMetrics {
+            requests_total: 0,
+            requests_success: 0,
+            requests_failed: 0,
+            latency_p50_ms: 0,
+            latency_p95_ms: 0,
+            latency_p99_ms: 0,
+            error_rate: 0.0,
+        }
+    }
+
+    fn record_request(endpoint_id: String, latency_ms: Int, success: Bool) {
+        this.requests_total = this.requests_total + 1
+
+        if success {
+            this.requests_success = this.requests_success + 1
+        } else {
+            this.requests_failed = this.requests_failed + 1
+        }
+
+        -- Update percentiles
+        this.latency_p50_ms = latency_ms
+        this.latency_p95_ms = latency_ms
+        this.latency_p99_ms = latency_ms
+
+        this.error_rate = (this.requests_failed as Float) / (this.requests_total as Float)
+    }
+}
+
+-- Virtual services and destination rules
+type VirtualService = {
+    name: String
+    hosts: List[String]
+    http_routes: List[HttpRoute]
+}
+
+type HttpRoute = {
+    match_conditions: List[HttpMatchCondition]
+    route: List[RouteDestination]
+    timeout: TimeoutPolicy
+    retries: RetryPolicy
+}
+
+type HttpMatchCondition = {
+    uri: Option[StringMatch]
+    headers: Map[String, StringMatch]
+    method: Option[String]
+}
+
+type StringMatch = {
+    exact: Option[String]
+    prefix: Option[String]
+    regex: Option[String]
+}
+
+type RouteDestination = {
+    destination_host: String
+    port: Int
+    weight: Float
+    subset: Option[String]
+}
+
+type DestinationRule = {
+    host: String
+    traffic_policy: TrafficPolicy
+    subsets: List[Subset]
+}
+
+type Subset = {
+    name: String
+    labels: Map[String, String]
+}
+
+fn forward_request(endpoint: MeshEndpoint, request: Any) -> Result[Any] {
+    return Result::Ok(request)
+}
+
+fn random_int(min: Int, max: Int) -> Int {
+    return min
+}
+
+fn is_local(address: String) -> Bool {
+    return false
+}
+
+fn now_ms() -> Int {
+    return 0
+}
+
+type Result<T> = Any
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Any = Any
+
+fn Result<T>::Ok(val: T) -> Result[T] { return val; }
+fn Result<T>::Err(msg: String) -> Result[T] { return msg; }
+fn is_ok<T>(result: Result[T]) -> Bool { return true; }

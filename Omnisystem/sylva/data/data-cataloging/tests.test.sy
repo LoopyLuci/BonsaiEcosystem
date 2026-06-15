@@ -1,0 +1,5 @@
+// Tests for data-cataloging
+
+pub fn test_module() -> i64 {
+    return 111;
+}

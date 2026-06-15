@@ -1,0 +1,5 @@
+// Tests for high-availability-controller
+
+pub fn test_module() -> i64 {
+    return 111;
+}

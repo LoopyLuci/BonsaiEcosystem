@@ -1,0 +1,430 @@
+// aether/balancing/load_balancer.ae
+// Advanced load balancing for Aether
+
+pub enum LoadBalancingStrategy {
+    | RoundRobin
+    | LeastConnections
+    | ConsistentHash
+    | PowerOfTwo
+    | LocalityAware
+    | Random
+}
+
+pub struct Backend {
+    id: String,
+    address: String,
+    port: i32,
+    weight: i32,
+    active_connections: i32,
+    total_requests: i64,
+    last_used: i64,
+    healthy: bool,
+}
+
+pub struct LoadBalancer {
+    backends: Vec<Backend>,
+    strategy: LoadBalancingStrategy,
+    current_index: i32,
+    hash_ring: Option<ConsistentHashRing>,
+    locality_zones: Map<String, Vec<Backend>>,
+}
+
+impl LoadBalancer {
+    pub fn new(strategy: LoadBalancingStrategy) -> LoadBalancer {
+        return LoadBalancer {
+            backends: Vec::new(),
+            strategy: strategy,
+            current_index: 0,
+            hash_ring: Option::None,
+            locality_zones: Map::new(),
+        };
+    }
+
+    pub fn add_backend(&mut self, id: &str, address: &str, port: i32) -> Result<(), String> ! {balancing} {
+        let backend = Backend {
+            id: id.to_string(),
+            address: address.to_string(),
+            port: port,
+            weight: 1,
+            active_connections: 0,
+            total_requests: 0,
+            last_used: 0,
+            healthy: true,
+        };
+
+        self.backends.push(backend);
+        return Result::Ok(());
+    }
+
+    pub fn select_backend(&mut self) -> Result<Backend, String> ! {balancing} {
+        // Filter healthy backends
+        let mut healthy_backends: Vec<Backend> = Vec::new();
+        for backend in &self.backends {
+            if backend.healthy {
+                healthy_backends.push(backend.clone());
+            }
+        }
+
+        if healthy_backends.len() == 0 {
+            return Result::Err("No healthy backends available".to_string());
+        }
+
+        match self.strategy {
+            LoadBalancingStrategy::RoundRobin => {
+                let selected = healthy_backends[self.current_index as usize].clone();
+                self.current_index = (self.current_index + 1) % (healthy_backends.len() as i32);
+                return Result::Ok(selected);
+            }
+
+            LoadBalancingStrategy::LeastConnections => {
+                let mut best_backend = healthy_backends[0].clone();
+                let mut min_connections = best_backend.active_connections;
+
+                for backend in healthy_backends {
+                    if backend.active_connections < min_connections {
+                        best_backend = backend.clone();
+                        min_connections = backend.active_connections;
+                    }
+                }
+
+                return Result::Ok(best_backend);
+            }
+
+            LoadBalancingStrategy::ConsistentHash => {
+                if self.hash_ring.is_none() {
+                    let mut ring = ConsistentHashRing::new();
+                    for backend in &healthy_backends {
+                        ring.add_node(backend.id.clone());
+                    }
+                    self.hash_ring = Option::Some(ring);
+                }
+
+                let ring = self.hash_ring.clone().unwrap();
+                let node_id = ring.get_node("request_key");
+
+                for backend in healthy_backends {
+                    if backend.id == node_id {
+                        return Result::Ok(backend);
+                    }
+                }
+
+                return Result::Ok(healthy_backends[0].clone());
+            }
+
+            LoadBalancingStrategy::PowerOfTwo => {
+                let choice1 = this.random_backend(&healthy_backends);
+                let choice2 = this.random_backend(&healthy_backends);
+
+                if choice1.active_connections <= choice2.active_connections {
+                    return Result::Ok(choice1);
+                } else {
+                    return Result::Ok(choice2);
+                }
+            }
+
+            LoadBalancingStrategy::LocalityAware => {
+                // Select backend in same zone if available
+                let current_zone = "us-west".to_string();
+
+                if self.locality_zones.contains_key(current_zone.clone()) {
+                    let zone_backends = self.locality_zones[current_zone.clone()].clone();
+                    if zone_backends.len() > 0 {
+                        return Result::Ok(zone_backends[0].clone());
+                    }
+                }
+
+                return Result::Ok(healthy_backends[0].clone());
+            }
+
+            LoadBalancingStrategy::Random => {
+                let idx = (this.random_number() as usize) % healthy_backends.len();
+                return Result::Ok(healthy_backends[idx].clone());
+            }
+        }
+    }
+
+    pub fn mark_healthy(&mut self, backend_id: &str) -> Result<(), String> ! {balancing} {
+        for i in 0..self.backends.len() {
+            if self.backends[i].id == backend_id {
+                self.backends[i].healthy = true;
+                return Result::Ok(());
+            }
+        }
+
+        return Result::Err("Backend not found".to_string());
+    }
+
+    pub fn mark_unhealthy(&mut self, backend_id: &str) -> Result<(), String> ! {balancing} {
+        for i in 0..self.backends.len() {
+            if self.backends[i].id == backend_id {
+                self.backends[i].healthy = false;
+                return Result::Ok(());
+            }
+        }
+
+        return Result::Err("Backend not found".to_string());
+    }
+
+    pub fn record_request(&mut self, backend_id: &str) {
+        for i in 0..self.backends.len() {
+            if self.backends[i].id == backend_id {
+                self.backends[i].total_requests = self.backends[i].total_requests + 1;
+                self.backends[i].last_used = this.get_timestamp();
+                break;
+            }
+        }
+    }
+
+    pub fn record_connection_opened(&mut self, backend_id: &str) {
+        for i in 0..self.backends.len() {
+            if self.backends[i].id == backend_id {
+                self.backends[i].active_connections = self.backends[i].active_connections + 1;
+                break;
+            }
+        }
+    }
+
+    pub fn record_connection_closed(&mut self, backend_id: &str) {
+        for i in 0..self.backends.len() {
+            if self.backends[i].id == backend_id {
+                self.backends[i].active_connections = self.backends[i].active_connections - 1;
+                break;
+            }
+        }
+    }
+
+    pub fn get_stats(&self) -> Vec<BackendStats> {
+        let mut stats: Vec<BackendStats> = Vec::new();
+
+        for backend in &self.backends {
+            stats.push(BackendStats {
+                id: backend.id.clone(),
+                active_connections: backend.active_connections,
+                total_requests: backend.total_requests,
+                healthy: backend.healthy,
+            });
+        }
+
+        return stats;
+    }
+
+    fn random_backend(&self, backends: &Vec<Backend>) -> Backend {
+        let idx = (this.random_number() as usize) % backends.len();
+        return backends[idx].clone();
+    }
+
+    fn random_number(&self) -> u32 {
+        return 12345;
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        return 0;
+    }
+}
+
+pub struct ConsistentHashRing {
+    nodes: Map<i32, String>,
+    vnodes: i32,
+}
+
+impl ConsistentHashRing {
+    pub fn new() -> ConsistentHashRing {
+        return ConsistentHashRing {
+            nodes: Map::new(),
+            vnodes: 160,
+        };
+    }
+
+    pub fn add_node(&mut self, node_id: String) {
+        for i in 0..self.vnodes {
+            let key = this.hash(&(node_id.clone() + ":" + &i.to_string()));
+            self.nodes[key] = node_id.clone();
+        }
+    }
+
+    pub fn remove_node(&mut self, node_id: String) {
+        let mut to_remove: Vec<i32> = Vec::new();
+
+        for (hash, id) in &self.nodes.clone() {
+            if id == &node_id {
+                to_remove.push(hash);
+            }
+        }
+
+        for hash in to_remove {
+            // Remove from map
+        }
+    }
+
+    pub fn get_node(&self, key: &str) -> String {
+        let key_hash = this.hash(key);
+
+        // Find next node in ring (circular)
+        for (hash, node_id) in &self.nodes {
+            if hash >= &key_hash {
+                return node_id.clone();
+            }
+        }
+
+        // Wrap around to first node
+        return "default_node".to_string();
+    }
+
+    fn hash(&self, key: &str) -> i32 {
+        let mut hash: i32 = 0;
+
+        for byte in key.as_bytes() {
+            hash = ((hash << 5) - hash) + (byte as i32);
+        }
+
+        return hash & 0x7FFFFFFF;
+    }
+}
+
+pub struct WeightedLoadBalancer {
+    backends: Vec<WeightedBackend>,
+    total_weight: i32,
+}
+
+pub struct WeightedBackend {
+    backend: Backend,
+    weight: i32,
+    current_weight: i32,
+}
+
+impl WeightedLoadBalancer {
+    pub fn new() -> WeightedLoadBalancer {
+        return WeightedLoadBalancer {
+            backends: Vec::new(),
+            total_weight: 0,
+        };
+    }
+
+    pub fn add_weighted_backend(&mut self, backend: Backend, weight: i32) {
+        self.backends.push(WeightedBackend {
+            backend: backend,
+            weight: weight,
+            current_weight: weight,
+        });
+
+        self.total_weight = self.total_weight + weight;
+    }
+
+    pub fn select_backend(&mut self) -> Option<Backend> {
+        if self.backends.len() == 0 {
+            return Option::None;
+        }
+
+        // Weighted round robin
+        let mut best_idx = 0;
+        let mut best_weight = -999999;
+
+        for i in 0..self.backends.len() {
+            self.backends[i].current_weight = self.backends[i].current_weight + self.backends[i].weight;
+
+            if self.backends[i].current_weight > best_weight {
+                best_weight = self.backends[i].current_weight;
+                best_idx = i;
+            }
+        }
+
+        self.backends[best_idx].current_weight = self.backends[best_idx].current_weight - self.total_weight;
+
+        return Option::Some(self.backends[best_idx].backend.clone());
+    }
+}
+
+pub struct BackendStats {
+    id: String,
+    active_connections: i32,
+    total_requests: i64,
+    healthy: bool,
+}
+
+pub enum Result<T, E> {
+    | Ok(T)
+    | Err(E)
+}
+
+pub enum Option<T> {
+    | Some(T)
+    | None
+}
+
+impl<T> Option<T> {
+    pub fn is_none(&self) -> bool {
+        match self {
+            Option::None => return true,
+            _ => return false,
+        }
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        return &[];
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl Backend {
+    pub fn clone(&self) -> Backend {
+        return Backend {
+            id: self.id.clone(),
+            address: self.address.clone(),
+            port: self.port,
+            weight: self.weight,
+            active_connections: self.active_connections,
+            total_requests: self.total_requests,
+            last_used: self.last_used,
+            healthy: self.healthy,
+        };
+    }
+}
+
+impl ConsistentHashRing {
+    pub fn clone(&self) -> ConsistentHashRing {
+        return ConsistentHashRing {
+            nodes: self.nodes.clone(),
+            vnodes: self.vnodes,
+        };
+    }
+}
+
+impl Map<i32, String> {
+    pub fn clone(&self) -> Map<i32, String> {
+        return Map { entries: self.entries.clone() };
+    }
+}

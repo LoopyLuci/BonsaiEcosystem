@@ -1,0 +1,457 @@
+// titan/gpu/kernel.ti
+// GPU compute kernel support for Titan
+
+pub struct GPUDevice {
+    device_id: i32,
+    compute_capability: i32,  // e.g., 80 for A100
+    total_memory: u64,
+    free_memory: u64,
+    max_threads_per_block: i32,
+    max_blocks_per_grid: i32,
+    warp_size: i32,
+}
+
+pub struct GPUKernel {
+    kernel_fn: fn() -> (),
+    grid_dim: (i32, i32, i32),      // (blocks_x, blocks_y, blocks_z)
+    block_dim: (i32, i32, i32),     // (threads_x, threads_y, threads_z)
+    shared_memory_bytes: i32,
+    stream: i32,
+}
+
+pub struct GPUBuffer<T> {
+    device_ptr: u64,
+    host_ptr: &T,
+    size_bytes: u64,
+    device_id: i32,
+}
+
+pub struct KernelConfig {
+    grid_x: i32,
+    grid_y: i32,
+    grid_z: i32,
+    block_x: i32,
+    block_y: i32,
+    block_z: i32,
+    shared_memory: i32,
+    stream: i32,
+}
+
+// Built-in kernel variables (available inside __global__ functions)
+pub struct ThreadIdx {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+pub struct BlockIdx {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+pub struct BlockDim {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+pub struct GridDim {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+// Global device state
+static mut CURRENT_GPU_DEVICE: i32 = 0;
+static mut GPU_DEVICES: [GPUDevice; 16] = [GPUDevice {
+    device_id: 0,
+    compute_capability: 80,
+    total_memory: 0,
+    free_memory: 0,
+    max_threads_per_block: 1024,
+    max_blocks_per_grid: 65535,
+    warp_size: 32,
+}; 16];
+
+// Device selection and initialization
+pub fn gpu_get_device_count() -> i32 ! {gpu} {
+    // Query available GPU devices
+    let count: i32 = 0;
+    asm! {
+        "call cudaGetDeviceCount"
+        : "=a"(count)
+        :
+        :
+        : volatile
+    }
+    return count;
+}
+
+pub fn gpu_set_device(device_id: i32) ! {gpu} {
+    if device_id < 0 || device_id >= 16 {
+        emit_panic("Invalid GPU device");
+    }
+    unsafe {
+        CURRENT_GPU_DEVICE = device_id;
+    }
+}
+
+pub fn gpu_get_device() -> i32 ! {gpu} {
+    unsafe {
+        return CURRENT_GPU_DEVICE;
+    }
+}
+
+pub fn gpu_get_device_properties(device_id: i32) -> GPUDevice ! {gpu} {
+    if device_id < 0 || device_id >= 16 {
+        emit_panic("Invalid GPU device");
+    }
+    unsafe {
+        return GPU_DEVICES[device_id as usize];
+    }
+}
+
+// Memory management
+pub fn gpu_malloc<T>(count: i64) -> GPUBuffer<T> ! {gpu, alloc} {
+    let size_bytes = (count * 8) as u64;  // Assume 8 bytes per element
+    let device_id = unsafe { CURRENT_GPU_DEVICE };
+
+    let device_ptr: u64 = 0;
+    asm! {
+        "call cudaMalloc"
+        : "=a"(device_ptr)
+        : "d"(size_bytes)
+        :
+        : volatile
+    }
+
+    return GPUBuffer<T> {
+        device_ptr: device_ptr,
+        host_ptr: &[0 as T],
+        size_bytes: size_bytes,
+        device_id: device_id,
+    };
+}
+
+pub fn gpu_free<T>(buf: GPUBuffer<T>) ! {gpu, alloc} {
+    asm! {
+        "call cudaFree"
+        :
+        : "a"(buf.device_ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_memcpy_h2d<T>(dst: &mut GPUBuffer<T>, src: &T, count: i64) ! {gpu, io} {
+    let size_bytes = (count * 8) as u64;
+    asm! {
+        "call cudaMemcpy"
+        :
+        : "a"(dst.device_ptr), "d"(src), "c"(size_bytes)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_memcpy_d2h<T>(dst: &T, src: &GPUBuffer<T>, count: i64) ! {gpu, io} {
+    let size_bytes = (count * 8) as u64;
+    asm! {
+        "call cudaMemcpy"
+        :
+        : "a"(dst), "d"(src.device_ptr), "c"(size_bytes)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_memcpy_d2d<T>(dst: &mut GPUBuffer<T>, src: &GPUBuffer<T>, count: i64) ! {gpu, io} {
+    let size_bytes = (count * 8) as u64;
+    asm! {
+        "call cudaMemcpy"
+        :
+        : "a"(dst.device_ptr), "d"(src.device_ptr), "c"(size_bytes)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_memset<T>(buf: &mut GPUBuffer<T>, value: i32, count: i64) ! {gpu, io} {
+    let size_bytes = (count * 8) as u64;
+    asm! {
+        "call cudaMemset"
+        :
+        : "a"(buf.device_ptr), "d"(value), "c"(size_bytes)
+        :
+        : volatile
+    }
+}
+
+// Kernel execution
+pub fn gpu_launch_kernel(
+    kernel: fn() -> (),
+    grid: (i32, i32, i32),
+    block: (i32, i32, i32),
+    shared_memory: i32,
+    stream: i32
+) ! {gpu} {
+    // Launch kernel with configuration
+    let kernel_ptr = kernel as u64;
+
+    asm! {
+        "call cudaLaunchKernel"
+        :
+        : "a"(kernel_ptr), "d"(grid.0), "c"(grid.1), "r8"(grid.2),
+          "r9"(block.0), "r10"(block.1), "r11"(block.2),
+          "r12"(shared_memory), "r13"(stream)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_synchronize() ! {gpu} {
+    // Wait for all GPU operations to complete
+    asm! {
+        "call cudaDeviceSynchronize"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_stream_synchronize(stream: i32) ! {gpu} {
+    asm! {
+        "call cudaStreamSynchronize"
+        :
+        : "a"(stream)
+        :
+        : volatile
+    }
+}
+
+// Stream management
+pub fn gpu_stream_create() -> i32 ! {gpu} {
+    let stream: i32 = 0;
+    asm! {
+        "call cudaStreamCreate"
+        : "=a"(stream)
+        :
+        :
+        : volatile
+    }
+    return stream;
+}
+
+pub fn gpu_stream_destroy(stream: i32) ! {gpu} {
+    asm! {
+        "call cudaStreamDestroy"
+        :
+        : "a"(stream)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_stream_query(stream: i32) -> bool ! {gpu} {
+    let status: i32 = 0;
+    asm! {
+        "call cudaStreamQuery"
+        : "=a"(status)
+        : "a"(stream)
+        :
+        : volatile
+    }
+    return status == 0;  // 0 = ready
+}
+
+// Event-based synchronization
+pub struct GPUEvent {
+    event_id: u64,
+    stream: i32,
+}
+
+pub fn gpu_event_create() -> GPUEvent ! {gpu} {
+    let event_id: u64 = 0;
+    asm! {
+        "call cudaEventCreate"
+        : "=a"(event_id)
+        :
+        :
+        : volatile
+    }
+    return GPUEvent {
+        event_id: event_id,
+        stream: unsafe { CURRENT_GPU_DEVICE },
+    };
+}
+
+pub fn gpu_event_destroy(event: GPUEvent) ! {gpu} {
+    asm! {
+        "call cudaEventDestroy"
+        :
+        : "a"(event.event_id)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_event_record(event: &mut GPUEvent, stream: i32) ! {gpu} {
+    asm! {
+        "call cudaEventRecord"
+        :
+        : "a"(event.event_id), "d"(stream)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_event_synchronize(event: &GPUEvent) ! {gpu} {
+    asm! {
+        "call cudaEventSynchronize"
+        :
+        : "a"(event.event_id)
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_event_elapsed_time(start: &GPUEvent, end: &GPUEvent) -> f32 ! {gpu} {
+    let ms: f32 = 0.0;
+    asm! {
+        "call cudaEventElapsedTime"
+        : "=a"(ms)
+        : "d"(start.event_id), "c"(end.event_id)
+        :
+        : volatile
+    }
+    return ms;
+}
+
+// Error handling
+pub fn gpu_get_last_error() -> String ! {gpu} {
+    let error_str: String = "Unknown error";
+    asm! {
+        "call cudaGetLastError"
+        : "=a"(error_str)
+        :
+        :
+        : volatile
+    }
+    return error_str;
+}
+
+pub fn gpu_check_error(msg: String) ! {gpu} {
+    let error_str = gpu_get_last_error();
+    if error_str.len() > 0 {
+        emit_panic(msg);
+    }
+}
+
+// Shared memory access patterns
+pub fn gpu_shared_memory_barrier() ! {gpu} {
+    // __syncthreads() - synchronize all threads in block
+    asm! {
+        "bar.sync 0"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn gpu_warp_barrier() ! {gpu} {
+    // __syncwarp() - synchronize within warp
+    asm! {
+        "bar.warp.sync 0"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+// Thread index queries (inside kernel)
+pub fn gpu_thread_idx_x() -> i32 ! {gpu} {
+    let idx: i32 = 0;
+    asm! {
+        "mov %%tidx, %0"
+        : "=r"(idx)
+        :
+        :
+        : volatile
+    }
+    return idx;
+}
+
+pub fn gpu_block_idx_x() -> i32 ! {gpu} {
+    let idx: i32 = 0;
+    asm! {
+        "mov %%ctaid.x, %0"
+        : "=r"(idx)
+        :
+        :
+        : volatile
+    }
+    return idx;
+}
+
+pub fn gpu_block_dim_x() -> i32 ! {gpu} {
+    let dim: i32 = 0;
+    asm! {
+        "mov %%ntid.x, %0"
+        : "=r"(dim)
+        :
+        :
+        : volatile
+    }
+    return dim;
+}
+
+// Atomic operations
+pub fn gpu_atomic_add(ptr: &mut i32, value: i32) -> i32 ! {gpu} {
+    let result: i32 = 0;
+    asm! {
+        "atom.add.s32 %0, [%1], %2"
+        : "=r"(result)
+        : "l"(ptr), "r"(value)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn gpu_atomic_max(ptr: &mut i32, value: i32) -> i32 ! {gpu} {
+    let result: i32 = 0;
+    asm! {
+        "atom.max.s32 %0, [%1], %2"
+        : "=r"(result)
+        : "l"(ptr), "r"(value)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn gpu_atomic_cas(ptr: &mut i32, expected: i32, new_value: i32) -> i32 ! {gpu} {
+    let result: i32 = 0;
+    asm! {
+        "atom.cas.b32 %0, [%1], %2, %3"
+        : "=r"(result)
+        : "l"(ptr), "r"(expected), "r"(new_value)
+        :
+        : volatile
+    }
+    return result;
+}
+
+fn emit_panic(msg: String) ! {io} {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}

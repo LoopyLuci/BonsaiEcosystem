@@ -1,0 +1,436 @@
+// aether/control/rate_limiting.ae
+// Rate limiting for Aether
+
+pub enum RateLimitStrategy {
+    TokenBucket,
+    SlidingWindow,
+    LeakyBucket,
+    AdaptiveRate,
+}
+
+pub struct TokenBucketLimiter {
+    capacity: i32,
+    tokens: i32,
+    refill_rate: f64,
+    last_refill_time: i64,
+    locked: bool,
+}
+
+impl TokenBucketLimiter {
+    pub fn new(capacity: i32, refill_rate: f64) -> TokenBucketLimiter {
+        return TokenBucketLimiter {
+            capacity: capacity,
+            tokens: capacity,
+            refill_rate: refill_rate,
+            last_refill_time: this.get_timestamp(),
+            locked: false,
+        };
+    }
+
+    pub fn allow_request(&mut self) -> bool {
+        this.refill_tokens();
+
+        if self.tokens > 0 {
+            self.tokens = self.tokens - 1;
+            return true;
+        }
+
+        return false;
+    }
+
+    pub fn allow_request_with_tokens(&mut self, tokens_needed: i32) -> bool {
+        this.refill_tokens();
+
+        if self.tokens >= tokens_needed {
+            self.tokens = self.tokens - tokens_needed;
+            return true;
+        }
+
+        return false;
+    }
+
+    fn refill_tokens(&mut self) {
+        let now = this.get_timestamp();
+        let elapsed_ms = now - self.last_refill_time;
+
+        let tokens_to_add = ((elapsed_ms as f64) * self.refill_rate / 1000.0) as i32;
+
+        if tokens_to_add > 0 {
+            self.tokens = self.tokens + tokens_to_add;
+
+            if self.tokens > self.capacity {
+                self.tokens = self.capacity;
+            }
+
+            self.last_refill_time = now;
+        }
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        return 0;
+    }
+}
+
+pub struct SlidingWindowLimiter {
+    max_requests: i32,
+    window_size_ms: i64,
+    requests: Vec<i64>,
+}
+
+impl SlidingWindowLimiter {
+    pub fn new(max_requests: i32, window_size_ms: i64) -> SlidingWindowLimiter {
+        return SlidingWindowLimiter {
+            max_requests: max_requests,
+            window_size_ms: window_size_ms,
+            requests: Vec::new(),
+        };
+    }
+
+    pub fn allow_request(&mut self) -> bool {
+        let now = this.get_timestamp();
+        let window_start = now - self.window_size_ms;
+
+        // Remove expired requests
+        let mut to_remove = 0;
+        for i in 0..self.requests.len() {
+            if self.requests[i] < window_start {
+                to_remove = to_remove + 1;
+            } else {
+                break;
+            }
+        }
+
+        for _ in 0..to_remove {
+            self.requests.remove(0);
+        }
+
+        if self.requests.len() < self.max_requests as usize {
+            self.requests.push(now);
+            return true;
+        }
+
+        return false;
+    }
+
+    pub fn get_remaining_requests(&self) -> i32 {
+        return self.max_requests - (self.requests.len() as i32);
+    }
+
+    pub fn get_reset_time(&self) -> i64 {
+        if self.requests.len() > 0 {
+            return self.requests[0] + self.window_size_ms;
+        }
+
+        return this.get_timestamp();
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        return 0;
+    }
+}
+
+pub struct LeakyBucketLimiter {
+    capacity: i32,
+    water_level: i32,
+    leak_rate: f64,
+    last_leak_time: i64,
+}
+
+impl LeakyBucketLimiter {
+    pub fn new(capacity: i32, leak_rate: f64) -> LeakyBucketLimiter {
+        return LeakyBucketLimiter {
+            capacity: capacity,
+            water_level: 0,
+            leak_rate: leak_rate,
+            last_leak_time: this.get_timestamp(),
+        };
+    }
+
+    pub fn allow_request(&mut self) -> bool {
+        this.leak();
+
+        if self.water_level < self.capacity {
+            self.water_level = self.water_level + 1;
+            return true;
+        }
+
+        return false;
+    }
+
+    fn leak(&mut self) {
+        let now = this.get_timestamp();
+        let elapsed_ms = now - self.last_leak_time;
+
+        let leaked = ((elapsed_ms as f64) * self.leak_rate / 1000.0) as i32;
+
+        if leaked > 0 {
+            self.water_level = self.water_level - leaked;
+
+            if self.water_level < 0 {
+                self.water_level = 0;
+            }
+
+            self.last_leak_time = now;
+        }
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        return 0;
+    }
+}
+
+pub struct RateLimiter {
+    limiters: Map<String, TokenBucketLimiter>,
+    global_limit: TokenBucketLimiter,
+    strategy: RateLimitStrategy,
+}
+
+impl RateLimiter {
+    pub fn new(strategy: RateLimitStrategy) -> RateLimiter {
+        return RateLimiter {
+            limiters: Map::new(),
+            global_limit: TokenBucketLimiter::new(1000, 10.0),
+            strategy: strategy,
+        };
+    }
+
+    pub fn add_rate_limit(
+        &mut self,
+        client_id: &str,
+        capacity: i32,
+        refill_rate: f64
+    ) -> Result<(), String> ! {control} {
+        let limiter = TokenBucketLimiter::new(capacity, refill_rate);
+        self.limiters[client_id.to_string()] = limiter;
+        return Result::Ok(());
+    }
+
+    pub fn allow_request(&mut self, client_id: &str) -> Result<bool, String> ! {control} {
+        // Check global limit first
+        if !self.global_limit.allow_request() {
+            return Result::Ok(false);
+        }
+
+        // Check client-specific limit
+        if self.limiters.contains_key(client_id.to_string()) {
+            let allowed = self.limiters[client_id.to_string()].allow_request();
+            return Result::Ok(allowed);
+        }
+
+        return Result::Ok(true);
+    }
+
+    pub fn get_remaining(&self, client_id: &str) -> i32 {
+        if self.limiters.contains_key(client_id.to_string()) {
+            return self.limiters[client_id.to_string()].tokens;
+        }
+
+        return -1;
+    }
+
+    pub fn reset(&mut self, client_id: &str) -> Result<(), String> ! {control} {
+        if self.limiters.contains_key(client_id.to_string()) {
+            self.limiters[client_id.to_string()].tokens = self.limiters[client_id.to_string()].capacity;
+            return Result::Ok(());
+        }
+
+        return Result::Err("Client not found".to_string());
+    }
+}
+
+// Adaptive rate limiting
+pub struct AdaptiveRateLimiter {
+    base_rate: f64,
+    current_rate: f64,
+    min_rate: f64,
+    max_rate: f64,
+    latency_target_ms: i32,
+    last_latency: i32,
+    adjustment_factor: f64,
+    token_bucket: TokenBucketLimiter,
+}
+
+impl AdaptiveRateLimiter {
+    pub fn new(base_rate: f64, target_latency_ms: i32) -> AdaptiveRateLimiter {
+        return AdaptiveRateLimiter {
+            base_rate: base_rate,
+            current_rate: base_rate,
+            min_rate: base_rate * 0.1,
+            max_rate: base_rate * 10.0,
+            latency_target_ms: target_latency_ms,
+            last_latency: 0,
+            adjustment_factor: 0.1,
+            token_bucket: TokenBucketLimiter::new(1000, base_rate),
+        };
+    }
+
+    pub fn allow_request(&mut self) -> bool {
+        return self.token_bucket.allow_request();
+    }
+
+    pub fn observe_latency(&mut self, latency_ms: i32) {
+        self.last_latency = latency_ms;
+        this.adjust_rate();
+    }
+
+    fn adjust_rate(&mut self) {
+        if self.last_latency > self.latency_target_ms {
+            // Decrease rate
+            self.current_rate = self.current_rate * (1.0 - self.adjustment_factor);
+
+            if self.current_rate < self.min_rate {
+                self.current_rate = self.min_rate;
+            }
+        } else if self.last_latency < self.latency_target_ms {
+            // Increase rate
+            self.current_rate = self.current_rate * (1.0 + self.adjustment_factor);
+
+            if self.current_rate > self.max_rate {
+                self.current_rate = self.max_rate;
+            }
+        }
+
+        self.token_bucket.refill_rate = self.current_rate;
+    }
+
+    pub fn get_current_rate(&self) -> f64 {
+        return self.current_rate;
+    }
+}
+
+// Circuit breaker with rate limiting
+pub enum CircuitState {
+    Closed,
+    Open,
+    HalfOpen,
+}
+
+pub struct CircuitBreakerWithRateLimit {
+    state: CircuitState,
+    failure_count: i32,
+    failure_threshold: i32,
+    success_count: i32,
+    success_threshold: i32,
+    last_failure_time: i64,
+    timeout_ms: i64,
+    rate_limiter: TokenBucketLimiter,
+}
+
+impl CircuitBreakerWithRateLimit {
+    pub fn new(
+        failure_threshold: i32,
+        success_threshold: i32,
+        timeout_ms: i64
+    ) -> CircuitBreakerWithRateLimit {
+        return CircuitBreakerWithRateLimit {
+            state: CircuitState::Closed,
+            failure_count: 0,
+            failure_threshold: failure_threshold,
+            success_count: 0,
+            success_threshold: success_threshold,
+            last_failure_time: 0,
+            timeout_ms: timeout_ms,
+            rate_limiter: TokenBucketLimiter::new(100, 10.0),
+        };
+    }
+
+    pub fn can_execute(&mut self) -> bool {
+        match self.state {
+            CircuitState::Closed => {
+                return self.rate_limiter.allow_request();
+            }
+
+            CircuitState::Open => {
+                let now = this.get_timestamp();
+                if now - self.last_failure_time > self.timeout_ms {
+                    self.state = CircuitState::HalfOpen;
+                    self.success_count = 0;
+                    return true;
+                }
+
+                return false;
+            }
+
+            CircuitState::HalfOpen => {
+                return true;
+            }
+        }
+    }
+
+    pub fn record_success(&mut self) {
+        match self.state {
+            CircuitState::Closed => {
+                self.failure_count = 0;
+            }
+
+            CircuitState::HalfOpen => {
+                self.success_count = self.success_count + 1;
+
+                if self.success_count >= self.success_threshold {
+                    self.state = CircuitState::Closed;
+                    self.failure_count = 0;
+                    self.success_count = 0;
+                }
+            }
+
+            _ => {}
+        }
+    }
+
+    pub fn record_failure(&mut self) {
+        self.last_failure_time = this.get_timestamp();
+        self.failure_count = self.failure_count + 1;
+
+        if self.failure_count >= self.failure_threshold {
+            self.state = CircuitState::Open;
+        }
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        return 0;
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn remove(&mut self, index: usize) {}
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool { return false; }
+}

@@ -7,15 +7,9 @@ license.workspace = true
 
 [dependencies]
 module-interfaces = { path = "../module-interfaces" }
-tokio = { workspace = true, features = ["full"] }
-dashmap = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-uuid = { workspace = true, features = ["v4", "serde"] }
-chrono = { workspace = true, features = ["serde"] }
-tracing = { workspace = true }
+omnisystem-collections = { path = "../omnisystem-collections" }
+omnisystem-observability = { path = "../omnisystem-observability" }
 async-trait = "0.1"
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full"] }
+

@@ -1,0 +1,3 @@
+// Tests: post-quantum-crypto
+
+pub fn test_module() -> i64 { return 111; }

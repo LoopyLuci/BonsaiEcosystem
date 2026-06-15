@@ -1,0 +1,439 @@
+// axiom/stdlib/decision_procedures.ax
+// Decision procedures for specific theories in Axiom
+
+-- Linear arithmetic decision procedure (using Fourier-Motzkin elimination)
+struct LinearArithmeticDecider {
+    variables: List[String]
+    constraints: List[LinearConstraint]
+
+    fn new() -> LinearArithmeticDecider {
+        return LinearArithmeticDecider {
+            variables: List::new(),
+            constraints: List::new(),
+        }
+    }
+
+    fn add_constraint(constraint: LinearConstraint) {
+        this.constraints.push(constraint)
+    }
+
+    fn is_satisfiable() -> Bool {
+        -- Gaussian elimination to check consistency
+        let matrix = build_constraint_matrix(this.constraints)
+
+        let rref = row_reduce(matrix)
+
+        return check_consistency(rref)
+    }
+
+    fn find_counterexample() -> Option[Assignment] {
+        if !this.is_satisfiable() {
+            return None
+        }
+
+        let assignment = solve_linear_system(this.constraints)
+
+        return Some(assignment)
+    }
+
+    fn is_valid_inequality(lhs: Term, rhs: Term, op: String) -> Bool {
+        let constraint = LinearConstraint {
+            lhs: lhs,
+            rhs: rhs,
+            operator: op,
+        }
+
+        this.add_constraint(constraint)
+
+        let valid = !this.is_satisfiable()
+
+        return valid
+    }
+}
+
+type LinearConstraint = {
+    lhs: Term
+    rhs: Term
+    operator: String
+}
+
+type Term = {
+    coefficients: Map[String, Float]
+    constant: Float
+}
+
+-- Unification algorithm (Robinson's algorithm)
+struct UnificationDecider {
+    substitutions: Map[String, Term]
+
+    fn new() -> UnificationDecider {
+        return UnificationDecider {
+            substitutions: Map::new(),
+        }
+    }
+
+    fn unify(term1: Term, term2: Term) -> Option[Map[String, Term]] {
+        if terms_equal(term1, term2) {
+            return Some(Map::new())
+        }
+
+        if is_variable(term1) {
+            if occurs_check(term1, term2) {
+                return None
+            }
+
+            let mut subst = Map::new()
+            subst[term1.name] = term2
+
+            return Some(subst)
+        }
+
+        if is_variable(term2) {
+            if occurs_check(term2, term1) {
+                return None
+            }
+
+            let mut subst = Map::new()
+            subst[term2.name] = term1
+
+            return Some(subst)
+        }
+
+        if is_compound(term1) && is_compound(term2) {
+            if get_functor(term1) != get_functor(term2) {
+                return None
+            }
+
+            let args1 = get_arguments(term1)
+            let args2 = get_arguments(term2)
+
+            if args1.len() != args2.len() {
+                return None
+            }
+
+            let mut combined_subst = Map::new()
+
+            for i in 0..args1.len() {
+                let arg1 = apply_substitution(args1[i], combined_subst)
+                let arg2 = apply_substitution(args2[i], combined_subst)
+
+                let subst = this.unify(arg1, arg2)
+
+                if subst.is_none() {
+                    return None
+                }
+
+                let s = subst.unwrap()
+
+                for (var, term) in s.entries() {
+                    combined_subst[var] = term
+                }
+            }
+
+            return Some(combined_subst)
+        }
+
+        return None
+    }
+
+    fn occurs_check(var: Term, term: Term) -> Bool {
+        if terms_equal(var, term) {
+            return true
+        }
+
+        if is_compound(term) {
+            let args = get_arguments(term)
+
+            for arg in args {
+                if this.occurs_check(var, arg) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+}
+
+-- Equality saturation (E-matching)
+struct EqualitySaturator {
+    equalities: List[Equality]
+    known_equal: List[(Term, Term)]
+    union_find: UnionFind
+
+    fn new() -> EqualitySaturator {
+        return EqualitySaturator {
+            equalities: List::new(),
+            known_equal: List::new(),
+            union_find: UnionFind::new(),
+        }
+    }
+
+    fn add_equality(lhs: Term, rhs: Term) {
+        this.equalities.push(Equality { lhs: lhs, rhs: rhs })
+
+        this.union_find.union(term_to_id(lhs), term_to_id(rhs))
+    }
+
+    fn saturate() {
+        let mut changed = true
+
+        while changed {
+            changed = false
+
+            -- E-matching: find instances of equalities
+            for equality in this.equalities {
+                let instances = find_instances(equality, this.known_equal)
+
+                for (inst_lhs, inst_rhs) in instances {
+                    if !this.union_find.connected(
+                        term_to_id(inst_lhs),
+                        term_to_id(inst_rhs)
+                    ) {
+                        this.add_equality(inst_lhs, inst_rhs)
+                        changed = true
+                    }
+                }
+            }
+        }
+    }
+
+    fn are_equal(lhs: Term, rhs: Term) -> Bool {
+        this.saturate()
+
+        return this.union_find.connected(
+            term_to_id(lhs),
+            term_to_id(rhs)
+        )
+    }
+}
+
+type Equality = {
+    lhs: Term
+    rhs: Term
+}
+
+-- Union-Find data structure
+struct UnionFind {
+    parent: Map[Int, Int]
+    rank: Map[Int, Int]
+
+    fn new() -> UnionFind {
+        return UnionFind {
+            parent: Map::new(),
+            rank: Map::new(),
+        }
+    }
+
+    fn find(x: Int) -> Int {
+        if !this.parent.get(x).is_some() {
+            this.parent[x] = x
+            this.rank[x] = 0
+        }
+
+        if this.parent[x] != x {
+            this.parent[x] = this.find(this.parent[x])
+        }
+
+        return this.parent[x]
+    }
+
+    fn union(x: Int, y: Int) {
+        let root_x = this.find(x)
+        let root_y = this.find(y)
+
+        if root_x == root_y {
+            return
+        }
+
+        let rank_x = this.rank.get(root_x).unwrap_or(0)
+        let rank_y = this.rank.get(root_y).unwrap_or(0)
+
+        if rank_x < rank_y {
+            this.parent[root_x] = root_y
+        } else if rank_x > rank_y {
+            this.parent[root_y] = root_x
+        } else {
+            this.parent[root_y] = root_x
+            this.rank[root_x] = rank_x + 1
+        }
+    }
+
+    fn connected(x: Int, y: Int) -> Bool {
+        return this.find(x) == this.find(y)
+    }
+}
+
+-- Theory of arrays (EUF + Array axioms)
+struct ArrayTheoryDecider {
+    select_axioms: List[ArrayAxiom]
+    store_axioms: List[ArrayAxiom]
+
+    fn new() -> ArrayTheoryDecider {
+        return ArrayTheoryDecider {
+            select_axioms: List::new(),
+            store_axioms: List::new(),
+        }
+    }
+
+    fn add_select(array: Term, index: Term, value: Term) {
+        let axiom = ArrayAxiom {
+            kind: "select",
+            array: array,
+            index: index,
+            value: value,
+        }
+
+        this.select_axioms.push(axiom)
+    }
+
+    fn add_store(array: Term, index: Term, value: Term, result: Term) {
+        let axiom = ArrayAxiom {
+            kind: "store",
+            array: array,
+            index: index,
+            value: value,
+        }
+
+        this.store_axioms.push(axiom)
+    }
+
+    fn simplify_read(array: Term, index: Term) -> Option[Term] {
+        -- Check if there's a recent write to this index
+        for axiom in this.store_axioms {
+            if terms_equal(axiom.array, array) && terms_equal(axiom.index, index) {
+                return Some(axiom.value)
+            }
+        }
+
+        return None
+    }
+}
+
+type ArrayAxiom = {
+    kind: String
+    array: Term
+    index: Term
+    value: Term
+}
+
+-- Bit-vector decision procedure (simplified)
+struct BitvectorDecider {
+    width: Int
+    constraints: List[BitvectorConstraint]
+
+    fn new(width: Int) -> BitvectorDecider {
+        return BitvectorDecider {
+            width: width,
+            constraints: List::new(),
+        }
+    }
+
+    fn add_constraint(constraint: BitvectorConstraint) {
+        this.constraints.push(constraint)
+    }
+
+    fn is_satisfiable() -> Bool {
+        -- Check if constraints are satisfiable
+        -- Use SAT solver or enumeration for small bit-widths
+
+        if this.width <= 32 {
+            return check_by_enumeration(this.constraints, this.width)
+        } else {
+            return check_by_sat_solver(this.constraints)
+        }
+    }
+
+    fn simplify_operation(op: String, args: List[Term]) -> Option[Term] {
+        match op {
+            "bv_add" => return simplify_add(args)
+            "bv_sub" => return simplify_sub(args)
+            "bv_and" => return simplify_and(args)
+            "bv_or" => return simplify_or(args)
+            _ => return None
+        }
+    }
+}
+
+type BitvectorConstraint = {
+    lhs: Term
+    rhs: Term
+    operator: String
+}
+
+-- Helper functions
+fn build_constraint_matrix(constraints: List[LinearConstraint]) -> List[List[Float]] {
+    return List::new()
+}
+
+fn row_reduce(matrix: List[List[Float]]) -> List[List[Float]] {
+    return matrix
+}
+
+fn check_consistency(matrix: List[List[Float]]) -> Bool {
+    return true
+}
+
+fn solve_linear_system(constraints: List[LinearConstraint]) -> Assignment {
+    return Assignment { values: Map::new() }
+}
+
+fn terms_equal(t1: Term, t2: Term) -> Bool {
+    return false
+}
+
+fn is_variable(term: Term) -> Bool {
+    return false
+}
+
+fn is_compound(term: Term) -> Bool {
+    return false
+}
+
+fn get_functor(term: Term) -> String {
+    return ""
+}
+
+fn get_arguments(term: Term) -> List[Term] {
+    return List::new()
+}
+
+fn apply_substitution(term: Term, subst: Map[String, Term]) -> Term {
+    return term
+}
+
+fn term_to_id(term: Term) -> Int {
+    return 0
+}
+
+fn find_instances(equality: Equality, known: List[(Term, Term)]) -> List[(Term, Term)] {
+    return List::new()
+}
+
+fn check_by_enumeration(constraints: List[BitvectorConstraint], width: Int) -> Bool {
+    return true
+}
+
+fn check_by_sat_solver(constraints: List[BitvectorConstraint]) -> Bool {
+    return true
+}
+
+fn simplify_add(args: List[Term]) -> Option[Term] { return None; }
+fn simplify_sub(args: List[Term]) -> Option[Term] { return None; }
+fn simplify_and(args: List[Term]) -> Option[Term] { return None; }
+fn simplify_or(args: List[Term]) -> Option[Term] { return None; }
+
+type Assignment = {
+    values: Map[String, Int]
+}
+
+type Term = {
+    name: String
+}
+
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }

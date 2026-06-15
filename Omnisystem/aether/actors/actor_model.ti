@@ -1,0 +1,335 @@
+// aether/actors/actor_model.ti
+// Actor model for concurrent message-passing computation
+
+pub struct ActorRef {
+    actor_id: i32,
+    mailbox: i32,
+}
+
+pub struct Actor {
+    id: i32,
+    state: i32,
+    mailbox_capacity: i32,
+}
+
+pub struct Message {
+    sender_id: i32,
+    payload: Vec<u8>,
+    timestamp: i64,
+}
+
+pub struct ActorSystem {
+    num_actors: i32,
+    running: bool,
+    event_loop_ticks: i64,
+}
+
+pub fn actor_system_create() -> ActorSystem {
+    return ActorSystem {
+        num_actors: 0,
+        running: false,
+        event_loop_ticks: 0,
+    };
+}
+
+pub fn actor_system_start(system: &mut ActorSystem) ! {distributed} {
+    system.running = true;
+    actor_event_loop(system);
+}
+
+pub fn actor_system_stop(system: &mut ActorSystem) ! {distributed} {
+    system.running = false;
+}
+
+pub fn actor_create(system: &mut ActorSystem, initial_state: i32) -> ActorRef ! {distributed} {
+    let actor_id = system.num_actors;
+    system.num_actors = system.num_actors + 1;
+
+    register_actor(actor_id, initial_state);
+
+    return ActorRef {
+        actor_id: actor_id,
+        mailbox: actor_id,
+    };
+}
+
+pub fn actor_send(from: &ActorRef, to: &ActorRef, message: &Message) ! {distributed, io} {
+    let mut msg = message.clone();
+    msg.sender_id = from.actor_id;
+    msg.timestamp = read_tsc();
+
+    enqueue_message(to.mailbox, &msg);
+}
+
+pub fn actor_reply(from: &ActorRef, to: &ActorRef, message: &Message) ! {distributed, io} {
+    actor_send(from, to, message);
+}
+
+pub fn actor_broadcast(from: &ActorRef, actors: &Vec<ActorRef>, message: &Message) ! {distributed, io} {
+    for actor in actors {
+        actor_send(from, actor, message);
+    }
+}
+
+fn actor_event_loop(system: &mut ActorSystem) ! {distributed} {
+    while system.running {
+        // Process one tick: deliver messages to all actors
+        for actor_id in 0..system.num_actors {
+            if let Some(msg) = dequeue_message(actor_id) {
+                actor_handle_message(actor_id, &msg);
+            }
+        }
+
+        system.event_loop_ticks = system.event_loop_ticks + 1;
+
+        // Yield to other tasks
+        yield_cpu();
+    }
+}
+
+fn actor_handle_message(actor_id: i32, message: &Message) ! {distributed} {
+    // Route message to actor's handler
+    asm! {
+        "call actor_message_handler"
+        :
+        : "a"(actor_id), "d"(message)
+        :
+        : volatile
+    }
+}
+
+// Supervision tree
+pub struct SupervisorRef {
+    supervisor_id: i32,
+}
+
+pub fn supervisor_create(system: &mut ActorSystem) -> SupervisorRef ! {distributed} {
+    let supervisor_id = system.num_actors;
+    system.num_actors = system.num_actors + 1;
+
+    return SupervisorRef {
+        supervisor_id: supervisor_id,
+    };
+}
+
+pub fn supervisor_spawn_child(
+    supervisor: &SupervisorRef,
+    initial_state: i32
+) -> ActorRef ! {distributed} {
+    let child_id = actor_id_counter();
+
+    register_actor(child_id, initial_state);
+    link_child(supervisor.supervisor_id, child_id);
+
+    return ActorRef {
+        actor_id: child_id,
+        mailbox: child_id,
+    };
+}
+
+pub enum SupervisionStrategy {
+    OneForOne,
+    OneForAll,
+    RestForOne,
+}
+
+pub fn supervisor_set_strategy(
+    supervisor: &SupervisorRef,
+    strategy: SupervisionStrategy
+) ! {distributed} {
+    set_strategy(supervisor.supervisor_id, &strategy);
+}
+
+pub fn supervisor_handle_child_failure(supervisor: &SupervisorRef, child_id: i32) ! {distributed} {
+    // Restart failed child according to supervision strategy
+    get_strategy(supervisor.supervisor_id);
+
+    restart_actor(child_id);
+}
+
+// Stashing and unstashing messages
+pub struct Stash {
+    messages: Vec<Message>,
+}
+
+pub fn stash_create() -> Stash {
+    return Stash {
+        messages: Vec::new(),
+    };
+}
+
+pub fn stash_message(stash: &mut Stash, message: &Message) ! {distributed} {
+    stash.messages.push(message.clone());
+}
+
+pub fn unstash_all(stash: &mut Stash) ! {distributed} {
+    for message in &stash.messages {
+        enqueue_message(0, message);
+    }
+    stash.messages.clear();
+}
+
+// Timeouts
+pub fn actor_set_timeout(actor: &ActorRef, duration_ms: u64) ! {distributed} {
+    schedule_timeout(actor.actor_id, duration_ms);
+}
+
+pub fn actor_cancel_timeout(actor: &ActorRef) ! {distributed} {
+    cancel_timeout(actor.actor_id);
+}
+
+// Ask pattern (request-reply with timeout)
+pub fn actor_ask<T>(to: &ActorRef, request: &Message, timeout_ms: u64) -> Option<Vec<u8>> ! {distributed, io} {
+    let response_id = create_response_channel();
+
+    let mut req = request.clone();
+    req.payload = serialize_response_id(response_id);
+
+    actor_send(&ActorRef { actor_id: 0, mailbox: 0 }, to, &req);
+
+    // Wait for response with timeout
+    let start_time = read_tsc();
+    loop {
+        let elapsed_ms = (read_tsc() - start_time) / 3000;  // Convert to ms (3GHz)
+
+        if let Some(response) = try_receive_response(response_id) {
+            return Option::Some(response);
+        }
+
+        if elapsed_ms > timeout_ms {
+            return Option::None;
+        }
+
+        yield_cpu();
+    }
+}
+
+// Clustering and remoting
+pub struct RemoteActorRef {
+    node_id: i32,
+    actor_id: i32,
+}
+
+pub fn actor_send_remote(from: &ActorRef, to: &RemoteActorRef, message: &Message) ! {distributed, io} {
+    let serialized = serialize_message(message);
+    send_to_remote_node(to.node_id, to.actor_id, &serialized);
+}
+
+pub fn register_remote_actor(node_id: i32, actor_id: i32) -> RemoteActorRef ! {distributed} {
+    return RemoteActorRef {
+        node_id: node_id,
+        actor_id: actor_id,
+    };
+}
+
+// Metrics and monitoring
+pub struct ActorMetrics {
+    messages_received: i64,
+    messages_sent: i64,
+    processing_time_nanos: i64,
+    last_activity: i64,
+}
+
+pub fn get_actor_metrics(actor_id: i32) -> ActorMetrics ! {distributed} {
+    return fetch_metrics(actor_id);
+}
+
+// Graceful shutdown
+pub fn actor_shutdown(actor_ref: &ActorRef) ! {distributed} {
+    send_shutdown_signal(actor_ref.actor_id);
+}
+
+pub fn actor_await_termination(actor_ref: &ActorRef) ! {distributed} {
+    loop {
+        if is_actor_terminated(actor_ref.actor_id) {
+            return;
+        }
+        yield_cpu();
+    }
+}
+
+// Internal functions
+fn register_actor(actor_id: i32, initial_state: i32) ! {distributed} {
+    asm! {
+        "call register_actor"
+        :
+        : "a"(actor_id), "d"(initial_state)
+        :
+        : volatile
+    }
+}
+
+fn enqueue_message(mailbox: i32, msg: &Message) ! {distributed} {
+    asm! {
+        "call enqueue_mailbox"
+        :
+        : "a"(mailbox), "d"(msg)
+        :
+        : volatile
+    }
+}
+
+fn dequeue_message(mailbox: i32) -> Option<Message> ! {distributed} {
+    return Option::None;
+}
+
+fn yield_cpu() ! {distributed} {
+    asm! { "pause" : : : : }
+}
+
+fn read_tsc() -> u64 ! {realtime} {
+    let low: u32 = 0;
+    let high: u32 = 0;
+    asm! {
+        "rdtsc"
+        : "=a"(low), "=d"(high)
+        :
+        :
+        : volatile
+    }
+    return ((high as u64) << 32) | (low as u64);
+}
+
+fn actor_id_counter() -> i32 {
+    return 0;
+}
+
+fn link_child(supervisor_id: i32, child_id: i32) ! {distributed} {}
+fn get_strategy(supervisor_id: i32) ! {distributed} {}
+fn set_strategy(supervisor_id: i32, strategy: &SupervisionStrategy) ! {distributed} {}
+fn restart_actor(actor_id: i32) ! {distributed} {}
+fn schedule_timeout(actor_id: i32, duration_ms: u64) ! {distributed} {}
+fn cancel_timeout(actor_id: i32) ! {distributed} {}
+fn create_response_channel() -> i32 { return 0; }
+fn serialize_response_id(response_id: i32) -> Vec<u8> { return Vec::new(); }
+fn try_receive_response(response_id: i32) -> Option<Vec<u8>> { return Option::None; }
+fn serialize_message(message: &Message) -> Vec<u8> { return Vec::new(); }
+fn send_to_remote_node(node_id: i32, actor_id: i32, data: &Vec<u8>) ! {distributed, io} {}
+fn fetch_metrics(actor_id: i32) -> ActorMetrics { return ActorMetrics { messages_received: 0, messages_sent: 0, processing_time_nanos: 0, last_activity: 0 }; }
+fn send_shutdown_signal(actor_id: i32) ! {distributed} {}
+fn is_actor_terminated(actor_id: i32) -> bool { return false; }
+
+trait Clone {
+    fn clone(&self) -> Self;
+}
+
+impl Clone for Message {
+    fn clone(&self) -> Message {
+        return Message {
+            sender_id: self.sender_id,
+            payload: self.payload.clone(),
+            timestamp: self.timestamp,
+        };
+    }
+}
+
+impl Clone for Vec<u8> {
+    fn clone(&self) -> Vec<u8> {
+        return *self;
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}

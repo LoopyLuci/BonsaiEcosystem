@@ -1,0 +1,427 @@
+// sylva/stdlib/visualization.sy
+// Advanced data visualization and plotting in Sylva
+
+struct Figure {
+    axes: List[Axis]
+    width: Int
+    height: Int
+    title: String
+    theme: Theme
+}
+
+struct Axis {
+    plots: List[Plot]
+    xlabel: String
+    ylabel: String
+    title: String
+    xlim: (Float, Float)
+    ylim: (Float, Float)
+    grid: Bool
+    legend: Bool
+    scale: AxisScale
+}
+
+enum Plot {
+    | Line(LinePlot)
+    | Scatter(ScatterPlot)
+    | Histogram(HistogramPlot)
+    | HeatMap(HeatMapPlot)
+    | Box(BoxPlot)
+    | Violin(ViolinPlot)
+    | Surface(SurfacePlot)
+    | Contour(ContourPlot)
+}
+
+struct LinePlot {
+    x: Tensor[f32]
+    y: Tensor[f32]
+    label: String
+    color: String
+    linestyle: LineStyle
+    linewidth: Float
+}
+
+enum LineStyle {
+    | Solid
+    | Dashed
+    | Dotted
+    | DashDot
+}
+
+struct ScatterPlot {
+    x: Tensor[f32]
+    y: Tensor[f32]
+    label: String
+    color: String
+    size: Int
+    alpha: Float
+}
+
+struct HistogramPlot {
+    data: Tensor[f32]
+    bins: Int
+    label: String
+    color: String
+    alpha: Float
+}
+
+struct HeatMapPlot {
+    data: Tensor[f32]
+    x_labels: List[String]
+    y_labels: List[String]
+    colormap: Colormap
+    vmin: Option[Float]
+    vmax: Option[Float]
+}
+
+enum Colormap {
+    | Viridis
+    | Plasma
+    | Inferno
+    | Magma
+    | CoolWarm
+    | RdYlBu
+    | Greys
+    | Jet
+}
+
+struct BoxPlot {
+    data: List[Tensor[f32]]
+    labels: List[String]
+    color: String
+}
+
+struct ViolinPlot {
+    data: List[Tensor[f32]]
+    labels: List[String]
+    color: String
+}
+
+struct SurfacePlot {
+    x: Tensor[f32]
+    y: Tensor[f32]
+    z: Tensor[f32]
+    colormap: Colormap
+}
+
+struct ContourPlot {
+    x: Tensor[f32]
+    y: Tensor[f32]
+    z: Tensor[f32]
+    levels: Int
+    colormap: Colormap
+}
+
+enum AxisScale {
+    | Linear
+    | Log
+    | Sqrt
+    | Symlog
+}
+
+struct Theme {
+    background_color: String
+    text_color: String
+    grid_color: String
+    font_family: String
+    font_size: Int
+}
+
+impl Figure {
+    fn new(title: String, width: Int, height: Int) -> Figure {
+        return Figure {
+            axes: List::new(),
+            width: width,
+            height: height,
+            title: title,
+            theme: Theme {
+                background_color: "#ffffff",
+                text_color: "#000000",
+                grid_color: "#cccccc",
+                font_family: "sans-serif",
+                font_size: 12,
+            },
+        }
+    }
+
+    fn add_subplot(rows: Int, cols: Int, index: Int) -> Axis {
+        let axis = Axis {
+            plots: List::new(),
+            xlabel: "",
+            ylabel: "",
+            title: "",
+            xlim: (0.0, 1.0),
+            ylim: (0.0, 1.0),
+            grid: false,
+            legend: false,
+            scale: AxisScale::Linear,
+        }
+
+        this.axes.push(axis)
+
+        return axis
+    }
+
+    fn savefig(filename: String) {
+        -- Render and save figure
+        render_to_file(this, filename)
+    }
+
+    fn show() {
+        -- Display figure in interactive viewer
+        display_figure(this)
+    }
+}
+
+impl Axis {
+    fn plot(x: Tensor[f32], y: Tensor[f32], label: String) {
+        let plot = Plot::Line(LinePlot {
+            x: x,
+            y: y,
+            label: label,
+            color: "#000000",
+            linestyle: LineStyle::Solid,
+            linewidth: 1.0,
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn scatter(x: Tensor[f32], y: Tensor[f32], label: String, size: Int) {
+        let plot = Plot::Scatter(ScatterPlot {
+            x: x,
+            y: y,
+            label: label,
+            color: "#000000",
+            size: size,
+            alpha: 1.0,
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn hist(data: Tensor[f32], bins: Int, label: String) {
+        let plot = Plot::Histogram(HistogramPlot {
+            data: data,
+            bins: bins,
+            label: label,
+            color: "#000000",
+            alpha: 0.7,
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn heatmap(
+        data: Tensor[f32],
+        x_labels: List[String],
+        y_labels: List[String],
+        colormap: Colormap
+    ) {
+        let plot = Plot::HeatMap(HeatMapPlot {
+            data: data,
+            x_labels: x_labels,
+            y_labels: y_labels,
+            colormap: colormap,
+            vmin: None,
+            vmax: None,
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn box(data: List[Tensor[f32]], labels: List[String]) {
+        let plot = Plot::Box(BoxPlot {
+            data: data,
+            labels: labels,
+            color: "#000000",
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn violin(data: List[Tensor[f32]], labels: List[String]) {
+        let plot = Plot::Violin(ViolinPlot {
+            data: data,
+            labels: labels,
+            color: "#000000",
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn surface(x: Tensor[f32], y: Tensor[f32], z: Tensor[f32]) {
+        let plot = Plot::Surface(SurfacePlot {
+            x: x,
+            y: y,
+            z: z,
+            colormap: Colormap::Viridis,
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn contour(x: Tensor[f32], y: Tensor[f32], z: Tensor[f32], levels: Int) {
+        let plot = Plot::Contour(ContourPlot {
+            x: x,
+            y: y,
+            z: z,
+            levels: levels,
+            colormap: Colormap::Viridis,
+        })
+
+        this.plots.push(plot)
+    }
+
+    fn set_xlabel(label: String) {
+        this.xlabel = label
+    }
+
+    fn set_ylabel(label: String) {
+        this.ylabel = label
+    }
+
+    fn set_title(title: String) {
+        this.title = title
+    }
+
+    fn set_xlim(min: Float, max: Float) {
+        this.xlim = (min, max)
+    }
+
+    fn set_ylim(min: Float, max: Float) {
+        this.ylim = (min, max)
+    }
+
+    fn grid(enabled: Bool) {
+        this.grid = enabled
+    }
+
+    fn legend(enabled: Bool) {
+        this.legend = enabled
+    }
+
+    fn set_scale(scale: AxisScale) {
+        this.scale = scale
+    }
+}
+
+// High-level plotting functions
+fn plot(x: Tensor[f32], y: Tensor[f32]) -> Figure {
+    let fig = Figure::new("", 800, 600)
+    let ax = fig.add_subplot(1, 1, 1)
+
+    ax.plot(x, y, "")
+
+    return fig
+}
+
+fn scatter(x: Tensor[f32], y: Tensor[f32], size: Int) -> Figure {
+    let fig = Figure::new("", 800, 600)
+    let ax = fig.add_subplot(1, 1, 1)
+
+    ax.scatter(x, y, "", size)
+
+    return fig
+}
+
+fn hist(data: Tensor[f32], bins: Int) -> Figure {
+    let fig = Figure::new("", 800, 600)
+    let ax = fig.add_subplot(1, 1, 1)
+
+    ax.hist(data, bins, "")
+
+    return fig
+}
+
+fn heatmap(data: Tensor[f32]) -> Figure {
+    let fig = Figure::new("", 800, 600)
+    let ax = fig.add_subplot(1, 1, 1)
+
+    ax.heatmap(data, List::new(), List::new(), Colormap::Viridis)
+
+    return fig
+}
+
+fn boxplot(data: List[Tensor[f32]]) -> Figure {
+    let fig = Figure::new("", 800, 600)
+    let ax = fig.add_subplot(1, 1, 1)
+
+    ax.box(data, List::new())
+
+    return fig
+}
+
+fn violin(data: List[Tensor[f32]]) -> Figure {
+    let fig = Figure::new("", 800, 600)
+    let ax = fig.add_subplot(1, 1, 1)
+
+    ax.violin(data, List::new())
+
+    return fig
+}
+
+// Interactive plotting
+struct InteractivePlot {
+    figure: Figure
+    interactive: Bool
+}
+
+impl InteractivePlot {
+    fn new(figure: Figure) -> InteractivePlot {
+        return InteractivePlot {
+            figure: figure,
+            interactive: true,
+        }
+    }
+
+    fn enable_zoom(enabled: Bool) {
+        -- Enable interactive zoom
+    }
+
+    fn enable_pan(enabled: Bool) {
+        -- Enable interactive pan
+    }
+
+    fn enable_hover_tooltip(enabled: Bool) {
+        -- Enable hover tooltips
+    }
+
+    fn export_html(filename: String) {
+        -- Export as interactive HTML
+        export_html_figure(this.figure, filename)
+    }
+}
+
+// Rendering and export
+fn render_to_file(figure: Figure, filename: String) {
+    -- Render figure to file (PNG, PDF, SVG, etc)
+}
+
+fn display_figure(figure: Figure) {
+    -- Display in interactive viewer
+}
+
+fn export_html_figure(figure: Figure, filename: String) {
+    -- Export as interactive HTML using Plotly or similar
+}
+
+fn export_svg(figure: Figure, filename: String) {
+    -- Export as SVG
+}
+
+fn export_pdf(figure: Figure, filename: String) {
+    -- Export as PDF
+}
+
+fn export_png(figure: Figure, filename: String, dpi: Int) {
+    -- Export as PNG
+}
+
+type Tensor[T] = Any
+type Tensor[T, Shape] = Any
+type List<T> = Any
+type Option<T> = Any
+
+fn List<T>::new() -> List<T> { return []; }
+fn push<T>(list: List<T>, item: T) {}

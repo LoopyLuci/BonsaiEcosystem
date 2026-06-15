@@ -1,0 +1,5 @@
+// Tests for failure-detector-isolation
+
+pub fn test_module() -> i64 {
+    return 111;
+}

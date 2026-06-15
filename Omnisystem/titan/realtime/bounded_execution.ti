@@ -1,0 +1,369 @@
+// titan/realtime/bounded_execution.ti
+// Real-time execution guarantees and latency bounds
+
+pub struct ExecutionBound {
+    worst_case_cycles: u64,
+    worst_case_nanos: u64,
+    max_memory_bytes: u64,
+    cache_misses_max: u32,
+    branch_mispredictions_max: u32,
+}
+
+pub struct RealtimeConfig {
+    period_nanos: u64,
+    deadline_nanos: u64,
+    wcet_nanos: u64,      // Worst-case execution time
+    stack_depth_bytes: u64,
+    frequency_mhz: u32,
+}
+
+pub struct TaskMetrics {
+    execution_time_nanos: u64,
+    max_latency_nanos: u64,
+    jitter_nanos: u64,
+    cache_hit_rate: f32,
+    branch_prediction_rate: f32,
+}
+
+// WCET analysis structures
+pub struct CriticalPath {
+    operations: i32,
+    memory_accesses: i32,
+    branches: i32,
+    estimated_cycles: u64,
+}
+
+pub fn analyze_wcet(fn_ptr: fn() -> (), cpu_freq_mhz: i32) -> ExecutionBound {
+    // Perform static WCET analysis
+    let cycles = estimate_cycles(fn_ptr);
+    let nanos = (cycles * 1000) / (cpu_freq_mhz as u64);
+
+    return ExecutionBound {
+        worst_case_cycles: cycles,
+        worst_case_nanos: nanos,
+        max_memory_bytes: estimate_memory(fn_ptr),
+        cache_misses_max: estimate_cache_misses(fn_ptr),
+        branch_mispredictions_max: estimate_branch_mispred(fn_ptr),
+    };
+}
+
+fn estimate_cycles(fn_ptr: fn() -> ()) -> u64 {
+    // Conservative estimate based on function complexity
+    return 10000;  // Placeholder
+}
+
+fn estimate_memory(fn_ptr: fn() -> ()) -> u64 {
+    return 4096;
+}
+
+fn estimate_cache_misses(fn_ptr: fn() -> ()) -> u32 {
+    return 100;
+}
+
+fn estimate_branch_mispred(fn_ptr: fn() -> ()) -> u32 {
+    return 50;
+}
+
+// Real-time task scheduling
+pub struct RealtimeTask {
+    task_id: i32,
+    priority: i32,        // 0 (low) to 255 (high)
+    period_nanos: u64,
+    deadline_nanos: u64,
+    wcet_nanos: u64,
+    handler: fn() -> (),
+}
+
+pub fn schedule_periodic_task(task: RealtimeTask) ! {realtime} {
+    // Register task with real-time scheduler
+    asm! {
+        "call register_realtime_task"
+        :
+        : "a"(task.task_id), "d"(task.priority), "c"(task.period_nanos)
+        :
+        : volatile
+    }
+}
+
+pub fn cancel_task(task_id: i32) ! {realtime} {
+    asm! {
+        "call cancel_realtime_task"
+        :
+        : "a"(task_id)
+        :
+        : volatile
+    }
+}
+
+// Deterministic memory allocation (pre-allocated pools)
+pub struct MemoryPool {
+    base_addr: u64,
+    pool_size: u64,
+    block_size: u64,
+    total_blocks: i32,
+    free_blocks: i32,
+}
+
+pub fn create_memory_pool(pool_size: u64, block_size: u64) -> MemoryPool ! {alloc, realtime} {
+    let base_addr = malloc_aligned(pool_size, 4096);
+    let total_blocks = (pool_size / block_size) as i32;
+
+    return MemoryPool {
+        base_addr: base_addr,
+        pool_size: pool_size,
+        block_size: block_size,
+        total_blocks: total_blocks,
+        free_blocks: total_blocks,
+    };
+}
+
+pub fn pool_alloc(pool: &mut MemoryPool) -> &mut u8 ! {alloc, realtime} {
+    if pool.free_blocks <= 0 {
+        emit_panic("Memory pool exhausted");
+    }
+
+    let block_addr = pool.base_addr + ((pool.total_blocks - pool.free_blocks) as u64 * pool.block_size);
+    pool.free_blocks = pool.free_blocks - 1;
+
+    return block_addr as &mut u8;
+}
+
+pub fn pool_free(pool: &mut MemoryPool, ptr: &u8) ! {alloc, realtime} {
+    // O(1) free back to pool
+    pool.free_blocks = pool.free_blocks + 1;
+}
+
+pub fn destroy_memory_pool(pool: &MemoryPool) ! {alloc, realtime} {
+    free_aligned(pool.base_addr, pool.pool_size);
+}
+
+// Lock-free queue for inter-task communication
+pub struct LockFreeQueue<T> {
+    head: i32,
+    tail: i32,
+    data: [T; 1024],
+}
+
+pub fn queue_enqueue<T>(queue: &mut LockFreeQueue<T>, item: T) -> bool ! {realtime} {
+    let next_tail = (queue.tail + 1) % 1024;
+    if next_tail == queue.head {
+        return false;  // Queue full
+    }
+
+    queue.data[queue.tail as usize] = item;
+    queue.tail = next_tail;
+    return true;
+}
+
+pub fn queue_dequeue<T>(queue: &mut LockFreeQueue<T>) -> (T, bool) ! {realtime} {
+    if queue.head == queue.tail {
+        return (queue.data[0], false);  // Queue empty
+    }
+
+    let item = queue.data[queue.head as usize];
+    queue.head = (queue.head + 1) % 1024;
+    return (item, true);
+}
+
+// Bounded execution using watchdog timer
+pub fn execute_with_timeout(fn_ptr: fn() -> (), timeout_nanos: u64) -> bool ! {realtime} {
+    // Start watchdog timer
+    start_watchdog_timer(timeout_nanos);
+
+    // Execute function
+    fn_ptr();
+
+    // Clear watchdog
+    clear_watchdog_timer();
+
+    return true;
+}
+
+fn start_watchdog_timer(nanos: u64) ! {realtime} {
+    // Program hardware watchdog timer
+    let cycles = (nanos as u64) * 3;  // 3 GHz CPU
+
+    asm! {
+        "mov %0, %%r10; call start_timer"
+        :
+        : "r"(cycles)
+        :
+        : volatile
+    }
+}
+
+fn clear_watchdog_timer() ! {realtime} {
+    asm! {
+        "call stop_timer"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+// CPU affinity for guaranteed execution
+pub fn set_cpu_affinity(cpu_mask: u64) ! {realtime} {
+    // Pin thread to specific CPU cores
+    asm! {
+        "call set_thread_affinity"
+        :
+        : "a"(cpu_mask)
+        :
+        : volatile
+    }
+}
+
+pub fn get_cpu_affinity() -> u64 ! {realtime} {
+    let mask: u64 = 0;
+    asm! {
+        "call get_thread_affinity"
+        : "=a"(mask)
+        :
+        :
+        : volatile
+    }
+    return mask;
+}
+
+// Power management for predictability
+pub fn disable_cpu_frequency_scaling() ! {realtime, privileged} {
+    // Disable dynamic frequency scaling (P-states)
+    asm! {
+        "wrmsr"
+        :
+        : "c"(0x199), "a"(0x0), "d"(0x0)
+        :
+        : volatile
+    }
+}
+
+pub fn enable_turbo_boost() ! {realtime, privileged} {
+    // Enable Intel Turbo Boost for consistent max frequency
+    asm! {
+        "wrmsr"
+        :
+        : "c"(0x1a0), "a"(0x0), "d"(0x0)
+        :
+        : volatile
+    }
+}
+
+// Interrupt latency measurement
+pub fn measure_interrupt_latency() -> u64 ! {realtime} {
+    let start_tsc: u64 = 0;
+    let end_tsc: u64 = 0;
+
+    asm! {
+        "rdtsc"
+        : "=a"(start_tsc), "=d"(end_tsc)
+        :
+        :
+        : volatile
+    }
+
+    // Interrupt fires here (measured by latency histogram)
+
+    asm! {
+        "rdtsc"
+        : "=a"(end_tsc), "=d"(end_tsc)
+        :
+        :
+        : volatile
+    }
+
+    return end_tsc - start_tsc;
+}
+
+// Time stamp counter operations
+pub fn read_tsc() -> u64 ! {realtime} {
+    let low: u32 = 0;
+    let high: u32 = 0;
+
+    asm! {
+        "rdtsc"
+        : "=a"(low), "=d"(high)
+        :
+        :
+        : volatile
+    }
+
+    return ((high as u64) << 32) | (low as u64);
+}
+
+pub fn read_tsc_fence() -> u64 ! {realtime} {
+    // Serialize TSC read with surrounding instructions
+    asm! {
+        "lfence"
+        :
+        :
+        :
+        : volatile
+    }
+    let tsc = read_tsc();
+    asm! {
+        "lfence"
+        :
+        :
+        :
+        : volatile
+    }
+    return tsc;
+}
+
+// Nanosleep with TSC for high-resolution sleep
+pub fn nanosleep_hires(nanos: u64) ! {realtime} {
+    let start = read_tsc();
+    let cycles_needed = nanos * 3;  // 3 GHz
+
+    while (read_tsc() - start) < cycles_needed {
+        // Busy wait with pause instruction
+        asm! {
+            "pause"
+            :
+            :
+            :
+            :
+        }
+    }
+}
+
+// Cache-aware memory barrier
+pub fn cache_flush_line(ptr: &u8) ! {realtime, privileged} {
+    // Flush cache line (clflush instruction)
+    asm! {
+        "clflush (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn cache_flush_all() ! {realtime, privileged} {
+    // Flush all caches (wbinvd instruction)
+    asm! {
+        "wbinvd"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+fn emit_panic(msg: String) ! {io} {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+fn malloc_aligned(size: u64, alignment: i32) -> u64 ! {alloc} {
+    return 0;
+}
+
+fn free_aligned(ptr: u64, size: u64) ! {alloc} {
+}

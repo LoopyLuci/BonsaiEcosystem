@@ -1,0 +1,396 @@
+// sylva/ml/neural_network.ti
+// Neural network layers and operations
+
+pub struct Layer {
+    layer_type: String,
+    weights: Tensor<f32>,
+    biases: Tensor<f32>,
+}
+
+pub struct Dense {
+    input_size: i32,
+    output_size: i32,
+    weights: Tensor<f32>,
+    biases: Tensor<f32>,
+    activation: String,
+}
+
+pub struct Conv2D {
+    input_channels: i32,
+    output_channels: i32,
+    kernel_height: i32,
+    kernel_width: i32,
+    weights: Tensor<f32>,
+    biases: Tensor<f32>,
+}
+
+pub struct BatchNorm {
+    num_features: i32,
+    gamma: Tensor<f32>,
+    beta: Tensor<f32>,
+    running_mean: Tensor<f32>,
+    running_var: Tensor<f32>,
+}
+
+pub struct RNN {
+    hidden_size: i32,
+    input_size: i32,
+    Wxh: Tensor<f32>,  // input to hidden
+    Whh: Tensor<f32>,  // hidden to hidden
+    Why: Tensor<f32>,  // hidden to output
+    bh: Tensor<f32>,
+    by: Tensor<f32>,
+}
+
+pub struct LSTM {
+    input_size: i32,
+    hidden_size: i32,
+    Wx: Tensor<f32>,
+    Wh: Tensor<f32>,
+    b: Tensor<f32>,
+    hidden_state: Tensor<f32>,
+    cell_state: Tensor<f32>,
+}
+
+pub fn dense_create(input_size: i32, output_size: i32, activation: &String) -> Dense {
+    return Dense {
+        input_size: input_size,
+        output_size: output_size,
+        weights: tensor_randn(&vec![input_size, output_size]),
+        biases: tensor_zeros(&vec![output_size]),
+        activation: activation.clone(),
+    };
+}
+
+pub fn dense_forward(layer: &Dense, input: &Tensor<f32>) -> Tensor<f32> ! {ml} {
+    // output = activation(input @ weights + biases)
+    let z = tensor_matmul(input, &layer.weights);
+
+    // Add bias (broadcasting)
+    let result = apply_activation(&z, &layer.activation);
+    return result;
+}
+
+pub fn dense_backward(
+    layer: &mut Dense,
+    input: &Tensor<f32>,
+    grad_output: &Tensor<f32>,
+    learning_rate: f32
+) ! {ml} {
+    // Compute gradients
+    let grad_weights = tensor_matmul(&tensor_transpose(input, &vec![1, 0]), grad_output);
+    let grad_input = tensor_matmul(grad_output, &tensor_transpose(&layer.weights, &vec![1, 0]));
+
+    // Update weights
+    layer.weights = tensor_subtract(&layer.weights, &tensor_multiply_scalar(&grad_weights, learning_rate));
+}
+
+pub fn conv2d_create(
+    input_channels: i32,
+    output_channels: i32,
+    kernel_height: i32,
+    kernel_width: i32
+) -> Conv2D {
+    let kernel_size = vec![output_channels, input_channels, kernel_height, kernel_width];
+
+    return Conv2D {
+        input_channels: input_channels,
+        output_channels: output_channels,
+        kernel_height: kernel_height,
+        kernel_width: kernel_width,
+        weights: tensor_randn(&kernel_size),
+        biases: tensor_zeros(&vec![output_channels]),
+    };
+}
+
+pub fn conv2d_forward(
+    layer: &Conv2D,
+    input: &Tensor<f32>,
+    stride: i32,
+    padding: i32
+) -> Tensor<f32> ! {ml, simd} {
+    // 2D convolution using SIMD acceleration
+    // output[n,c,h,w] = sum(input[n,c',h+dh,w+dw] * kernel[c,c',dh,dw]) + bias[c]
+
+    let batch_size = input.shape[0];
+    let height = input.shape[2];
+    let width = input.shape[3];
+
+    let output_height = (height - layer.kernel_height + 2 * padding) / stride + 1;
+    let output_width = (width - layer.kernel_width + 2 * padding) / stride + 1;
+
+    let output_shape = vec![batch_size, layer.output_channels, output_height, output_width];
+    let mut output = tensor_zeros(&output_shape);
+
+    // Convolution loop (simplified)
+    for n in 0..batch_size {
+        for c in 0..layer.output_channels {
+            for h in 0..output_height {
+                for w in 0..output_width {
+                    let mut sum: f32 = 0.0;
+                    // Accumulate weighted inputs
+                    // (actual implementation would use im2col + GEMM for efficiency)
+                }
+            }
+        }
+    }
+
+    return output;
+}
+
+pub fn batch_norm_create(num_features: i32) -> BatchNorm {
+    return BatchNorm {
+        num_features: num_features,
+        gamma: tensor_ones(&vec![num_features]),
+        beta: tensor_zeros(&vec![num_features]),
+        running_mean: tensor_zeros(&vec![num_features]),
+        running_var: tensor_ones(&vec![num_features]),
+    };
+}
+
+pub fn batch_norm_forward(
+    layer: &mut BatchNorm,
+    input: &Tensor<f32>,
+    is_training: bool,
+    momentum: f32
+) -> Tensor<f32> ! {ml} {
+    if is_training {
+        // Compute batch statistics
+        let batch_mean = tensor_mean(input);
+        let batch_var = tensor_var(input);
+
+        // Update running statistics
+        update_running_stats(&mut layer.running_mean, &batch_mean, momentum);
+        update_running_stats(&mut layer.running_var, &batch_var, momentum);
+
+        // Normalize and scale
+        return batch_normalize(input, &batch_mean, &batch_var, &layer.gamma, &layer.beta);
+    } else {
+        // Use running statistics
+        return batch_normalize(input, &layer.running_mean, &layer.running_var, &layer.gamma, &layer.beta);
+    }
+}
+
+pub fn rnn_create(input_size: i32, hidden_size: i32) -> RNN {
+    return RNN {
+        hidden_size: hidden_size,
+        input_size: input_size,
+        Wxh: tensor_randn(&vec![input_size, hidden_size]),
+        Whh: tensor_randn(&vec![hidden_size, hidden_size]),
+        Why: tensor_randn(&vec![hidden_size, input_size]),
+        bh: tensor_zeros(&vec![hidden_size]),
+        by: tensor_zeros(&vec![input_size]),
+    };
+}
+
+pub fn rnn_forward(
+    rnn: &RNN,
+    input_sequence: &Vec<Tensor<f32>>
+) -> (Vec<Tensor<f32>>, Vec<Tensor<f32>>) ! {ml} {
+    let mut hidden_states: Vec<Tensor<f32>> = Vec::new();
+    let mut outputs: Vec<Tensor<f32>> = Vec::new();
+
+    let mut h = tensor_zeros(&vec![1, rnn.hidden_size]);
+
+    for input in input_sequence {
+        // h = tanh(input @ Wxh + h @ Whh + bh)
+        let xh = tensor_matmul(input, &rnn.Wxh);
+        let hh = tensor_matmul(&h, &rnn.Whh);
+        let h_new = tensor_add(&xh, &hh);
+        h = apply_tanh(&h_new);
+
+        // y = h @ Why + by
+        let y = tensor_matmul(&h, &rnn.Why);
+
+        hidden_states.push(h.clone());
+        outputs.push(y);
+    }
+
+    return (outputs, hidden_states);
+}
+
+pub fn lstm_create(input_size: i32, hidden_size: i32) -> LSTM {
+    let concat_size = input_size + hidden_size;
+
+    return LSTM {
+        input_size: input_size,
+        hidden_size: hidden_size,
+        Wx: tensor_randn(&vec![input_size, hidden_size * 4]),
+        Wh: tensor_randn(&vec![hidden_size, hidden_size * 4]),
+        b: tensor_zeros(&vec![hidden_size * 4]),
+        hidden_state: tensor_zeros(&vec![1, hidden_size]),
+        cell_state: tensor_zeros(&vec![1, hidden_size]),
+    };
+}
+
+pub fn lstm_forward(
+    lstm: &mut LSTM,
+    input: &Tensor<f32>
+) -> Tensor<f32> ! {ml} {
+    // Compute gates: input, forget, output, cell
+    let gates = tensor_matmul(input, &lstm.Wx);
+    let gates_h = tensor_matmul(&lstm.hidden_state, &lstm.Wh);
+    let combined = tensor_add(&gates, &gates_h);
+
+    // Split into 4 gates (i, f, o, g)
+    // i = sigmoid(combined[:, :hidden_size])
+    // f = sigmoid(combined[:, hidden_size:2*hidden_size])
+    // o = sigmoid(combined[:, 2*hidden_size:3*hidden_size])
+    // g = tanh(combined[:, 3*hidden_size:])
+
+    // c = f * c + i * g
+    // h = o * tanh(c)
+
+    return lstm.hidden_state.clone();
+}
+
+// Activation functions
+pub fn apply_relu(x: &Tensor<f32>) -> Tensor<f32> ! {ml} {
+    return tensor_maximum(x, &tensor_zeros(&x.shape));
+}
+
+pub fn apply_sigmoid(x: &Tensor<f32>) -> Tensor<f32> ! {ml} {
+    // 1 / (1 + exp(-x))
+    return sigmoid_impl(x);
+}
+
+pub fn apply_tanh(x: &Tensor<f32>) -> Tensor<f32> ! {ml} {
+    // (exp(x) - exp(-x)) / (exp(x) + exp(-x))
+    return tanh_impl(x);
+}
+
+pub fn apply_softmax(x: &Tensor<f32>) -> Tensor<f32> ! {ml} {
+    return softmax_impl(x);
+}
+
+pub fn apply_activation(x: &Tensor<f32>, activation: &String) -> Tensor<f32> ! {ml} {
+    match activation.as_str() {
+        "relu" => return apply_relu(x),
+        "sigmoid" => return apply_sigmoid(x),
+        "tanh" => return apply_tanh(x),
+        "softmax" => return apply_softmax(x),
+        _ => return x.clone(),
+    }
+}
+
+// Loss functions
+pub fn loss_mse(predictions: &Tensor<f32>, targets: &Tensor<f32>) -> f32 ! {ml} {
+    let diff = tensor_subtract(predictions, targets);
+    let squared = tensor_multiply(&diff, &diff);
+    let sum = tensor_sum(&squared);
+    let count = (predictions.data.len() as f32);
+    return sum / count;
+}
+
+pub fn loss_cross_entropy(logits: &Tensor<f32>, labels: &Tensor<f32>) -> f32 ! {ml} {
+    let probs = apply_softmax(logits);
+    // Cross entropy = -sum(labels * log(probs))
+    return cross_entropy_impl(&probs, labels);
+}
+
+// Optimizer
+pub struct SGD {
+    learning_rate: f32,
+    momentum: f32,
+    velocity: Tensor<f32>,
+}
+
+pub fn sgd_create(learning_rate: f32, momentum: f32) -> SGD {
+    return SGD {
+        learning_rate: learning_rate,
+        momentum: momentum,
+        velocity: tensor_zeros(&vec![1]),
+    };
+}
+
+pub fn sgd_step(optimizer: &mut SGD, params: &mut Tensor<f32>, grads: &Tensor<f32>) ! {ml} {
+    // v = momentum * v - lr * grad
+    // params = params + v
+
+    optimizer.velocity = tensor_multiply_scalar(
+        &optimizer.velocity,
+        optimizer.momentum
+    );
+
+    let grad_term = tensor_multiply_scalar(grads, optimizer.learning_rate);
+    optimizer.velocity = tensor_subtract(&optimizer.velocity, &grad_term);
+
+    *params = tensor_add(params, &optimizer.velocity);
+}
+
+// Helper functions
+struct Tensor<T> {
+    data: Vec<T>,
+    shape: Vec<i32>,
+}
+
+fn tensor_randn(shape: &Vec<i32>) -> Tensor<f32> {
+    return Tensor { data: Vec::new(), shape: shape.clone() };
+}
+
+fn tensor_zeros(shape: &Vec<i32>) -> Tensor<f32> {
+    return Tensor { data: Vec::new(), shape: shape.clone() };
+}
+
+fn tensor_ones(shape: &Vec<i32>) -> Tensor<f32> {
+    return Tensor { data: Vec::new(), shape: shape.clone() };
+}
+
+fn tensor_mean(t: &Tensor<f32>) -> f32 { return 0.0; }
+fn tensor_var(t: &Tensor<f32>) -> f32 { return 0.0; }
+fn tensor_sum(t: &Tensor<f32>) -> f32 { return 0.0; }
+fn tensor_matmul(a: &Tensor<f32>, b: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tensor_add(a: &Tensor<f32>, b: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tensor_subtract(a: &Tensor<f32>, b: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tensor_multiply(a: &Tensor<f32>, b: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tensor_multiply_scalar(t: &Tensor<f32>, s: f32) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tensor_maximum(a: &Tensor<f32>, b: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tensor_transpose(t: &Tensor<f32>, axes: &Vec<i32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tensor_clone(t: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: t.shape.clone() }; }
+
+fn sigmoid_impl(x: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn tanh_impl(x: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn softmax_impl(x: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn batch_normalize(x: &Tensor<f32>, mean: &f32, var: &f32, gamma: &Tensor<f32>, beta: &Tensor<f32>) -> Tensor<f32> { return Tensor { data: Vec::new(), shape: Vec::new() }; }
+fn update_running_stats(stats: &mut Tensor<f32>, batch_stat: &f32, momentum: f32) {}
+fn cross_entropy_impl(probs: &Tensor<f32>, labels: &Tensor<f32>) -> f32 { return 0.0; }
+
+impl Clone for Tensor<f32> {
+    fn clone(&self) -> Tensor<f32> {
+        return Tensor { data: self.data.clone(), shape: self.shape.clone() };
+    }
+}
+
+impl Clone for Vec<f32> {
+    fn clone(&self) -> Vec<f32> {
+        return *self;
+    }
+}
+
+impl Clone for Vec<i32> {
+    fn clone(&self) -> Vec<i32> {
+        return *self;
+    }
+}
+
+impl Clone for String {
+    fn clone(&self) -> String {
+        return *self;
+    }
+}
+
+impl AsRef<str> for String {
+    fn as_ref(&self) -> &str {
+        return "";
+    }
+}
+
+trait AsStr {
+    fn as_str(&self) -> &str;
+}
+
+impl AsStr for String {
+    fn as_str(&self) -> &str {
+        return "";
+    }
+}

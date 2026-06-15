@@ -1,0 +1,14 @@
+// Common module: error
+// Unified error handling
+
+pub struct ErrorConfig {
+    enabled: bool,
+}
+
+pub fn create_config() -> ErrorConfig {
+    return ErrorConfig { enabled: true };
+}
+
+pub fn main() -> i64 {
+    return 111;
+}

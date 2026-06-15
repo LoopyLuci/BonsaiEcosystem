@@ -1,0 +1,283 @@
+// titan/compiler/codegen_inline_asm.ti
+// LLVM IR generation for inline assembly blocks
+
+pub fn codegen_asm_block(asm_block: AsmBlock, target_arch: String) -> String {
+    let mut ir = String::new();
+
+    // Start inline asm IR
+    ir = ir + "call void asm sideeffect \"";
+
+    // Escape special characters in assembly template
+    let escaped_template = escape_asm_template(asm_block.template);
+    ir = ir + escaped_template;
+
+    // Add constraint string
+    ir = ir + "\", \"";
+    ir = ir + build_constraint_string(asm_block.outputs, asm_block.inputs, asm_block.clobbers);
+    ir = ir + "\"";
+
+    // Add operands
+    for (i, output) in asm_block.outputs.iter().enumerate() {
+        ir = ir + "(";
+        ir = ir + output.value;
+        ir = ir + ")";
+        if i < asm_block.outputs.len() - 1 {
+            ir = ir + ", ";
+        }
+    }
+
+    if asm_block.inputs.len() > 0 {
+        ir = ir + ", ";
+    }
+
+    for (i, input) in asm_block.inputs.iter().enumerate() {
+        ir = ir + "(";
+        ir = ir + input.value;
+        ir = ir + ")";
+        if i < asm_block.inputs.len() - 1 {
+            ir = ir + ", ";
+        }
+    }
+
+    // Add attributes
+    ir = ir + "\"";
+
+    // Volatility
+    for option in asm_block.options.iter() {
+        match option {
+            AsmOption::Volatile => {
+                ir = ir + " volatile";
+            }
+            AsmOption::AlignStack => {
+                ir = ir + " alignstack";
+            }
+            AsmOption::Intel => {
+                ir = ir + " intel";
+            }
+            AsmOption::NoReturn => {
+                ir = ir + " noreturn";
+            }
+            _ => {}
+        }
+    }
+
+    return ir;
+}
+
+fn escape_asm_template(template: String) -> String {
+    let mut result = String::new();
+    for i in 0..template.len() {
+        let ch = source_char_at(template, i as i64);
+        if ch == "\"" {
+            result = result + "\\\"";
+        } else if ch == "\n" {
+            result = result + "\\n";
+        } else if ch == "\\" {
+            result = result + "\\\\";
+        } else {
+            result = result + ch;
+        }
+    }
+    return result;
+}
+
+fn build_constraint_string(
+    outputs: Vec<AsmConstraint>,
+    inputs: Vec<AsmConstraint>,
+    clobbers: Vec<String>
+) -> String {
+    let mut constraints = String::new();
+
+    // Output constraints
+    for (i, output) in outputs.iter().enumerate() {
+        constraints = constraints + output.constraint;
+        if i < outputs.len() - 1 {
+            constraints = constraints + ",";
+        }
+    }
+
+    if inputs.len() > 0 {
+        if outputs.len() > 0 {
+            constraints = constraints + ",";
+        }
+
+        // Input constraints
+        for (i, input) in inputs.iter().enumerate() {
+            constraints = constraints + input.constraint;
+            if i < inputs.len() - 1 {
+                constraints = constraints + ",";
+            }
+        }
+    }
+
+    // Clobber list
+    if clobbers.len() > 0 {
+        constraints = constraints + "~{";
+        for (i, clobber) in clobbers.iter().enumerate() {
+            constraints = constraints + clobber;
+            if i < clobbers.len() - 1 {
+                constraints = constraints + "},{";
+            }
+        }
+        constraints = constraints + "}";
+    }
+
+    return constraints;
+}
+
+pub fn codegen_interrupt_handler(handler_name: String, arch: String) -> String {
+    let mut ir = String::new();
+
+    // Define interrupt handler function signature
+    ir = ir + "define void @";
+    ir = ir + handler_name;
+    ir = ir + "(%InterruptFrame* %frame) {\n";
+
+    // For x86_64, we need to:
+    // 1. Save registers (already done by CPU)
+    // 2. Call the actual handler
+    // 3. Restore registers
+    // 4. IRET
+
+    if arch == "x86_64" {
+        // Load handler address from symbol
+        ir = ir + "  %handler_fn = load i64, i64* @";
+        ir = ir + handler_name;
+        ir = ir + "_handler\n";
+
+        // Cast to function pointer
+        ir = ir + "  %fn_ptr = inttoptr i64 %handler_fn to void(%InterruptFrame*)*\n";
+
+        // Call handler
+        ir = ir + "  call void %fn_ptr(%InterruptFrame* %frame)\n";
+
+        // Return (CPU will handle IRET via the interrupt frame)
+        ir = ir + "  ret void\n";
+    } else if arch == "arm64" {
+        // ARM64 exception handling
+        ir = ir + "  %handler_fn = load i64, i64* @";
+        ir = ir + handler_name;
+        ir = ir + "_handler\n";
+        ir = ir + "  %fn_ptr = inttoptr i64 %handler_fn to void(%InterruptFrame*)*\n";
+        ir = ir + "  call void %fn_ptr(%InterruptFrame* %frame)\n";
+        ir = ir + "  ret void\n";
+    }
+
+    ir = ir + "}\n";
+
+    return ir;
+}
+
+pub fn codegen_control_register_read(reg: String, arch: String) -> String {
+    let mut ir = String::new();
+
+    if arch == "x86_64" {
+        match reg.as_str() {
+            "cr0" => {
+                ir = ir + "call i64 asm \"mov %%cr0, $0\", \"=r\"()";
+            }
+            "cr2" => {
+                ir = ir + "call i64 asm \"mov %%cr2, $0\", \"=r\"()";
+            }
+            "cr3" => {
+                ir = ir + "call i64 asm \"mov %%cr3, $0\", \"=r\"()";
+            }
+            "cr4" => {
+                ir = ir + "call i64 asm \"mov %%cr4, $0\", \"=r\"()";
+            }
+            "rflags" => {
+                ir = ir + "call i64 asm \"pushfq; pop $0\", \"=r\"()";
+            }
+            _ => {
+                ir = ir + "call i64 asm \"\", \"=r\"()";
+            }
+        }
+    } else if arch == "arm64" {
+        match reg.as_str() {
+            "sctlr" => {
+                ir = ir + "call i64 asm \"mrs $0, sctlr_el1\", \"=r\"()";
+            }
+            "tcr" => {
+                ir = ir + "call i64 asm \"mrs $0, tcr_el1\", \"=r\"()";
+            }
+            "ttbr0" => {
+                ir = ir + "call i64 asm \"mrs $0, ttbr0_el1\", \"=r\"()";
+            }
+            _ => {
+                ir = ir + "call i64 asm \"\", \"=r\"()";
+            }
+        }
+    }
+
+    return ir;
+}
+
+pub fn codegen_msr_operations(operation: String, msr: u32, arch: String) -> String {
+    let mut ir = String::new();
+
+    if arch == "x86_64" {
+        if operation == "read" {
+            ir = ir + "call i64 asm \"rdmsr\", \"={eax},{edx},{ecx}\"(i32 ";
+            ir = ir + format_u32(msr);
+            ir = ir + ")";
+        } else if operation == "write" {
+            ir = ir + "call void asm \"wrmsr\", \"={ecx},{eax},{edx}\"(i32 ";
+            ir = ir + format_u32(msr);
+            ir = ir + ", i32 $1, i32 $2)";
+        }
+    }
+
+    return ir;
+}
+
+pub fn codegen_privilege_check(required_level: String) -> String {
+    let mut ir = String::new();
+
+    // Generate code to read current privilege level from CS selector
+    ir = ir + "%cs = call i16 asm \"mov %%cs, $0\", \"=r\"()\n";
+    ir = ir + "%cpl = and i16 %cs, 3\n";
+
+    let required = parse_privilege_level(required_level);
+    ir = ir + "%check = icmp ule i16 %cpl, ";
+    ir = ir + format_i64(required as i64);
+    ir = ir + "\n";
+    ir = ir + "br i1 %check, label %priv_ok, label %priv_fail\n";
+    ir = ir + "priv_fail:\n";
+    ir = ir + "  call void @panic()\n";
+    ir = ir + "  unreachable\n";
+    ir = ir + "priv_ok:\n";
+
+    return ir;
+}
+
+fn parse_privilege_level(level: String) -> i64 {
+    if level == "Kernel" {
+        return 0;
+    } else if level == "Driver" {
+        return 1;
+    } else if level == "Service" {
+        return 2;
+    } else if level == "User" {
+        return 3;
+    }
+    return 3;
+}
+
+fn format_u32(val: u32) -> String {
+    // Format u32 as decimal string
+    // Simplified - in real Titan would use proper formatting
+    return "0";
+}
+
+fn format_i64(val: i64) -> String {
+    // Format i64 as decimal string
+    return "0";
+}
+
+fn source_char_at(source: String, pos: i64) -> String {
+    return " ";
+}
+
+pub struct AsmBlock {}
+pub enum AsmOption {}
+pub struct AsmConstraint {}

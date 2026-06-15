@@ -1,0 +1,5 @@
+// Tests for app-manager-web-ui
+
+pub fn test_module() -> i64 {
+    return 111;
+}

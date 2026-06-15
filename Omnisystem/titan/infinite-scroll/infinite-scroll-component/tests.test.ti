@@ -1,0 +1,5 @@
+// Tests for infinite-scroll-component
+
+pub fn test_module() -> i64 {
+    return 111;
+}

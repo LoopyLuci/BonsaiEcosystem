@@ -1,0 +1,377 @@
+// aether/stdlib/rpc.ae
+// Remote Procedure Call framework with serialization in Aether
+
+actor RPCServer {
+    port: Int
+    routes: Map[String, RPCHandler]
+    active_calls: Atomic[Int]
+    total_calls: Atomic[i64]
+    error_handlers: List[ErrorHandler]
+
+    type RPCHandler = fn(RPC Request) -> RPC Response
+    type ErrorHandler = fn(Error) -> RPC Response
+
+    fn on_init(port: Int) {
+        this.port = port
+        this.routes = Map::new()
+        this.active_calls = Atomic::new(0)
+        this.total_calls = Atomic::new(0)
+        this.error_handlers = []
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            Register(method_name, handler) => {
+                this.routes[method_name] = handler
+                send Reply(Ok) to sender
+            }
+
+            Call(method_name, params, client_ref) => {
+                this.active_calls.fetch_add(1, Acquire)
+                this.total_calls.fetch_add(1, Release)
+
+                if method_name in this.routes {
+                    let handler = this.routes[method_name]
+
+                    -- Call handler with timeout
+                    try {
+                        let request = RPCRequest {
+                            method: method_name,
+                            params: params,
+                            id: generate_request_id(),
+                        }
+
+                        let response = handler(request)
+
+                        -- Send response back to client
+                        send client_ref RpcResponse(response)
+                    } catch error {
+                        let error_response = this.handle_error(error)
+                        send client_ref RpcResponse(error_response)
+                    }
+                } else {
+                    let error_response = this.handle_error(
+                        Error::new("Method not found")
+                    )
+                    send client_ref RpcResponse(error_response)
+                }
+
+                this.active_calls.fetch_sub(1, Release)
+            }
+
+            GetStats => {
+                let stats = {
+                    active_calls: this.active_calls.load(Acquire),
+                    total_calls: this.total_calls.load(Acquire),
+                    port: this.port,
+                }
+                send Reply(stats) to sender
+            }
+        }
+    }
+
+    fn handle_error(error: Error) -> RPCResponse {
+        for handler in this.error_handlers {
+            let response = handler(error)
+            if response != null {
+                return response
+            }
+        }
+
+        -- Default error response
+        return RPCResponse {
+            error: error.message,
+            code: error.code,
+            data: null,
+        }
+    }
+}
+
+type RPCRequest = {
+    method: String
+    params: Map[String, Any]
+    id: String
+}
+
+type RpcResponse = {
+    result: Any
+    error: Option[String]
+    code: Int
+    id: String
+    data: Any
+}
+
+-- Serialization/deserialization
+struct MessageCodec {
+    fn encode(value: Any) -> ByteBuffer ! {io} {
+        match value {
+            Int(n) => {
+                let buf = ByteBuffer::new()
+                buf.write_u8(TYPE_INT)
+                buf.write_i64(n)
+                return buf
+            }
+            Float(f) => {
+                let buf = ByteBuffer::new()
+                buf.write_u8(TYPE_FLOAT)
+                buf.write_f32(f)
+                return buf
+            }
+            String(s) => {
+                let buf = ByteBuffer::new()
+                buf.write_u8(TYPE_STRING)
+                buf.write_varint(s.len() as i64)
+                buf.write_bytes(s.as_bytes())
+                return buf
+            }
+            Map(map) => {
+                let buf = ByteBuffer::new()
+                buf.write_u8(TYPE_MAP)
+                buf.write_varint(map.len() as i64)
+
+                for (key, val) in map {
+                    buf.write_bytes(this.encode(key))
+                    buf.write_bytes(this.encode(val))
+                }
+                return buf
+            }
+            List(list) => {
+                let buf = ByteBuffer::new()
+                buf.write_u8(TYPE_LIST)
+                buf.write_varint(list.len() as i64)
+
+                for item in list {
+                    buf.write_bytes(this.encode(item))
+                }
+                return buf
+            }
+            _ => {
+                return ByteBuffer::new()
+            }
+        }
+    }
+
+    fn decode(buf: ByteBuffer) -> Any ! {io} {
+        let type_byte = buf.read_u8()
+
+        match type_byte {
+            TYPE_INT => return Int(buf.read_i64())
+            TYPE_FLOAT => return Float(buf.read_f32())
+            TYPE_STRING => {
+                let len = buf.read_varint() as usize
+                let bytes = buf.read_bytes(len)
+                return String::from_bytes(bytes)
+            }
+            TYPE_MAP => {
+                let count = buf.read_varint() as usize
+                let mut map = Map::new()
+
+                for i in 0..count {
+                    let key = this.decode(buf)
+                    let val = this.decode(buf)
+                    map[key.to_string()] = val
+                }
+                return map
+            }
+            TYPE_LIST => {
+                let count = buf.read_varint() as usize
+                let mut list = []
+
+                for i in 0..count {
+                    list.push(this.decode(buf))
+                }
+                return list
+            }
+            _ => return null
+        }
+    }
+}
+
+const TYPE_INT = 1
+const TYPE_FLOAT = 2
+const TYPE_STRING = 3
+const TYPE_MAP = 4
+const TYPE_LIST = 5
+const TYPE_NULL = 6
+
+struct ByteBuffer {
+    data: List[u8]
+    position: Int
+
+    fn write_u8(value: u8) {
+        this.data.push(value)
+    }
+
+    fn write_i64(value: i64) {
+        for i in 0..8 {
+            this.data.push(((value >> (i * 8)) & 0xFF) as u8)
+        }
+    }
+
+    fn write_f32(value: f32) {
+        let bits = value.to_bits() as i32
+        for i in 0..4 {
+            this.data.push(((bits >> (i * 8)) & 0xFF) as u8)
+        }
+    }
+
+    fn write_varint(value: i64) {
+        let mut v = value
+        while (v & !0x7F) != 0 {
+            this.data.push(((v & 0x7F) | 0x80) as u8)
+            v = v >> 7
+        }
+        this.data.push((v & 0x7F) as u8)
+    }
+
+    fn write_bytes(bytes: List[u8]) {
+        for b in bytes {
+            this.data.push(b)
+        }
+    }
+
+    fn read_u8() -> u8 {
+        let val = this.data[this.position]
+        this.position = this.position + 1
+        return val
+    }
+
+    fn read_i64() -> i64 {
+        let mut val: i64 = 0
+        for i in 0..8 {
+            val = val | (((this.read_u8() as i64) & 0xFF) << (i * 8))
+        }
+        return val
+    }
+
+    fn read_f32() -> f32 {
+        let mut bits: i32 = 0
+        for i in 0..4 {
+            bits = bits | (((this.read_u8() as i32) & 0xFF) << (i * 8))
+        }
+        return f32::from_bits(bits)
+    }
+
+    fn read_varint() -> i64 {
+        let mut val: i64 = 0
+        let mut shift = 0
+
+        loop {
+            let b = this.read_u8() as i64
+            val = val | ((b & 0x7F) << shift)
+
+            if (b & 0x80) == 0 {
+                break
+            }
+            shift = shift + 7
+        }
+
+        return val
+    }
+
+    fn read_bytes(count: usize) -> List[u8] {
+        let mut bytes = []
+        for i in 0..count {
+            bytes.push(this.read_u8())
+        }
+        return bytes
+    }
+}
+
+-- Connection pooling for efficient RPC
+actor ConnectionPool {
+    target_host: String
+    target_port: Int
+    pool_size: Int
+    available_conns: List[Connection]
+    in_use: Atomic[Int]
+
+    type Connection = {
+        socket: NetworkSocket
+        last_used: i64
+        call_count: i64
+    }
+
+    fn on_init(host: String, port: Int, pool_size: Int) {
+        this.target_host = host
+        this.target_port = port
+        this.pool_size = pool_size
+        this.available_conns = []
+        this.in_use = Atomic::new(0)
+
+        -- Pre-create connections
+        for i in 0..pool_size {
+            let conn = create_connection(host, port)
+            this.available_conns.push(conn)
+        }
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            GetConnection => {
+                if this.available_conns.len() > 0 {
+                    let conn = this.available_conns.pop()
+                    this.in_use.fetch_add(1, Acquire)
+                    send Reply(conn) to sender
+                } else {
+                    send Reply(Error("No available connections")) to sender
+                }
+            }
+
+            ReleaseConnection(conn) => {
+                conn.last_used = now_nanos()
+                conn.call_count = conn.call_count + 1
+                this.available_conns.push(conn)
+                this.in_use.fetch_sub(1, Release)
+                send Reply(Ok) to sender
+            }
+
+            GetStats => {
+                send Reply({
+                    in_use: this.in_use.load(Acquire),
+                    available: this.available_conns.len(),
+                    total: this.pool_size,
+                }) to sender
+            }
+        }
+    }
+}
+
+fn create_connection(host: String, port: Int) -> Connection {
+    return Connection {
+        socket: NetworkSocket::connect(host, port),
+        last_used: now_nanos(),
+        call_count: 0,
+    }
+}
+
+fn generate_request_id() -> String {
+    return "req_" + (now_nanos().to_string())
+}
+
+fn now_nanos() -> i64 {
+    return 0
+}
+
+type Error = {
+    message: String
+    code: Int
+}
+
+impl Error {
+    fn new(msg: String) -> Error {
+        return Error {
+            message: msg,
+            code: 500,
+        }
+    }
+}
+
+type NetworkSocket = Any  // Placeholder
+
+type Map<K, V> = Any  // Placeholder
+
+enum Option<T> {
+    Some(T)
+    None
+}

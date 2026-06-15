@@ -6,13 +6,10 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-tokio = { workspace = true }
-serde = { workspace = true }
-dashmap = { workspace = true }
-tracing = { workspace = true }
-thiserror = { workspace = true }
-uuid = { workspace = true }
-chrono = { workspace = true }
+omnisystem-async-runtime = { path = "../omnisystem-async-runtime" }
+omnisystem-serialization = { path = "../omnisystem-serialization" }
+omnisystem-collections = { path = "../omnisystem-collections" }
+omnisystem-observability = { path = "../omnisystem-observability" }
 arc-swap = { workspace = true }
 
 [lib]
@@ -24,5 +21,5 @@ name = "citizen_engagement_cli"
 path = "src/bin/cli.rs"
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full"] }
+
 

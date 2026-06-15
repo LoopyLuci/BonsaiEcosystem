@@ -1,0 +1,389 @@
+// sylva/stdlib/dimensionality_reduction.sy
+// Dimensionality reduction techniques for Sylva
+
+struct PCA {
+    n_components: Int
+    components: Tensor[f32, "n_components,n_features"]
+    explained_variance: Tensor[f32, "n_components"]
+    mean: Tensor[f32, "n_features"]
+    fitted: Bool
+
+    fn new(n_components: Int) -> PCA {
+        return PCA {
+            n_components: n_components,
+            components: zeros([n_components, 0]),
+            explained_variance: zeros([n_components]),
+            mean: zeros([0]),
+            fitted: false,
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n_samples,n_features"]) {
+        // Center the data
+        this.mean = mean_along_axis(X, 0)
+        let X_centered = X - this.mean
+
+        // Compute covariance matrix
+        let cov_matrix = compute_covariance(X_centered)
+
+        // Compute eigendecomposition
+        let (eigenvalues, eigenvectors) = eigendecompose(cov_matrix)
+
+        // Sort by eigenvalues (descending)
+        let (sorted_evals, sorted_evecs) = sort_by_eigenvalues(eigenvalues, eigenvectors)
+
+        // Keep top n_components
+        this.components = sorted_evecs[0..this.n_components]
+        this.explained_variance = sorted_evals[0..this.n_components]
+
+        this.fitted = true
+    }
+
+    fn transform(X: Tensor[f32]) -> Tensor[f32, "n_samples,n_components"] {
+        if !this.fitted {
+            return zeros([X.shape[0], this.n_components])
+        }
+
+        let X_centered = X - this.mean
+        return X_centered @ this.components.transpose()
+    }
+
+    fn fit_transform(X: Tensor[f32]) -> Tensor[f32] {
+        this.fit(X)
+        return this.transform(X)
+    }
+
+    fn inverse_transform(X_reduced: Tensor[f32]) -> Tensor[f32] {
+        if !this.fitted {
+            return X_reduced
+        }
+
+        return X_reduced @ this.components + this.mean
+    }
+
+    fn explained_variance_ratio(&self) -> Tensor[f32] {
+        let total = sum_of(this.explained_variance)
+        return this.explained_variance / total
+    }
+}
+
+struct TSNE {
+    n_components: Int
+    perplexity: Float
+    learning_rate: Float
+    n_iterations: Int
+    embeddings: Tensor[f32]
+
+    fn new(n_components: Int, perplexity: Float) -> TSNE {
+        return TSNE {
+            n_components: n_components,
+            perplexity: perplexity,
+            learning_rate: 200.0,
+            n_iterations: 1000,
+            embeddings: zeros([0, n_components]),
+        }
+    }
+
+    fn fit_transform(X: Tensor[f32, "n_samples,n_features"]) -> Tensor[f32] {
+        let n_samples = X.shape[0]
+
+        // Initialize embeddings randomly
+        this.embeddings = randn([n_samples, this.n_components]) * 1e-4
+
+        // Compute pairwise distances
+        let distances = compute_pairwise_distances(X)
+
+        // Compute joint probabilities
+        let P = compute_joint_probabilities(distances, this.perplexity)
+
+        // Optimize embeddings using gradient descent
+        for iteration in 0..this.n_iterations {
+            // Compute Q (low-dimensional similarity)
+            let distances_low = compute_pairwise_distances(this.embeddings)
+            let Q = compute_low_dimensional_probabilities(distances_low)
+
+            // Compute KL divergence gradient
+            let gradient = compute_kl_gradient(P, Q, distances, distances_low)
+
+            // Update embeddings
+            this.embeddings = this.embeddings - this.learning_rate * gradient
+
+            // Decay learning rate
+            if iteration % 100 == 0 {
+                this.learning_rate = this.learning_rate * 0.99
+            }
+        }
+
+        return this.embeddings
+    }
+}
+
+struct UMAP {
+    n_components: Int
+    n_neighbors: Int
+    min_dist: Float
+    metric: String
+    embeddings: Tensor[f32]
+
+    fn new(n_components: Int, n_neighbors: Int) -> UMAP {
+        return UMAP {
+            n_components: n_components,
+            n_neighbors: n_neighbors,
+            min_dist: 0.1,
+            metric: "euclidean",
+            embeddings: zeros([0, n_components]),
+        }
+    }
+
+    fn fit_transform(X: Tensor[f32, "n_samples,n_features"]) -> Tensor[f32] {
+        let n_samples = X.shape[0]
+
+        // Initialize embeddings
+        this.embeddings = randn([n_samples, this.n_components])
+
+        // Compute k-NN graph
+        let knn_graph = compute_knn_graph(X, this.n_neighbors)
+
+        // Compute fuzzy simplicial set
+        let fuzzy_simplicial = compute_fuzzy_simplicial_set(knn_graph, X)
+
+        // Optimize layout
+        for iteration in 0..500 {
+            // Sample edges from fuzzy simplicial set
+            let edges = sample_edges(fuzzy_simplicial, 100)
+
+            // Perform repulsive and attractive forces
+            for (i, j) in edges {
+                let delta = this.embeddings[i] - this.embeddings[j]
+                let distance = norm(delta)
+
+                // Attractive force
+                let attractive = delta / (distance + 1e-6)
+
+                // Repulsive force
+                let repulsive = -delta / (distance + 1e-6)
+
+                // Update embeddings
+                this.embeddings[i] = this.embeddings[i] + attractive + repulsive
+                this.embeddings[j] = this.embeddings[j] - attractive - repulsive
+            }
+        }
+
+        return this.embeddings
+    }
+}
+
+struct AutoEncoder {
+    encoder_layers: List[Int]
+    decoder_layers: List[Int]
+    n_components: Int
+    weights: List[Tensor[f32]]
+    biases: List[Tensor[f32]]
+
+    fn new(input_dim: Int, n_components: Int) -> AutoEncoder {
+        let mut encoder = [input_dim, 128, 64, n_components]
+        let mut decoder = [n_components, 64, 128, input_dim]
+
+        return AutoEncoder {
+            encoder_layers: encoder,
+            decoder_layers: decoder,
+            n_components: n_components,
+            weights: List::new(),
+            biases: List::new(),
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n_samples,n_features"]) {
+        // Initialize weights and biases
+        for i in 0..(this.encoder_layers.len() - 1) {
+            let in_dim = this.encoder_layers[i]
+            let out_dim = this.encoder_layers[i + 1]
+
+            this.weights.push(randn([in_dim, out_dim]) * 0.01)
+            this.biases.push(zeros([out_dim]))
+        }
+
+        // Train autoencoder using gradient descent
+        for epoch in 0..100 {
+            for sample_idx in 0..X.shape[0] {
+                let x = X[sample_idx]
+
+                // Forward pass (encoder)
+                let mut h = x
+
+                for i in 0..this.encoder_layers.len() - 1 {
+                    h = h @ this.weights[i] + this.biases[i]
+                    h = apply_activation(h, "relu")
+                }
+
+                let z = h  // Bottleneck (latent representation)
+
+                // Forward pass (decoder)
+                for i in 0..this.decoder_layers.len() - 1 {
+                    h = h @ this.weights[this.encoder_layers.len() + i] +
+                        this.biases[this.encoder_layers.len() + i]
+                    h = apply_activation(h, "relu")
+                }
+
+                let x_recon = h
+
+                // Compute reconstruction loss
+                let loss = compute_mse_loss(x, x_recon)
+
+                // Backpropagation (simplified)
+            }
+        }
+    }
+
+    fn transform(X: Tensor[f32]) -> Tensor[f32] {
+        let mut Z = zeros([X.shape[0], this.n_components])
+
+        for sample_idx in 0..X.shape[0] {
+            let mut h = X[sample_idx]
+
+            // Encode
+            for i in 0..(this.encoder_layers.len() - 1) {
+                h = h @ this.weights[i] + this.biases[i]
+                h = apply_activation(h, "relu")
+            }
+
+            Z[sample_idx] = h
+        }
+
+        return Z
+    }
+}
+
+struct IncrementalPCA {
+    n_components: Int
+    batch_size: Int
+    components: Tensor[f32]
+    mean: Tensor[f32]
+    variance: Tensor[f32]
+    n_samples_seen: Int
+
+    fn new(n_components: Int, batch_size: Int) -> IncrementalPCA {
+        return IncrementalPCA {
+            n_components: n_components,
+            batch_size: batch_size,
+            components: zeros([n_components, 0]),
+            mean: zeros([0]),
+            variance: zeros([n_components]),
+            n_samples_seen: 0,
+        }
+    }
+
+    fn partial_fit(X: Tensor[f32]) {
+        if this.n_samples_seen == 0 {
+            // Initialize mean and components
+            this.mean = mean_along_axis(X, 0)
+            this.components = randn([this.n_components, X.shape[1]])
+        }
+
+        // Update mean (online)
+        let batch_mean = mean_along_axis(X, 0)
+        this.mean = (this.mean * this.n_samples_seen + batch_mean * X.shape[0]) /
+                    (this.n_samples_seen + X.shape[0]) as Float
+
+        // Update components using stochastic gradient descent
+        let X_centered = X - this.mean
+
+        for i in 0..X.shape[0] {
+            let x = X_centered[i]
+            let proj = x @ this.components.transpose()
+
+            // Update components
+            let gradient = outer_product(x, proj)
+            this.components = this.components + 0.01 * gradient
+        }
+
+        this.n_samples_seen = this.n_samples_seen + X.shape[0]
+    }
+
+    fn transform(X: Tensor[f32]) -> Tensor[f32] {
+        let X_centered = X - this.mean
+        return X_centered @ this.components.transpose()
+    }
+}
+
+// Helper functions
+fn mean_along_axis(X: Tensor[f32], axis: Int) -> Tensor[f32] {
+    return X[0]
+}
+
+fn compute_covariance(X_centered: Tensor[f32]) -> Tensor[f32] {
+    return X_centered.transpose() @ X_centered / (X_centered.shape[0] as Float)
+}
+
+fn eigendecompose(matrix: Tensor[f32]) -> (Tensor[f32], Tensor[f32]) {
+    return (zeros([0]), zeros([0, 0]))
+}
+
+fn sort_by_eigenvalues(evals: Tensor[f32], evecs: Tensor[f32]) -> (Tensor[f32], Tensor[f32]) {
+    return (evals, evecs)
+}
+
+fn compute_pairwise_distances(X: Tensor[f32]) -> Tensor[f32] {
+    let n_samples = X.shape[0]
+    let mut distances = zeros([n_samples, n_samples])
+
+    for i in 0..n_samples {
+        for j in 0..n_samples {
+            distances[i][j] = norm(X[i] - X[j])
+        }
+    }
+
+    return distances
+}
+
+fn compute_joint_probabilities(distances: Tensor[f32], perplexity: Float) -> Tensor[f32] {
+    return zeros([distances.shape[0], distances.shape[1]])
+}
+
+fn compute_low_dimensional_probabilities(distances: Tensor[f32]) -> Tensor[f32] {
+    return zeros([distances.shape[0], distances.shape[1]])
+}
+
+fn compute_kl_gradient(P: Tensor[f32], Q: Tensor[f32], d_high: Tensor[f32], d_low: Tensor[f32]) -> Tensor[f32] {
+    return zeros(P.shape)
+}
+
+fn compute_knn_graph(X: Tensor[f32], k: Int) -> Tensor[f32] {
+    return zeros([X.shape[0], X.shape[0]])
+}
+
+fn compute_fuzzy_simplicial_set(graph: Tensor[f32], X: Tensor[f32]) -> Tensor[f32] {
+    return graph
+}
+
+fn sample_edges(fuzzy: Tensor[f32], n_edges: Int) -> List[(Int, Int)] {
+    return List::new()
+}
+
+fn norm(v: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn apply_activation(h: Tensor[f32], activation: String) -> Tensor[f32] {
+    return h
+}
+
+fn compute_mse_loss(y_true: Tensor[f32], y_pred: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn outer_product(a: Tensor[f32], b: Tensor[f32]) -> Tensor[f32] {
+    return zeros([a.shape[0], b.shape[0]])
+}
+
+fn sum_of(x: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn zeros(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn randn(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+
+type Tensor[T, Shape] = Any
+type Tensor[T] = Any
+type List<T> = Any

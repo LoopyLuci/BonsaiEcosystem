@@ -1,0 +1,342 @@
+// aether/patterns/state_machine.ae
+// State machine patterns for Aether
+
+pub enum StateTransition {
+    Allow,
+    Guard(fn() -> bool),
+    Deny,
+}
+
+pub struct State {
+    name: String,
+    on_enter: Option<fn() -> ()>,
+    on_exit: Option<fn() -> ()>,
+    on_update: Option<fn() -> ()>,
+}
+
+pub struct StateMachine {
+    states: Map<String, State>,
+    current_state: String,
+    transitions: Map<(String, String), StateTransition>,
+    state_data: Map<String, Any>,
+    event_handlers: Vec<(String, fn(Any) -> ())>,
+}
+
+impl StateMachine {
+    pub fn new() -> StateMachine {
+        return StateMachine {
+            states: Map::new(),
+            current_state: "".to_string(),
+            transitions: Map::new(),
+            state_data: Map::new(),
+            event_handlers: Vec::new(),
+        };
+    }
+
+    pub fn add_state(
+        &mut self,
+        name: &str,
+        on_enter: Option<fn() -> ()>,
+        on_exit: Option<fn() -> ()>,
+        on_update: Option<fn() -> ()>
+    ) {
+        self.states[name.to_string()] = State {
+            name: name.to_string(),
+            on_enter: on_enter,
+            on_exit: on_exit,
+            on_update: on_update,
+        };
+    }
+
+    pub fn add_transition(
+        &mut self,
+        from: &str,
+        to: &str,
+        guard: StateTransition
+    ) -> Result<(), String> ! {orchestration} {
+        if !self.states.contains_key(from.to_string()) {
+            return Result::Err("Source state does not exist".to_string());
+        }
+
+        if !self.states.contains_key(to.to_string()) {
+            return Result::Err("Target state does not exist".to_string());
+        }
+
+        self.transitions[(from.to_string(), to.to_string())] = guard;
+        return Result::Ok(());
+    }
+
+    pub fn set_initial_state(&mut self, state: &str) -> Result<(), String> ! {orchestration} {
+        if !self.states.contains_key(state.to_string()) {
+            return Result::Err("State does not exist".to_string());
+        }
+
+        self.current_state = state.to_string();
+
+        let initial_state = self.states[state.to_string()];
+        if initial_state.on_enter.is_some() {
+            initial_state.on_enter.unwrap()();
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn can_transition(&self, to: &str) -> bool {
+        let key = (self.current_state.clone(), to.to_string());
+
+        if !self.transitions.contains_key(&key) {
+            return false;
+        }
+
+        match self.transitions[&key] {
+            StateTransition::Allow => {
+                return true;
+            }
+
+            StateTransition::Guard(guard_fn) => {
+                return guard_fn();
+            }
+
+            StateTransition::Deny => {
+                return false;
+            }
+        }
+    }
+
+    pub fn transition(&mut self, to: &str) -> Result<(), String> ! {orchestration} {
+        if !self.can_transition(to) {
+            return Result::Err("Transition not allowed".to_string());
+        }
+
+        // Call on_exit handler for current state
+        let current = self.states[self.current_state.clone()];
+        if current.on_exit.is_some() {
+            current.on_exit.unwrap()();
+        }
+
+        // Update current state
+        self.current_state = to.to_string();
+
+        // Call on_enter handler for new state
+        let new_state = self.states[to.to_string()];
+        if new_state.on_enter.is_some() {
+            new_state.on_enter.unwrap()();
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn emit_event(&mut self, event_name: &str, data: Any) -> Result<(), String> ! {orchestration} {
+        // Call event handlers
+        for (name, handler) in &self.event_handlers {
+            if name == event_name {
+                handler(data);
+            }
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn on_event(&mut self, event_name: &str, handler: fn(Any) -> ()) {
+        self.event_handlers.push((event_name.to_string(), handler));
+    }
+
+    pub fn update(&mut self) -> Result<(), String> ! {orchestration} {
+        let current = self.states[self.current_state.clone()];
+        if current.on_update.is_some() {
+            current.on_update.unwrap()();
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn get_current_state(&self) -> String {
+        return self.current_state.clone();
+    }
+
+    pub fn get_state_data(&self, key: &str) -> Option<Any> {
+        if self.state_data.contains_key(key.to_string()) {
+            return Option::Some(self.state_data[key.to_string()]);
+        }
+
+        return Option::None;
+    }
+
+    pub fn set_state_data(&mut self, key: &str, value: Any) {
+        self.state_data[key.to_string()] = value;
+    }
+}
+
+// Hierarchical State Machine
+pub struct NestedStateMachine {
+    parent_state: String,
+    child_machines: Map<String, StateMachine>,
+}
+
+impl NestedStateMachine {
+    pub fn new() -> NestedStateMachine {
+        return NestedStateMachine {
+            parent_state: "".to_string(),
+            child_machines: Map::new(),
+        };
+    }
+
+    pub fn add_child_machine(&mut self, parent: &str, child: StateMachine) {
+        self.child_machines[parent.to_string()] = child;
+    }
+
+    pub fn transition(&mut self, to: &str) -> Result<(), String> ! {orchestration} {
+        // Transition in parent and child states simultaneously
+        if self.child_machines.contains_key(to.to_string()) {
+            let mut child = self.child_machines[to.to_string()].clone();
+            child.update()?;
+        }
+
+        return Result::Ok(());
+    }
+}
+
+// State machine with history
+pub struct StateMachineWithHistory {
+    machine: StateMachine,
+    history: Vec<String>,
+    history_size: usize,
+}
+
+impl StateMachineWithHistory {
+    pub fn new(initial_size: usize) -> StateMachineWithHistory {
+        return StateMachineWithHistory {
+            machine: StateMachine::new(),
+            history: Vec::new(),
+            history_size: initial_size,
+        };
+    }
+
+    pub fn transition(&mut self, to: &str) -> Result<(), String> ! {orchestration} {
+        // Record current state in history
+        self.history.push(self.machine.current_state.clone());
+
+        if self.history.len() > self.history_size {
+            self.history.remove(0);
+        }
+
+        // Perform transition
+        return self.machine.transition(to);
+    }
+
+    pub fn get_history(&self) -> Vec<String> {
+        return self.history.clone();
+    }
+
+    pub fn revert_to_previous(&mut self) -> Result<(), String> ! {orchestration} {
+        if self.history.len() == 0 {
+            return Result::Err("No history available".to_string());
+        }
+
+        let previous_state = self.history[self.history.len() - 1].clone();
+        self.history.pop();
+
+        return self.machine.transition(previous_state.as_str());
+    }
+}
+
+// Timed state transitions
+pub struct TimedStateMachine {
+    machine: StateMachine,
+    state_timers: Map<String, u64>,
+    transition_queue: Vec<(String, u64)>,
+}
+
+impl TimedStateMachine {
+    pub fn new() -> TimedStateMachine {
+        return TimedStateMachine {
+            machine: StateMachine::new(),
+            state_timers: Map::new(),
+            transition_queue: Vec::new(),
+        };
+    }
+
+    pub fn schedule_transition(&mut self, to: &str, delay_ms: u64) -> Result<(), String> ! {orchestration} {
+        self.transition_queue.push((to.to_string(), delay_ms));
+        return Result::Ok(());
+    }
+
+    pub fn update(&mut self, elapsed_ms: u64) -> Result<(), String> ! {orchestration} {
+        // Process queued transitions
+        let mut executed = Vec::new();
+
+        for i in 0..self.transition_queue.len() {
+            let (to_state, delay) = self.transition_queue[i].clone();
+            let new_delay = if delay > elapsed_ms { delay - elapsed_ms } else { 0 };
+
+            if new_delay == 0 {
+                self.machine.transition(to_state.as_str())?;
+                executed.push(i);
+            } else {
+                self.transition_queue[i] = (to_state, new_delay);
+            }
+        }
+
+        // Remove executed transitions
+        for i in executed.iter().rev() {
+            self.transition_queue.remove(i);
+        }
+
+        return self.machine.update();
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+pub type Any = *void
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn remove(&mut self, index: usize) {}
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool { return false; }
+}

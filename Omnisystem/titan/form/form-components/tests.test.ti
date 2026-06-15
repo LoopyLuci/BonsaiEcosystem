@@ -1,0 +1,5 @@
+// Tests for form-components
+
+pub fn test_module() -> i64 {
+    return 111;
+}

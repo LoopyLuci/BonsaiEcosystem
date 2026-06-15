@@ -1,0 +1,3 @@
+// Tests: api-gateway-rate-limiting
+
+pub fn test_module() -> i64 { return 111; }

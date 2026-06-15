@@ -1,0 +1,3 @@
+// Tests: api-marketplace-analytics
+
+pub fn test_module() -> i64 { return 111; }

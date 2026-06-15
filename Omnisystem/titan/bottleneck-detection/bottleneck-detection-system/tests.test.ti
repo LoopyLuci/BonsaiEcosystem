@@ -1,0 +1,5 @@
+// Tests for bottleneck-detection-system
+
+pub fn test_module() -> i64 {
+    return 111;
+}

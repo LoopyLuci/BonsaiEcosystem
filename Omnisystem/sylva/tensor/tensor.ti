@@ -1,0 +1,447 @@
+// sylva/tensor/tensor.ti
+// N-dimensional tensor operations for numerical computing
+
+pub struct Tensor<T> {
+    data: Vec<T>,
+    shape: Vec<i32>,
+    strides: Vec<i32>,
+}
+
+pub struct Shape {
+    dims: Vec<i32>,
+}
+
+pub enum DType {
+    Float32,
+    Float64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Uint8,
+    Bool,
+}
+
+// Tensor creation
+pub fn tensor_zeros<T>(shape: &Vec<i32>) -> Tensor<T> {
+    let size = calculate_size(shape);
+    let mut data: Vec<T> = Vec::new();
+    for i in 0..size {
+        data.push(0 as T);
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape.clone(),
+        strides: calculate_strides(shape),
+    };
+}
+
+pub fn tensor_ones<T>(shape: &Vec<i32>) -> Tensor<T> {
+    let size = calculate_size(shape);
+    let mut data: Vec<T> = Vec::new();
+    for i in 0..size {
+        data.push(1 as T);
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape.clone(),
+        strides: calculate_strides(shape),
+    };
+}
+
+pub fn tensor_from_array<T: Clone>(data: &Vec<T>, shape: &Vec<i32>) -> Tensor<T> {
+    return Tensor {
+        data: data.clone(),
+        shape: shape.clone(),
+        strides: calculate_strides(shape),
+    };
+}
+
+pub fn tensor_randn<T>(shape: &Vec<i32>) -> Tensor<T> {
+    let size = calculate_size(shape);
+    let mut data: Vec<T> = Vec::new();
+
+    for i in 0..size {
+        data.push(randn_sample() as T);
+    }
+
+    return Tensor {
+        data: data,
+        shape: shape.clone(),
+        strides: calculate_strides(shape),
+    };
+}
+
+// Element access
+pub fn tensor_get<T: Clone>(tensor: &Tensor<T>, indices: &Vec<i32>) -> T {
+    let offset = calculate_offset(&tensor.strides, indices);
+    return tensor.data[offset as usize].clone();
+}
+
+pub fn tensor_set<T>(tensor: &mut Tensor<T>, indices: &Vec<i32>, value: T) {
+    let offset = calculate_offset(&tensor.strides, indices);
+    tensor.data[offset as usize] = value;
+}
+
+// Shape queries
+pub fn tensor_shape<T>(tensor: &Tensor<T>) -> Vec<i32> {
+    return tensor.shape.clone();
+}
+
+pub fn tensor_ndim<T>(tensor: &Tensor<T>) -> i32 {
+    return tensor.shape.len() as i32;
+}
+
+pub fn tensor_size<T>(tensor: &Tensor<T>) -> i32 {
+    return calculate_size(&tensor.shape);
+}
+
+pub fn tensor_numel<T>(tensor: &Tensor<T>) -> i32 {
+    return tensor.data.len() as i32;
+}
+
+// Reshape
+pub fn tensor_reshape<T: Clone>(tensor: &Tensor<T>, new_shape: &Vec<i32>) -> Tensor<T> {
+    if calculate_size(new_shape) != calculate_size(&tensor.shape) {
+        emit_panic("Shape mismatch for reshape");
+    }
+
+    return Tensor {
+        data: tensor.data.clone(),
+        shape: new_shape.clone(),
+        strides: calculate_strides(new_shape),
+    };
+}
+
+// Transpose
+pub fn tensor_transpose<T: Clone>(tensor: &Tensor<T>, axes: &Vec<i32>) -> Tensor<T> {
+    // Permute dimensions
+    let mut new_shape: Vec<i32> = Vec::new();
+    let mut new_strides: Vec<i32> = Vec::new();
+
+    for axis in axes {
+        new_shape.push(tensor.shape[*axis as usize]);
+        new_strides.push(tensor.strides[*axis as usize]);
+    }
+
+    // Permute data
+    let mut permuted_data: Vec<T> = Vec::new();
+    let size = calculate_size(&tensor.shape);
+
+    for i in 0..size {
+        let orig_indices = indices_from_flat(&tensor.shape, i);
+        let mut new_indices: Vec<i32> = Vec::new();
+
+        for (idx, ax) in axes.iter().enumerate() {
+            new_indices.push(orig_indices[*ax as usize]);
+        }
+
+        let new_offset = calculate_offset(&new_strides, &new_indices);
+        permuted_data.push(tensor.data[new_offset as usize].clone());
+    }
+
+    return Tensor {
+        data: permuted_data,
+        shape: new_shape,
+        strides: new_strides,
+    };
+}
+
+// Slice
+pub fn tensor_slice<T: Clone>(
+    tensor: &Tensor<T>,
+    start: &Vec<i32>,
+    end: &Vec<i32>
+) -> Tensor<T> {
+    let mut sliced_data: Vec<T> = Vec::new();
+    let mut new_shape: Vec<i32> = Vec::new();
+
+    for i in 0..start.len() {
+        new_shape.push(end[i] - start[i]);
+    }
+
+    let size = calculate_size(&new_shape);
+    for i in 0..size {
+        let indices = indices_from_flat(&new_shape, i);
+        let mut absolute_indices: Vec<i32> = Vec::new();
+
+        for j in 0..indices.len() {
+            absolute_indices.push(start[j] + indices[j]);
+        }
+
+        let offset = calculate_offset(&tensor.strides, &absolute_indices);
+        sliced_data.push(tensor.data[offset as usize].clone());
+    }
+
+    return Tensor {
+        data: sliced_data,
+        shape: new_shape,
+        strides: calculate_strides(&new_shape),
+    };
+}
+
+// Arithmetic operations
+pub fn tensor_add<T: Add>(a: &Tensor<T>, b: &Tensor<T>) -> Tensor<T> {
+    if a.shape != b.shape {
+        emit_panic("Shape mismatch for add");
+    }
+
+    let mut result: Vec<T> = Vec::new();
+    for i in 0..a.data.len() {
+        result.push(a.data[i].add(&b.data[i]));
+    }
+
+    return Tensor {
+        data: result,
+        shape: a.shape.clone(),
+        strides: a.strides.clone(),
+    };
+}
+
+pub fn tensor_subtract<T: Sub>(a: &Tensor<T>, b: &Tensor<T>) -> Tensor<T> {
+    if a.shape != b.shape {
+        emit_panic("Shape mismatch for subtract");
+    }
+
+    let mut result: Vec<T> = Vec::new();
+    for i in 0..a.data.len() {
+        result.push(a.data[i].sub(&b.data[i]));
+    }
+
+    return Tensor {
+        data: result,
+        shape: a.shape.clone(),
+        strides: a.strides.clone(),
+    };
+}
+
+pub fn tensor_multiply<T: Mul>(a: &Tensor<T>, b: &Tensor<T>) -> Tensor<T> {
+    if a.shape != b.shape {
+        emit_panic("Shape mismatch for multiply");
+    }
+
+    let mut result: Vec<T> = Vec::new();
+    for i in 0..a.data.len() {
+        result.push(a.data[i].mul(&b.data[i]));
+    }
+
+    return Tensor {
+        data: result,
+        shape: a.shape.clone(),
+        strides: a.strides.clone(),
+    };
+}
+
+pub fn tensor_divide<T: Div>(a: &Tensor<T>, b: &Tensor<T>) -> Tensor<T> {
+    if a.shape != b.shape {
+        emit_panic("Shape mismatch for divide");
+    }
+
+    let mut result: Vec<T> = Vec::new();
+    for i in 0..a.data.len() {
+        result.push(a.data[i].div(&b.data[i]));
+    }
+
+    return Tensor {
+        data: result,
+        shape: a.shape.clone(),
+        strides: a.strides.clone(),
+    };
+}
+
+// Matrix multiplication
+pub fn tensor_matmul<T: Mul + Add + Zero>(
+    a: &Tensor<T>,
+    b: &Tensor<T>
+) -> Tensor<T> {
+    if a.shape.len() != 2 || b.shape.len() != 2 {
+        emit_panic("Matmul requires 2D tensors");
+    }
+
+    if a.shape[1] != b.shape[0] {
+        emit_panic("Incompatible shapes for matmul");
+    }
+
+    let m = a.shape[0];
+    let n = b.shape[1];
+    let k = a.shape[1];
+
+    let mut result_data: Vec<T> = Vec::new();
+    for i in 0..(m * n) {
+        result_data.push(T::zero());
+    }
+
+    for i in 0..m {
+        for j in 0..n {
+            for p in 0..k {
+                let a_idx = calculate_offset(&a.strides, &vec![i, p]);
+                let b_idx = calculate_offset(&b.strides, &vec![p, j]);
+                let result_idx = (i * n + j) as usize;
+
+                result_data[result_idx] = result_data[result_idx].add(
+                    &a.data[a_idx as usize].mul(&b.data[b_idx as usize])
+                );
+            }
+        }
+    }
+
+    return Tensor {
+        data: result_data,
+        shape: vec![m, n],
+        strides: calculate_strides(&vec![m, n]),
+    };
+}
+
+// Reduction operations
+pub fn tensor_sum<T: Add + Zero>(tensor: &Tensor<T>) -> T {
+    let mut result = T::zero();
+    for elem in &tensor.data {
+        result = result.add(elem);
+    }
+    return result;
+}
+
+pub fn tensor_mean<T: Add + Div + Zero>(tensor: &Tensor<T>) -> T {
+    let sum = tensor_sum(tensor);
+    let count = tensor.data.len() as i32;
+    return sum.div(&(count as T));
+}
+
+pub fn tensor_max<T: Compare>(tensor: &Tensor<T>) -> T {
+    if tensor.data.len() == 0 {
+        emit_panic("Empty tensor");
+    }
+
+    let mut max = tensor.data[0].clone();
+    for elem in &tensor.data {
+        if elem.greater_than(&max) {
+            max = elem.clone();
+        }
+    }
+    return max;
+}
+
+pub fn tensor_min<T: Compare>(tensor: &Tensor<T>) -> T {
+    if tensor.data.len() == 0 {
+        emit_panic("Empty tensor");
+    }
+
+    let mut min = tensor.data[0].clone();
+    for elem in &tensor.data {
+        if elem.less_than(&min) {
+            min = elem.clone();
+        }
+    }
+    return min;
+}
+
+// Utility functions
+fn calculate_size(shape: &Vec<i32>) -> i32 {
+    let mut size: i32 = 1;
+    for dim in shape {
+        size = size * dim;
+    }
+    return size;
+}
+
+fn calculate_strides(shape: &Vec<i32>) -> Vec<i32> {
+    let mut strides: Vec<i32> = Vec::new();
+    let mut stride: i32 = 1;
+
+    for i in (0..shape.len()).rev() {
+        strides.push(stride);
+        stride = stride * shape[i];
+    }
+
+    strides.reverse();
+    return strides;
+}
+
+fn calculate_offset(strides: &Vec<i32>, indices: &Vec<i32>) -> i32 {
+    let mut offset: i32 = 0;
+    for i in 0..indices.len() {
+        offset = offset + (strides[i] * indices[i]);
+    }
+    return offset;
+}
+
+fn indices_from_flat(shape: &Vec<i32>, flat_index: i32) -> Vec<i32> {
+    let mut indices: Vec<i32> = Vec::new();
+    let mut remainder = flat_index;
+
+    for i in (0..shape.len()).rev() {
+        let stride = if i == shape.len() - 1 { 1 } else { calculate_strides(shape)[i] };
+        indices.push(remainder % shape[i]);
+        remainder = remainder / shape[i];
+    }
+
+    indices.reverse();
+    return indices;
+}
+
+fn randn_sample() -> f32 {
+    return 0.0;  // Placeholder: would use actual RNG
+}
+
+fn emit_panic(msg: &str) {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+trait Add {
+    fn add(&self, other: &Self) -> Self;
+}
+
+trait Sub {
+    fn sub(&self, other: &Self) -> Self;
+}
+
+trait Mul {
+    fn mul(&self, other: &Self) -> Self;
+}
+
+trait Div {
+    fn div(&self, other: &Self) -> Self;
+}
+
+trait Zero {
+    fn zero() -> Self;
+}
+
+trait Compare: Clone {
+    fn greater_than(&self, other: &Self) -> bool;
+    fn less_than(&self, other: &Self) -> bool;
+}
+
+trait Clone {
+    fn clone(&self) -> Self;
+}
+
+impl PartialEq for Vec<i32> {
+    fn eq(&self, other: &Vec<i32>) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+        for i in 0..self.len() {
+            if self[i] != other[i] {
+                return false;
+            }
+        }
+        return true;
+    }
+    fn ne(&self, other: &Vec<i32>) -> bool {
+        return !(self == other);
+    }
+}
+
+trait PartialEq<T> {
+    fn eq(&self, other: &T) -> bool;
+    fn ne(&self, other: &T) -> bool;
+}

@@ -1,0 +1,474 @@
+// titan/net/http.ti
+// HTTP/HTTPS client and server implementation for Titan
+
+pub enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Delete,
+    Patch,
+    Head,
+    Options,
+    Trace,
+    Connect,
+}
+
+pub enum HttpVersion {
+    Http10,
+    Http11,
+    Http2,
+    Http3,
+}
+
+pub struct HttpRequest {
+    method: HttpMethod,
+    uri: String,
+    version: HttpVersion,
+    headers: Map<String, String>,
+    body: Vec<u8>,
+}
+
+pub struct HttpResponse {
+    status_code: u16,
+    reason_phrase: String,
+    version: HttpVersion,
+    headers: Map<String, String>,
+    body: Vec<u8>,
+}
+
+pub struct HttpHeader {
+    name: String,
+    value: String,
+}
+
+pub enum StatusCode {
+    Ok = 200,
+    Created = 201,
+    Accepted = 202,
+    BadRequest = 400,
+    Unauthorized = 401,
+    Forbidden = 403,
+    NotFound = 404,
+    InternalServerError = 500,
+    NotImplemented = 501,
+    ServiceUnavailable = 503,
+}
+
+pub struct HttpClient {
+    connection: TcpStream,
+    timeout: u64,
+    user_agent: String,
+}
+
+impl HttpClient {
+    pub fn new(host: &str, port: u16, timeout: u64) -> Result<HttpClient, String> ! {http} {
+        let addr = SocketAddress {
+            family: AddressFamily::IPv4,
+            port: port,
+            address: [0; 16],
+        };
+
+        match socket_connect(&addr) {
+            Result::Ok(stream) => {
+                return Result::Ok(HttpClient {
+                    connection: stream,
+                    timeout: timeout,
+                    user_agent: "Titan/1.0".to_string(),
+                });
+            }
+            Result::Err(e) => {
+                return Result::Err(e);
+            }
+        }
+    }
+
+    pub fn get(&mut self, path: &str) -> Result<HttpResponse, String> ! {http} {
+        let request = HttpRequest {
+            method: HttpMethod::Get,
+            uri: path.to_string(),
+            version: HttpVersion::Http11,
+            headers: Map::new(),
+            body: Vec::new(),
+        };
+
+        return self.send_request(request);
+    }
+
+    pub fn post(&mut self, path: &str, body: Vec<u8>) -> Result<HttpResponse, String> ! {http} {
+        let mut headers = Map::new();
+        headers["Content-Type"] = "application/octet-stream".to_string();
+        headers["Content-Length"] = body.len().to_string();
+
+        let request = HttpRequest {
+            method: HttpMethod::Post,
+            uri: path.to_string(),
+            version: HttpVersion::Http11,
+            headers: headers,
+            body: body,
+        };
+
+        return self.send_request(request);
+    }
+
+    pub fn put(&mut self, path: &str, body: Vec<u8>) -> Result<HttpResponse, String> ! {http} {
+        let mut headers = Map::new();
+        headers["Content-Type"] = "application/octet-stream".to_string();
+
+        let request = HttpRequest {
+            method: HttpMethod::Put,
+            uri: path.to_string(),
+            version: HttpVersion::Http11,
+            headers: headers,
+            body: body,
+        };
+
+        return self.send_request(request);
+    }
+
+    pub fn delete(&mut self, path: &str) -> Result<HttpResponse, String> ! {http} {
+        let request = HttpRequest {
+            method: HttpMethod::Delete,
+            uri: path.to_string(),
+            version: HttpVersion::Http11,
+            headers: Map::new(),
+            body: Vec::new(),
+        };
+
+        return self.send_request(request);
+    }
+
+    pub fn send_request(&mut self, request: HttpRequest) -> Result<HttpResponse, String> ! {http} {
+        let request_line = format_request_line(&request);
+        socket_send(&self.connection, request_line.as_bytes())?;
+
+        for (key, value) in &request.headers {
+            let header_line = key + ": " + value + "\r\n";
+            socket_send(&self.connection, header_line.as_bytes())?;
+        }
+
+        socket_send(&self.connection, "\r\n".as_bytes())?;
+
+        if request.body.len() > 0 {
+            socket_send(&self.connection, &request.body)?;
+        }
+
+        return self.read_response();
+    }
+
+    fn read_response(&mut self) -> Result<HttpResponse, String> ! {http} {
+        let mut buffer = [0u8; 4096];
+        let bytes_read = socket_recv(&self.connection, &mut buffer)?;
+
+        let response_str = buffer_to_string(&buffer[0..bytes_read]);
+        let lines: Vec<String> = response_str.split("\r\n").collect();
+
+        if lines.len() < 1 {
+            return Result::Err("Invalid response".to_string());
+        }
+
+        let status_line = &lines[0];
+        let status_parts: Vec<String> = status_line.split(" ").collect();
+
+        if status_parts.len() < 2 {
+            return Result::Err("Invalid status line".to_string());
+        }
+
+        let status_code = parse_status_code(&status_parts[1])?;
+        let reason_phrase = if status_parts.len() > 2 { status_parts[2] } else { "" }.to_string();
+
+        let mut headers = Map::new();
+        let mut body_start = 0;
+
+        for i in 1..lines.len() {
+            if lines[i].len() == 0 {
+                body_start = i + 1;
+                break;
+            }
+
+            let header_parts: Vec<String> = lines[i].split(":").collect();
+            if header_parts.len() == 2 {
+                let key = header_parts[0].trim().to_string();
+                let value = header_parts[1].trim().to_string();
+                headers[key] = value;
+            }
+        }
+
+        let mut body: Vec<u8> = Vec::new();
+        for i in body_start..lines.len() {
+            for byte in lines[i].as_bytes() {
+                body.push(*byte);
+            }
+        }
+
+        return Result::Ok(HttpResponse {
+            status_code: status_code,
+            reason_phrase: reason_phrase,
+            version: HttpVersion::Http11,
+            headers: headers,
+            body: body,
+        });
+    }
+
+    pub fn close(&self) -> Result<(), String> ! {http} {
+        return socket_close(&self.connection);
+    }
+}
+
+pub struct HttpServer {
+    listener: TcpListener,
+    routes: Map<String, fn(HttpRequest) -> HttpResponse>,
+}
+
+impl HttpServer {
+    pub fn new(host: &str, port: u16) -> Result<HttpServer, String> ! {http} {
+        let addr = SocketAddress {
+            family: AddressFamily::IPv4,
+            port: port,
+            address: [0; 16],
+        };
+
+        let socket = socket_create(AddressFamily::IPv4, SocketType::Stream)?;
+        socket_set_so_reuseaddr(&socket)?;
+        socket_bind(&socket, &addr)?;
+        let listener = socket_listen(&socket, 128)?;
+
+        return Result::Ok(HttpServer {
+            listener: listener,
+            routes: Map::new(),
+        });
+    }
+
+    pub fn register_route(&mut self, path: &str, handler: fn(HttpRequest) -> HttpResponse) {
+        self.routes[path.to_string()] = handler;
+    }
+
+    pub fn start(&self) -> Result<(), String> ! {http} {
+        loop {
+            match socket_accept(&self.listener) {
+                Result::Ok(stream) => {
+                    self.handle_connection(stream);
+                }
+                Result::Err(e) => {
+                    return Result::Err(e);
+                }
+            }
+        }
+    }
+
+    fn handle_connection(&self, stream: TcpStream) {
+        let mut buffer = [0u8; 4096];
+
+        match socket_recv(&stream, &mut buffer) {
+            Result::Ok(bytes_read) => {
+                let request_str = buffer_to_string(&buffer[0..bytes_read]);
+
+                match parse_http_request(&request_str) {
+                    Result::Ok(request) => {
+                        let response = self.route_request(&request);
+                        let response_bytes = format_http_response(&response);
+                        let _ = socket_send(&stream, response_bytes.as_bytes());
+                    }
+                    Result::Err(_) => {
+                        let error_response = HttpResponse {
+                            status_code: 400,
+                            reason_phrase: "Bad Request".to_string(),
+                            version: HttpVersion::Http11,
+                            headers: Map::new(),
+                            body: Vec::new(),
+                        };
+
+                        let response_bytes = format_http_response(&error_response);
+                        let _ = socket_send(&stream, response_bytes.as_bytes());
+                    }
+                }
+
+                let _ = socket_close(&stream);
+            }
+            Result::Err(_) => {}
+        }
+    }
+
+    fn route_request(&self, request: &HttpRequest) -> HttpResponse {
+        let handler = self.routes.get(&request.uri);
+
+        if handler.is_some() {
+            return (handler.unwrap())(request.clone());
+        }
+
+        return HttpResponse {
+            status_code: 404,
+            reason_phrase: "Not Found".to_string(),
+            version: HttpVersion::Http11,
+            headers: Map::new(),
+            body: Vec::new(),
+        };
+    }
+}
+
+fn format_request_line(request: &HttpRequest) -> String {
+    let method_str = match request.method {
+        HttpMethod::Get => "GET",
+        HttpMethod::Post => "POST",
+        HttpMethod::Put => "PUT",
+        HttpMethod::Delete => "DELETE",
+        HttpMethod::Patch => "PATCH",
+        HttpMethod::Head => "HEAD",
+        HttpMethod::Options => "OPTIONS",
+        HttpMethod::Trace => "TRACE",
+        HttpMethod::Connect => "CONNECT",
+    };
+
+    let version_str = match request.version {
+        HttpVersion::Http10 => "HTTP/1.0",
+        HttpVersion::Http11 => "HTTP/1.1",
+        HttpVersion::Http2 => "HTTP/2.0",
+        HttpVersion::Http3 => "HTTP/3.0",
+    };
+
+    return method_str + " " + &request.uri + " " + version_str + "\r\n";
+}
+
+fn format_http_response(response: &HttpResponse) -> String {
+    let version_str = "HTTP/1.1";
+    let mut result = version_str + " " + response.status_code.to_string() + " " + &response.reason_phrase + "\r\n";
+
+    for (key, value) in &response.headers {
+        result = result + key + ": " + value + "\r\n";
+    }
+
+    result = result + "Content-Length: " + response.body.len().to_string() + "\r\n";
+    result = result + "\r\n";
+
+    return result;
+}
+
+fn parse_http_request(request_str: &str) -> Result<HttpRequest, String> ! {http} {
+    let lines: Vec<String> = request_str.split("\r\n").collect();
+
+    if lines.len() < 1 {
+        return Result::Err("Empty request".to_string());
+    }
+
+    let request_line_parts: Vec<String> = lines[0].split(" ").collect();
+
+    if request_line_parts.len() < 3 {
+        return Result::Err("Invalid request line".to_string());
+    }
+
+    let method = parse_http_method(&request_line_parts[0])?;
+    let uri = request_line_parts[1].clone();
+
+    return Result::Ok(HttpRequest {
+        method: method,
+        uri: uri,
+        version: HttpVersion::Http11,
+        headers: Map::new(),
+        body: Vec::new(),
+    });
+}
+
+fn parse_http_method(method_str: &str) -> Result<HttpMethod, String> ! {http} {
+    match method_str {
+        "GET" => Result::Ok(HttpMethod::Get),
+        "POST" => Result::Ok(HttpMethod::Post),
+        "PUT" => Result::Ok(HttpMethod::Put),
+        "DELETE" => Result::Ok(HttpMethod::Delete),
+        "PATCH" => Result::Ok(HttpMethod::Patch),
+        "HEAD" => Result::Ok(HttpMethod::Head),
+        "OPTIONS" => Result::Ok(HttpMethod::Options),
+        "TRACE" => Result::Ok(HttpMethod::Trace),
+        "CONNECT" => Result::Ok(HttpMethod::Connect),
+        _ => Result::Err("Unknown method".to_string()),
+    }
+}
+
+fn parse_status_code(code_str: &str) -> Result<u16, String> ! {http} {
+    return Result::Ok(200);
+}
+
+fn buffer_to_string(buffer: &[u8]) -> String {
+    return "".to_string();
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        return &[];
+    }
+
+    pub fn split(&self, delimiter: &str) -> Vec<String> {
+        return Vec::new();
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn get(&self, key: &K) -> Option<V> {
+        return None;
+    }
+}
+
+pub struct TcpStream {}
+pub struct TcpListener {}
+pub struct SocketAddress {
+    family: i32,
+    port: u16,
+    address: [u8; 16],
+}
+
+pub enum AddressFamily { IPv4, IPv6 }
+pub enum SocketType { Stream, Datagram }
+
+fn socket_create(f: AddressFamily, t: SocketType) -> Result<TcpStream, String> { return Result::Ok(TcpStream {}); }
+fn socket_bind(s: &TcpStream, a: &SocketAddress) -> Result<(), String> { return Result::Ok(()); }
+fn socket_listen(s: &TcpStream, b: i32) -> Result<TcpListener, String> { return Result::Ok(TcpListener {}); }
+fn socket_accept(l: &TcpListener) -> Result<TcpStream, String> { return Result::Ok(TcpStream {}); }
+fn socket_connect(a: &SocketAddress) -> Result<TcpStream, String> { return Result::Ok(TcpStream {}); }
+fn socket_send(s: &TcpStream, d: &[u8]) -> Result<usize, String> { return Result::Ok(0); }
+fn socket_recv(s: &TcpStream, b: &mut [u8]) -> Result<usize, String> { return Result::Ok(0); }
+fn socket_close(s: &TcpStream) -> Result<(), String> { return Result::Ok(()); }
+fn socket_set_so_reuseaddr(s: &TcpStream) -> Result<(), String> { return Result::Ok(()); }

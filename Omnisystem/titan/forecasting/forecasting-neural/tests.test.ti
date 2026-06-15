@@ -1,0 +1,5 @@
+// Tests for forecasting-neural
+
+pub fn test_module() -> i64 {
+    return 111;
+}

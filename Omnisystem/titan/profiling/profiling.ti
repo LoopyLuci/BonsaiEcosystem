@@ -1,0 +1,426 @@
+// titan/profiling/profiling.ti
+// Performance profiling for Titan
+
+pub struct ProfileSample {
+    timestamp: u64,
+    instruction_pointer: u64,
+    function_name: String,
+    call_stack: Vec<StackFrame>,
+}
+
+pub struct StackFrame {
+    function: String,
+    filename: String,
+    line_number: u32,
+    address: u64,
+}
+
+pub struct CPUProfiler {
+    samples: Vec<ProfileSample>,
+    sampling_interval_us: u32,
+    is_running: bool,
+    start_time: u64,
+    total_samples: u64,
+    function_times: Map<String, u64>,
+}
+
+impl CPUProfiler {
+    pub fn new(sampling_interval_us: u32) -> CPUProfiler {
+        return CPUProfiler {
+            samples: Vec::new(),
+            sampling_interval_us: sampling_interval_us,
+            is_running: false,
+            start_time: 0,
+            total_samples: 0,
+            function_times: Map::new(),
+        };
+    }
+
+    pub fn start(&mut self) -> Result<(), String> ! {profiling} {
+        if self.is_running {
+            return Result::Err("Profiler already running".to_string());
+        }
+
+        self.is_running = true;
+        self.start_time = this.get_timestamp();
+        self.samples = Vec::new();
+        self.function_times = Map::new();
+
+        // Set up signal handler for SIGPROF
+        asm! {
+            "call signal"
+            :
+            : "d"(27), "c"(&this.sample_handler)
+            :
+            : volatile
+        }
+
+        // Set timer for interval
+        asm! {
+            "call setitimer"
+            :
+            : "d"(0), "c"(self.sampling_interval_us), "S"(0)
+            :
+            : volatile
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn stop(&mut self) -> Result<ProfileResult, String> ! {profiling} {
+        if !self.is_running {
+            return Result::Err("Profiler not running".to_string());
+        }
+
+        // Stop the timer
+        asm! {
+            "call setitimer"
+            :
+            : "d"(0), "c"(0), "S"(0)
+            :
+            : volatile
+        }
+
+        self.is_running = false;
+
+        // Aggregate results
+        let mut function_times: Map<String, FunctionStats> = Map::new();
+
+        for sample in &self.samples {
+            if !function_times.contains_key(sample.function_name.clone()) {
+                function_times[sample.function_name.clone()] = FunctionStats {
+                    function_name: sample.function_name.clone(),
+                    sample_count: 0,
+                    total_time_ms: 0.0,
+                    call_count: 0,
+                };
+            }
+
+            let stats = function_times[sample.function_name.clone()];
+            stats.sample_count = stats.sample_count + 1;
+            stats.total_time_ms = stats.total_time_ms + ((self.sampling_interval_us as f64) / 1000.0);
+        }
+
+        return Result::Ok(ProfileResult {
+            total_duration_ms: ((this.get_timestamp() - self.start_time) as f64) / 1000.0,
+            total_samples: self.total_samples,
+            function_stats: function_times,
+            samples: self.samples.clone(),
+        });
+    }
+
+    pub fn record_sample(&mut self) {
+        if !self.is_running {
+            return;
+        }
+
+        // Capture current instruction pointer
+        let rip: u64 = 0;
+        asm! {
+            "call backtrace"
+            : "=a"(rip)
+            :
+            :
+            : volatile
+        }
+
+        // Capture call stack (simplified - would need full unwinding in practice)
+        let mut call_stack: Vec<StackFrame> = Vec::new();
+
+        // Get current function from RIP
+        let function_name = this.resolve_function(rip);
+
+        let sample = ProfileSample {
+            timestamp: this.get_timestamp(),
+            instruction_pointer: rip,
+            function_name: function_name,
+            call_stack: call_stack,
+        };
+
+        self.samples.push(sample);
+        self.total_samples = self.total_samples + 1;
+    }
+
+    pub fn get_hotspots(&self) -> Vec<HotspotEntry> {
+        let mut hotspots: Vec<HotspotEntry> = Vec::new();
+
+        for sample in &self.samples {
+            let mut found = false;
+            for i in 0..hotspots.len() {
+                if hotspots[i].function_name == sample.function_name {
+                    hotspots[i].sample_count = hotspots[i].sample_count + 1;
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                hotspots.push(HotspotEntry {
+                    function_name: sample.function_name.clone(),
+                    sample_count: 1,
+                    percentage: 0.0,
+                });
+            }
+        }
+
+        // Calculate percentages and sort
+        for i in 0..hotspots.len() {
+            hotspots[i].percentage = (hotspots[i].sample_count as f64) / (self.total_samples as f64) * 100.0;
+        }
+
+        return hotspots;
+    }
+
+    fn sample_handler() {
+        // Signal handler that records a sample
+    }
+
+    fn resolve_function(&self, address: u64) -> String {
+        // Resolve address to function name using symbol table
+        return "unknown_function".to_string();
+    }
+
+    fn get_timestamp(&self) -> u64 {
+        let ts: u64 = 0;
+        asm! {
+            "call rdtsc"
+            : "=a"(ts)
+            :
+            :
+            : volatile
+        }
+        return ts;
+    }
+}
+
+pub struct MemoryProfiler {
+    allocations: Vec<Allocation>,
+    total_allocated: u64,
+    peak_memory: u64,
+    current_memory: u64,
+}
+
+pub struct Allocation {
+    address: u64,
+    size: u64,
+    timestamp: u64,
+    call_stack: Vec<StackFrame>,
+    freed: bool,
+}
+
+impl MemoryProfiler {
+    pub fn new() -> MemoryProfiler {
+        return MemoryProfiler {
+            allocations: Vec::new(),
+            total_allocated: 0,
+            peak_memory: 0,
+            current_memory: 0,
+        };
+    }
+
+    pub fn record_allocation(&mut self, address: u64, size: u64) {
+        let alloc = Allocation {
+            address: address,
+            size: size,
+            timestamp: this.get_timestamp(),
+            call_stack: Vec::new(),
+            freed: false,
+        };
+
+        self.allocations.push(alloc);
+        self.current_memory = self.current_memory + size;
+        self.total_allocated = self.total_allocated + size;
+
+        if self.current_memory > self.peak_memory {
+            self.peak_memory = self.current_memory;
+        }
+    }
+
+    pub fn record_free(&mut self, address: u64) {
+        for i in 0..self.allocations.len() {
+            if self.allocations[i].address == address && !self.allocations[i].freed {
+                self.allocations[i].freed = true;
+                self.current_memory = self.current_memory - self.allocations[i].size;
+                break;
+            }
+        }
+    }
+
+    pub fn get_memory_report(&self) -> MemoryReport {
+        let mut live_allocations: Vec<Allocation> = Vec::new();
+        let mut total_live: u64 = 0;
+
+        for alloc in &self.allocations {
+            if !alloc.freed {
+                live_allocations.push(alloc.clone());
+                total_live = total_live + alloc.size;
+            }
+        }
+
+        // Find top memory consumers
+        let mut top_allocations: Vec<Allocation> = Vec::new();
+        for alloc in live_allocations.clone() {
+            top_allocations.push(alloc);
+        }
+
+        return MemoryReport {
+            total_allocated: self.total_allocated,
+            peak_memory: self.peak_memory,
+            current_memory: self.current_memory,
+            live_allocations: live_allocations.len() as u64,
+            top_allocations: top_allocations,
+        };
+    }
+
+    fn get_timestamp(&self) -> u64 {
+        return 0;
+    }
+}
+
+pub struct ProfileResult {
+    total_duration_ms: f64,
+    total_samples: u64,
+    function_stats: Map<String, FunctionStats>,
+    samples: Vec<ProfileSample>,
+}
+
+pub struct FunctionStats {
+    function_name: String,
+    sample_count: u64,
+    total_time_ms: f64,
+    call_count: u64,
+}
+
+pub struct HotspotEntry {
+    function_name: String,
+    sample_count: u64,
+    percentage: f64,
+}
+
+pub struct MemoryReport {
+    total_allocated: u64,
+    peak_memory: u64,
+    current_memory: u64,
+    live_allocations: u64,
+    top_allocations: Vec<Allocation>,
+}
+
+// Flame graph generation
+pub struct FlameGraphGenerator {
+    samples: Vec<ProfileSample>,
+}
+
+impl FlameGraphGenerator {
+    pub fn new() -> FlameGraphGenerator {
+        return FlameGraphGenerator {
+            samples: Vec::new(),
+        };
+    }
+
+    pub fn add_samples(&mut self, samples: &Vec<ProfileSample>) {
+        for sample in samples {
+            self.samples.push(sample.clone());
+        }
+    }
+
+    pub fn generate_svg(&self) -> String {
+        let mut svg = "<svg>".to_string();
+
+        // Generate stack representations
+        let mut y = 0;
+        for sample in &self.samples {
+            let x = 0;
+            svg = svg + "<rect x='".to_string().as_str() + &x.to_string() + "' y='" + &y.to_string() + "' width='100' height='20' fill='blue'/>";
+            y = y + 25;
+        }
+
+        svg = svg + "</svg>".to_string().as_str();
+        return svg;
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool { return false; }
+}
+
+impl Allocation {
+    pub fn clone(&self) -> Allocation {
+        return Allocation {
+            address: self.address,
+            size: self.size,
+            timestamp: self.timestamp,
+            call_stack: self.call_stack.clone(),
+            freed: self.freed,
+        };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn clone(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+}
+
+impl StackFrame {
+    pub fn clone(&self) -> StackFrame {
+        return StackFrame {
+            function: self.function.clone(),
+            filename: self.filename.clone(),
+            line_number: self.line_number,
+            address: self.address,
+        };
+    }
+}
+
+impl ProfileSample {
+    pub fn clone(&self) -> ProfileSample {
+        return ProfileSample {
+            timestamp: self.timestamp,
+            instruction_pointer: self.instruction_pointer,
+            function_name: self.function_name.clone(),
+            call_stack: self.call_stack.clone(),
+        };
+    }
+}

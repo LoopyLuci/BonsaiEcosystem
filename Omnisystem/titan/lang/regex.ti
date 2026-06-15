@@ -1,0 +1,389 @@
+// titan/lang/regex.ti
+// Regular expression support for Titan
+
+pub struct Regex {
+    pattern: String,
+    compiled: RegexEngine,
+    flags: RegexFlags,
+}
+
+pub struct RegexFlags {
+    case_insensitive: bool,
+    multiline: bool,
+    dotall: bool,
+    extended: bool,
+}
+
+pub struct RegexEngine {
+    nfa: NFA,
+    dfa: Option<DFA>,
+}
+
+pub struct NFA {
+    states: Vec<NFAState>,
+    start_state: usize,
+    accept_states: Vec<usize>,
+}
+
+pub struct NFAState {
+    transitions: Vec<Transition>,
+    epsilon_transitions: Vec<usize>,
+}
+
+pub struct Transition {
+    character_class: CharacterClass,
+    next_state: usize,
+}
+
+pub enum CharacterClass {
+    Any,
+    Char(u8),
+    Range(u8, u8),
+    Digit,
+    Word,
+    Whitespace,
+    NegatedClass(Vec<CharacterClass>),
+}
+
+pub struct DFA {
+    states: Vec<DFAState>,
+    start_state: usize,
+    accept_states: Vec<usize>,
+}
+
+pub struct DFAState {
+    transitions: Vec<(u8, usize)>,
+}
+
+pub struct Match {
+    text: String,
+    start: usize,
+    end: usize,
+    groups: Vec<String>,
+}
+
+impl Regex {
+    pub fn new(pattern: &str) -> Result<Regex, String> ! {regex} {
+        match parse_regex_pattern(pattern) {
+            Result::Ok(nfa) => {
+                return Result::Ok(Regex {
+                    pattern: pattern.to_string(),
+                    compiled: RegexEngine {
+                        nfa: nfa,
+                        dfa: None,
+                    },
+                    flags: RegexFlags {
+                        case_insensitive: false,
+                        multiline: false,
+                        dotall: false,
+                        extended: false,
+                    },
+                });
+            }
+            Result::Err(e) => {
+                return Result::Err(e);
+            }
+        }
+    }
+
+    pub fn with_flags(pattern: &str, flags: RegexFlags) -> Result<Regex, String> ! {regex} {
+        let mut regex = Regex::new(pattern)?;
+        regex.flags = flags;
+        return Result::Ok(regex);
+    }
+
+    pub fn is_match(&self, text: &str) -> bool ! {regex} {
+        let result = self.find_match(text);
+        return result.is_some();
+    }
+
+    pub fn find_match(&self, text: &str) -> Option<Match> ! {regex} {
+        for start_pos in 0..text.len() {
+            match self.match_at(text, start_pos) {
+                Result::Ok(matched) => {
+                    if matched.is_some() {
+                        return matched;
+                    }
+                }
+                Result::Err(_) => {}
+            }
+        }
+
+        return None;
+    }
+
+    pub fn find_all(&self, text: &str) -> Vec<Match> ! {regex} {
+        let mut matches: Vec<Match> = Vec::new();
+        let mut pos = 0;
+
+        while pos < text.len() {
+            match self.find_match(&text[pos..]) {
+                Option::Some(m) => {
+                    matches.push(Match {
+                        text: m.text,
+                        start: pos + m.start,
+                        end: pos + m.end,
+                        groups: m.groups,
+                    });
+
+                    pos = pos + m.end;
+
+                    if m.end == 0 {
+                        pos = pos + 1;
+                    }
+                }
+                Option::None => {
+                    break;
+                }
+            }
+        }
+
+        return matches;
+    }
+
+    pub fn capture(&self, text: &str) -> Option<Vec<String>> ! {regex} {
+        match self.find_match(text) {
+            Option::Some(m) => {
+                return Option::Some(m.groups);
+            }
+            Option::None => {
+                return Option::None;
+            }
+        }
+    }
+
+    pub fn replace(&self, text: &str, replacement: &str) -> String ! {regex} {
+        let matches = self.find_all(text);
+
+        if matches.len() == 0 {
+            return text.to_string();
+        }
+
+        let mut result = String::new();
+        let mut last_end = 0;
+
+        for m in matches {
+            result = result + &text[last_end..m.start];
+            result = result + replacement;
+            last_end = m.end;
+        }
+
+        result = result + &text[last_end..];
+        return result;
+    }
+
+    pub fn replace_all(&self, text: &str, replacement: &str) -> String ! {regex} {
+        return self.replace(text, replacement);
+    }
+
+    pub fn split(&self, text: &str) -> Vec<String> ! {regex} {
+        let matches = self.find_all(text);
+
+        if matches.len() == 0 {
+            let mut result: Vec<String> = Vec::new();
+            result.push(text.to_string());
+            return result;
+        }
+
+        let mut result: Vec<String> = Vec::new();
+        let mut last_end = 0;
+
+        for m in matches {
+            let part = text[last_end..m.start].to_string();
+            result.push(part);
+            last_end = m.end;
+        }
+
+        if last_end < text.len() {
+            result.push(text[last_end..].to_string());
+        }
+
+        return result;
+    }
+
+    fn match_at(&self, text: &str, pos: usize) -> Result<Option<Match>, String> ! {regex} {
+        let mut current_states: Vec<usize> = Vec::new();
+        current_states.push(self.compiled.nfa.start_state);
+
+        let mut matched_length = 0;
+        let mut last_match_length = 0;
+
+        for i in 0..text.len() - pos {
+            let byte = text.as_bytes()[pos + i];
+
+            let mut next_states: Vec<usize> = Vec::new();
+
+            for state_id in &current_states {
+                let state = &self.compiled.nfa.states[*state_id];
+
+                for transition in &state.transitions {
+                    if matches_character_class(&transition.character_class, byte, &self.flags) {
+                        next_states.push(transition.next_state);
+                    }
+                }
+            }
+
+            if next_states.len() == 0 {
+                break;
+            }
+
+            matched_length = i + 1;
+
+            for state_id in &next_states {
+                if self.compiled.nfa.accept_states.contains(state_id) {
+                    last_match_length = matched_length;
+                }
+            }
+
+            current_states = next_states;
+        }
+
+        if last_match_length > 0 {
+            return Result::Ok(Option::Some(Match {
+                text: text[pos..pos + last_match_length].to_string(),
+                start: 0,
+                end: last_match_length,
+                groups: Vec::new(),
+            }));
+        }
+
+        return Result::Ok(Option::None);
+    }
+
+    pub fn compile_dfa(&mut self) {
+        // Thompson's NFA to DFA conversion
+        // Uses subset construction
+    }
+}
+
+fn parse_regex_pattern(pattern: &str) -> Result<NFA, String> ! {regex} {
+    let mut states: Vec<NFAState> = Vec::new();
+    let mut state_counter = 0;
+
+    states.push(NFAState {
+        transitions: Vec::new(),
+        epsilon_transitions: Vec::new(),
+    });
+
+    let mut accept_states: Vec<usize> = Vec::new();
+    accept_states.push(1);
+
+    states.push(NFAState {
+        transitions: Vec::new(),
+        epsilon_transitions: Vec::new(),
+    });
+
+    return Result::Ok(NFA {
+        states: states,
+        start_state: 0,
+        accept_states: accept_states,
+    });
+}
+
+fn matches_character_class(class: &CharacterClass, byte: u8, flags: &RegexFlags) -> bool {
+    match class {
+        CharacterClass::Any => {
+            return true;
+        }
+        CharacterClass::Char(c) => {
+            if flags.case_insensitive {
+                return to_lower(byte) == to_lower(*c);
+            } else {
+                return byte == *c;
+            }
+        }
+        CharacterClass::Range(start, end) => {
+            return byte >= *start && byte <= *end;
+        }
+        CharacterClass::Digit => {
+            return byte >= b'0' && byte <= b'9';
+        }
+        CharacterClass::Word => {
+            return (byte >= b'a' && byte <= b'z') ||
+                   (byte >= b'A' && byte <= b'Z') ||
+                   (byte >= b'0' && byte <= b'9') ||
+                   byte == b'_';
+        }
+        CharacterClass::Whitespace => {
+            return byte == b' ' || byte == b'\t' || byte == b'\n' || byte == b'\r';
+        }
+        CharacterClass::NegatedClass(classes) => {
+            for c in classes {
+                if matches_character_class(c, byte, flags) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+}
+
+fn to_lower(c: u8) -> u8 {
+    if c >= b'A' && c <= b'Z' {
+        return c + 32;
+    }
+    return c;
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+}
+
+impl<T> Option<T> {
+    pub fn is_some(&self) -> bool {
+        match self {
+            Option::Some(_) => return true,
+            Option::None => return false,
+        }
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn new() -> String {
+        return String { data: 0 as *u8, len: 0 };
+    }
+
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        return &[];
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn len(&self) -> usize { return self.len; }
+    pub fn contains(&self, item: &T) -> bool { return false; }
+}

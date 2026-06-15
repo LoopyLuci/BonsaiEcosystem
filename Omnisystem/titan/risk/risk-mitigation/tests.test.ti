@@ -1,0 +1,5 @@
+// Tests for risk-mitigation
+
+pub fn test_module() -> i64 {
+    return 111;
+}

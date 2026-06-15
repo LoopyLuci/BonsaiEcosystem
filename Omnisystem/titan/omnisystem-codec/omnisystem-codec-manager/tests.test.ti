@@ -1,0 +1,5 @@
+// Tests for omnisystem-codec-manager
+
+pub fn test_module() -> i64 {
+    return 111;
+}

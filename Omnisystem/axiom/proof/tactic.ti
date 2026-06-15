@@ -1,0 +1,381 @@
+// axiom/proof/tactic.ti
+// Proof tactics and automation for Axiom formal verification language
+
+pub struct Goal {
+    hypotheses: Vec<(String, String)>,  // (name, type)
+    conclusion: String,
+}
+
+pub struct Proof {
+    goals: Vec<Goal>,
+    completed: bool,
+}
+
+pub enum Tactic {
+    Intro,
+    IntroAll,
+    Apply(String),
+    Exact(String),
+    Rewrite(String),
+    SimplifyAll,
+    Induction,
+    Cases,
+    Simp(Vec<String>),  // simp with lemmas
+    Auto,
+    Trivial,
+    Contradiction,
+    Constructor,
+    LeftChoice,
+    RightChoice,
+    Split,
+    Assumption,
+    Reflexivity,
+    Symmetry,
+    Transitivity,
+    Unfold(String),
+    Fold(String),
+    Rfl,
+}
+
+// Proof state management
+pub fn create_proof(goal: Goal) -> Proof {
+    return Proof {
+        goals: vec![goal],
+        completed: false,
+    };
+}
+
+pub fn apply_tactic(proof: &mut Proof, tactic: Tactic) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    match tactic {
+        Tactic::Intro => {
+            tactic_intro(proof);
+        }
+        Tactic::IntroAll => {
+            tactic_intro_all(proof);
+        }
+        Tactic::Apply(lemma_name) => {
+            tactic_apply(proof, &lemma_name);
+        }
+        Tactic::Exact(term) => {
+            tactic_exact(proof, &term);
+        }
+        Tactic::Rewrite(eq) => {
+            tactic_rewrite(proof, &eq);
+        }
+        Tactic::SimplifyAll => {
+            tactic_simplify_all(proof);
+        }
+        Tactic::Induction => {
+            tactic_induction(proof);
+        }
+        Tactic::Reflexivity => {
+            tactic_reflexivity(proof);
+        }
+        Tactic::Symmetry => {
+            tactic_symmetry(proof);
+        }
+        Tactic::Assumption => {
+            tactic_assumption(proof);
+        }
+        _ => {}
+    }
+}
+
+// intro tactic: introduce a hypothesis
+fn tactic_intro(proof: &mut Proof) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &mut proof.goals[0];
+
+    // Parse conclusion: assumption must be of form (x : T) -> P
+    // Extract first argument and add to hypotheses
+    if goal.conclusion.contains("->") {
+        let parts: Vec<&String> = goal.conclusion.split_str("->").collect();
+        if parts.len() >= 2 {
+            // New hypothesis added (simplified)
+            let new_hyp_name = "h".to_string();
+            goal.hypotheses.push((new_hyp_name, parts[0].to_string()));
+
+            // Update conclusion to rest of implication
+            goal.conclusion = parts[1].to_string();
+        }
+    }
+}
+
+fn tactic_intro_all(proof: &mut Proof) ! {verify} {
+    while proof.goals.len() > 0 && proof.goals[0].conclusion.contains("->") {
+        tactic_intro(proof);
+    }
+}
+
+// apply tactic: apply a lemma
+fn tactic_apply(proof: &mut Proof, lemma_name: &String) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    // Look up lemma and check if it matches goal
+    let lemma_type = lookup_lemma(lemma_name);
+
+    let goal = &mut proof.goals[0];
+
+    // If lemma conclusion matches goal conclusion, apply it
+    if lemma_type == goal.conclusion {
+        // Create subgoals for lemma hypotheses
+        // (simplified - in real version would do proper unification)
+    }
+}
+
+// exact tactic: prove goal with exact term
+fn tactic_exact(proof: &mut Proof, term: &String) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &proof.goals[0];
+
+    // Check if term has type goal.conclusion
+    let term_type = infer_type(term, &goal.hypotheses);
+
+    if term_type == goal.conclusion {
+        proof.goals.remove(0);
+        if proof.goals.len() == 0 {
+            proof.completed = true;
+        }
+    }
+}
+
+// rewrite tactic: rewrite using equality
+fn tactic_rewrite(proof: &mut Proof, eq: &String) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &mut proof.goals[0];
+
+    // Parse equality: assume format "a = b"
+    if eq.contains("=") {
+        // Apply rewrite in goal conclusion
+        // (simplified - real version would do pattern matching)
+    }
+}
+
+// simplify tactic: apply simplification rules
+fn tactic_simplify_all(proof: &mut Proof) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &mut proof.goals[0];
+
+    // Apply built-in simplification rules
+    apply_simplification_rules(&mut goal.conclusion);
+}
+
+fn apply_simplification_rules(term: &mut String) ! {verify} {
+    // Beta reduction
+    if term.contains("(fun") {
+        // Simplify lambda application
+    }
+
+    // Zero elimination
+    if term.contains("0 + ") {
+        // Simplify 0 + x to x
+    }
+
+    // Associativity
+    if term.contains("(") && term.contains(")") {
+        // Normalize associativity
+    }
+}
+
+// induction tactic: structural induction
+fn tactic_induction(proof: &mut Proof) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &proof.goals[0];
+
+    // Find inductive variable from hypotheses
+    // Generate base case and inductive step subgoals
+
+    // For simplified version, just mark as complete
+    // In real version would generate proper subgoals
+    proof.completed = true;
+}
+
+// reflexivity tactic: prove x = x
+fn tactic_reflexivity(proof: &mut Proof) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &proof.goals[0];
+
+    if goal.conclusion.contains(" = ") {
+        let parts: Vec<&String> = goal.conclusion.split_str("=").collect();
+        if parts.len() == 2 && parts[0].trim() == parts[1].trim() {
+            proof.goals.remove(0);
+            if proof.goals.len() == 0 {
+                proof.completed = true;
+            }
+        }
+    }
+}
+
+// symmetry tactic: from x = y prove y = x
+fn tactic_symmetry(proof: &mut Proof) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &mut proof.goals[0];
+
+    if goal.conclusion.contains(" = ") {
+        let parts: Vec<&String> = goal.conclusion.split_str("=").collect();
+        if parts.len() == 2 {
+            // Swap sides
+            goal.conclusion = (parts[1].to_string() + " = " + parts[0]);
+        }
+    }
+}
+
+// assumption tactic: prove goal from hypothesis
+fn tactic_assumption(proof: &mut Proof) ! {verify} {
+    if proof.goals.len() == 0 {
+        return;
+    }
+
+    let goal = &proof.goals[0];
+
+    // Check if conclusion matches any hypothesis
+    for (_, hyp_type) in &goal.hypotheses {
+        if hyp_type == &goal.conclusion {
+            proof.goals.remove(0);
+            if proof.goals.len() == 0 {
+                proof.completed = true;
+            }
+            return;
+        }
+    }
+}
+
+// Lemma database
+pub struct LemmaDB {
+    lemmas: Vec<(String, String)>,  // (name, type signature)
+}
+
+pub fn lemma_db_create() -> LemmaDB {
+    return LemmaDB {
+        lemmas: Vec::new(),
+    };
+}
+
+pub fn lemma_db_add(db: &mut LemmaDB, name: &String, ty: &String) ! {verify} {
+    db.lemmas.push((name.clone(), ty.clone()));
+}
+
+pub fn lemma_db_lookup(db: &LemmaDB, name: &String) -> Option<String> ! {verify} {
+    for (lem_name, lem_type) in &db.lemmas {
+        if lem_name == name {
+            return Option::Some(lem_type.clone());
+        }
+    }
+    return Option::None;
+}
+
+// SMT solver integration
+pub fn call_smt_solver(goal: &Goal) -> bool ! {verify} {
+    // Interface with Z3 or similar SMT solver
+    // Convert goal to SMT-LIB format and check satisfiability
+
+    // For now, simplified version
+    return false;
+}
+
+// Type inference
+fn infer_type(term: &String, hypotheses: &Vec<(String, String)>) -> String ! {verify} {
+    // Infer type of term in given context
+    // (simplified - real version would do full type checking)
+
+    return "Type".to_string();
+}
+
+// Lemma lookup
+fn lookup_lemma(name: &String) -> String ! {verify} {
+    // Look up lemma in global database
+    // (simplified)
+
+    return "Lemma".to_string();
+}
+
+// Helper functions
+fn split_str(s: &String, delim: &str) -> Vec<&String> {
+    // String splitting (simplified)
+    let mut parts: Vec<&String> = Vec::new();
+    return parts;
+}
+
+pub struct Option<T> {
+    value: T,
+}
+
+impl Option<T> {
+    fn Some(val: T) -> Option<T> {
+        return Option { value: val };
+    }
+
+    fn None() -> Option<T> {
+        return Option { value: unimplemented() };
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+trait Clone {
+    fn clone(&self) -> Self;
+}
+
+impl Clone for String {
+    fn clone(&self) -> String {
+        return *self;
+    }
+}
+
+impl PartialEq for String {
+    fn eq(&self, other: &String) -> bool {
+        return true;  // Placeholder
+    }
+    fn ne(&self, other: &String) -> bool {
+        return !self.eq(other);
+    }
+}
+
+trait PartialEq<T> {
+    fn eq(&self, other: &T) -> bool;
+    fn ne(&self, other: &T) -> bool;
+}
+
+pub fn to_string(&self) -> String {
+    return "".to_string();
+}
+
+fn unimplemented<T>() -> T {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}

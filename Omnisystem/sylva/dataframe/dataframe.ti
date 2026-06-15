@@ -1,0 +1,511 @@
+// sylva/dataframe/dataframe.ti
+// DataFrame operations for data manipulation and analysis (Pandas-equivalent)
+
+pub struct DataFrame {
+    columns: Vec<String>,
+    data: Vec<Vec<Value>>,
+    index: Vec<i64>,
+}
+
+pub enum Value {
+    IntVal(i64),
+    FloatVal(f32),
+    StringVal(String),
+    BoolVal(bool),
+    NullVal,
+}
+
+pub fn dataframe_create(columns: &Vec<String>) -> DataFrame {
+    return DataFrame {
+        columns: columns.clone(),
+        data: Vec::new(),
+        index: Vec::new(),
+    };
+}
+
+pub fn dataframe_add_row(df: &mut DataFrame, values: &Vec<Value>) ! {data} {
+    if values.len() != df.columns.len() {
+        emit_panic("Row length mismatch");
+    }
+
+    df.data.push(values.clone());
+    df.index.push((df.data.len() - 1) as i64);
+}
+
+pub fn dataframe_get_column<T>(df: &DataFrame, column_name: &String) -> Vec<Value> ! {data} {
+    let mut col_index: i32 = -1;
+
+    for (i, col) in df.columns.iter().enumerate() {
+        if col == column_name {
+            col_index = i as i32;
+            break;
+        }
+    }
+
+    if col_index < 0 {
+        emit_panic("Column not found");
+    }
+
+    let mut column: Vec<Value> = Vec::new();
+
+    for row in &df.data {
+        column.push(row[col_index as usize].clone());
+    }
+
+    return column;
+}
+
+pub fn dataframe_select_columns(df: &DataFrame, column_names: &Vec<String>) -> DataFrame ! {data} {
+    let mut new_df = dataframe_create(column_names);
+
+    for row in &df.data {
+        let mut new_row: Vec<Value> = Vec::new();
+
+        for col_name in column_names {
+            let mut col_idx: i32 = -1;
+
+            for (i, col) in df.columns.iter().enumerate() {
+                if col == col_name {
+                    col_idx = i as i32;
+                    break;
+                }
+            }
+
+            new_row.push(row[col_idx as usize].clone());
+        }
+
+        new_df.data.push(new_row);
+    }
+
+    return new_df;
+}
+
+pub fn dataframe_filter(df: &DataFrame, column_name: &String, predicate: fn(&Value) -> bool) -> DataFrame ! {data} {
+    let mut filtered_df = dataframe_create(&df.columns);
+
+    let mut col_index: i32 = -1;
+
+    for (i, col) in df.columns.iter().enumerate() {
+        if col == column_name {
+            col_index = i as i32;
+            break;
+        }
+    }
+
+    for row in &df.data {
+        if predicate(&row[col_index as usize]) {
+            filtered_df.data.push(row.clone());
+        }
+    }
+
+    return filtered_df;
+}
+
+pub fn dataframe_group_by(df: &DataFrame, column_name: &String) -> Vec<DataFrame> ! {data} {
+    let mut groups: Vec<DataFrame> = Vec::new();
+
+    let mut col_index: i32 = -1;
+
+    for (i, col) in df.columns.iter().enumerate() {
+        if col == column_name {
+            col_index = i as i32;
+            break;
+        }
+    }
+
+    let mut group_map: Vec<(Value, Vec<Vec<Value>>)> = Vec::new();
+
+    for row in &df.data {
+        let key = row[col_index as usize].clone();
+
+        let mut found = false;
+        for (k, group) in &mut group_map {
+            if values_equal(k, &key) {
+                group.push(row.clone());
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            group_map.push((key, vec![row.clone()]));
+        }
+    }
+
+    for (_, group_rows) in &group_map {
+        let mut group_df = dataframe_create(&df.columns);
+        for row in group_rows {
+            group_df.data.push(row.clone());
+        }
+        groups.push(group_df);
+    }
+
+    return groups;
+}
+
+pub fn dataframe_sort(df: &DataFrame, column_name: &String, ascending: bool) -> DataFrame ! {data} {
+    let mut sorted_df = dataframe_create(&df.columns);
+
+    let mut col_index: i32 = -1;
+
+    for (i, col) in df.columns.iter().enumerate() {
+        if col == column_name {
+            col_index = i as i32;
+            break;
+        }
+    }
+
+    let mut data_with_keys: Vec<(Value, Vec<Value>)> = Vec::new();
+
+    for row in &df.data {
+        let key = row[col_index as usize].clone();
+        data_with_keys.push((key, row.clone()));
+    }
+
+    // Sort by key (simplified bubble sort)
+    for i in 0..data_with_keys.len() {
+        for j in i+1..data_with_keys.len() {
+            let should_swap = if ascending {
+                value_less_than(&data_with_keys[j].0, &data_with_keys[i].0)
+            } else {
+                value_greater_than(&data_with_keys[j].0, &data_with_keys[i].0)
+            };
+
+            if should_swap {
+                // Swap
+                let temp = data_with_keys[i].clone();
+                data_with_keys[i] = data_with_keys[j].clone();
+                data_with_keys[j] = temp;
+            }
+        }
+    }
+
+    for (_, row) in &data_with_keys {
+        sorted_df.data.push(row.clone());
+    }
+
+    return sorted_df;
+}
+
+pub fn dataframe_join(
+    left: &DataFrame,
+    right: &DataFrame,
+    left_key: &String,
+    right_key: &String
+) -> DataFrame ! {data} {
+    let mut result = dataframe_create(&combine_columns(&left.columns, &right.columns));
+
+    let mut left_key_idx: i32 = -1;
+    for (i, col) in left.columns.iter().enumerate() {
+        if col == left_key {
+            left_key_idx = i as i32;
+            break;
+        }
+    }
+
+    let mut right_key_idx: i32 = -1;
+    for (i, col) in right.columns.iter().enumerate() {
+        if col == right_key {
+            right_key_idx = i as i32;
+            break;
+        }
+    }
+
+    for left_row in &left.data {
+        for right_row in &right.data {
+            if values_equal(
+                &left_row[left_key_idx as usize],
+                &right_row[right_key_idx as usize]
+            ) {
+                let mut joined_row: Vec<Value> = Vec::new();
+                for val in left_row {
+                    joined_row.push(val.clone());
+                }
+                for val in right_row {
+                    joined_row.push(val.clone());
+                }
+                result.data.push(joined_row);
+            }
+        }
+    }
+
+    return result;
+}
+
+pub fn dataframe_apply(
+    df: &DataFrame,
+    column_name: &String,
+    func: fn(&Value) -> Value
+) -> DataFrame ! {data} {
+    let mut result_df = dataframe_create(&df.columns);
+
+    let mut col_index: i32 = -1;
+
+    for (i, col) in df.columns.iter().enumerate() {
+        if col == column_name {
+            col_index = i as i32;
+            break;
+        }
+    }
+
+    for row in &df.data {
+        let mut new_row = row.clone();
+        new_row[col_index as usize] = func(&row[col_index as usize]);
+        result_df.data.push(new_row);
+    }
+
+    return result_df;
+}
+
+pub fn dataframe_aggregate(
+    df: &DataFrame,
+    column_name: &String,
+    agg_fn: String
+) -> Value ! {data} {
+    let column = dataframe_get_column(df, column_name);
+
+    match agg_fn.as_str() {
+        "sum" => return aggregate_sum(&column),
+        "mean" => return aggregate_mean(&column),
+        "min" => return aggregate_min(&column),
+        "max" => return aggregate_max(&column),
+        "count" => return Value::IntVal(column.len() as i64),
+        _ => emit_panic("Unknown aggregation function"),
+    }
+}
+
+pub fn dataframe_describe(df: &DataFrame) -> DataFrame ! {data} {
+    let mut stats_df = dataframe_create(&vec!["statistic", "count", "mean", "min", "max"]);
+
+    for col_name in &df.columns {
+        let col = dataframe_get_column(df, col_name);
+
+        let count = col.len() as i64;
+        let mean = aggregate_mean_value(&col);
+        let min = aggregate_min(&col);
+        let max = aggregate_max(&col);
+
+        let stat_row = vec![
+            Value::StringVal(col_name.clone()),
+            Value::IntVal(count),
+            mean,
+            min,
+            max,
+        ];
+
+        stats_df.data.push(stat_row);
+    }
+
+    return stats_df;
+}
+
+pub fn dataframe_to_csv(df: &DataFrame) -> String ! {io} {
+    let mut csv = String::new();
+
+    // Header
+    for (i, col) in df.columns.iter().enumerate() {
+        csv = csv + col;
+        if i < df.columns.len() - 1 {
+            csv = csv + ",";
+        }
+    }
+    csv = csv + "\n";
+
+    // Rows
+    for row in &df.data {
+        for (i, val) in row.iter().enumerate() {
+            csv = csv + &value_to_string(val);
+            if i < row.len() - 1 {
+                csv = csv + ",";
+            }
+        }
+        csv = csv + "\n";
+    }
+
+    return csv;
+}
+
+pub fn dataframe_from_csv(csv_str: &String) -> DataFrame ! {io} {
+    let lines: Vec<&String> = csv_str.split_str("\n").collect();
+
+    if lines.len() == 0 {
+        emit_panic("Empty CSV");
+    }
+
+    let columns: Vec<String> = parse_csv_line(lines[0]);
+    let mut df = dataframe_create(&columns);
+
+    for i in 1..lines.len() {
+        let values = parse_csv_line(lines[i]);
+        let mut row: Vec<Value> = Vec::new();
+
+        for val_str in &values {
+            row.push(string_to_value(val_str));
+        }
+
+        if row.len() == columns.len() {
+            df.data.push(row);
+        }
+    }
+
+    return df;
+}
+
+// Helper functions
+fn values_equal(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::IntVal(x), Value::IntVal(y)) => return x == y,
+        (Value::FloatVal(x), Value::FloatVal(y)) => return x == y,
+        (Value::StringVal(x), Value::StringVal(y)) => return x == y,
+        (Value::BoolVal(x), Value::BoolVal(y)) => return x == y,
+        (Value::NullVal, Value::NullVal) => return true,
+        _ => return false,
+    }
+}
+
+fn value_less_than(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::IntVal(x), Value::IntVal(y)) => return x < y,
+        (Value::FloatVal(x), Value::FloatVal(y)) => return x < y,
+        _ => return false,
+    }
+}
+
+fn value_greater_than(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::IntVal(x), Value::IntVal(y)) => return x > y,
+        (Value::FloatVal(x), Value::FloatVal(y)) => return x > y,
+        _ => return false,
+    }
+}
+
+fn aggregate_sum(column: &Vec<Value>) -> Value {
+    let mut sum: i64 = 0;
+    for val in column {
+        if let Value::IntVal(v) = val {
+            sum = sum + v;
+        }
+    }
+    return Value::IntVal(sum);
+}
+
+fn aggregate_mean(column: &Vec<Value>) -> Value {
+    let sum = aggregate_sum(column);
+    if let Value::IntVal(s) = sum {
+        return Value::FloatVal((s as f32) / (column.len() as f32));
+    }
+    return Value::NullVal;
+}
+
+fn aggregate_mean_value(column: &Vec<Value>) -> Value {
+    return aggregate_mean(column);
+}
+
+fn aggregate_min(column: &Vec<Value>) -> Value {
+    if column.len() == 0 {
+        return Value::NullVal;
+    }
+    let mut min = column[0].clone();
+    for val in column {
+        if value_less_than(val, &min) {
+            min = val.clone();
+        }
+    }
+    return min;
+}
+
+fn aggregate_max(column: &Vec<Value>) -> Value {
+    if column.len() == 0 {
+        return Value::NullVal;
+    }
+    let mut max = column[0].clone();
+    for val in column {
+        if value_greater_than(val, &max) {
+            max = val.clone();
+        }
+    }
+    return max;
+}
+
+fn combine_columns(left: &Vec<String>, right: &Vec<String>) -> Vec<String> {
+    let mut combined: Vec<String> = Vec::new();
+    for col in left {
+        combined.push(col.clone());
+    }
+    for col in right {
+        combined.push(col.clone());
+    }
+    return combined;
+}
+
+fn value_to_string(val: &Value) -> String {
+    match val {
+        Value::IntVal(v) => return v.to_string(),
+        Value::FloatVal(v) => return "0.0".to_string(),
+        Value::StringVal(s) => return s.clone(),
+        Value::BoolVal(b) => return if *b { "true" } else { "false" }.to_string(),
+        Value::NullVal => return "null".to_string(),
+    }
+}
+
+fn string_to_value(s: &String) -> Value {
+    // Try to parse as integer
+    // Try to parse as float
+    // Default to string
+    return Value::StringVal(s.clone());
+}
+
+fn parse_csv_line(line: &String) -> Vec<String> {
+    let parts: Vec<&String> = line.split_str(",").collect();
+    let mut result: Vec<String> = Vec::new();
+    for part in parts {
+        result.push(part.to_string());
+    }
+    return result;
+}
+
+fn emit_panic(msg: &str) {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+trait Clone {
+    fn clone(&self) -> Self;
+}
+
+impl Clone for Value {
+    fn clone(&self) -> Value {
+        return match self {
+            Value::IntVal(v) => Value::IntVal(*v),
+            Value::FloatVal(v) => Value::FloatVal(*v),
+            Value::StringVal(s) => Value::StringVal(s.clone()),
+            Value::BoolVal(b) => Value::BoolVal(*b),
+            Value::NullVal => Value::NullVal,
+        };
+    }
+}
+
+impl Clone for Vec<String> {
+    fn clone(&self) -> Vec<String> {
+        return *self;
+    }
+}
+
+impl Clone for String {
+    fn clone(&self) -> String {
+        return *self;
+    }
+}
+
+fn split_str(s: &String, delim: &str) -> Vec<&String> {
+    return Vec::new();
+}
+
+fn to_string(&self) -> String {
+    return "".to_string();
+}

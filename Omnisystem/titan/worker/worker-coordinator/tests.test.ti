@@ -1,0 +1,5 @@
+// Tests for worker-coordinator
+
+pub fn test_module() -> i64 {
+    return 111;
+}

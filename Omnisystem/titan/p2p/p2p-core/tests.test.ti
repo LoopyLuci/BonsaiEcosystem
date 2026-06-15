@@ -1,0 +1,5 @@
+// Tests for p2p-core
+
+pub fn test_module() -> i64 {
+    return 111;
+}

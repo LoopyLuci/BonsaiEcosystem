@@ -1,0 +1,5 @@
+// Tests for omnisystem-time
+
+pub fn test_module() -> i64 {
+    return 111;
+}

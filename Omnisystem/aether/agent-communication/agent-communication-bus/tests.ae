@@ -1,0 +1,3 @@
+// Tests: agent-communication-bus
+
+pub fn test_module() -> i64 { return 111; }

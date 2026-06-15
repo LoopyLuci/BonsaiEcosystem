@@ -11,6 +11,14 @@ pub struct Runtime {
     worker_threads: Vec<JoinHandle<()>>,
 }
 
+impl std::fmt::Debug for Runtime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Runtime")
+            .field("num_workers", &self.executor.num_workers)
+            .finish()
+    }
+}
+
 impl Runtime {
     /// Create a new runtime with specified number of worker threads
     pub fn new(num_workers: usize) -> Self {

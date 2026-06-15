@@ -1,0 +1,3 @@
+// Tests: zero-knowledge-proofs
+
+pub fn test_module() -> i64 { return 111; }

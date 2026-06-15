@@ -1,0 +1,3 @@
+// Tests: poe-manifestation
+
+pub fn test_module() -> i64 { return 111; }

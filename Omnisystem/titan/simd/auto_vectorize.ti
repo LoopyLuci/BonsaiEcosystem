@@ -1,0 +1,355 @@
+// titan/simd/auto_vectorize.ti
+// Automatic vectorization hints and loop transformations
+
+pub struct VectorizeHint {
+    enable: bool,
+    width: i32,     // 128, 256, or 512
+    cost_model: String,  // "default", "aggressive", "conservative"
+    inline_threshold: i32,
+}
+
+pub fn vectorize_loop(width: i32) -> VectorizeHint {
+    return VectorizeHint {
+        enable: true,
+        width: width,
+        cost_model: "default",
+        inline_threshold: 1000,
+    };
+}
+
+pub fn aggressive_vectorize(width: i32) -> VectorizeHint {
+    return VectorizeHint {
+        enable: true,
+        width: width,
+        cost_model: "aggressive",
+        inline_threshold: 5000,
+    };
+}
+
+pub fn conservative_vectorize(width: i32) -> VectorizeHint {
+    return VectorizeHint {
+        enable: true,
+        width: width,
+        cost_model: "conservative",
+        inline_threshold: 500,
+    };
+}
+
+// Attribute macros for auto-vectorization
+pub fn hint_simd_width(width: i32) ! {simd} {
+    // Compiler hint: assume loop can be vectorized to this width
+    asm! {
+        ".hint SIMD_WIDTH %0"
+        :
+        : "i"(width)
+        :
+        : volatile
+    }
+}
+
+pub fn hint_loop_align(alignment: i32) ! {simd} {
+    // Hint: align loop to cache line
+    asm! {
+        ".align %0"
+        :
+        : "i"(alignment)
+        :
+        : volatile
+    }
+}
+
+pub fn hint_loop_count(count: i32) ! {simd} {
+    // Hint: loop will execute approximately count times
+    asm! {
+        ".hint LOOP_COUNT %0"
+        :
+        : "i"(count)
+        :
+        : volatile
+    }
+}
+
+pub fn hint_assume_aligned(ptr: &i32, alignment: i32) -> &i32 ! {simd} {
+    // Runtime assertion: ptr is aligned to boundary
+    let addr = ptr as i64;
+    if (addr & ((alignment - 1) as i64)) != 0 {
+        emit_panic("Pointer not aligned");
+    }
+    return ptr;
+}
+
+pub fn hint_no_unroll() ! {simd} {
+    // Prevent loop unrolling
+    asm! {
+        "#pragma clang loop unroll(disable)"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn hint_unroll_count(count: i32) ! {simd} {
+    // Unroll loop count times
+    asm! {
+        ".unroll %0"
+        :
+        : "i"(count)
+        :
+        : volatile
+    }
+}
+
+// Vectorizable loop patterns
+pub fn vectorized_sum(arr: &[i32], len: i32) -> i32 ! {simd} {
+    let mut sum: i32 = 0;
+    let mut i: i32 = 0;
+
+    // Hint: this loop can be vectorized
+    hint_simd_width(256);
+
+    while i < len {
+        sum = sum + arr[i as usize];
+        i = i + 1;
+    }
+
+    return sum;
+}
+
+pub fn vectorized_dot_product(a: &[f32], b: &[f32], len: i32) -> f32 ! {simd} {
+    let mut result: f32 = 0.0;
+    let mut i: i32 = 0;
+
+    hint_simd_width(256);
+
+    while i < len {
+        result = result + (a[i as usize] * b[i as usize]);
+        i = i + 1;
+    }
+
+    return result;
+}
+
+pub fn vectorized_max(arr: &[i32], len: i32) -> i32 ! {simd} {
+    let mut max_val: i32 = -2147483648;  // min i32
+    let mut i: i32 = 0;
+
+    hint_simd_width(256);
+
+    while i < len {
+        if arr[i as usize] > max_val {
+            max_val = arr[i as usize];
+        }
+        i = i + 1;
+    }
+
+    return max_val;
+}
+
+pub fn vectorized_min(arr: &[i32], len: i32) -> i32 ! {simd} {
+    let mut min_val: i32 = 2147483647;  // max i32
+    let mut i: i32 = 0;
+
+    hint_simd_width(256);
+
+    while i < len {
+        if arr[i as usize] < min_val {
+            min_val = arr[i as usize];
+        }
+        i = i + 1;
+    }
+
+    return min_val;
+}
+
+pub fn vectorized_filter(src: &[i32], dst: &mut [i32], len: i32, threshold: i32) -> i32 ! {simd} {
+    let mut count: i32 = 0;
+    let mut i: i32 = 0;
+
+    hint_simd_width(256);
+
+    while i < len {
+        if src[i as usize] > threshold {
+            dst[count as usize] = src[i as usize];
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+
+    return count;
+}
+
+pub fn vectorized_transform(src: &[f32], dst: &mut [f32], len: i32, scale: f32) ! {simd} {
+    let mut i: i32 = 0;
+
+    hint_simd_width(256);
+
+    while i < len {
+        dst[i as usize] = src[i as usize] * scale;
+        i = i + 1;
+    }
+}
+
+// Horizontal reduction operations (tree-reduce for parallelism)
+pub fn vectorized_horizontal_add(arr: &[i32], len: i32) -> i32 ! {simd} {
+    // Use tree reduction for better vectorization
+    if len <= 1 {
+        if len == 0 {
+            return 0;
+        }
+        return arr[0];
+    }
+
+    let mid = len / 2;
+    let left_sum = vectorized_horizontal_add(arr, mid);
+    let right_sum = vectorized_horizontal_add(&arr[mid as usize..], len - mid);
+
+    return left_sum + right_sum;
+}
+
+pub fn vectorized_horizontal_mul(arr: &[f32], len: i32) -> f32 ! {simd} {
+    // Product with tree reduction
+    if len <= 1 {
+        if len == 0 {
+            return 1.0;
+        }
+        return arr[0];
+    }
+
+    let mid = len / 2;
+    let left_prod = vectorized_horizontal_mul(arr, mid);
+    let right_prod = vectorized_horizontal_mul(&arr[mid as usize..], len - mid);
+
+    return left_prod * right_prod;
+}
+
+// Loop tiling for cache optimization + vectorization
+pub fn tiled_vector_add(
+    a: &[f32],
+    b: &[f32],
+    c: &mut [f32],
+    len: i32,
+    tile_size: i32
+) ! {simd} {
+    let mut i: i32 = 0;
+
+    hint_simd_width(256);
+
+    while i < len {
+        let end = if (i + tile_size) > len { len } else { i + tile_size };
+
+        // Inner loop is vectorized
+        let mut j: i32 = i;
+        while j < end {
+            c[j as usize] = a[j as usize] + b[j as usize];
+            j = j + 1;
+        }
+
+        i = end;
+    }
+}
+
+// Prefetch hints for data locality
+pub fn prefetch_read(ptr: &i32) ! {simd, io} {
+    // Prefetch for reading (L1 cache)
+    asm! {
+        "prefetcht0 (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn prefetch_write(ptr: &i32) ! {simd, io} {
+    // Prefetch for writing (exclusive L2)
+    asm! {
+        "prefetcht1 (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn prefetch_nta(ptr: &i32) ! {simd, io} {
+    // Non-temporal access (bypass cache)
+    asm! {
+        "prefetchnta (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+// Fence operations for memory consistency
+pub fn lfence() ! {simd, io} {
+    // Load fence - order loads
+    asm! {
+        "lfence"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn sfence() ! {simd, io} {
+    // Store fence - order stores
+    asm! {
+        "sfence"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn mfence() ! {simd, io} {
+    // Full memory fence
+    asm! {
+        "mfence"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+// Aligned memory allocation
+pub fn alloc_simd_aligned(size: i64, alignment: i32) -> &mut u8 ! {alloc, simd} {
+    // Allocate memory with SIMD alignment
+    let raw_ptr = malloc(size);
+    let addr = raw_ptr as i64;
+    let align_mask = (alignment - 1) as i64;
+    let aligned_addr = if (addr & align_mask) != 0 {
+        (addr + alignment as i64) & (!align_mask)
+    } else {
+        addr
+    };
+
+    return aligned_addr as &mut u8;
+}
+
+pub fn free_simd_aligned(ptr: &u8) ! {alloc, simd} {
+    // Free SIMD-aligned memory
+    free(ptr);
+}
+
+fn emit_panic(msg: String) ! {io} {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+fn malloc(size: i64) -> &mut u8 ! {alloc} {
+    return &mut [0u8; 1];
+}
+
+fn free(ptr: &u8) ! {alloc} {
+}

@@ -1,0 +1,3 @@
+// Tests: api-marketplace-discovery
+
+pub fn test_module() -> i64 { return 111; }

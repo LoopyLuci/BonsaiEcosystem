@@ -1,0 +1,416 @@
+// sylva/stdlib/computer_vision.sy
+// Computer vision operations in Sylva
+
+import sylva.tensor as tf
+import sylva.conv as conv
+
+# Image type
+struct Image {
+    data: Tensor[u8, "height,width,channels"]
+    height: Int
+    width: Int
+    channels: Int
+}
+
+fn image_load(path: String) -> Image {
+    // Load image from file
+    let tensor: Tensor[u8] = load_image_file(path)
+    return Image {
+        data: tensor,
+        height: tensor.shape[0],
+        width: tensor.shape[1],
+        channels: tensor.shape[2],
+    }
+}
+
+fn image_save(image: Image, path: String) {
+    save_image_file(path, image.data)
+}
+
+# Image filtering and convolution
+fn gaussian_blur(image: Image, kernel_size: Int, sigma: Float) -> Image {
+    let kernel = create_gaussian_kernel(kernel_size, sigma)
+    let blurred = convolve_2d(image.data, kernel)
+
+    return Image {
+        data: blurred,
+        height: image.height,
+        width: image.width,
+        channels: image.channels,
+    }
+}
+
+fn sobel_edge_detection(image: Image) -> Image {
+    let sobel_x = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
+    let sobel_y = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+
+    let edges_x = convolve_2d(image.data, sobel_x)
+    let edges_y = convolve_2d(image.data, sobel_y)
+
+    let magnitude = (edges_x ^ 2 + edges_y ^ 2).sqrt()
+
+    return Image {
+        data: magnitude,
+        height: image.height,
+        width: image.width,
+        channels: 1,
+    }
+}
+
+fn canny_edge_detection(image: Image, low_threshold: Float, high_threshold: Float) -> Image {
+    // Step 1: Gaussian blur
+    let blurred = gaussian_blur(image, 5, 1.4)
+
+    // Step 2: Sobel edge detection
+    let edges = sobel_edge_detection(blurred)
+
+    // Step 3: Non-maximum suppression
+    let suppressed = non_maximum_suppression(edges)
+
+    // Step 4: Double threshold and edge tracking
+    let final_edges = double_threshold_and_tracking(
+        suppressed, low_threshold, high_threshold
+    )
+
+    return final_edges
+}
+
+# Morphological operations
+fn dilate(image: Image, kernel_size: Int) -> Image {
+    let kernel = ones([kernel_size, kernel_size])
+    let dilated = morphological_operation(image.data, kernel, "max")
+
+    return Image {
+        data: dilated,
+        height: image.height,
+        width: image.width,
+        channels: image.channels,
+    }
+}
+
+fn erode(image: Image, kernel_size: Int) -> Image {
+    let kernel = ones([kernel_size, kernel_size])
+    let eroded = morphological_operation(image.data, kernel, "min")
+
+    return Image {
+        data: eroded,
+        height: image.height,
+        width: image.width,
+        channels: image.channels,
+    }
+}
+
+fn opening(image: Image, kernel_size: Int) -> Image {
+    let eroded = erode(image, kernel_size)
+    return dilate(eroded, kernel_size)
+}
+
+fn closing(image: Image, kernel_size: Int) -> Image {
+    let dilated = dilate(image, kernel_size)
+    return erode(dilated, kernel_size)
+}
+
+# Feature detection
+struct Keypoint {
+    x: Float
+    y: Float
+    scale: Float
+    orientation: Float
+    response: Float
+}
+
+fn harris_corner_detection(image: Image, threshold: Float = 0.01) -> List[Keypoint] {
+    // Compute image derivatives
+    let Ix = convolve_2d(image.data, [-1, 0, 1])
+    let Iy = convolve_2d(image.data, [[-1], [0], [1]])
+
+    let Ix2 = Ix ^ 2
+    let Iy2 = Iy ^ 2
+    let IxIy = Ix * Iy
+
+    // Gaussian smoothing of products
+    let Sx2 = gaussian_blur_tensor(Ix2, 3, 1.0)
+    let Sy2 = gaussian_blur_tensor(Iy2, 3, 1.0)
+    let Sxy = gaussian_blur_tensor(IxIy, 3, 1.0)
+
+    // Compute corner response
+    let mut keypoints = []
+    let k = 0.04
+
+    for y in 0..(image.height - 2) {
+        for x in 0..(image.width - 2) {
+            let m00 = Sx2[y, x]
+            let m01 = Sxy[y, x]
+            let m10 = Sxy[y, x]
+            let m11 = Sy2[y, x]
+
+            let trace = m00 + m11
+            let det = m00 * m11 - m01 * m10
+
+            let response = det - k * (trace ^ 2)
+
+            if response > threshold {
+                keypoints.push(Keypoint {
+                    x: x as Float,
+                    y: y as Float,
+                    scale: 1.0,
+                    orientation: 0.0,
+                    response: response,
+                })
+            }
+        }
+    }
+
+    return keypoints
+}
+
+fn sift_feature_detection(image: Image) -> List[Keypoint] {
+    // Simplified SIFT (Scale-Invariant Feature Transform)
+    let mut keypoints = []
+
+    // Build scale space
+    for octave in 0..3 {
+        for scale in 0..5 {
+            let blurred = gaussian_blur(image, 3 + scale, 0.5 + scale as Float)
+
+            // Detect keypoints at this scale
+            let corners = harris_corner_detection(blurred, 0.05)
+
+            for corner in corners {
+                keypoints.push(Keypoint {
+                    x: corner.x,
+                    y: corner.y,
+                    scale: (1 << octave) as Float * (1.0 + scale as Float * 0.3),
+                    orientation: estimate_orientation(blurred, corner.x, corner.y),
+                    response: corner.response,
+                })
+            }
+        }
+    }
+
+    return keypoints
+}
+
+# Feature descriptors
+fn compute_sift_descriptor(image: Image, keypoint: Keypoint) -> Tensor[f32, "128"] {
+    // Compute 128-dimensional SIFT descriptor
+    let mut descriptor: Tensor[f32] = zeros(128)
+    let region_size = 16
+    let patch_size = 16
+
+    // Extract patch
+    let patch = extract_patch(image, keypoint, patch_size)
+
+    // Compute gradients and orientations
+    let gradients = compute_gradients(patch)
+
+    // Create histogram of oriented gradients
+    descriptor = create_hog_descriptor(gradients, 128)
+
+    return descriptor
+}
+
+fn compute_orb_descriptor(image: Image, keypoint: Keypoint) -> Tensor[u8, "32"] {
+    // Compute 256-bit ORB (Oriented FAST and Rotated BRIEF) descriptor
+    let mut descriptor: Tensor<u8> = zeros(32)
+
+    let region_size = 31
+    let patch = extract_patch(image, keypoint, region_size)
+
+    // Generate test pairs for BRIEF
+    let test_pairs = generate_brief_test_pairs(256)
+
+    // Compute BRIEF descriptor
+    for i in 0..256 {
+        let (p1, p2) = test_pairs[i]
+        let val1 = sample_patch(patch, p1)
+        let val2 = sample_patch(patch, p2)
+
+        if val1 < val2 {
+            set_bit(descriptor, i)
+        }
+    }
+
+    return descriptor
+}
+
+# Object detection
+struct BoundingBox {
+    x: Float
+    y: Float
+    width: Float
+    height: Float
+    confidence: Float
+    class_id: Int
+}
+
+fn detect_objects_sliding_window(
+    image: Image,
+    classifier: fn(Image) -> (Float, Int),
+    window_size: (Int, Int),
+    stride: Int
+) -> List[BoundingBox] {
+    let mut detections = []
+
+    for y in range(0, image.height - window_size.0, stride) {
+        for x in range(0, image.width - window_size.1, stride) {
+            let patch = extract_window(image, x, y, window_size)
+            let (confidence, class_id) = classifier(patch)
+
+            if confidence > 0.5 {
+                detections.push(BoundingBox {
+                    x: x as Float,
+                    y: y as Float,
+                    width: window_size.1 as Float,
+                    height: window_size.0 as Float,
+                    confidence: confidence,
+                    class_id: class_id,
+                })
+            }
+        }
+    }
+
+    return detections
+}
+
+# Non-maximum suppression
+fn non_maximum_suppression_boxes(boxes: List[BoundingBox], iou_threshold: Float) -> List[BoundingBox] {
+    let mut kept_boxes = []
+
+    // Sort by confidence
+    boxes.sort_by(|a, b| b.confidence - a.confidence)
+
+    for i in 0..boxes.len() {
+        let mut keep = true
+
+        for j in 0..kept_boxes.len() {
+            let iou = compute_iou(boxes[i], kept_boxes[j])
+            if iou > iou_threshold {
+                keep = false
+                break
+            }
+        }
+
+        if keep {
+            kept_boxes.push(boxes[i])
+        }
+    }
+
+    return kept_boxes
+}
+
+fn compute_iou(box1: BoundingBox, box2: BoundingBox) -> Float {
+    let x1 = max(box1.x, box2.x)
+    let y1 = max(box1.y, box2.y)
+    let x2 = min(box1.x + box1.width, box2.x + box2.width)
+    let y2 = min(box1.y + box1.height, box2.y + box2.height)
+
+    let intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+    let union = box1.width * box1.height + box2.width * box2.height - intersection
+
+    return intersection / (union + 1e-8)
+}
+
+# Image transformations
+fn resize_image(image: Image, new_width: Int, new_height: Int) -> Image {
+    let resized = resize_tensor(image.data, [new_height, new_width, image.channels])
+
+    return Image {
+        data: resized,
+        height: new_height,
+        width: new_width,
+        channels: image.channels,
+    }
+}
+
+fn rotate_image(image: Image, angle_degrees: Float) -> Image {
+    let angle_radians = angle_degrees * (3.14159265 / 180.0)
+    let rotated = rotate_tensor(image.data, angle_radians)
+
+    return Image {
+        data: rotated,
+        height: image.height,
+        width: image.width,
+        channels: image.channels,
+    }
+}
+
+fn crop_image(image: Image, x: Int, y: Int, width: Int, height: Int) -> Image {
+    let cropped = image.data[y..(y+height), x..(x+width), :]
+
+    return Image {
+        data: cropped,
+        height: height,
+        width: width,
+        channels: image.channels,
+    }
+}
+
+# Utility functions
+fn create_gaussian_kernel(size: Int, sigma: Float) -> Tensor[f32, "size,size"] {
+    let mut kernel: Tensor[f32] = zeros([size, size])
+    let center = (size / 2) as Float
+
+    for y in 0..size {
+        for x in 0..size {
+            let dx = (x as Float) - center
+            let dy = (y as Float) - center
+            let distance = (dx ^ 2 + dy ^ 2).sqrt()
+            kernel[y, x] = math::exp(-distance ^ 2 / (2 * sigma ^ 2))
+        }
+    }
+
+    // Normalize
+    kernel = kernel / kernel.sum()
+    return kernel
+}
+
+fn convolve_2d(image: Tensor[u8], kernel: Tensor[f32]) -> Tensor[f32] {
+    // 2D convolution
+    return image as Tensor[f32]
+}
+
+fn extract_patch(image: Image, keypoint: Keypoint, size: Int) -> Image {
+    let x = (keypoint.x as Int) - (size / 2)
+    let y = (keypoint.y as Int) - (size / 2)
+
+    return crop_image(image, x, y, size, size)
+}
+
+fn ones(shape: List[Int]) -> Tensor[f32] {
+    return zeros(shape)
+}
+
+fn zeros(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+// Placeholder implementations
+fn load_image_file(path: String) -> Tensor[u8] { return zeros_tensor([0, 0, 3]); }
+fn save_image_file(path: String, data: Tensor[u8]) {}
+fn convolve_2d(data: Tensor[u8], kernel: Any) -> Tensor[u8] { return data; }
+fn morphological_operation(data: Tensor[u8], kernel: Any, op: String) -> Tensor[u8] { return data; }
+fn gaussian_blur_tensor(data: Tensor[f32], size: Int, sigma: Float) -> Tensor[f32] { return data; }
+fn non_maximum_suppression(edges: Image) -> Image { return edges; }
+fn double_threshold_and_tracking(edges: Image, low: Float, high: Float) -> Image { return edges; }
+fn estimate_orientation(image: Image, x: Float, y: Float) -> Float { return 0.0; }
+fn extract_window(image: Image, x: Int, y: Int, size: (Int, Int)) -> Image { return image; }
+fn resize_tensor(data: Tensor[u8], shape: List[Int]) -> Tensor[u8] { return data; }
+fn rotate_tensor(data: Tensor[u8], angle: Float) -> Tensor[u8] { return data; }
+fn compute_gradients(patch: Image) -> Tensor[f32] { return zeros_tensor([1, 1]); }
+fn create_hog_descriptor(gradients: Tensor[f32], size: Int) -> Tensor[f32] { return zeros_tensor([size]); }
+fn generate_brief_test_pairs(count: Int) -> List[(Int, Int)] { return []; }
+fn sample_patch(patch: Image, p: Int) -> u8 { return 0; }
+fn set_bit(desc: Tensor[u8], idx: Int) {}
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+
+fn range(start: Int, end: Int, step: Int) -> List[Int] { return []; }
+fn max(a: Float, b: Float) -> Float { return a; }
+fn min(a: Float, b: Float) -> Float { return a; }
+
+type Tensor[T, Shape] = Any
+type Image = Any
+
+namespace math {
+    fn exp(x: Float) -> Float { return x; }
+}

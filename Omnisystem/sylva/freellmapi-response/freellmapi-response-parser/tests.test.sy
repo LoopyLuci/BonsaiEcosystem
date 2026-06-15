@@ -1,0 +1,5 @@
+// Tests for freellmapi-response-parser
+
+pub fn test_module() -> i64 {
+    return 111;
+}

@@ -1,0 +1,5 @@
+// Tests for enterprise-integration-data
+
+pub fn test_module() -> i64 {
+    return 111;
+}

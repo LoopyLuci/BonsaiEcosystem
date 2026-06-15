@@ -1,0 +1,3 @@
+// Tests: skill-compiler
+
+pub fn test_module() -> i64 { return 111; }

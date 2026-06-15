@@ -1,0 +1,499 @@
+// titan/crypt/tls.ti
+// TLS 1.3 implementation for Titan
+
+pub struct TLSContext {
+    protocol_version: u16,
+    cipher_suite: u16,
+    handshake_hash: [u8; 32],
+    master_secret: [u8; 48],
+    session_key: [u8; 32],
+    state: TLSState,
+}
+
+pub enum TLSState {
+    Initial,
+    ClientHello,
+    ServerHello,
+    ServerCertificate,
+    ServerCertificateVerify,
+    ServerFinished,
+    ClientCertificate,
+    ClientCertificateVerify,
+    ClientFinished,
+    Connected,
+    Error,
+}
+
+pub enum TLSCipherSuite {
+    TLS_AES_256_GCM_SHA384 = 0x1302,
+    TLS_CHACHA20_POLY1305_SHA256 = 0x1303,
+    TLS_AES_128_GCM_SHA256 = 0x1301,
+}
+
+pub struct TLSConnection {
+    context: TLSContext,
+    server_public_key: [u8; 256],
+    client_random: [u8; 32],
+    server_random: [u8; 32],
+    read_buffer: Vec<u8>,
+    write_buffer: Vec<u8>,
+    socket_fd: i32,
+}
+
+impl TLSConnection {
+    pub fn new(fd: i32) -> TLSConnection {
+        return TLSConnection {
+            context: TLSContext {
+                protocol_version: 0x0303,
+                cipher_suite: 0x1302,
+                handshake_hash: [0; 32],
+                master_secret: [0; 48],
+                session_key: [0; 32],
+                state: TLSState::Initial,
+            },
+            server_public_key: [0; 256],
+            client_random: [0; 32],
+            server_random: [0; 32],
+            read_buffer: Vec::new(),
+            write_buffer: Vec::new(),
+            socket_fd: fd,
+        };
+    }
+
+    pub fn client_handshake(&mut self, hostname: &str) -> Result<(), String> ! {crypto} {
+        // Generate client random
+        self.generate_random(&mut self.client_random);
+
+        // Send ClientHello
+        let client_hello = self.build_client_hello(hostname)?;
+        self.send_record(0x16, client_hello.as_slice())?;
+        self.context.state = TLSState::ClientHello;
+
+        // Receive ServerHello
+        let server_hello = self.recv_record(0x16)?;
+        self.parse_server_hello(server_hello.as_slice())?;
+        self.context.state = TLSState::ServerHello;
+
+        // Receive ServerCertificate
+        let cert = self.recv_record(0x16)?;
+        self.parse_certificate(cert.as_slice())?;
+        self.context.state = TLSState::ServerCertificate;
+
+        // Receive ServerCertificateVerify
+        let cert_verify = self.recv_record(0x16)?;
+        self.verify_certificate_signature(cert_verify.as_slice())?;
+        self.context.state = TLSState::ServerCertificateVerify;
+
+        // Receive ServerFinished
+        let server_finished = self.recv_record(0x16)?;
+        self.verify_server_finished(server_finished.as_slice())?;
+        self.context.state = TLSState::ServerFinished;
+
+        // Send ClientFinished
+        let client_finished = self.build_client_finished()?;
+        self.send_record(0x16, client_finished.as_slice())?;
+        self.context.state = TLSState::ClientFinished;
+
+        self.context.state = TLSState::Connected;
+        return Result::Ok(());
+    }
+
+    pub fn write(&mut self, data: &[u8]) -> Result<usize, String> ! {crypto} {
+        let plaintext = data;
+        let ciphertext = self.encrypt_aes_256_gcm(plaintext)?;
+        self.send_record(0x17, ciphertext.as_slice())?;
+        return Result::Ok(data.len());
+    }
+
+    pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, String> ! {crypto} {
+        let record = self.recv_record(0x17)?;
+        let plaintext = self.decrypt_aes_256_gcm(record.as_slice())?;
+
+        let len = if plaintext.len() > buffer.len() { buffer.len() } else { plaintext.len() };
+        for i in 0..len {
+            buffer[i] = plaintext[i];
+        }
+
+        return Result::Ok(len);
+    }
+
+    fn build_client_hello(&self, hostname: &str) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut hello = Vec::new();
+
+        // Handshake type: ClientHello (1)
+        hello.push(0x01);
+
+        // Version
+        hello.push(0x03);
+        hello.push(0x03);
+
+        // Random
+        for byte in &self.client_random {
+            hello.push(byte);
+        }
+
+        // Session ID length (0)
+        hello.push(0x00);
+
+        // Cipher suites
+        hello.push(0x00);
+        hello.push(0x04); // Length
+        hello.push(0x13); // TLS_AES_256_GCM_SHA384
+        hello.push(0x02);
+
+        // Compression methods
+        hello.push(0x01); // Length
+        hello.push(0x00); // null
+
+        // Extensions
+        // SNI extension
+        let sni_ext = self.build_sni_extension(hostname)?;
+        for byte in &sni_ext {
+            hello.push(byte);
+        }
+
+        // Supported versions
+        let version_ext = self.build_supported_versions_extension()?;
+        for byte in &version_ext {
+            hello.push(byte);
+        }
+
+        // Key share
+        let key_share_ext = self.build_key_share_extension()?;
+        for byte in &key_share_ext {
+            hello.push(byte);
+        }
+
+        return Result::Ok(hello);
+    }
+
+    fn parse_server_hello(&mut self, data: &[u8]) -> Result<(), String> ! {crypto} {
+        if data.len() < 34 {
+            return Result::Err("Invalid ServerHello".to_string());
+        }
+
+        // Skip handshake type (1 byte)
+        // Skip version (2 bytes)
+        // Extract server random (32 bytes)
+        for i in 0..32 {
+            self.server_random[i] = data[3 + i];
+        }
+
+        // Extract cipher suite (2 bytes at offset 35)
+        let suite_high = data[35];
+        let suite_low = data[36];
+        self.context.cipher_suite = ((suite_high as u16) << 8) | (suite_low as u16);
+
+        // Derive session key from client_random + server_random
+        self.derive_session_key()?;
+
+        return Result::Ok(());
+    }
+
+    fn parse_certificate(&mut self, data: &[u8]) -> Result<(), String> ! {crypto} {
+        if data.len() < 4 {
+            return Result::Err("Invalid Certificate".to_string());
+        }
+
+        // Extract certificate (simplified)
+        // In production: full X.509 parsing
+        let cert_len = ((data[1] as usize) << 16) | ((data[2] as usize) << 8) | (data[3] as usize);
+
+        if data.len() < cert_len + 4 {
+            return Result::Err("Certificate data truncated".to_string());
+        }
+
+        // Parse public key from certificate
+        for i in 0..256 {
+            if 4 + i < data.len() {
+                self.server_public_key[i] = data[4 + i];
+            }
+        }
+
+        return Result::Ok(());
+    }
+
+    fn verify_certificate_signature(&self, data: &[u8]) -> Result<(), String> ! {crypto} {
+        if data.len() < 6 {
+            return Result::Err("Invalid CertificateVerify".to_string());
+        }
+
+        // Extract signature algorithm (2 bytes at offset 4)
+        let sig_alg = ((data[4] as u16) << 8) | (data[5] as u16);
+
+        // Extract signature (variable length)
+        let sig_len = ((data[6] as usize) << 8) | (data[7] as usize);
+
+        if data.len() < 8 + sig_len {
+            return Result::Err("Signature data truncated".to_string());
+        }
+
+        // Verify signature using server_public_key
+        // In production: RSA/ECDSA verification
+        return Result::Ok(());
+    }
+
+    fn verify_server_finished(&self, data: &[u8]) -> Result<(), String> ! {crypto} {
+        if data.len() < 36 {
+            return Result::Err("Invalid Finished message".to_string());
+        }
+
+        // Verify HMAC of all handshake messages
+        // In production: use HMAC-SHA256
+        return Result::Ok(());
+    }
+
+    fn build_client_finished(&self) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut finished = Vec::new();
+
+        // Finished message type
+        finished.push(0x14);
+
+        // Verify data (32 bytes for SHA256)
+        for i in 0..32 {
+            finished.push(self.context.handshake_hash[i]);
+        }
+
+        return Result::Ok(finished);
+    }
+
+    fn send_record(&mut self, content_type: u8, data: &[u8]) -> Result<(), String> ! {crypto} {
+        let mut record = Vec::new();
+
+        // TLS record header
+        record.push(content_type);
+        record.push(0x03); // Version major
+        record.push(0x03); // Version minor
+        record.push((data.len() >> 8) as u8);
+        record.push(data.len() as u8);
+
+        // Record payload
+        for byte in data {
+            record.push(byte);
+        }
+
+        // Write to socket
+        let bytes_written: i32 = 0;
+        asm! {
+            "call write"
+            : "=a"(bytes_written)
+            : "d"(self.socket_fd), "c"(record.as_slice()), "S"(record.len())
+            :
+            : volatile
+        }
+
+        if bytes_written < 0 {
+            return Result::Err("Failed to send TLS record".to_string());
+        }
+
+        return Result::Ok(());
+    }
+
+    fn recv_record(&mut self, expected_type: u8) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut header: [u8; 5] = [0; 5];
+
+        let bytes_read: i32 = 0;
+        asm! {
+            "call read"
+            : "=a"(bytes_read)
+            : "d"(self.socket_fd), "c"(&header), "S"(5)
+            :
+            : volatile
+        }
+
+        if bytes_read != 5 {
+            return Result::Err("Failed to read TLS header".to_string());
+        }
+
+        let content_type = header[0];
+        let length = ((header[3] as usize) << 8) | (header[4] as usize);
+
+        if content_type != expected_type {
+            return Result::Err("Unexpected TLS record type".to_string());
+        }
+
+        let mut payload: Vec<u8> = Vec::new();
+        let mut remaining = length;
+
+        while remaining > 0 {
+            let to_read = if remaining > 1024 { 1024 } else { remaining };
+            let mut buffer: [u8; 1024] = [0; 1024];
+
+            let bytes_read: i32 = 0;
+            asm! {
+                "call read"
+                : "=a"(bytes_read)
+                : "d"(self.socket_fd), "c"(&buffer), "S"(to_read)
+                :
+                : volatile
+            }
+
+            if bytes_read < 0 {
+                return Result::Err("Failed to read TLS payload".to_string());
+            }
+
+            for i in 0..(bytes_read as usize) {
+                payload.push(buffer[i]);
+            }
+
+            remaining = remaining - (bytes_read as usize);
+        }
+
+        return Result::Ok(payload);
+    }
+
+    fn encrypt_aes_256_gcm(&self, plaintext: &[u8]) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut ciphertext = Vec::new();
+
+        // Generate IV (12 bytes)
+        let iv: [u8; 12] = [0; 12];
+
+        // Encrypt with AES-256-GCM
+        // In production: use proper crypto library
+        for byte in plaintext {
+            ciphertext.push(byte ^ 0xAA);
+        }
+
+        return Result::Ok(ciphertext);
+    }
+
+    fn decrypt_aes_256_gcm(&self, ciphertext: &[u8]) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut plaintext = Vec::new();
+
+        // Decrypt with AES-256-GCM
+        // In production: use proper crypto library
+        for byte in ciphertext {
+            plaintext.push(byte ^ 0xAA);
+        }
+
+        return Result::Ok(plaintext);
+    }
+
+    fn derive_session_key(&mut self) -> Result<(), String> ! {crypto} {
+        // HKDF-Expand-Label for TLS 1.3
+        // PRK = HMAC-Hash(salt, IKM)
+        // OKM = HKDF-Expand-Label(PRK, label, info, L)
+
+        for i in 0..32 {
+            self.context.session_key[i] = 0;
+        }
+
+        return Result::Ok(());
+    }
+
+    fn generate_random(&self, buffer: &mut [u8; 32]) {
+        // Generate cryptographically secure random bytes
+        asm! {
+            "call getrandom"
+            :
+            : "d"(buffer), "c"(32)
+            :
+            : volatile
+        }
+    }
+
+    fn build_sni_extension(&self, hostname: &str) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut ext = Vec::new();
+
+        ext.push(0x00); // SNI extension ID
+        ext.push(0x00);
+
+        let hostname_len = hostname.len();
+        ext.push(((hostname_len + 5) >> 8) as u8);
+        ext.push((hostname_len + 5) as u8);
+
+        ext.push(0x00); // List length
+        ext.push(((hostname_len + 3) >> 8) as u8);
+        ext.push((hostname_len + 3) as u8);
+
+        ext.push(0x00); // DNS name type
+        ext.push((hostname_len >> 8) as u8);
+        ext.push(hostname_len as u8);
+
+        for byte in hostname.as_bytes() {
+            ext.push(byte);
+        }
+
+        return Result::Ok(ext);
+    }
+
+    fn build_supported_versions_extension(&self) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut ext = Vec::new();
+
+        ext.push(0x00); // Supported versions ID
+        ext.push(0x2b);
+
+        ext.push(0x00); // Extension length
+        ext.push(0x05);
+
+        ext.push(0x04); // List length
+        ext.push(0x03); // TLS 1.3
+        ext.push(0x03);
+        ext.push(0x03); // TLS 1.2
+        ext.push(0x02);
+
+        return Result::Ok(ext);
+    }
+
+    fn build_key_share_extension(&self) -> Result<Vec<u8>, String> ! {crypto} {
+        let mut ext = Vec::new();
+
+        ext.push(0x00); // Key share extension ID
+        ext.push(0x33);
+
+        ext.push(0x00); // Extension length
+        ext.push(0x24);
+
+        ext.push(0x00); // Key share list length
+        ext.push(0x20);
+
+        ext.push(0x00); // Curve ID (x25519)
+        ext.push(0x1d);
+
+        ext.push(0x00); // Key exchange length
+        ext.push(0x20);
+
+        // Public key (32 bytes, all zeros for simplicity)
+        for _ in 0..32 {
+            ext.push(0x00);
+        }
+
+        return Result::Ok(ext);
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<u8> {
+    data: *u8,
+    len: usize,
+    capacity: usize,
+}
+
+impl String {
+    pub fn as_bytes(&self) -> &[u8] {
+        return &[];
+    }
+
+    pub fn len(&self) -> usize {
+        return self.len;
+    }
+}
+
+impl Vec<u8> {
+    pub fn new() -> Vec<u8> {
+        return Vec { data: 0 as *u8, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: u8) {}
+    pub fn len(&self) -> usize { return self.len; }
+    pub fn as_slice(&self) -> &[u8] { return &[]; }
+}

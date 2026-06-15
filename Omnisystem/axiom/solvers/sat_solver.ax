@@ -1,0 +1,406 @@
+// axiom/solvers/sat_solver.ax
+// SAT solver (DPLL algorithm) for Axiom
+
+type Literal = Int
+type Clause = List[Literal]
+type Assignment = Map[Int, Bool]
+
+enum SATResult {
+    | Satisfiable(Assignment)
+    | Unsatisfiable
+}
+
+struct SATSolver {
+    clauses: List[Clause]
+    variables: Set[Int]
+    assignment: Assignment
+    decision_level: Int
+
+    fn new() -> SATSolver {
+        return SATSolver {
+            clauses: List::new(),
+            variables: Set::new(),
+            assignment: Map::new(),
+            decision_level: 0,
+        }
+    }
+
+    fn add_clause(clause: Clause) {
+        this.clauses.push(clause)
+
+        for literal in clause {
+            let var = this.get_variable(literal)
+            this.variables.insert(var)
+        }
+    }
+
+    fn solve() -> SATResult {
+        return this.dpll()
+    }
+
+    fn dpll() -> SATResult {
+        // Unit propagation
+        while true {
+            let unit_clause = this.find_unit_clause()
+
+            if unit_clause.is_some() {
+                let clause = unit_clause.unwrap()
+                let unit_literal = this.get_unit_literal(clause)
+                this.assign_variable(unit_literal)
+            } else {
+                break
+            }
+        }
+
+        // Check for conflicts
+        if this.has_conflict() {
+            return SATResult::Unsatisfiable
+        }
+
+        // Check if all variables are assigned
+        if this.all_variables_assigned() {
+            return SATResult::Satisfiable(this.assignment.clone())
+        }
+
+        // Pure literal elimination
+        let pure_literal = this.find_pure_literal()
+        if pure_literal.is_some() {
+            this.assign_variable(pure_literal.unwrap())
+            return this.dpll()
+        }
+
+        // Make a decision on an unassigned variable
+        let decision_literal = this.choose_decision_literal()
+        if decision_literal.is_none() {
+            return SATResult::Unsatisfiable
+        }
+
+        // Try assigning true
+        this.decision_level = this.decision_level + 1
+        this.assign_variable(decision_literal.unwrap())
+
+        let result = this.dpll()
+
+        match result {
+            SATResult::Satisfiable(assignment) => {
+                return SATResult::Satisfiable(assignment)
+            }
+
+            SATResult::Unsatisfiable => {
+                // Backtrack
+                this.decision_level = this.decision_level - 1
+                this.unassign_variable(decision_literal.unwrap())
+
+                // Try assigning false
+                this.decision_level = this.decision_level + 1
+                this.assign_variable(-decision_literal.unwrap())
+
+                let result2 = this.dpll()
+                this.decision_level = this.decision_level - 1
+
+                return result2
+            }
+        }
+    }
+
+    fn find_unit_clause() -> Option[Clause] {
+        for clause in this.clauses {
+            let unassigned_count = 0
+            let unassigned_literal = 0
+
+            for literal in clause {
+                let var = this.get_variable(literal)
+
+                if !this.assignment.contains_key(var) {
+                    unassigned_count = unassigned_count + 1
+                    unassigned_literal = literal
+                }
+            }
+
+            // Unit clause: exactly one unassigned literal
+            if unassigned_count == 1 {
+                return Option::Some(List::singleton(unassigned_literal))
+            }
+
+            // Empty clause: conflict
+            if unassigned_count == 0 && !this.is_satisfied(clause) {
+                return Option::None
+            }
+        }
+
+        return Option::None
+    }
+
+    fn get_unit_literal(clause: Clause) -> Literal {
+        for literal in clause {
+            let var = this.get_variable(literal)
+            if !this.assignment.contains_key(var) {
+                return literal
+            }
+        }
+        return 0
+    }
+
+    fn find_pure_literal() -> Option[Literal] {
+        for var in this.variables {
+            if !this.assignment.contains_key(var) {
+                let positive_found = false
+                let negative_found = false
+
+                for clause in this.clauses {
+                    if !this.is_satisfied(clause) {
+                        for literal in clause {
+                            if this.get_variable(literal) == var {
+                                if literal > 0 {
+                                    positive_found = true
+                                } else {
+                                    negative_found = true
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Pure literal: appears only in one polarity
+                if positive_found && !negative_found {
+                    return Option::Some(var)
+                }
+
+                if negative_found && !positive_found {
+                    return Option::Some(-var)
+                }
+            }
+        }
+
+        return Option::None
+    }
+
+    fn choose_decision_literal() -> Option[Literal] {
+        // VSIDS heuristic: choose variable with most occurrences
+        let best_var = 0
+        let best_score = 0
+
+        for var in this.variables {
+            if !this.assignment.contains_key(var) {
+                let score = this.compute_variable_score(var)
+
+                if score > best_score {
+                    best_var = var
+                    best_score = score
+                }
+            }
+        }
+
+        if best_var > 0 {
+            return Option::Some(best_var)
+        }
+
+        return Option::None
+    }
+
+    fn compute_variable_score(var: Int) -> Int {
+        let score = 0
+
+        for clause in this.clauses {
+            if !this.is_satisfied(clause) {
+                for literal in clause {
+                    if this.get_variable(literal) == var {
+                        score = score + 1
+                    }
+                }
+            }
+        }
+
+        return score
+    }
+
+    fn assign_variable(literal: Literal) {
+        let var = this.get_variable(literal)
+        let value = literal > 0
+        this.assignment[var] = value
+    }
+
+    fn unassign_variable(literal: Literal) {
+        let var = this.get_variable(literal)
+        this.assignment.remove(var)
+    }
+
+    fn has_conflict() -> Bool {
+        for clause in this.clauses {
+            if !this.is_satisfied(clause) && this.is_clause_conflicted(clause) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fn is_clause_conflicted(clause: Clause) -> Bool {
+        for literal in clause {
+            let var = this.get_variable(literal)
+            if this.assignment.contains_key(var) {
+                let value = this.assignment[var]
+                if (literal > 0 && value) || (literal < 0 && !value) {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    fn is_satisfied(clause: Clause) -> Bool {
+        for literal in clause {
+            let var = this.get_variable(literal)
+            if this.assignment.contains_key(var) {
+                let value = this.assignment[var]
+                if (literal > 0 && value) || (literal < 0 && !value) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    fn all_variables_assigned() -> Bool {
+        for var in this.variables {
+            if !this.assignment.contains_key(var) {
+                return false
+            }
+        }
+        return true
+    }
+
+    fn get_variable(literal: Literal) -> Int {
+        if literal > 0 {
+            return literal
+        } else {
+            return -literal
+        }
+    }
+}
+
+// Conflict analysis for learning
+struct ConflictAnalyzer {
+    learnt_clauses: List[Clause]
+
+    fn new() -> ConflictAnalyzer {
+        return ConflictAnalyzer {
+            learnt_clauses: List::new(),
+        }
+    }
+
+    fn analyze(conflict_clause: Clause) -> Clause {
+        let learnt = conflict_clause.clone()
+
+        // First UIP (Unique Implication Point) resolution
+        while learnt.len() > 1 {
+            let last_literal = learnt[learnt.len() - 1]
+            let var = this.get_variable(last_literal)
+
+            // Find implication clause for var
+            let impl_clause = Option::None
+
+            // Resolution step
+            if impl_clause.is_some() {
+                let clause = impl_clause.unwrap()
+                learnt = this.resolve(learnt, clause, var)
+            } else {
+                break
+            }
+        }
+
+        this.learnt_clauses.push(learnt.clone())
+        return learnt
+    }
+
+    fn resolve(c1: Clause, c2: Clause, var: Int) -> Clause {
+        let mut result = List::new()
+
+        for literal in c1 {
+            if this.get_variable(literal) != var {
+                result.push(literal)
+            }
+        }
+
+        for literal in c2 {
+            if this.get_variable(literal) != var {
+                result.push(literal)
+            }
+        }
+
+        return result
+    }
+
+    fn get_variable(literal: Int) -> Int {
+        if literal > 0 {
+            return literal
+        } else {
+            return -literal
+        }
+    }
+}
+
+// Boolean Constraint Propagation
+struct BCP {
+    implications: Map[Int, List[Clause]]
+
+    fn new() -> BCP {
+        return BCP {
+            implications: Map::new(),
+        }
+    }
+
+    fn propagate(literal: Int, clauses: List[Clause]) -> Result[(), Clause] {
+        let mut queue = List::new()
+        queue.push(literal)
+
+        while queue.len() > 0 {
+            let prop_literal = queue[0]
+            queue.pop_front()
+
+            for clause in clauses {
+                let unit_literal = this.unit_propagate(clause, prop_literal)
+
+                if unit_literal.is_some() {
+                    queue.push(unit_literal.unwrap())
+                } else if this.is_conflict(clause) {
+                    return Result::Err(clause)
+                }
+            }
+        }
+
+        return Result::Ok(())
+    }
+
+    fn unit_propagate(clause: Clause, assigned_literal: Int) -> Option[Int] {
+        let unassigned_count = 0
+        let unassigned_literal = 0
+
+        for literal in clause {
+            if literal != assigned_literal {
+                unassigned_count = unassigned_count + 1
+                unassigned_literal = literal
+            }
+        }
+
+        if unassigned_count == 1 {
+            return Option::Some(unassigned_literal)
+        }
+
+        return Option::None
+    }
+
+    fn is_conflict(clause: Clause) -> Bool {
+        return clause.len() == 0
+    }
+}
+
+type List<T> = Any
+type Set<T> = Any
+type Map<K, V> = Any
+type Option<T> = Any
+type Result<T, E> = Any
+
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }
+fn Ok<T, E>(val: T) -> Result<T, E> { return val; }
+fn Err<T, E>(err: E) -> Result<T, E> { return err; }

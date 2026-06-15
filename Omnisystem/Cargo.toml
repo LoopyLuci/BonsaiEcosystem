@@ -2418,6 +2418,9 @@ members = [
     "crates/omnisystem-async-runtime",
     "crates/omnisystem-collections",
     "crates/omnisystem-web-framework",
+    "crates/omnisystem-time",
+    "crates/omnisystem-id-generation",
+    "crates/omnisystem-serialization",
 ]
 
 [workspace.package]

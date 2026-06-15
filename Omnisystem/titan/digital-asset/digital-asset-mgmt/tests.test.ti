@@ -1,0 +1,5 @@
+// Tests for digital-asset-mgmt
+
+pub fn test_module() -> i64 {
+    return 111;
+}

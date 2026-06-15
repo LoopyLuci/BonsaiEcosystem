@@ -1,0 +1,3 @@
+// Tests: api-gateway-graphql
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,341 @@
+// aether/consensus/raft.ti
+// Raft consensus algorithm implementation for distributed state replication
+
+pub struct RaftNode {
+    node_id: i32,
+    current_term: i64,
+    voted_for: i32,
+    state: RaftState,
+    election_timeout: u64,
+    heartbeat_interval: u64,
+}
+
+pub enum RaftState {
+    Follower,
+    Candidate,
+    Leader,
+}
+
+pub struct LogEntry<T> {
+    term: i64,
+    index: i64,
+    command: T,
+}
+
+pub struct RaftLog<T> {
+    entries: Vec<LogEntry<T>>,
+    commit_index: i64,
+    last_applied: i64,
+}
+
+pub struct RaftConfig {
+    cluster_size: i32,
+    election_timeout_min: u64,  // milliseconds
+    election_timeout_max: u64,
+    heartbeat_interval: u64,    // milliseconds
+    rpc_timeout: u64,
+}
+
+// Raft RPC types
+pub struct AppendEntriesRequest<T> {
+    term: i64,
+    leader_id: i32,
+    prev_log_index: i64,
+    prev_log_term: i64,
+    entries: Vec<LogEntry<T>>,
+    leader_commit_index: i64,
+}
+
+pub struct AppendEntriesResponse {
+    term: i64,
+    success: bool,
+    last_log_index: i64,
+}
+
+pub struct RequestVoteRequest {
+    term: i64,
+    candidate_id: i32,
+    last_log_index: i64,
+    last_log_term: i64,
+}
+
+pub struct RequestVoteResponse {
+    term: i64,
+    vote_granted: bool,
+}
+
+// Raft state machine
+pub fn create_raft_node(config: &RaftConfig, node_id: i32) -> RaftNode {
+    return RaftNode {
+        node_id: node_id,
+        current_term: 0,
+        voted_for: -1,
+        state: RaftState::Follower,
+        election_timeout: randomize_timeout(config.election_timeout_min, config.election_timeout_max),
+        heartbeat_interval: config.heartbeat_interval,
+    };
+}
+
+pub fn raft_append_entry<T>(
+    node: &mut RaftNode,
+    log: &mut RaftLog<T>,
+    command: T
+) -> bool ! {distributed} {
+    // Only leader can append
+    if !matches!(node.state, RaftState::Leader) {
+        return false;
+    }
+
+    let current_index = (log.entries.len() as i64) + 1;
+    let entry = LogEntry {
+        term: node.current_term,
+        index: current_index,
+        command: command,
+    };
+
+    log.entries.push(entry);
+    return true;
+}
+
+pub fn raft_handle_append_entries<T>(
+    node: &mut RaftNode,
+    log: &mut RaftLog<T>,
+    request: &AppendEntriesRequest<T>
+) -> AppendEntriesResponse ! {distributed} {
+    // Update term
+    if request.term > node.current_term {
+        node.current_term = request.term;
+        node.state = RaftState::Follower;
+        node.voted_for = -1;
+    }
+
+    // Check log matching
+    let mut success = false;
+    if request.prev_log_index == 0 ||
+       (request.prev_log_index <= (log.entries.len() as i64) &&
+        log.entries[(request.prev_log_index - 1) as usize].term == request.prev_log_term) {
+        success = true;
+
+        // Append new entries
+        for entry in &request.entries {
+            if (entry.index as usize) > log.entries.len() {
+                log.entries.push(entry.clone());
+            }
+        }
+
+        // Update commit index
+        if request.leader_commit_index > log.commit_index {
+            log.commit_index = request.leader_commit_index;
+        }
+    }
+
+    return AppendEntriesResponse {
+        term: node.current_term,
+        success: success,
+        last_log_index: log.entries.len() as i64,
+    };
+}
+
+pub fn raft_handle_request_vote(
+    node: &mut RaftNode,
+    log: &RaftLog<i32>,
+    request: &RequestVoteRequest
+) -> RequestVoteResponse ! {distributed} {
+    // Update term
+    if request.term > node.current_term {
+        node.current_term = request.term;
+        node.state = RaftState::Follower;
+        node.voted_for = -1;
+    }
+
+    // Check if we can vote
+    let last_log_term = if log.entries.len() > 0 {
+        log.entries[log.entries.len() - 1].term
+    } else {
+        0
+    };
+
+    let can_vote = (node.voted_for == -1 || node.voted_for == request.candidate_id) &&
+                   (request.last_log_term > last_log_term ||
+                    (request.last_log_term == last_log_term &&
+                     request.last_log_index >= (log.entries.len() as i64)));
+
+    if request.term == node.current_term && can_vote {
+        node.voted_for = request.candidate_id;
+        return RequestVoteResponse {
+            term: request.term,
+            vote_granted: true,
+        };
+    }
+
+    return RequestVoteResponse {
+        term: node.current_term,
+        vote_granted: false,
+    };
+}
+
+pub fn raft_become_candidate(node: &mut RaftNode) ! {distributed} {
+    node.current_term = node.current_term + 1;
+    node.state = RaftState::Candidate;
+    node.voted_for = node.node_id;
+}
+
+pub fn raft_become_leader(node: &mut RaftNode) ! {distributed} {
+    node.state = RaftState::Leader;
+}
+
+pub fn raft_become_follower(node: &mut RaftNode, term: i64) ! {distributed} {
+    node.current_term = term;
+    node.state = RaftState::Follower;
+    node.voted_for = -1;
+}
+
+// Election timeout tick
+pub fn raft_election_timeout_tick(node: &mut RaftNode, elapsed: u64) -> bool ! {distributed} {
+    if elapsed >= node.election_timeout {
+        return true;  // Election timeout occurred
+    }
+    return false;
+}
+
+// Heartbeat tick
+pub fn raft_heartbeat_tick(node: &mut RaftNode, elapsed: u64) -> bool ! {distributed} {
+    if matches!(node.state, RaftState::Leader) && elapsed >= node.heartbeat_interval {
+        return true;  // Time to send heartbeat
+    }
+    return false;
+}
+
+// Log replication
+pub struct ReplicationState {
+    node_id: i32,
+    next_index: i64,
+    match_index: i64,
+}
+
+pub fn raft_update_replication_state(
+    state: &mut ReplicationState,
+    success: bool
+) ! {distributed} {
+    if success {
+        state.match_index = state.next_index;
+        state.next_index = state.next_index + 1;
+    } else {
+        if state.next_index > 1 {
+            state.next_index = state.next_index - 1;
+        }
+    }
+}
+
+// Snapshot support
+pub struct Snapshot {
+    last_included_index: i64,
+    last_included_term: i64,
+    data: Vec<u8>,
+}
+
+pub fn raft_snapshot(log: &RaftLog<i32>, index: i64) -> Snapshot ! {distributed} {
+    return Snapshot {
+        last_included_index: index,
+        last_included_term: 0,
+        data: Vec::new(),
+    };
+}
+
+pub fn raft_install_snapshot(log: &mut RaftLog<i32>, snapshot: &Snapshot) ! {distributed} {
+    log.last_applied = snapshot.last_included_index;
+    log.commit_index = snapshot.last_included_index;
+}
+
+// Persistent storage (to disk)
+pub fn raft_persist_state(node: &RaftNode) ! {distributed, io} {
+    // Save current_term and voted_for to disk
+    asm! {
+        "call save_raft_state"
+        :
+        : "a"(node.current_term), "d"(node.voted_for)
+        :
+        : volatile
+    }
+}
+
+pub fn raft_load_state(node: &mut RaftNode) ! {distributed, io} {
+    // Load current_term and voted_for from disk
+    let term: i64 = 0;
+    let voted_for: i32 = 0;
+
+    asm! {
+        "call load_raft_state"
+        : "=a"(term), "=d"(voted_for)
+        :
+        :
+        : volatile
+    }
+
+    node.current_term = term;
+    node.voted_for = voted_for;
+}
+
+// Quorum checks
+pub fn has_quorum(votes_received: i32, cluster_size: i32) -> bool {
+    return votes_received > (cluster_size / 2);
+}
+
+pub fn get_quorum_size(cluster_size: i32) -> i32 {
+    return (cluster_size / 2) + 1;
+}
+
+// Deterministic leader election via term increments
+pub fn raft_start_election(node: &mut RaftNode, peers: i32) ! {distributed} {
+    raft_become_candidate(node);
+
+    // Send RequestVote RPCs to all peers
+    for peer_id in 0..peers {
+        if peer_id != node.node_id {
+            send_request_vote_rpc(peer_id, node.node_id, node.current_term);
+        }
+    }
+}
+
+fn send_request_vote_rpc(peer_id: i32, candidate_id: i32, term: i64) ! {distributed, io} {
+    asm! {
+        "call send_rpc"
+        :
+        : "a"(peer_id), "d"(candidate_id), "c"(term)
+        :
+        : volatile
+    }
+}
+
+fn randomize_timeout(min_ms: u64, max_ms: u64) -> u64 {
+    // Random timeout between min and max
+    return min_ms + (min_ms / 10);
+}
+
+pub trait Clone {
+    fn clone(&self) -> Self;
+}
+
+impl Clone for LogEntry<i32> {
+    fn clone(&self) -> LogEntry<i32> {
+        return LogEntry {
+            term: self.term,
+            index: self.index,
+            command: self.command,
+        };
+    }
+}
+
+impl Clone for RaftState {
+    fn clone(&self) -> RaftState {
+        return match self {
+            RaftState::Follower => RaftState::Follower,
+            RaftState::Candidate => RaftState::Candidate,
+            RaftState::Leader => RaftState::Leader,
+        };
+    }
+}
+
+fn matches<T>(val: &RaftState, pattern: T) -> bool {
+    return false;
+}

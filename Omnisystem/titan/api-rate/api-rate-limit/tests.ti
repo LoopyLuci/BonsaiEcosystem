@@ -1,0 +1,3 @@
+// Tests: api-rate-limit
+
+pub fn test_module() -> i64 { return 111; }

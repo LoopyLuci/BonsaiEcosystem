@@ -1,0 +1,442 @@
+// titan/io/logging.ti
+// Structured logging framework for Titan
+
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+    Fatal,
+}
+
+pub enum LogTarget {
+    Console,
+    File(String),
+    Syslog,
+    MultiTarget(Vec<LogTarget>),
+}
+
+pub struct LogEntry {
+    level: LogLevel,
+    timestamp: u64,
+    message: String,
+    context: Map<String, String>,
+    caller: CallSite,
+    thread_id: u64,
+}
+
+pub struct CallSite {
+    file: String,
+    line: u32,
+    column: u32,
+    function: String,
+}
+
+pub struct Logger {
+    name: String,
+    level: LogLevel,
+    targets: Vec<LogTarget>,
+    formatters: Map<String, LogFormatter>,
+    filters: Vec<LogFilter>,
+}
+
+pub struct LogFormatter {
+    format_string: String,
+    include_timestamp: bool,
+    include_level: bool,
+    include_context: bool,
+    include_location: bool,
+    timestamp_format: String,
+}
+
+pub struct LogFilter {
+    pattern: String,
+    level_threshold: LogLevel,
+}
+
+impl Logger {
+    pub fn new(name: &str) -> Logger {
+        return Logger {
+            name: name.to_string(),
+            level: LogLevel::Info,
+            targets: Vec::new(),
+            formatters: Map::new(),
+            filters: Vec::new(),
+        };
+    }
+
+    pub fn set_level(&mut self, level: LogLevel) {
+        self.level = level;
+    }
+
+    pub fn add_target(&mut self, target: LogTarget) {
+        self.targets.push(target);
+    }
+
+    pub fn add_filter(&mut self, filter: LogFilter) {
+        self.filters.push(filter);
+    }
+
+    pub fn set_formatter(&mut self, name: &str, formatter: LogFormatter) {
+        self.formatters[name.to_string()] = formatter;
+    }
+
+    pub fn trace(&self, message: &str) ! {logging} {
+        self.log(LogLevel::Trace, message, Map::new());
+    }
+
+    pub fn debug(&self, message: &str) ! {logging} {
+        self.log(LogLevel::Debug, message, Map::new());
+    }
+
+    pub fn info(&self, message: &str) ! {logging} {
+        self.log(LogLevel::Info, message, Map::new());
+    }
+
+    pub fn warn(&self, message: &str) ! {logging} {
+        self.log(LogLevel::Warn, message, Map::new());
+    }
+
+    pub fn error(&self, message: &str) ! {logging} {
+        self.log(LogLevel::Error, message, Map::new());
+    }
+
+    pub fn fatal(&self, message: &str) ! {logging} {
+        self.log(LogLevel::Fatal, message, Map::new());
+    }
+
+    pub fn log(&self, level: LogLevel, message: &str, context: Map<String, String>) ! {logging} {
+        // Check if level passes threshold
+        if !self.should_log(level) {
+            return;
+        }
+
+        // Check filters
+        if !self.passes_filters(&context) {
+            return;
+        }
+
+        // Create log entry
+        let entry = LogEntry {
+            level: level,
+            timestamp: get_current_timestamp(),
+            message: message.to_string(),
+            context: context,
+            caller: get_call_site(),
+            thread_id: get_thread_id(),
+        };
+
+        // Format and output
+        for target in &self.targets {
+            self.write_to_target(target, &entry);
+        }
+    }
+
+    fn should_log(&self, level: LogLevel) -> bool {
+        return level_to_int(level) >= level_to_int(self.level);
+    }
+
+    fn passes_filters(&self, context: &Map<String, String>) -> bool {
+        for filter in &self.filters {
+            if !pattern_matches(&filter.pattern, context) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    fn write_to_target(&self, target: &LogTarget, entry: &LogEntry) {
+        match target {
+            LogTarget::Console => {
+                self.write_to_console(entry);
+            }
+            LogTarget::File(path) => {
+                self.write_to_file(path, entry);
+            }
+            LogTarget::Syslog => {
+                self.write_to_syslog(entry);
+            }
+            LogTarget::MultiTarget(targets) => {
+                for t in targets {
+                    self.write_to_target(t, entry);
+                }
+            }
+        }
+    }
+
+    fn write_to_console(&self, entry: &LogEntry) {
+        let formatted = self.format_entry(entry);
+        println!("{}", formatted);
+    }
+
+    fn write_to_file(&self, path: &str, entry: &LogEntry) {
+        let formatted = self.format_entry(entry);
+        // Append to file
+    }
+
+    fn write_to_syslog(&self, entry: &LogEntry) {
+        let formatted = self.format_entry(entry);
+        // Send to syslog
+    }
+
+    fn format_entry(&self, entry: &LogEntry) -> String {
+        let default_formatter = LogFormatter {
+            format_string: "[{timestamp}] {level} {message}".to_string(),
+            include_timestamp: true,
+            include_level: true,
+            include_context: false,
+            include_location: false,
+            timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
+        };
+
+        let formatter = self.formatters
+            .get("default")
+            .unwrap_or(&default_formatter);
+
+        let mut result = formatter.format_string.clone();
+
+        result = result.replace("{timestamp}", &format_timestamp(entry.timestamp));
+        result = result.replace("{level}", &level_to_string(entry.level));
+        result = result.replace("{message}", &entry.message);
+        result = result.replace("{logger}", &self.name);
+
+        if formatter.include_location {
+            let location = format!(
+                "{}:{}:{}",
+                entry.caller.file,
+                entry.caller.line,
+                entry.caller.column
+            );
+            result = result.replace("{location}", &location);
+        }
+
+        if formatter.include_context {
+            for (key, value) in &entry.context.entries() {
+                let placeholder = "{" + key + "}";
+                result = result.replace(&placeholder, value);
+            }
+        }
+
+        return result;
+    }
+}
+
+pub struct LoggerBuilder {
+    logger: Logger,
+}
+
+impl LoggerBuilder {
+    pub fn new(name: &str) -> LoggerBuilder {
+        return LoggerBuilder {
+            logger: Logger::new(name),
+        };
+    }
+
+    pub fn with_level(mut self, level: LogLevel) -> LoggerBuilder {
+        self.logger.set_level(level);
+        return self;
+    }
+
+    pub fn with_target(mut self, target: LogTarget) -> LoggerBuilder {
+        self.logger.add_target(target);
+        return self;
+    }
+
+    pub fn with_filter(mut self, filter: LogFilter) -> LoggerBuilder {
+        self.logger.add_filter(filter);
+        return self;
+    }
+
+    pub fn build(self) -> Logger {
+        return self.logger;
+    }
+}
+
+// Global logger registry
+pub struct LoggerRegistry {
+    loggers: Map<String, Logger>,
+    default_level: LogLevel,
+}
+
+impl LoggerRegistry {
+    pub fn new() -> LoggerRegistry {
+        return LoggerRegistry {
+            loggers: Map::new(),
+            default_level: LogLevel::Info,
+        };
+    }
+
+    pub fn get_or_create(&mut self, name: &str) -> Logger {
+        match self.loggers.get(name) {
+            Option::Some(logger) => {
+                return logger;
+            }
+            Option::None => {
+                let logger = Logger::new(name);
+                self.loggers[name.to_string()] = logger.clone();
+                return logger;
+            }
+        }
+    }
+
+    pub fn set_global_level(&mut self, level: LogLevel) {
+        self.default_level = level;
+    }
+}
+
+// Structured logging context
+pub struct LogContext {
+    fields: Map<String, String>,
+}
+
+impl LogContext {
+    pub fn new() -> LogContext {
+        return LogContext {
+            fields: Map::new(),
+        };
+    }
+
+    pub fn add(&mut self, key: &str, value: &str) {
+        self.fields[key.to_string()] = value.to_string();
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        return self.fields.get(key);
+    }
+}
+
+// Helper functions
+fn get_current_timestamp() -> u64 {
+    let ts: u64 = 0;
+
+    asm! {
+        "call rdtsc"
+        : "=A"(ts)
+        :
+        :
+        : volatile
+    }
+
+    return ts;
+}
+
+fn get_call_site() -> CallSite {
+    return CallSite {
+        file: "unknown".to_string(),
+        line: 0,
+        column: 0,
+        function: "unknown".to_string(),
+    };
+}
+
+fn get_thread_id() -> u64 {
+    let tid: u64 = 0;
+
+    asm! {
+        "call pthread_self"
+        : "=a"(tid)
+        :
+        :
+        : volatile
+    }
+
+    return tid;
+}
+
+fn level_to_int(level: LogLevel) -> i32 {
+    match level {
+        LogLevel::Trace => 0,
+        LogLevel::Debug => 1,
+        LogLevel::Info => 2,
+        LogLevel::Warn => 3,
+        LogLevel::Error => 4,
+        LogLevel::Fatal => 5,
+    }
+}
+
+fn level_to_string(level: LogLevel) -> String {
+    match level {
+        LogLevel::Trace => "TRACE".to_string(),
+        LogLevel::Debug => "DEBUG".to_string(),
+        LogLevel::Info => "INFO".to_string(),
+        LogLevel::Warn => "WARN".to_string(),
+        LogLevel::Error => "ERROR".to_string(),
+        LogLevel::Fatal => "FATAL".to_string(),
+    }
+}
+
+fn format_timestamp(ts: u64) -> String {
+    return "".to_string();
+}
+
+fn pattern_matches(pattern: &str, context: &Map<String, String>) -> bool {
+    return true;
+}
+
+fn println!(msg: &str) {}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn replace(&self, from: &str, to: &str) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn get(&self, key: &K) -> Option<V> {
+        return Option::None;
+    }
+
+    pub fn entries(&self) -> &Vec<(K, V)> {
+        return &self.entries;
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+impl<T> Option<T> {
+    pub fn unwrap_or(&self, default: T) -> T {
+        match self {
+            Option::Some(val) => return val,
+            Option::None => return default,
+        }
+    }
+}

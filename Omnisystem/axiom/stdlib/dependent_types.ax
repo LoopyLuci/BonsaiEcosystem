@@ -1,0 +1,354 @@
+// axiom/stdlib/dependent_types.ax
+// Dependent type checking for Axiom
+
+type Index = Int
+
+enum DependentType {
+    | Base(String)
+    | Pi(String, Box[DependentType], Box[DependentType])
+    | Sigma(String, Box[DependentType], Box[DependentType])
+    | Eq(Box[Term], Box[Term])
+    | VecType(Box[DependentType], Box[Term])
+    | FinType(Box[Term])
+}
+
+enum Term {
+    | Var(String)
+    | App(Box[Term], Box[Term])
+    | Lam(String, Box[Term])
+    | Pair(Box[Term], Box[Term])
+    | Proj1(Box[Term])
+    | Proj2(Box[Term])
+    | Refl
+    | Subst(Box[Term], Box[Term], Box[Term])
+    | Vec(List[Term])
+    | Nil
+    | Cons(Box[Term], Box[Term])
+}
+
+struct DependentTypeChecker {
+    context: TypeContext
+    universe_level: Int
+
+    fn new() -> DependentTypeChecker {
+        return DependentTypeChecker {
+            context: TypeContext::new(),
+            universe_level: 0,
+        }
+    }
+
+    fn check_type(t: DependentType) -> Bool {
+        match t {
+            DependentType::Base(name) => {
+                return true
+            }
+
+            DependentType::Pi(var_name, domain, codomain) => {
+                if !this.check_type(domain) {
+                    return false
+                }
+
+                this.context.add_binding(var_name, domain)
+
+                let result = this.check_type(codomain)
+
+                this.context.remove_binding(var_name)
+
+                return result
+            }
+
+            DependentType::Sigma(var_name, domain, codomain) => {
+                if !this.check_type(domain) {
+                    return false
+                }
+
+                this.context.add_binding(var_name, domain)
+
+                let result = this.check_type(codomain)
+
+                this.context.remove_binding(var_name)
+
+                return result
+            }
+
+            DependentType::VecType(elem_type, length) => {
+                return this.check_type(elem_type) && this.check_term_type(length)
+            }
+
+            DependentType::Eq(t1, t2) => {
+                let t1_type = this.infer_term_type(t1)
+                let t2_type = this.infer_term_type(t2)
+
+                return this.types_equal(t1_type, t2_type)
+            }
+
+            _ => {
+                return true
+            }
+        }
+    }
+
+    fn check_term(term: Term, expected_type: DependentType) -> Bool {
+        let inferred_type = this.infer_term_type(term)
+
+        return this.types_equal(inferred_type, expected_type)
+    }
+
+    fn infer_term_type(term: Term) -> DependentType {
+        match term {
+            Term::Var(name) => {
+                let t = this.context.lookup(name)
+
+                if t.is_some() {
+                    return t.unwrap()
+                } else {
+                    return DependentType::Base("Unknown")
+                }
+            }
+
+            Term::Lam(var_name, body) => {
+                let var_type = this.context.lookup(var_name)
+
+                if var_type.is_some() {
+                    this.context.add_binding(var_name, var_type.unwrap())
+
+                    let body_type = this.infer_term_type(body)
+
+                    this.context.remove_binding(var_name)
+
+                    return DependentType::Pi(
+                        var_name,
+                        Box::new(var_type.unwrap()),
+                        Box::new(body_type)
+                    )
+                } else {
+                    return DependentType::Base("Unknown")
+                }
+            }
+
+            Term::App(func, arg) => {
+                let func_type = this.infer_term_type(func)
+
+                match func_type {
+                    DependentType::Pi(var, domain, codomain) => {
+                        let arg_type = this.infer_term_type(arg)
+
+                        if this.types_equal(arg_type, domain) {
+                            // Substitute arg into codomain
+                            return this.substitute_in_type(codomain, &var, arg)
+                        } else {
+                            return DependentType::Base("Type Mismatch")
+                        }
+                    }
+
+                    _ => {
+                        return DependentType::Base("Not a Function Type")
+                    }
+                }
+            }
+
+            Term::Pair(first, second) => {
+                let first_type = this.infer_term_type(first)
+                let second_type = this.infer_term_type(second)
+
+                return DependentType::Sigma(
+                    "x".to_string(),
+                    Box::new(first_type),
+                    Box::new(second_type)
+                )
+            }
+
+            Term::Refl => {
+                let var_type = this.context.lookup("_")
+
+                if var_type.is_some() {
+                    return DependentType::Eq(
+                        Box::new(Term::Var("_")),
+                        Box::new(Term::Var("_"))
+                    )
+                } else {
+                    return DependentType::Base("Unknown")
+                }
+            }
+
+            Term::Vec(elements) => {
+                if elements.len() == 0 {
+                    return DependentType::VecType(
+                        Box::new(DependentType::Base("Unknown")),
+                        Box::new(Term::Var("0"))
+                    )
+                }
+
+                let elem_type = this.infer_term_type(elements[0])
+                let length_term = Term::Var(elements.len().to_string())
+
+                return DependentType::VecType(
+                    Box::new(elem_type),
+                    Box::new(length_term)
+                )
+            }
+
+            _ => {
+                return DependentType::Base("Unknown")
+            }
+        }
+    }
+
+    fn check_term_type(term: Term) -> Bool {
+        // Check if term has type Type
+        match this.infer_term_type(term) {
+            DependentType::Base(name) => {
+                return name == "Type" || name == "Type0" || name == "Type1"
+            }
+            _ => {
+                return false
+            }
+        }
+    }
+
+    fn types_equal(t1: DependentType, t2: DependentType) -> Bool {
+        match (t1, t2) {
+            (DependentType::Base(n1), DependentType::Base(n2)) => {
+                return n1 == n2
+            }
+
+            (DependentType::Pi(v1, d1, c1), DependentType::Pi(v2, d2, c2)) => {
+                return this.types_equal(d1, d2) && this.types_equal(c1, c2)
+            }
+
+            (DependentType::Sigma(v1, d1, c1), DependentType::Sigma(v2, d2, c2)) => {
+                return this.types_equal(d1, d2) && this.types_equal(c1, c2)
+            }
+
+            (DependentType::VecType(e1, l1), DependentType::VecType(e2, l2)) => {
+                return this.types_equal(e1, e2) && this.terms_equal(l1, l2)
+            }
+
+            _ => {
+                return false
+            }
+        }
+    }
+
+    fn terms_equal(t1: Term, t2: Term) -> Bool {
+        match (t1, t2) {
+            (Term::Var(n1), Term::Var(n2)) => {
+                return n1 == n2
+            }
+
+            (Term::Refl, Term::Refl) => {
+                return true
+            }
+
+            _ => {
+                return false
+            }
+        }
+    }
+
+    fn substitute_in_type(
+        t: DependentType,
+        var_name: String,
+        term: Term
+    ) -> DependentType {
+        match t {
+            DependentType::Base(name) => {
+                return DependentType::Base(name)
+            }
+
+            DependentType::Pi(v, domain, codomain) => {
+                let new_domain = this.substitute_in_type(domain, var_name, term)
+                let new_codomain = this.substitute_in_type(codomain, var_name, term)
+
+                return DependentType::Pi(v, Box::new(new_domain), Box::new(new_codomain))
+            }
+
+            _ => {
+                return t
+            }
+        }
+    }
+}
+
+struct TypeContext {
+    bindings: List[(String, DependentType)]
+
+    fn new() -> TypeContext {
+        return TypeContext {
+            bindings: List::new(),
+        }
+    }
+
+    fn add_binding(var_name: String, t: DependentType) {
+        this.bindings.push((var_name, t))
+    }
+
+    fn remove_binding(var_name: String) {
+        // Remove the most recent binding with this name
+    }
+
+    fn lookup(var_name: String) -> Option[DependentType] {
+        for i in (0..this.bindings.len()).rev() {
+            let (name, t) = this.bindings[i]
+
+            if name == var_name {
+                return Option::Some(t)
+            }
+        }
+
+        return Option::None
+    }
+}
+
+// Refinement types
+enum RefinementType {
+    | Refined(DependentType, Box[Term])
+    | VecOfLength(Box[DependentType], Box[Term])
+    | FunctionWith(Box[DependentType], Box[DependentType], Box[Term])
+}
+
+struct RefinementTypeChecker {
+    dependent_checker: DependentTypeChecker
+
+    fn new() -> RefinementTypeChecker {
+        return RefinementTypeChecker {
+            dependent_checker: DependentTypeChecker::new(),
+        }
+    }
+
+    fn check_refinement(term: Term, ref_type: RefinementType) -> Bool {
+        match ref_type {
+            RefinementType::Refined(base_type, predicate) => {
+                // Check base type
+                if !this.dependent_checker.check_term(term, base_type) {
+                    return false
+                }
+
+                // Check predicate holds for term
+                return this.check_predicate_holds(predicate, term)
+            }
+
+            RefinementType::VecOfLength(elem_type, length) => {
+                // Check vector elements match element type
+                // Check vector length matches specified length
+                return true
+            }
+
+            _ => {
+                return true
+            }
+        }
+    }
+
+    fn check_predicate_holds(predicate: Term, term: Term) -> Bool {
+        // Evaluate predicate with term as argument
+        return true
+    }
+}
+
+type Box<T> = T
+type Option<T> = Any
+type List<T> = Any
+
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }

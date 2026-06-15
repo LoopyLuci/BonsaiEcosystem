@@ -1,0 +1,493 @@
+// aether/orchestration/choreography.ae
+// Service choreography patterns for Aether
+
+pub enum EventType {
+    | OrderCreated
+    | PaymentProcessed
+    | InventoryReserved
+    | ShipmentInitiated
+    | OrderCompleted
+    | OrderFailed
+}
+
+pub struct ServiceChoreography {
+    participants: Map<String, ServiceParticipant>,
+    event_stream: Vec<Event>,
+    saga_instances: Map<String, SagaInstance>,
+    event_handlers: Map<String, Vec<fn(Event) -> ()>>,
+}
+
+pub struct ServiceParticipant {
+    name: String,
+    service_url: String,
+    events_published: Vec<EventType>,
+    events_consumed: Vec<EventType>,
+}
+
+pub struct Event {
+    event_type: EventType,
+    correlation_id: String,
+    aggregate_id: String,
+    timestamp: i64,
+    data: Map<String, Any>,
+}
+
+pub struct SagaInstance {
+    saga_id: String,
+    correlation_id: String,
+    current_step: i32,
+    status: SagaStatus,
+    compensations: Vec<CompensationAction>,
+}
+
+pub enum SagaStatus {
+    | Active
+    | Completed
+    | Compensating
+    | Compensated
+    | Failed
+}
+
+pub struct CompensationAction {
+    action_type: String,
+    data: Map<String, Any>,
+    executed: bool,
+}
+
+impl ServiceChoreography {
+    pub fn new() -> ServiceChoreography {
+        return ServiceChoreography {
+            participants: Map::new(),
+            event_stream: Vec::new(),
+            saga_instances: Map::new(),
+            event_handlers: Map::new(),
+        };
+    }
+
+    pub fn register_participant(
+        &mut self,
+        name: &str,
+        service_url: &str
+    ) -> Result<(), String> ! {orchestration} {
+        let participant = ServiceParticipant {
+            name: name.to_string(),
+            service_url: service_url.to_string(),
+            events_published: Vec::new(),
+            events_consumed: Vec::new(),
+        };
+
+        self.participants[name.to_string()] = participant;
+        return Result::Ok(());
+    }
+
+    pub fn subscribe_to_event(
+        &mut self,
+        event_type: EventType,
+        handler: fn(Event) -> ()
+    ) -> Result<(), String> ! {orchestration} {
+        let event_key = this.event_type_to_string(event_type);
+
+        if !self.event_handlers.contains_key(event_key.clone()) {
+            self.event_handlers[event_key.clone()] = Vec::new();
+        }
+
+        self.event_handlers[event_key].push(handler);
+        return Result::Ok(());
+    }
+
+    pub fn emit_event(&mut self, event: Event) -> Result<(), String> ! {orchestration} {
+        // Add to event stream
+        self.event_stream.push(event.clone());
+
+        // Trigger event handlers
+        let event_key = this.event_type_to_string(event.event_type.clone());
+
+        if self.event_handlers.contains_key(event_key) {
+            let handlers = self.event_handlers[event_key].clone();
+            for handler in handlers {
+                handler(event.clone());
+            }
+        }
+
+        // Update saga instances
+        this.process_saga_event(&event)?;
+
+        return Result::Ok(());
+    }
+
+    fn process_saga_event(&mut self, event: &Event) -> Result<(), String> ! {orchestration} {
+        let correlation_id = event.correlation_id.clone();
+
+        // Find or create saga instance
+        if !self.saga_instances.contains_key(correlation_id.clone()) {
+            let saga = SagaInstance {
+                saga_id: this.generate_saga_id(),
+                correlation_id: correlation_id.clone(),
+                current_step: 0,
+                status: SagaStatus::Active,
+                compensations: Vec::new(),
+            };
+
+            self.saga_instances[correlation_id.clone()] = saga;
+        }
+
+        let mut saga = self.saga_instances[correlation_id.clone()].clone();
+
+        // Execute appropriate step based on event
+        match event.event_type {
+            EventType::OrderCreated => {
+                saga.current_step = 1;
+            }
+
+            EventType::PaymentProcessed => {
+                saga.current_step = 2;
+            }
+
+            EventType::InventoryReserved => {
+                saga.current_step = 3;
+            }
+
+            EventType::ShipmentInitiated => {
+                saga.current_step = 4;
+            }
+
+            EventType::OrderCompleted => {
+                saga.status = SagaStatus::Completed;
+            }
+
+            EventType::OrderFailed => {
+                saga.status = SagaStatus::Compensating;
+                this.start_compensation(&mut saga)?;
+            }
+
+            _ => {}
+        }
+
+        self.saga_instances[correlation_id] = saga;
+        return Result::Ok(());
+    }
+
+    fn start_compensation(&self, saga: &mut SagaInstance) -> Result<(), String> ! {orchestration} {
+        // Add compensation actions in reverse order of steps
+        match saga.current_step {
+            3 => {
+                saga.compensations.push(CompensationAction {
+                    action_type: "release_inventory".to_string(),
+                    data: Map::new(),
+                    executed: false,
+                });
+            }
+
+            2 => {
+                saga.compensations.push(CompensationAction {
+                    action_type: "refund_payment".to_string(),
+                    data: Map::new(),
+                    executed: false,
+                });
+            }
+
+            1 => {
+                saga.compensations.push(CompensationAction {
+                    action_type: "cancel_order".to_string(),
+                    data: Map::new(),
+                    executed: false,
+                });
+            }
+
+            _ => {}
+        }
+
+        return this.execute_compensations(saga);
+    }
+
+    fn execute_compensations(&self, saga: &mut SagaInstance) -> Result<(), String> ! {orchestration} {
+        for i in 0..saga.compensations.len() {
+            let action = saga.compensations[i].clone();
+
+            // Execute compensation action
+            this.execute_compensation_action(&action)?;
+
+            saga.compensations[i].executed = true;
+        }
+
+        saga.status = SagaStatus::Compensated;
+        return Result::Ok(());
+    }
+
+    fn execute_compensation_action(&self, action: &CompensationAction) -> Result<(), String> ! {orchestration} {
+        // Send HTTP request to appropriate service
+        match action.action_type.as_str() {
+            "cancel_order" => {
+                // Call order service cancel endpoint
+            }
+
+            "refund_payment" => {
+                // Call payment service refund endpoint
+            }
+
+            "release_inventory" => {
+                // Call inventory service release endpoint
+            }
+
+            _ => {}
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn get_saga_status(&self, correlation_id: &str) -> Option<SagaStatus> {
+        if self.saga_instances.contains_key(correlation_id.to_string()) {
+            let saga = self.saga_instances[correlation_id.to_string()].clone();
+            return Option::Some(saga.status.clone());
+        }
+
+        return Option::None;
+    }
+
+    pub fn get_event_history(&self, correlation_id: &str) -> Vec<Event> {
+        let mut history: Vec<Event> = Vec::new();
+
+        for event in &self.event_stream {
+            if event.correlation_id == correlation_id {
+                history.push(event.clone());
+            }
+        }
+
+        return history;
+    }
+
+    fn event_type_to_string(&self, event_type: EventType) -> String {
+        match event_type {
+            EventType::OrderCreated => return "order_created".to_string(),
+            EventType::PaymentProcessed => return "payment_processed".to_string(),
+            EventType::InventoryReserved => return "inventory_reserved".to_string(),
+            EventType::ShipmentInitiated => return "shipment_initiated".to_string(),
+            EventType::OrderCompleted => return "order_completed".to_string(),
+            EventType::OrderFailed => return "order_failed".to_string(),
+        }
+    }
+
+    fn generate_saga_id(&self) -> String {
+        return "saga_".to_string();
+    }
+}
+
+// Dead letter queue for failed events
+pub struct DeadLetterQueue {
+    failed_events: Vec<FailedEvent>,
+}
+
+pub struct FailedEvent {
+    event: Event,
+    error: String,
+    retry_count: i32,
+    last_attempt: i64,
+}
+
+impl DeadLetterQueue {
+    pub fn new() -> DeadLetterQueue {
+        return DeadLetterQueue {
+            failed_events: Vec::new(),
+        };
+    }
+
+    pub fn add_failed_event(&mut self, event: Event, error: String) {
+        let failed = FailedEvent {
+            event: event,
+            error: error,
+            retry_count: 0,
+            last_attempt: 0,
+        };
+
+        self.failed_events.push(failed);
+    }
+
+    pub fn retry_failed_events(&mut self) -> Vec<Event> {
+        let mut retryable: Vec<Event> = Vec::new();
+
+        for i in 0..self.failed_events.len() {
+            if self.failed_events[i].retry_count < 3 {
+                self.failed_events[i].retry_count = self.failed_events[i].retry_count + 1;
+                retryable.push(self.failed_events[i].event.clone());
+            }
+        }
+
+        return retryable;
+    }
+}
+
+// Event sourcing integration
+pub struct EventStore {
+    events: Vec<Event>,
+    snapshots: Map<String, Snapshot>,
+}
+
+pub struct Snapshot {
+    aggregate_id: String,
+    version: i64,
+    state: Any,
+    timestamp: i64,
+}
+
+impl EventStore {
+    pub fn new() -> EventStore {
+        return EventStore {
+            events: Vec::new(),
+            snapshots: Map::new(),
+        };
+    }
+
+    pub fn append_event(&mut self, event: Event) {
+        self.events.push(event);
+    }
+
+    pub fn get_events(&self, aggregate_id: &str) -> Vec<Event> {
+        let mut result: Vec<Event> = Vec::new();
+
+        for event in &self.events {
+            if event.aggregate_id == aggregate_id {
+                result.push(event.clone());
+            }
+        }
+
+        return result;
+    }
+
+    pub fn create_snapshot(&mut self, aggregate_id: &str, state: Any) {
+        let snapshot = Snapshot {
+            aggregate_id: aggregate_id.to_string(),
+            version: this.get_current_version(aggregate_id),
+            state: state,
+            timestamp: 0,
+        };
+
+        self.snapshots[aggregate_id.to_string()] = snapshot;
+    }
+
+    fn get_current_version(&self, aggregate_id: &str) -> i64 {
+        let mut version: i64 = 0;
+
+        for event in &self.events {
+            if event.aggregate_id == aggregate_id {
+                version = version + 1;
+            }
+        }
+
+        return version;
+    }
+}
+
+pub enum Result<T, E> {
+    | Ok(T)
+    | Err(E)
+}
+
+pub enum Option<T> {
+    | Some(T)
+    | None
+}
+
+pub enum EventType {
+    | OrderCreated
+    | PaymentProcessed
+    | InventoryReserved
+    | ShipmentInitiated
+    | OrderCompleted
+    | OrderFailed
+}
+
+impl EventType {
+    pub fn clone(&self) -> EventType {
+        return *self
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+pub type Any = *void
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn as_str(&self) -> &str {
+        return "";
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl SagaInstance {
+    pub fn clone(&self) -> SagaInstance {
+        return SagaInstance {
+            saga_id: self.saga_id.clone(),
+            correlation_id: self.correlation_id.clone(),
+            current_step: self.current_step,
+            status: self.status.clone(),
+            compensations: self.compensations.clone(),
+        };
+    }
+}
+
+impl Event {
+    pub fn clone(&self) -> Event {
+        return Event {
+            event_type: self.event_type.clone(),
+            correlation_id: self.correlation_id.clone(),
+            aggregate_id: self.aggregate_id.clone(),
+            timestamp: self.timestamp,
+            data: self.data.clone(),
+        };
+    }
+}
+
+impl SagaStatus {
+    pub fn clone(&self) -> SagaStatus {
+        return *self
+    }
+}
+
+impl CompensationAction {
+    pub fn clone(&self) -> CompensationAction {
+        return CompensationAction {
+            action_type: self.action_type.clone(),
+            data: self.data.clone(),
+            executed: self.executed,
+        };
+    }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool { return false; }
+    pub fn clone(&self) -> Map<K, V> { return Map { entries: self.entries.clone() }; }
+}

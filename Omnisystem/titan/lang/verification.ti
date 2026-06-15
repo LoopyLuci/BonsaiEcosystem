@@ -1,0 +1,388 @@
+// titan/lang/verification.ti
+// Runtime assertions and verification infrastructure
+
+pub struct Assertion {
+    condition: bool,
+    message: String,
+    file: String,
+    line: i32,
+}
+
+pub struct InvariantChecking {
+    enabled: bool,
+    violations_found: i32,
+}
+
+// Panic and assertion primitives
+pub fn assert(condition: bool) ! {verify} {
+    if !condition {
+        emit_panic("Assertion failed");
+    }
+}
+
+pub fn assert_eq<T: PartialEq>(left: &T, right: &T) ! {verify} {
+    if left != right {
+        emit_panic("Assertion failed: values not equal");
+    }
+}
+
+pub fn assert_ne<T: PartialEq>(left: &T, right: &T) ! {verify} {
+    if left == right {
+        emit_panic("Assertion failed: values are equal");
+    }
+}
+
+pub fn assert_true(condition: bool) ! {verify} {
+    if !condition {
+        emit_panic("Assertion failed: condition is false");
+    }
+}
+
+pub fn assert_false(condition: bool) ! {verify} {
+    if condition {
+        emit_panic("Assertion failed: condition is true");
+    }
+}
+
+pub fn debug_assert(condition: bool) ! {verify} {
+    // Only active in debug builds
+    if cfg_debug() && !condition {
+        emit_panic("Debug assertion failed");
+    }
+}
+
+pub fn unreachable_code() ! {verify, noreturn} {
+    emit_panic("Reached unreachable code");
+}
+
+pub fn unimplemented_feature() ! {verify, noreturn} {
+    emit_panic("Feature not yet implemented");
+}
+
+// Precondition checks
+pub struct Precondition {
+    condition: bool,
+    message: String,
+}
+
+pub fn require(condition: bool, message: &String) ! {verify} {
+    if !condition {
+        emit_panic(message);
+    }
+}
+
+pub fn require_not_null<T>(ptr: &T, message: &String) ! {verify} {
+    let addr = ptr as i64;
+    if addr == 0 {
+        emit_panic(message);
+    }
+}
+
+// Postcondition checks
+pub struct Postcondition {
+    condition: bool,
+    message: String,
+}
+
+pub fn ensure(condition: bool, message: &String) ! {verify} {
+    if !condition {
+        emit_panic(message);
+    }
+}
+
+// Class invariants
+pub struct Invariant {
+    check_fn: fn() -> bool,
+    message: String,
+}
+
+pub fn check_invariant(invariant: &Invariant) ! {verify} {
+    if !(invariant.check_fn)() {
+        emit_panic(&invariant.message);
+    }
+}
+
+// Contract-based programming with Design by Contract
+pub struct Contract {
+    preconditions: Vec<Precondition>,
+    postconditions: Vec<Postcondition>,
+    invariants: Vec<Invariant>,
+}
+
+pub fn verify_preconditions(contract: &Contract) ! {verify} {
+    for pre in &contract.preconditions {
+        if !pre.condition {
+            emit_panic(&pre.message);
+        }
+    }
+}
+
+pub fn verify_postconditions(contract: &Contract) ! {verify} {
+    for post in &contract.postconditions {
+        if !post.condition {
+            emit_panic(&post.message);
+        }
+    }
+}
+
+pub fn verify_invariants(contract: &Contract) ! {verify} {
+    for inv in &contract.invariants {
+        if !(inv.check_fn)() {
+            emit_panic(&inv.message);
+        }
+    }
+}
+
+// Bounded loops - prove loops terminate
+pub fn bounded_loop_verification(
+    loop_counter: &mut i32,
+    max_iterations: i32
+) ! {verify} {
+    if *loop_counter >= max_iterations {
+        emit_panic("Loop bound exceeded");
+    }
+    *loop_counter = *loop_counter + 1;
+}
+
+// Array bounds checking
+pub fn check_array_bounds<T>(array: &[T], index: i32) ! {verify} {
+    let len = array.len() as i32;
+    if index < 0 || index >= len {
+        emit_panic("Array index out of bounds");
+    }
+}
+
+// Null pointer checking
+pub fn check_not_null<T>(ptr: &T) ! {verify} {
+    let addr = ptr as i64;
+    if addr == 0 {
+        emit_panic("Null pointer dereference");
+    }
+}
+
+// Type safety verification
+pub fn verify_type_cast<From, To>() ! {verify} {
+    // Runtime verification that cast is valid
+    // In practice, this would use RTTI or similar
+}
+
+// Memory safety verification
+pub struct MemorySafetyCheck {
+    ptr: u64,
+    size: u64,
+}
+
+pub fn verify_memory_access(check: &MemorySafetyCheck) ! {verify} {
+    // Check that memory range is valid
+    if check.ptr == 0 || check.size == 0 {
+        emit_panic("Invalid memory access");
+    }
+}
+
+// Race condition detection (instrumentation-based)
+pub fn race_condition_check(var_name: &String, operation: &String) ! {verify} {
+    // Runtime check for data races (Tsan-like)
+    asm! {
+        "call race_condition_detector"
+        :
+        : "a"(var_name), "d"(operation)
+        :
+        : volatile
+    }
+}
+
+// Timeout detection
+pub fn check_timeout(start_time: u64, max_nanos: u64) ! {verify} {
+    let current = read_tsc();
+    let elapsed = current - start_time;
+    let max_cycles = max_nanos * 3;  // 3 GHz
+
+    if elapsed > max_cycles {
+        emit_panic("Operation timeout");
+    }
+}
+
+// Logical assertions
+pub fn assert_implies(p: bool, q: bool) ! {verify} {
+    // Assert: p => q (if p then q)
+    if p && !q {
+        emit_panic("Implication failed: p => q");
+    }
+}
+
+pub fn assert_and(p: bool, q: bool) ! {verify} {
+    if !p || !q {
+        emit_panic("Conjunction failed: p && q");
+    }
+}
+
+pub fn assert_or(p: bool, q: bool) ! {verify} {
+    if !p && !q {
+        emit_panic("Disjunction failed: p || q");
+    }
+}
+
+// Resource cleanup verification
+pub struct ResourceHandle {
+    id: i32,
+    acquired: bool,
+    released: bool,
+}
+
+pub fn verify_resource_acquired(handle: &ResourceHandle) ! {verify} {
+    if !handle.acquired {
+        emit_panic("Resource not acquired");
+    }
+}
+
+pub fn verify_resource_released(handle: &ResourceHandle) ! {verify} {
+    if !handle.released {
+        emit_panic("Resource not released");
+    }
+}
+
+// Deadlock detection
+pub struct LockHierarchy {
+    locks: Vec<i32>,
+}
+
+pub fn check_lock_ordering(hierarchy: &LockHierarchy, new_lock: i32) ! {verify} {
+    // Verify locks acquired in consistent order (prevents deadlock)
+    for lock_id in &hierarchy.locks {
+        if new_lock < *lock_id {
+            emit_panic("Lock ordering violated");
+        }
+    }
+}
+
+// Overflow/underflow checking
+pub fn checked_add(a: i32, b: i32) -> Result<i32, String> ! {verify} {
+    if a > 0 && b > 2147483647 - a {
+        return Result::Err("Integer overflow".to_string());
+    }
+    return Result::Ok(a + b);
+}
+
+pub fn checked_sub(a: i32, b: i32) -> Result<i32, String> ! {verify} {
+    if b > 0 && a < -2147483648 + b {
+        return Result::Err("Integer underflow".to_string());
+    }
+    return Result::Ok(a - b);
+}
+
+pub fn checked_mul(a: i32, b: i32) -> Result<i32, String> ! {verify} {
+    if a != 0 && (b > 2147483647 / a || b < -2147483648 / a) {
+        return Result::Err("Integer overflow".to_string());
+    }
+    return Result::Ok(a * b);
+}
+
+pub fn checked_div(a: i32, b: i32) -> Result<i32, String> ! {verify} {
+    if b == 0 {
+        return Result::Err("Division by zero".to_string());
+    }
+    return Result::Ok(a / b);
+}
+
+// Sanity checks
+pub fn sanity_check_struct<T>() ! {verify} {
+    // Runtime check that struct invariants hold
+    // E.g., linked list still well-formed after mutations
+}
+
+pub fn invariant_maintained<T: HasInvariant>(obj: &T) ! {verify} {
+    if !obj.check_invariant() {
+        emit_panic("Invariant violated");
+    }
+}
+
+trait HasInvariant {
+    fn check_invariant(&self) -> bool;
+}
+
+// Verification mode control
+pub fn enable_verification_checks() ! {verify} {
+    asm! {
+        "call enable_verification"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn disable_verification_checks() ! {verify} {
+    asm! {
+        "call disable_verification"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+fn emit_panic(msg: &String) {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+fn emit_panic(msg: &str) {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+fn cfg_debug() -> bool ! {meta} {
+    return false;
+}
+
+fn read_tsc() -> u64 ! {realtime} {
+    let low: u32 = 0;
+    let high: u32 = 0;
+    asm! {
+        "rdtsc"
+        : "=a"(low), "=d"(high)
+        :
+        :
+        : volatile
+    }
+    return ((high as u64) << 32) | (low as u64);
+}
+
+trait PartialEq<T> {
+    fn eq(&self, other: &T) -> bool;
+    fn ne(&self, other: &T) -> bool;
+}
+
+impl PartialEq<i32> for i32 {
+    fn eq(&self, other: &i32) -> bool {
+        return *self == *other;
+    }
+    fn ne(&self, other: &i32) -> bool {
+        return *self != *other;
+    }
+}
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl Clone for String {
+    fn clone(&self) -> String {
+        return *self;
+    }
+}
+
+fn to_string(&self) -> String {
+    return String::new();
+}

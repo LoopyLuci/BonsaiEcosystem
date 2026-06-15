@@ -1,0 +1,3 @@
+// Tests: swarm-topology-monitor
+
+pub fn test_module() -> i64 { return 111; }

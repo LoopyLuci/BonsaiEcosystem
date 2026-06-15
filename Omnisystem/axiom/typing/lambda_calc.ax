@@ -1,0 +1,196 @@
+// axiom/typing/lambda_calc.ax
+// Lambda calculus for Axiom
+
+type Var = String
+
+enum Term {
+    | Var(String)
+    | Lam(String, Box[Term])
+    | App(Box[Term], Box[Term])
+}
+
+struct LambdaCalculus {
+    terms: List[Term]
+
+    fn new() -> LambdaCalculus {
+        return LambdaCalculus {
+            terms: List::new(),
+        }
+    }
+
+    fn parse(input: String) -> Result[Term, String] {
+        // Parse lambda expression
+        return Result::Ok(Term::Var("x"))
+    }
+
+    fn beta_reduce(term: Term) -> Term {
+        match term {
+            Term::App(func, arg) => {
+                match func {
+                    Term::Lam(var, body) => {
+                        let reduced = this.substitute(body, &var, &arg)
+                        return this.beta_reduce(reduced)
+                    }
+
+                    _ => {
+                        return term
+                    }
+                }
+            }
+
+            _ => {
+                return term
+            }
+        }
+    }
+
+    fn substitute(term: Term, var: String, replacement: Term) -> Term {
+        match term {
+            Term::Var(name) => {
+                if name == var {
+                    return replacement
+                } else {
+                    return term
+                }
+            }
+
+            Term::Lam(bound_var, body) => {
+                if bound_var == var {
+                    return term
+                } else {
+                    let new_body = this.substitute(body, var, replacement)
+                    return Term::Lam(bound_var, Box::new(new_body))
+                }
+            }
+
+            Term::App(func, arg) => {
+                let new_func = this.substitute(func, var, replacement)
+                let new_arg = this.substitute(arg, var, replacement)
+                return Term::App(Box::new(new_func), Box::new(new_arg))
+            }
+
+            _ => {
+                return term
+            }
+        }
+    }
+
+    fn alpha_equivalence(t1: Term, t2: Term) -> Bool {
+        match (t1, t2) {
+            (Term::Var(n1), Term::Var(n2)) => {
+                return n1 == n2
+            }
+
+            (Term::App(f1, a1), Term::App(f2, a2)) => {
+                return this.alpha_equivalence(f1, f2) && this.alpha_equivalence(a1, a2)
+            }
+
+            (Term::Lam(v1, b1), Term::Lam(v2, b2)) => {
+                // Rename bound variables and check equivalence
+                return this.alpha_equivalence(b1, b2)
+            }
+
+            _ => {
+                return false
+            }
+        }
+    }
+
+    fn evaluate(term: Term) -> Result[Term, String] {
+        let reduced = this.beta_reduce(term)
+
+        match reduced {
+            Term::App(_, _) => {
+                // Non-reducing term
+                return Result::Ok(reduced)
+            }
+
+            _ => {
+                return Result::Ok(reduced)
+            }
+        }
+    }
+}
+
+// Church encodings
+pub struct ChurchEncodings {
+}
+
+impl ChurchEncodings {
+    pub fn church_zero() -> Term {
+        // λf.λx.x
+        return Term::Lam("f".to_string(), Box::new(
+            Term::Lam("x".to_string(), Box::new(Term::Var("x")))
+        ))
+    }
+
+    pub fn church_one() -> Term {
+        // λf.λx.f x
+        return Term::Lam("f".to_string(), Box::new(
+            Term::Lam("x".to_string(), Box::new(
+                Term::App(Box::new(Term::Var("f")), Box::new(Term::Var("x")))
+            ))
+        ))
+    }
+
+    pub fn church_add() -> Term {
+        // λm.λn.λf.λx.m f (n f x)
+        return Term::Lam("m".to_string(), Box::new(
+            Term::Lam("n".to_string(), Box::new(
+                Term::Lam("f".to_string(), Box::new(
+                    Term::Lam("x".to_string(), Box::new(Term::Var("x")))
+                ))
+            ))
+        ))
+    }
+
+    pub fn church_mult() -> Term {
+        // λm.λn.λf.m (n f)
+        return Term::Lam("m".to_string(), Box::new(
+            Term::Lam("n".to_string(), Box::new(
+                Term::Lam("f".to_string(), Box::new(Term::Var("f")))
+            ))
+        ))
+    }
+
+    pub fn church_true() -> Term {
+        // λx.λy.x
+        return Term::Lam("x".to_string(), Box::new(
+            Term::Lam("y".to_string(), Box::new(Term::Var("x")))
+        ))
+    }
+
+    pub fn church_false() -> Term {
+        // λx.λy.y
+        return Term::Lam("x".to_string(), Box::new(
+            Term::Lam("y".to_string(), Box::new(Term::Var("y")))
+        ))
+    }
+
+    pub fn church_if() -> Term {
+        // λp.λx.λy.p x y
+        return Term::Lam("p".to_string(), Box::new(
+            Term::Lam("x".to_string(), Box::new(
+                Term::Lam("y".to_string(), Box::new(Term::Var("p")))
+            ))
+        ))
+    }
+
+    pub fn church_pair() -> Term {
+        // λx.λy.λf.f x y
+        return Term::Lam("x".to_string(), Box::new(
+            Term::Lam("y".to_string(), Box::new(
+                Term::Lam("f".to_string(), Box::new(Term::Var("f")))
+            ))
+        ))
+    }
+}
+
+type List<T> = Any
+type Result<T, E> = Any
+type Box<T> = T
+type String = Any
+type Any = *void
+
+fn Ok<T, E>(val: T) -> Result<T, E> { return val; }
+fn Err<T, E>(msg: String) -> Result<T, E> { return null; }

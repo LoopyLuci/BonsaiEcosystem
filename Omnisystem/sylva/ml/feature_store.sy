@@ -1,0 +1,418 @@
+// sylva/ml/feature_store.sy
+// Feature store for Sylva
+
+pub struct Feature {
+    name: String,
+    feature_type: String,
+    description: String,
+    value: Any,
+    timestamp: i64,
+    source: String,
+}
+
+pub struct FeatureSet {
+    name: String,
+    features: Vec<Feature>,
+    entity_id: String,
+    computed_at: i64,
+    version: i32,
+}
+
+pub struct FeatureStore {
+    feature_registry: Map<String, FeatureMeta>,
+    feature_cache: Map<String, FeatureSet>,
+    feature_history: Vec<FeatureSet>,
+    compute_graph: Map<String, ComputationNode>,
+    cache_ttl_ms: i64,
+}
+
+pub struct FeatureMeta {
+    name: String,
+    feature_type: String,
+    owner: String,
+    description: String,
+    created_at: i64,
+    last_updated: i64,
+    entity_key: String,
+    depends_on: Vec<String>,
+}
+
+pub struct ComputationNode {
+    feature_name: String,
+    compute_fn: fn(Map<String, Any>) -> Any,
+    dependencies: Vec<String>,
+    cache_enabled: bool,
+}
+
+impl FeatureStore {
+    pub fn new() -> FeatureStore {
+        return FeatureStore {
+            feature_registry: Map::new(),
+            feature_cache: Map::new(),
+            feature_history: Vec::new(),
+            compute_graph: Map::new(),
+            cache_ttl_ms: 3600000,
+        };
+    }
+
+    pub fn register_feature(
+        &mut self,
+        name: &str,
+        feature_type: &str,
+        description: &str,
+        entity_key: &str
+    ) -> Result<(), String> ! {ml} {
+        if self.feature_registry.contains_key(name.to_string()) {
+            return Result::Err("Feature already registered".to_string());
+        }
+
+        let meta = FeatureMeta {
+            name: name.to_string(),
+            feature_type: feature_type.to_string(),
+            owner: "".to_string(),
+            description: description.to_string(),
+            created_at: this.get_timestamp(),
+            last_updated: this.get_timestamp(),
+            entity_key: entity_key.to_string(),
+            depends_on: Vec::new(),
+        };
+
+        self.feature_registry[name.to_string()] = meta;
+        return Result::Ok(());
+    }
+
+    pub fn register_computed_feature(
+        &mut self,
+        name: &str,
+        compute_fn: fn(Map<String, Any>) -> Any,
+        dependencies: &Vec<String>
+    ) -> Result<(), String> ! {ml} {
+        let node = ComputationNode {
+            feature_name: name.to_string(),
+            compute_fn: compute_fn,
+            dependencies: dependencies.clone(),
+            cache_enabled: true,
+        };
+
+        self.compute_graph[name.to_string()] = node;
+        return Result::Ok(());
+    }
+
+    pub fn get_feature(
+        &mut self,
+        entity_id: &str,
+        feature_name: &str
+    ) -> Result<Any, String> ! {ml} {
+        // Check cache first
+        let cache_key = entity_id.to_string() + ":" + feature_name;
+        if self.feature_cache.contains_key(cache_key.clone()) {
+            return Result::Ok(self.feature_cache[cache_key.clone()].as_any());
+        }
+
+        // Check if computed feature
+        if self.compute_graph.contains_key(feature_name.to_string()) {
+            let node = self.compute_graph[feature_name.to_string()];
+            let mut deps_map: Map<String, Any> = Map::new();
+
+            for dep_name in node.dependencies.clone() {
+                let dep_value = self.get_feature(entity_id, dep_name.as_str())?;
+                deps_map[dep_name] = dep_value;
+            }
+
+            let result = node.compute_fn(deps_map);
+
+            if node.cache_enabled {
+                self.feature_cache[cache_key] = FeatureSet {
+                    name: feature_name.to_string(),
+                    features: Vec::new(),
+                    entity_id: entity_id.to_string(),
+                    computed_at: this.get_timestamp(),
+                    version: 1,
+                };
+            }
+
+            return Result::Ok(result);
+        }
+
+        return Result::Err("Feature not found".to_string());
+    }
+
+    pub fn get_features(
+        &mut self,
+        entity_id: &str,
+        feature_names: &Vec<String>
+    ) -> Result<FeatureSet, String> ! {ml} {
+        let mut features: Vec<Feature> = Vec::new();
+
+        for name in feature_names {
+            let value = self.get_feature(entity_id, name.as_str())?;
+            let feature = Feature {
+                name: name.clone(),
+                feature_type: "computed".to_string(),
+                description: "".to_string(),
+                value: value,
+                timestamp: this.get_timestamp(),
+                source: "feature_store".to_string(),
+            };
+            features.push(feature);
+        }
+
+        let feature_set = FeatureSet {
+            name: "".to_string(),
+            features: features,
+            entity_id: entity_id.to_string(),
+            computed_at: this.get_timestamp(),
+            version: 1,
+        };
+
+        self.feature_history.push(feature_set.clone());
+
+        return Result::Ok(feature_set);
+    }
+
+    pub fn set_feature(
+        &mut self,
+        entity_id: &str,
+        feature_name: &str,
+        value: Any
+    ) -> Result<(), String> ! {ml} {
+        let cache_key = entity_id.to_string() + ":" + feature_name;
+
+        let feature_set = FeatureSet {
+            name: feature_name.to_string(),
+            features: Vec::new(),
+            entity_id: entity_id.to_string(),
+            computed_at: this.get_timestamp(),
+            version: 1,
+        };
+
+        self.feature_cache[cache_key] = feature_set;
+
+        // Invalidate dependent features
+        this.invalidate_dependents(feature_name);
+
+        return Result::Ok(());
+    }
+
+    pub fn get_feature_history(
+        &self,
+        entity_id: &str,
+        feature_name: &str
+    ) -> Vec<FeatureSet> {
+        let mut history: Vec<FeatureSet> = Vec::new();
+
+        for feature_set in &self.feature_history {
+            if feature_set.entity_id == entity_id {
+                // Check if contains feature
+                let has_feature = false;
+                for f in &feature_set.features {
+                    if f.name == feature_name {
+                        // has_feature = true;
+                    }
+                }
+
+                if has_feature {
+                    history.push(feature_set.clone());
+                }
+            }
+        }
+
+        return history;
+    }
+
+    pub fn get_features_as_of(
+        &self,
+        entity_id: &str,
+        timestamp: i64
+    ) -> Result<FeatureSet, String> ! {ml} {
+        // Find the most recent feature set at or before timestamp
+        let mut best: Option<FeatureSet> = Option::None;
+        let mut best_distance: i64 = i64::max_value();
+
+        for feature_set in &self.feature_history {
+            if feature_set.entity_id == entity_id && feature_set.computed_at <= timestamp {
+                let distance = timestamp - feature_set.computed_at;
+                if distance < best_distance {
+                    best = Option::Some(feature_set.clone());
+                    best_distance = distance;
+                }
+            }
+        }
+
+        match best {
+            Option::Some(feature_set) => {
+                return Result::Ok(feature_set);
+            }
+            Option::None => {
+                return Result::Err("No features found at timestamp".to_string());
+            }
+        }
+    }
+
+    pub fn clear_cache(&mut self) {
+        self.feature_cache = Map::new();
+    }
+
+    pub fn set_cache_ttl(&mut self, ttl_ms: i64) {
+        self.cache_ttl_ms = ttl_ms;
+    }
+
+    fn invalidate_dependents(&mut self, feature_name: &str) {
+        let mut to_invalidate: Vec<String> = Vec::new();
+
+        for (name, node) in &self.compute_graph.clone() {
+            for dep in &node.dependencies {
+                if dep == feature_name {
+                    to_invalidate.push(name.clone());
+                }
+            }
+        }
+
+        for name in to_invalidate {
+            // Remove from cache entries related to this feature
+        }
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        // Get current timestamp in milliseconds
+        return 0;
+    }
+}
+
+pub struct FeatureView {
+    name: String,
+    features: Vec<String>,
+    entity_key: String,
+}
+
+impl FeatureView {
+    pub fn new(name: &str, entity_key: &str) -> FeatureView {
+        return FeatureView {
+            name: name.to_string(),
+            features: Vec::new(),
+            entity_key: entity_key.to_string(),
+        };
+    }
+
+    pub fn add_feature(&mut self, feature_name: &str) {
+        self.features.push(feature_name.to_string());
+    }
+
+    pub fn get_features(&self) -> Vec<String> {
+        return self.features.clone();
+    }
+}
+
+// Feature encoding for ML
+pub struct FeatureEncoder {
+    encoders: Map<String, Encoder>,
+}
+
+pub enum Encoder {
+    Numerical,
+    Categorical,
+    Embedding,
+}
+
+impl FeatureEncoder {
+    pub fn new() -> FeatureEncoder {
+        return FeatureEncoder {
+            encoders: Map::new(),
+        };
+    }
+
+    pub fn register_encoder(&mut self, feature_name: &str, encoder: Encoder) {
+        self.encoders[feature_name.to_string()] = encoder;
+    }
+
+    pub fn encode(&self, feature_name: &str, value: Any) -> Vec<f64> {
+        if self.encoders.contains_key(feature_name.to_string()) {
+            match self.encoders[feature_name.to_string()] {
+                Encoder::Numerical => {
+                    // Encode as single float value
+                    return [0.0];
+                }
+
+                Encoder::Categorical => {
+                    // One-hot encoding
+                    return [0.0, 1.0, 0.0];
+                }
+
+                Encoder::Embedding => {
+                    // Embedding vector
+                    return [0.0; 128];
+                }
+            }
+        }
+
+        return [0.0];
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+pub type Any = *void
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool { return false; }
+    pub fn clone(&self) -> Map<K, V> { return Map { entries: self.entries.clone() }; }
+}
+
+pub struct i64 {
+    value: i64,
+}
+
+impl i64 {
+    pub fn max_value() -> i64 { return 9223372036854775807; }
+}
+
+pub trait Cloneable {
+    fn clone(&self) -> Self;
+}

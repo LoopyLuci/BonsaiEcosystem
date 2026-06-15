@@ -1,0 +1,3 @@
+// Tests: system-awareness-health
+
+pub fn test_module() -> i64 { return 111; }

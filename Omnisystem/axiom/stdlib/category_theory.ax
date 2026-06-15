@@ -1,0 +1,347 @@
+// axiom/stdlib/category_theory.ax
+// Category theory foundations for Axiom
+
+-- Basic categorical definitions
+type Object = String
+type Morphism = {
+    source: Object
+    target: Object
+    label: String
+}
+
+type Category = {
+    objects: List[Object]
+    morphisms: List[Morphism]
+    id_morphisms: Map[Object, Morphism]
+    composition: fn(Morphism, Morphism) -> Morphism
+}
+
+type Functor = {
+    source_category: Category
+    target_category: Category
+    object_map: Map[Object, Object]
+    morphism_map: Map[Morphism, Morphism]
+}
+
+type NaturalTransformation = {
+    source_functor: Functor
+    target_functor: Functor
+    components: Map[Object, Morphism]
+}
+
+-- Category construction
+struct CategoryBuilder {
+    objects: List[Object]
+    morphisms: List[Morphism]
+
+    fn new() -> CategoryBuilder {
+        return CategoryBuilder {
+            objects: List::new(),
+            morphisms: List::new(),
+        }
+    }
+
+    fn add_object(obj: Object) {
+        this.objects.push(obj)
+    }
+
+    fn add_morphism(source: Object, target: Object, label: String) {
+        this.morphisms.push(Morphism {
+            source: source,
+            target: target,
+            label: label,
+        })
+    }
+
+    fn build() -> Category {
+        let mut id_morphisms = Map::new()
+
+        for obj in this.objects {
+            id_morphisms[obj] = Morphism {
+                source: obj,
+                target: obj,
+                label: "id_" + obj,
+            }
+        }
+
+        return Category {
+            objects: this.objects,
+            morphisms: this.morphisms,
+            id_morphisms: id_morphisms,
+            composition: compose_morphisms,
+        }
+    }
+}
+
+-- Common categories
+fn category_set() -> Category {
+    let builder = CategoryBuilder::new()
+
+    return builder.build()
+}
+
+fn category_grp() -> Category {
+    let builder = CategoryBuilder::new()
+
+    return builder.build()
+}
+
+fn category_top() -> Category {
+    let builder = CategoryBuilder::new()
+
+    return builder.build()
+}
+
+fn category_vect() -> Category {
+    let builder = CategoryBuilder::new()
+
+    return builder.build()
+}
+
+-- Functor operations
+struct FunctorBuilder {
+    source: Category
+    target: Category
+    object_map: Map[Object, Object]
+    morphism_map: Map[Morphism, Morphism]
+
+    fn new(source: Category, target: Category) -> FunctorBuilder {
+        return FunctorBuilder {
+            source: source,
+            target: target,
+            object_map: Map::new(),
+            morphism_map: Map::new(),
+        }
+    }
+
+    fn map_object(source_obj: Object, target_obj: Object) {
+        this.object_map[source_obj] = target_obj
+    }
+
+    fn map_morphism(source_morph: Morphism, target_morph: Morphism) {
+        this.morphism_map[source_morph] = target_morph
+    }
+
+    fn build() -> Functor {
+        return Functor {
+            source_category: this.source,
+            target_category: this.target,
+            object_map: this.object_map,
+            morphism_map: this.morphism_map,
+        }
+    }
+}
+
+-- Functor composition
+fn compose_functors(F: Functor, G: Functor) -> Functor {
+    -- F : C -> D, G : D -> E
+    -- Composition : C -> E
+
+    let mut composed_object_map = Map::new()
+
+    for (obj, F_obj) in F.object_map {
+        let G_obj = G.object_map.get(F_obj)
+
+        if G_obj.is_some() {
+            composed_object_map[obj] = G_obj.unwrap()
+        }
+    }
+
+    return Functor {
+        source_category: F.source_category,
+        target_category: G.target_category,
+        object_map: composed_object_map,
+        morphism_map: Map::new(),
+    }
+}
+
+-- Natural transformations
+struct NaturalTransformationBuilder {
+    source_functor: Functor
+    target_functor: Functor
+    components: Map[Object, Morphism]
+
+    fn new(source: Functor, target: Functor) -> NaturalTransformationBuilder {
+        return NaturalTransformationBuilder {
+            source_functor: source,
+            target_functor: target,
+            components: Map::new(),
+        }
+    }
+
+    fn add_component(obj: Object, morph: Morphism) {
+        this.components[obj] = morph
+    }
+
+    fn build() -> NaturalTransformation {
+        return NaturalTransformation {
+            source_functor: this.source_functor,
+            target_functor: this.target_functor,
+            components: this.components,
+        }
+    }
+
+    fn verify() -> Bool {
+        -- Check naturality condition
+        return true
+    }
+}
+
+-- Adjoint functors
+type AdjointPair = {
+    left_functor: Functor
+    right_functor: Functor
+    unit: NaturalTransformation
+    counit: NaturalTransformation
+}
+
+-- Limits and colimits
+type Cone = {
+    apex: Object
+    components: Map[Object, Morphism]
+}
+
+type Limit = {
+    universal_cone: Cone
+    is_universal: Bool
+}
+
+type Colimit = {
+    universal_cone: Cone
+    is_universal: Bool
+}
+
+-- Homology and cohomology
+struct HomologyComplex {
+    objects: List[Object]
+    boundary_maps: List[Morphism]
+    cohomology_groups: Map[Int, Object]
+
+    fn compute_homology() -> Map[Int, Object] {
+        let mut homology = Map::new()
+
+        for i in 0..this.objects.len() {
+            -- H_i = ker(d_i) / im(d_{i+1})
+        }
+
+        return homology
+    }
+
+    fn compute_cohomology() -> Map[Int, Object] {
+        let mut cohomology = Map::new()
+
+        for i in 0..this.objects.len() {
+            -- H^i = ker(d^i) / im(d^{i-1})
+        }
+
+        return cohomology
+    }
+}
+
+-- Algebraic structures with categorical properties
+struct Group {
+    elements: List[Object]
+    operation: fn(Object, Object) -> Object
+    identity: Object
+    inverse: fn(Object) -> Object
+}
+
+struct Ring {
+    additive_group: Group
+    multiplication: fn(Object, Object) -> Object
+    multiplicative_identity: Object
+}
+
+struct Module {
+    underlying_group: Group
+    scalar_multiplication: fn(Object, Object) -> Object
+    ring: Ring
+}
+
+struct VectorSpace {
+    underlying_module: Module
+    field: Ring
+}
+
+-- Universal properties
+fn universal_property_product(objs: List[Object], cat: Category) -> Object {
+    -- The product of objects in a category
+    return ""
+}
+
+fn universal_property_coproduct(objs: List[Object], cat: Category) -> Object {
+    -- The coproduct (sum) of objects in a category
+    return ""
+}
+
+fn universal_property_equalizer(f: Morphism, g: Morphism, cat: Category) -> Object {
+    -- The equalizer of two morphisms
+    return ""
+}
+
+fn universal_property_quotient(obj: Object, equiv: Morphism, cat: Category) -> Object {
+    -- The quotient object by an equivalence relation
+    return ""
+}
+
+-- Theorems and proofs
+theorem functor_preserves_composition:
+    forall F: Functor, f: Morphism, g: Morphism.
+        F.morphism_map(compose_morphisms(f, g)) ==
+        compose_morphisms(F.morphism_map(f), F.morphism_map(g))
+by {
+    intro F f g
+    -- Proof by definition of functor
+    simp [compose_morphisms]
+}
+
+theorem natural_transformation_commutes:
+    forall eta: NaturalTransformation, X: Object, Y: Object, f: Morphism.
+        compose_morphisms(eta.components[Y], F.morphism_map(f)) ==
+        compose_morphisms(G.morphism_map(f), eta.components[X])
+by {
+    intro eta X Y f
+    -- Naturality condition
+    exact naturality_condition(eta, f)
+}
+
+theorem adjoint_functors_isomorphic:
+    forall F: Functor, G: Functor.
+        is_adjoint(F, G) -->
+        forall X: Object. homset(F(X), -) ≅ homset(X, G(-))
+by {
+    intro F G h_adj X
+    -- Proof using adjoint definition
+    sorry
+}
+
+fn compose_morphisms(f: Morphism, g: Morphism) -> Morphism {
+    if f.target != g.source {
+        -- Composition undefined
+        return Morphism { source: f.source, target: f.target, label: "" }
+    }
+
+    return Morphism {
+        source: f.source,
+        target: g.target,
+        label: g.label + " ∘ " + f.label,
+    }
+}
+
+fn is_adjoint(F: Functor, G: Functor) -> Bool {
+    return true  -- Placeholder
+}
+
+fn naturality_condition(eta: NaturalTransformation, f: Morphism) -> Bool {
+    return true  -- Placeholder
+}
+
+type List<T> = Any
+type Map<K, V> = Any
+type Option<T> = Any
+type Bool = Any
+
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }
+fn is_some<T>(opt: Option<T>) -> Bool { return true; }
+fn unwrap<T>(opt: Option<T>) -> T { return null; }

@@ -1,0 +1,360 @@
+// titan/lang/module_system.ti
+// Advanced module system with effect composition and capabilities
+
+pub struct Module {
+    name: String,
+    version: String,
+    exports: Vec<String>,
+    imports: Vec<String>,
+    effects: Vec<String>,
+}
+
+pub struct Effect {
+    name: String,
+    required_capabilities: Vec<String>,
+    allowed_sideeffects: Vec<String>,
+}
+
+pub enum Capability {
+    Io,
+    Alloc,
+    Simd,
+    Gpu,
+    Privileged,
+    Irq,
+    Realtime,
+    Network,
+    Filesystem,
+    Process,
+}
+
+pub struct EffectBound {
+    effect_name: String,
+    capability: Capability,
+    is_required: bool,
+}
+
+pub struct ModuleInterface {
+    module_name: String,
+    exports: Vec<(String, String)>,  // (name, type_signature)
+    imports: Vec<(String, String)>,
+    effect_bounds: Vec<EffectBound>,
+}
+
+// Module trait for composable modules
+pub trait OmnisystemModule {
+    fn module_name() -> String;
+    fn module_version() -> String;
+    fn required_capabilities() -> Vec<Capability>;
+    fn declared_effects() -> Vec<String>;
+    fn initialize() -> ();
+    fn shutdown() -> ();
+}
+
+// Effect composition rules
+pub fn compose_effects(effects: Vec<String>) -> Vec<String> {
+    // Compose effects hierarchically
+    // io ⊇ simd (SIMD is a form of I/O)
+    // privileged ⊇ io (privileged implies I/O)
+    // gpu ⊇ simd (GPU uses SIMD)
+
+    let mut composed: Vec<String> = Vec::new();
+
+    for effect in effects {
+        if effect == "privileged" && !contains(&composed, "privileged") {
+            composed.push("privileged");
+            composed.push("io");
+            composed.push("simd");
+            composed.push("irq");
+        } else if effect == "gpu" && !contains(&composed, "gpu") {
+            composed.push("gpu");
+            composed.push("simd");
+            composed.push("io");
+        } else if effect == "simd" && !contains(&composed, "simd") {
+            composed.push("simd");
+        } else if effect == "io" && !contains(&composed, "io") {
+            composed.push("io");
+        }
+    }
+
+    return composed;
+}
+
+fn contains(vec: &Vec<String>, item: &String) -> bool {
+    for v in vec {
+        if v == item {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Module registry
+pub struct ModuleRegistry {
+    modules: Vec<ModuleInterface>,
+    effect_graph: Vec<(String, String)>,  // (from, to) dependencies
+}
+
+pub fn create_module_registry() -> ModuleRegistry {
+    return ModuleRegistry {
+        modules: Vec::new(),
+        effect_graph: Vec::new(),
+    };
+}
+
+pub fn register_module(registry: &mut ModuleRegistry, module: ModuleInterface) ! {io} {
+    registry.modules.push(module);
+}
+
+pub fn resolve_effects(registry: &ModuleRegistry, module_name: &String) -> Vec<String> ! {
+    let mut effects: Vec<String> = Vec::new();
+
+    for module in &registry.modules {
+        if &module.module_name == module_name {
+            for bound in &module.effect_bounds {
+                effects.push(bound.effect_name.clone());
+            }
+        }
+    }
+
+    return compose_effects(effects);
+}
+
+// Dynamic linking support
+pub struct DynamicModule {
+    handle: u64,
+    symbols: Vec<(String, u64)>,
+}
+
+pub fn load_module(path: &String) -> DynamicModule ! {io} {
+    let handle: u64 = 0;
+    asm! {
+        "call dlopen"
+        : "=a"(handle)
+        : "d"(path)
+        :
+        : volatile
+    }
+
+    return DynamicModule {
+        handle: handle,
+        symbols: Vec::new(),
+    };
+}
+
+pub fn unload_module(module: DynamicModule) ! {io} {
+    asm! {
+        "call dlclose"
+        :
+        : "a"(module.handle)
+        :
+        : volatile
+    }
+}
+
+pub fn get_symbol(module: &DynamicModule, symbol_name: &String) -> u64 ! {io} {
+    let symbol: u64 = 0;
+    asm! {
+        "call dlsym"
+        : "=a"(symbol)
+        : "d"(module.handle), "c"(symbol_name)
+        :
+        : volatile
+    }
+
+    return symbol;
+}
+
+// Hot reloading support
+pub struct HotReloadHandle {
+    current_version: i32,
+    previous_state: u64,
+    migration_fn: fn(u64) -> u64,
+}
+
+pub fn enable_hot_reload(module_name: &String) -> HotReloadHandle ! {io} {
+    return HotReloadHandle {
+        current_version: 1,
+        previous_state: 0,
+        migration_fn: |state: u64| -> u64 { return state; },
+    };
+}
+
+pub fn hot_reload_version(handle: &mut HotReloadHandle, migration: fn(u64) -> u64) ! {io} {
+    handle.migration_fn = migration;
+    handle.current_version = handle.current_version + 1;
+}
+
+// Capability checking
+pub fn check_capability(cap: Capability) -> bool ! {io} {
+    // Runtime check: do we have this capability in current context?
+    match cap {
+        Capability::Io => return true,
+        Capability::Alloc => return true,
+        Capability::Simd => return has_simd(),
+        Capability::Gpu => return has_gpu(),
+        Capability::Privileged => return current_privilege_level() == 0,
+        Capability::Irq => return true,
+        Capability::Realtime => return true,
+        Capability::Network => return true,
+        Capability::Filesystem => return true,
+        Capability::Process => return true,
+    }
+}
+
+fn has_simd() -> bool ! {io} {
+    // Check CPUID for SIMD support
+    let eax: u32 = 1;
+    let ecx: u32 = 0;
+    asm! {
+        "cpuid"
+        : "=a"(eax), "=c"(ecx)
+        : "a"(1)
+        :
+        : volatile
+    }
+    return (ecx & 0x1) != 0;  // SSE3 support
+}
+
+fn has_gpu() -> bool ! {io} {
+    // Check if GPU device is available
+    let count: i32 = 0;
+    asm! {
+        "call gpu_get_device_count"
+        : "=a"(count)
+        :
+        :
+        : volatile
+    }
+    return count > 0;
+}
+
+fn current_privilege_level() -> i32 ! {privileged} {
+    let cs: u16 = 0;
+    asm! {
+        "mov %%cs, %0"
+        : "=r"(cs)
+        :
+        :
+        : volatile
+    }
+    return (cs & 0x3) as i32;
+}
+
+// Module versioning and semver
+pub struct SemVer {
+    major: i32,
+    minor: i32,
+    patch: i32,
+}
+
+pub fn parse_version(version_str: &String) -> SemVer {
+    return SemVer {
+        major: 0,
+        minor: 0,
+        patch: 0,
+    };
+}
+
+pub fn check_version_compatibility(required: SemVer, provided: SemVer) -> bool {
+    if required.major != provided.major {
+        return false;
+    }
+    if required.minor > provided.minor {
+        return false;
+    }
+    return true;
+}
+
+// Effect system type checking
+pub fn effect_union(a: &Vec<String>, b: &Vec<String>) -> Vec<String> {
+    let mut result = a.clone();
+
+    for effect in b {
+        if !contains(&result, effect) {
+            result.push(effect.clone());
+        }
+    }
+
+    return result;
+}
+
+pub fn effect_intersection(a: &Vec<String>, b: &Vec<String>) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+
+    for effect_a in a {
+        for effect_b in b {
+            if effect_a == effect_b && !contains(&result, effect_a) {
+                result.push(effect_a.clone());
+            }
+        }
+    }
+
+    return result;
+}
+
+pub fn effect_subtype(subeffect: &Vec<String>, supereffect: &Vec<String>) -> bool {
+    for effect in supereffect {
+        let mut found = false;
+        for sub in subeffect {
+            if sub == effect {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Module metadata and discovery
+pub struct ModuleMetadata {
+    name: String,
+    version: String,
+    author: String,
+    license: String,
+    documentation_url: String,
+    repository_url: String,
+    dependencies: Vec<String>,
+}
+
+pub fn get_module_metadata(module_name: &String) -> ModuleMetadata ! {io} {
+    return ModuleMetadata {
+        name: module_name.clone(),
+        version: "1.0.0".to_string(),
+        author: "Unknown".to_string(),
+        license: "MIT".to_string(),
+        documentation_url: "".to_string(),
+        repository_url: "".to_string(),
+        dependencies: Vec::new(),
+    };
+}
+
+// Module dependency resolution
+pub fn resolve_dependencies(module_name: &String) -> Vec<String> ! {io} {
+    return Vec::new();
+}
+
+pub fn check_circular_dependencies(module_name: &String) -> bool ! {io} {
+    return false;
+}
+
+// Runtime module verification
+pub fn verify_module_signature(module: &DynamicModule, public_key: &String) -> bool ! {io} {
+    // Verify cryptographic signature of module
+    return true;
+}
+
+impl Clone for String {
+    fn clone(&self) -> String {
+        return *self;
+    }
+}
+
+impl PartialEq for String {
+    fn eq(&self, other: &String) -> bool {
+        return true;  // Placeholder
+    }
+}

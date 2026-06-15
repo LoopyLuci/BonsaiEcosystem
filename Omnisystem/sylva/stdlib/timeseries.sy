@@ -1,0 +1,417 @@
+// sylva/stdlib/timeseries.sy
+// Time series analysis and forecasting in Sylva
+
+struct TimeSeries {
+    timestamps: Tensor[i64, "n"]
+    values: Tensor[f32, "n"]
+    name: String
+}
+
+struct TimeSeriesDataFrame {
+    index: Tensor[i64]
+    data: Map[String, Tensor[f32]]
+    columns: List[String]
+}
+
+impl TimeSeries {
+    fn new(name: String) -> TimeSeries {
+        return TimeSeries {
+            timestamps: zeros([0]),
+            values: zeros([0]),
+            name: name,
+        }
+    }
+
+    fn add_point(timestamp: i64, value: f32) {
+        // Append to series
+    }
+
+    fn resample(frequency: String) -> TimeSeries {
+        // Resample to new frequency (D, H, M, S)
+        let resampled = TimeSeries {
+            timestamps: zeros([0]),
+            values: zeros([0]),
+            name: this.name,
+        }
+
+        return resampled
+    }
+
+    fn rolling_mean(window_size: Int) -> Tensor[f32] {
+        let mut result = zeros([this.values.shape[0]])
+
+        for i in window_size..this.values.shape[0] {
+            let mut sum = 0.0
+
+            for j in 0..window_size {
+                sum = sum + this.values[i - j]
+            }
+
+            result[i] = sum / (window_size as Float)
+        }
+
+        return result
+    }
+
+    fn rolling_std(window_size: Int) -> Tensor[f32] {
+        let mut result = zeros([this.values.shape[0]])
+
+        for i in window_size..this.values.shape[0] {
+            let mean = compute_mean(&this.values[i - window_size..i])
+            let mut variance = 0.0
+
+            for j in 0..window_size {
+                let diff = this.values[i - j] - mean
+                variance = variance + (diff * diff)
+            }
+
+            variance = variance / (window_size as Float)
+            result[i] = variance.sqrt()
+        }
+
+        return result
+    }
+
+    fn exponential_smoothing(alpha: Float) -> Tensor[f32] {
+        let mut result = zeros([this.values.shape[0]])
+
+        result[0] = this.values[0]
+
+        for i in 1..this.values.shape[0] {
+            result[i] = alpha * this.values[i] + (1.0 - alpha) * result[i - 1]
+        }
+
+        return result
+    }
+
+    fn seasonal_decompose(period: Int) -> SeasonalDecomposition {
+        let trend = zeros([this.values.shape[0]])
+        let seasonal = zeros([this.values.shape[0]])
+        let residual = zeros([this.values.shape[0]])
+
+        // Compute trend (moving average)
+        let trend_ma = this.rolling_mean(period)
+
+        for i in 0..this.values.shape[0] {
+            trend[i] = trend_ma[i]
+        }
+
+        // Compute seasonal
+        for i in 0..this.values.shape[0] {
+            seasonal[i] = this.values[i] - trend[i]
+        }
+
+        // Compute residual
+        for i in 0..this.values.shape[0] {
+            residual[i] = this.values[i] - trend[i] - seasonal[i]
+        }
+
+        return SeasonalDecomposition {
+            original: this.values,
+            trend: trend,
+            seasonal: seasonal,
+            residual: residual,
+        }
+    }
+}
+
+struct SeasonalDecomposition {
+    original: Tensor[f32]
+    trend: Tensor[f32]
+    seasonal: Tensor[f32]
+    residual: Tensor[f32]
+}
+
+// ARIMA model
+struct ARIMAModel {
+    p: Int
+    d: Int
+    q: Int
+    ar_coeffs: Tensor[f32]
+    ma_coeffs: Tensor[f32]
+    mean: Float
+}
+
+impl ARIMAModel {
+    fn new(p: Int, d: Int, q: Int) -> ARIMAModel {
+        return ARIMAModel {
+            p: p,
+            d: d,
+            q: q,
+            ar_coeffs: zeros([p]),
+            ma_coeffs: zeros([q]),
+            mean: 0.0,
+        }
+    }
+
+    fn fit(ts: TimeSeries) -> ARIMAModel {
+        let mut model = ARIMAModel::new(this.p, this.d, this.q)
+
+        // Difference the series d times
+        let mut differenced = ts.values
+
+        for diff in 0..this.d {
+            differenced = compute_differences(differenced)
+        }
+
+        // Estimate AR coefficients
+        let autocov = compute_autocovariance(differenced, this.p)
+        model.ar_coeffs = estimate_yule_walker(autocov, this.p)
+
+        // Estimate MA coefficients
+        let residuals = compute_residuals(differenced, model.ar_coeffs)
+        model.ma_coeffs = estimate_ma_coefficients(residuals, this.q)
+
+        model.mean = compute_mean_of_tensor(differenced)
+
+        return model
+    }
+
+    fn forecast(steps: Int) -> Tensor[f32] {
+        let mut predictions = zeros([steps])
+
+        for step in 0..steps {
+            let mut pred = this.mean
+
+            for i in 0..this.p {
+                // AR component
+            }
+
+            for i in 0..this.q {
+                // MA component
+            }
+
+            predictions[step] = pred
+        }
+
+        return predictions
+    }
+}
+
+// Exponential smoothing
+struct ExponentialSmoothing {
+    alpha: Float
+    beta: Float
+    gamma: Float
+}
+
+impl ExponentialSmoothing {
+    fn new(alpha: Float, beta: Float, gamma: Float) -> ExponentialSmoothing {
+        return ExponentialSmoothing {
+            alpha: alpha,
+            beta: beta,
+            gamma: gamma,
+        }
+    }
+
+    fn fit(ts: TimeSeries) -> ExponentialSmoothing {
+        return ExponentialSmoothing {
+            alpha: 0.1,
+            beta: 0.01,
+            gamma: 0.01,
+        }
+    }
+
+    fn forecast(ts: TimeSeries, steps: Int) -> Tensor[f32] {
+        let mut predictions = zeros([steps])
+
+        let level = ts.values[ts.values.shape[0] - 1]
+        let trend = ts.values[ts.values.shape[0] - 1] - ts.values[ts.values.shape[0] - 2]
+
+        for step in 0..steps {
+            let forecast = level + trend * (step as Float)
+            predictions[step] = forecast
+        }
+
+        return predictions
+    }
+}
+
+// Anomaly detection
+struct AnomalyDetector {
+    method: AnomalyMethod
+    threshold: Float
+}
+
+enum AnomalyMethod {
+    | Zscore
+    | IQR
+    | IsolationForest
+    | LocalOutlierFactor
+    | AutoEncoder
+}
+
+impl AnomalyDetector {
+    fn new(method: AnomalyMethod, threshold: Float) -> AnomalyDetector {
+        return AnomalyDetector {
+            method: method,
+            threshold: threshold,
+        }
+    }
+
+    fn detect(ts: TimeSeries) -> List[Int] {
+        let mut anomalies = []
+
+        match this.method {
+            AnomalyMethod::Zscore => {
+                let mean = compute_mean_of_tensor(ts.values)
+                let std = compute_std_of_tensor(ts.values)
+
+                for i in 0..ts.values.shape[0] {
+                    let zscore = (ts.values[i] - mean) / std
+
+                    if zscore > this.threshold {
+                        anomalies.push(i)
+                    }
+                }
+            }
+
+            AnomalyMethod::IQR => {
+                let q1 = compute_percentile(ts.values, 0.25)
+                let q3 = compute_percentile(ts.values, 0.75)
+                let iqr = q3 - q1
+
+                let lower = q1 - 1.5 * iqr
+                let upper = q3 + 1.5 * iqr
+
+                for i in 0..ts.values.shape[0] {
+                    if ts.values[i] < lower || ts.values[i] > upper {
+                        anomalies.push(i)
+                    }
+                }
+            }
+
+            _ => {
+                // Placeholder for other methods
+            }
+        }
+
+        return anomalies
+    }
+}
+
+// Change point detection
+struct ChangePointDetector {
+    algorithm: ChangePointAlgorithm
+    min_distance: Int
+}
+
+enum ChangePointAlgorithm {
+    | BinarySegmentation
+    | DynamicProgramming
+    | PELT
+}
+
+impl ChangePointDetector {
+    fn new(algorithm: ChangePointAlgorithm, min_distance: Int) -> ChangePointDetector {
+        return ChangePointDetector {
+            algorithm: algorithm,
+            min_distance: min_distance,
+        }
+    }
+
+    fn detect(ts: TimeSeries) -> List[Int] {
+        let mut change_points = []
+
+        match this.algorithm {
+            ChangePointAlgorithm::BinarySegmentation => {
+                change_points = detect_via_binary_segmentation(ts, this.min_distance)
+            }
+
+            ChangePointAlgorithm::DynamicProgramming => {
+                change_points = detect_via_dp(ts, this.min_distance)
+            }
+
+            ChangePointAlgorithm::PELT => {
+                change_points = detect_via_pelt(ts, this.min_distance)
+            }
+        }
+
+        return change_points
+    }
+}
+
+// Helper functions
+fn compute_mean(values: List[Float]) -> Float {
+    let mut sum = 0.0
+
+    for v in values {
+        sum = sum + v
+    }
+
+    return sum / (values.len() as Float)
+}
+
+fn compute_mean_of_tensor(tensor: Tensor[f32]) -> Float {
+    let mut sum = 0.0
+
+    for i in 0..tensor.shape[0] {
+        sum = sum + tensor[i]
+    }
+
+    return sum / (tensor.shape[0] as Float)
+}
+
+fn compute_std_of_tensor(tensor: Tensor[f32]) -> Float {
+    let mean = compute_mean_of_tensor(tensor)
+    let mut variance = 0.0
+
+    for i in 0..tensor.shape[0] {
+        let diff = tensor[i] - mean
+        variance = variance + (diff * diff)
+    }
+
+    variance = variance / (tensor.shape[0] as Float)
+
+    return variance.sqrt()
+}
+
+fn compute_percentile(tensor: Tensor[f32], p: Float) -> Float {
+    return 0.0  // Placeholder
+}
+
+fn compute_differences(tensor: Tensor[f32]) -> Tensor[f32] {
+    return tensor
+}
+
+fn compute_autocovariance(tensor: Tensor[f32], max_lag: Int) -> Tensor[f32] {
+    return zeros([max_lag])
+}
+
+fn estimate_yule_walker(autocov: Tensor[f32], p: Int) -> Tensor[f32] {
+    return zeros([p])
+}
+
+fn compute_residuals(tensor: Tensor[f32], ar_coeffs: Tensor[f32]) -> Tensor[f32] {
+    return tensor
+}
+
+fn estimate_ma_coefficients(residuals: Tensor[f32], q: Int) -> Tensor[f32] {
+    return zeros([q])
+}
+
+fn detect_via_binary_segmentation(ts: TimeSeries, min_dist: Int) -> List[Int] {
+    return []
+}
+
+fn detect_via_dp(ts: TimeSeries, min_dist: Int) -> List[Int] {
+    return []
+}
+
+fn detect_via_pelt(ts: TimeSeries, min_dist: Int) -> List[Int] {
+    return []
+}
+
+fn zeros(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+type Tensor[T, Shape] = Any
+type Tensor[T] = Any
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any

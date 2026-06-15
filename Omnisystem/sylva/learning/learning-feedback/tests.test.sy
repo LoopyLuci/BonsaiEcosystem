@@ -1,0 +1,5 @@
+// Tests for learning-feedback
+
+pub fn test_module() -> i64 {
+    return 111;
+}

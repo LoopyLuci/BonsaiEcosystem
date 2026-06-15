@@ -1,0 +1,3 @@
+// Tests: formal-verification
+
+pub fn test_module() -> i64 { return 111; }

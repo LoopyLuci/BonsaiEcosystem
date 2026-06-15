@@ -1,0 +1,5 @@
+// Tests for container-management-ui
+
+pub fn test_module() -> i64 {
+    return 111;
+}

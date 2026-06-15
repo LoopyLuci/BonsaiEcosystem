@@ -1,0 +1,348 @@
+// aether/stdlib/pubsub.ae
+// Publish-Subscribe messaging system in Aether
+
+actor PubSubBroker {
+    topics: Map[String, Topic]
+    subscribers: Map[String, List[ActorRef]]
+    deadletter_queue: List[Message]
+    metrics: PublisherMetrics
+
+    type Topic = {
+        name: String
+        partition_count: Int
+        retention_millis: i64
+        messages: List[(i64, Message)]  // (timestamp, message)
+        partition_leaders: List[ActorRef]
+    }
+
+    type PublisherMetrics = {
+        messages_published: Atomic[i64]
+        messages_delivered: Atomic[i64]
+        messages_failed: Atomic[i64]
+        total_latency_nanos: Atomic[i64]
+    }
+
+    fn on_init(num_partitions: Int = 3) {
+        this.topics = Map::new()
+        this.subscribers = Map::new()
+        this.deadletter_queue = []
+        this.metrics = PublisherMetrics {
+            messages_published: Atomic::new(0),
+            messages_delivered: Atomic::new(0),
+            messages_failed: Atomic::new(0),
+            total_latency_nanos: Atomic::new(0),
+        }
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            CreateTopic(topic_name, num_partitions) => {
+                if topic_name not in this.topics {
+                    this.topics[topic_name] = Topic {
+                        name: topic_name,
+                        partition_count: num_partitions,
+                        retention_millis: 86400000,  // 24 hours
+                        messages: [],
+                        partition_leaders: [],
+                    }
+                    send Reply(Ok) to sender
+                } else {
+                    send Reply(Error("Topic already exists")) to sender
+                }
+            }
+
+            Publish(topic_name, message, key) => {
+                let start_time = now_nanos()
+
+                if topic_name in this.topics {
+                    let topic = this.topics[topic_name]
+                    let partition_id = hash_key(key) % topic.partition_count
+
+                    -- Add to partition
+                    topic.messages.push((start_time, message))
+
+                    -- Deliver to subscribers
+                    let subscriber_list = this.subscribers.get(topic_name)
+                    for subscriber in subscriber_list {
+                        send subscriber Message {
+                            topic: topic_name,
+                            partition: partition_id,
+                            data: message,
+                            timestamp: start_time,
+                        } with timeout 5s |result| {
+                            if result == Ok {
+                                this.metrics.messages_delivered.fetch_add(1, Release)
+                            } else {
+                                -- Add to dead letter queue
+                                this.deadletter_queue.push(message)
+                                this.metrics.messages_failed.fetch_add(1, Release)
+                            }
+                        }
+                    }
+
+                    this.metrics.messages_published.fetch_add(1, Release)
+                    let latency = now_nanos() - start_time
+                    this.metrics.total_latency_nanos.fetch_add(latency, Release)
+
+                    send Reply(Ok) to sender
+                } else {
+                    send Reply(Error("Topic not found")) to sender
+                }
+            }
+
+            Subscribe(topic_name, subscriber_ref) => {
+                if topic_name not in this.subscribers {
+                    this.subscribers[topic_name] = []
+                }
+                this.subscribers[topic_name].push(subscriber_ref)
+
+                -- Send catch-up messages
+                if topic_name in this.topics {
+                    let topic = this.topics[topic_name]
+                    for (timestamp, msg) in topic.messages {
+                        send subscriber_ref CatchupMessage(msg)
+                    }
+                }
+
+                send Reply(Ok) to sender
+            }
+
+            Unsubscribe(topic_name, subscriber_ref) => {
+                if topic_name in this.subscribers {
+                    let list = this.subscribers[topic_name]
+                    this.subscribers[topic_name] = list.filter(|s| s != subscriber_ref)
+                }
+                send Reply(Ok) to sender
+            }
+
+            GetMetrics => {
+                let metrics = {
+                    published: this.metrics.messages_published.load(Acquire),
+                    delivered: this.metrics.messages_delivered.load(Acquire),
+                    failed: this.metrics.messages_failed.load(Acquire),
+                    avg_latency_nanos: this.metrics.total_latency_nanos.load(Acquire) /
+                                      (this.metrics.messages_published.load(Acquire) + 1),
+                }
+                send Reply(metrics) to sender
+            }
+
+            GetDeadLetters => {
+                let letters = this.deadletter_queue.clone()
+                send Reply(letters) to sender
+            }
+        }
+    }
+}
+
+actor ConsumerGroup {
+    broker: ActorRef[PubSubBroker]
+    group_id: String
+    topic_name: String
+    consumers: List[ActorRef]
+    partition_assignment: Map[Int, ActorRef]
+    offsets: Map[Int, i64]
+
+    fn on_init(broker: ActorRef, group_id: String, topic_name: String, num_consumers: Int) {
+        this.broker = broker
+        this.group_id = group_id
+        this.topic_name = topic_name
+        this.consumers = []
+        this.partition_assignment = Map::new()
+        this.offsets = Map::new()
+
+        -- Create consumer actors
+        for i in 0..num_consumers {
+            let consumer = spawn Consumer(this.group_id, i)
+            this.consumers.push(consumer)
+        }
+
+        -- Subscribe to topic
+        ask this.broker Subscribe(topic_name, this) with timeout 5s |_| {
+            this.rebalance_partitions()
+        }
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            Message(topic, partition, data, timestamp) => {
+                -- Assign to consumer responsible for this partition
+                if partition in this.partition_assignment {
+                    let consumer = this.partition_assignment[partition]
+                    send consumer ProcessMessage(topic, partition, data, timestamp)
+
+                    -- Update offset
+                    this.offsets[partition] = timestamp
+                }
+            }
+
+            CommitOffset(partition, offset) => {
+                this.offsets[partition] = offset
+                send Reply(Ok) to sender
+            }
+
+            GetOffsets => {
+                send Reply(this.offsets) to sender
+            }
+
+            Rebalance => {
+                this.rebalance_partitions()
+                send Reply(Ok) to sender
+            }
+        }
+    }
+
+    fn rebalance_partitions() {
+        -- Distribute partitions among consumers
+        let partition_count = 3  // From topic configuration
+        let consumers_per_partition = (partition_count + this.consumers.len() - 1) / this.consumers.len()
+
+        for partition_id in 0..partition_count {
+            let consumer_id = partition_id / consumers_per_partition
+            this.partition_assignment[partition_id] = this.consumers[consumer_id]
+        }
+    }
+}
+
+actor Consumer {
+    group_id: String
+    consumer_id: Int
+    messages_processed: i64
+
+    fn on_init(group_id: String, consumer_id: Int) {
+        this.group_id = group_id
+        this.consumer_id = consumer_id
+        this.messages_processed = 0
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            ProcessMessage(topic, partition, data, timestamp) => {
+                -- Process message
+                this.handle_message(data)
+
+                -- Acknowledge
+                this.messages_processed = this.messages_processed + 1
+                send Reply(Ok) to sender
+            }
+
+            GetStats => {
+                send Reply({
+                    group: this.group_id,
+                    consumer: this.consumer_id,
+                    processed: this.messages_processed,
+                }) to sender
+            }
+        }
+    }
+
+    fn handle_message(data: Any) {
+        -- User-defined message handler
+        println(f"Consumer {this.consumer_id} processing: {data}")
+    }
+}
+
+-- Durable message log with compaction
+actor MessageLog {
+    topic_name: String
+    segments: List[Segment]
+    current_segment: Segment
+    compaction_enabled: Bool
+
+    type Segment = {
+        segment_id: Int
+        messages: List[(i64, Message)],
+        base_offset: i64,
+        start_time: i64,
+    }
+
+    fn on_init(topic_name: String) {
+        this.topic_name = topic_name
+        this.segments = []
+        this.current_segment = Segment {
+            segment_id: 0,
+            messages: [],
+            base_offset: 0,
+            start_time: now_nanos(),
+        }
+        this.compaction_enabled = true
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            AppendMessage(message) => {
+                let offset = this.current_segment.base_offset +
+                            (this.current_segment.messages.len() as i64)
+
+                this.current_segment.messages.push((offset, message))
+
+                -- Roll to new segment if too large
+                if this.current_segment.messages.len() > 10000 {
+                    this.roll_segment()
+                }
+
+                send Reply(Ok(offset)) to sender
+            }
+
+            FetchMessages(start_offset, max_bytes) => {
+                let mut messages = []
+                let mut bytes_read = 0
+
+                for segment in this.segments {
+                    for (offset, msg) in segment.messages {
+                        if offset >= start_offset && bytes_read < max_bytes {
+                            messages.push((offset, msg))
+                            bytes_read = bytes_read + msg.size()
+                        }
+                    }
+                }
+
+                send Reply(messages) to sender
+            }
+
+            Compact => {
+                this.compact_log()
+                send Reply(Ok) to sender
+            }
+        }
+    }
+
+    fn roll_segment() {
+        this.segments.push(this.current_segment)
+        this.current_segment = Segment {
+            segment_id: this.segments.len() as Int,
+            messages: [],
+            base_offset: this.current_segment.base_offset +
+                        (this.current_segment.messages.len() as i64),
+            start_time: now_nanos(),
+        }
+    }
+
+    fn compact_log() {
+        -- Remove duplicate keys, keeping only latest value
+        for segment in this.segments {
+            let mut seen_keys = Set::new()
+            let mut compacted = []
+
+            for (offset, msg) in segment.messages.reverse() {
+                if msg.key not in seen_keys {
+                    compacted.push((offset, msg))
+                    seen_keys.insert(msg.key)
+                }
+            }
+
+            segment.messages = compacted.reverse()
+        }
+    }
+}
+
+fn hash_key(key: String) -> Int {
+    let mut h = 0
+    for ch in key.chars() {
+        h = (h * 31 + (ch as Int)) % 2147483647
+    }
+    return h
+}
+
+fn now_nanos() -> i64 {
+    return 0  // Placeholder
+}

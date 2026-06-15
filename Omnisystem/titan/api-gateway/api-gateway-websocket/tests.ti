@@ -1,0 +1,3 @@
+// Tests: api-gateway-websocket
+
+pub fn test_module() -> i64 { return 111; }

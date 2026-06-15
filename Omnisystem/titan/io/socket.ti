@@ -1,0 +1,344 @@
+// titan/io/socket.ti
+// Socket programming and network I/O for Titan
+
+pub struct Socket {
+    fd: i32,
+    address_family: AddressFamily,
+    socket_type: SocketType,
+    protocol: i32,
+}
+
+pub enum AddressFamily {
+    IPv4,
+    IPv6,
+    Unix,
+}
+
+pub enum SocketType {
+    Stream,    // TCP
+    Datagram, // UDP
+    Raw,
+}
+
+pub struct SocketAddress {
+    family: AddressFamily,
+    port: u16,
+    address: [u8; 16],  // IPv6 is largest (16 bytes)
+}
+
+pub struct TcpListener {
+    socket: Socket,
+    listen_address: SocketAddress,
+    backlog: i32,
+}
+
+pub struct TcpStream {
+    socket: Socket,
+    peer_address: SocketAddress,
+}
+
+pub struct UdpSocket {
+    socket: Socket,
+    local_address: SocketAddress,
+}
+
+// TCP Socket functions
+pub fn socket_create(family: AddressFamily, sock_type: SocketType) -> Result<Socket, String> ! {io} {
+    let fd: i32 = 0;
+
+    asm! {
+        "call socket"
+        : "=a"(fd)
+        : "d"(family as i32), "c"(sock_type as i32)
+        :
+        : volatile
+    }
+
+    if fd < 0 {
+        return Result::Err("Failed to create socket".to_string());
+    }
+
+    return Result::Ok(Socket {
+        fd: fd,
+        address_family: family,
+        socket_type: sock_type,
+        protocol: 0,
+    });
+}
+
+pub fn socket_bind(socket: &Socket, address: &SocketAddress) -> Result<(), String> ! {io} {
+    let result: i32 = 0;
+
+    asm! {
+        "call bind"
+        : "=a"(result)
+        : "d"(socket.fd), "c"(address)
+        :
+        : volatile
+    }
+
+    if result < 0 {
+        return Result::Err("Failed to bind socket".to_string());
+    }
+
+    return Result::Ok(());
+}
+
+pub fn socket_listen(socket: &Socket, backlog: i32) -> Result<TcpListener, String> ! {io} {
+    let result: i32 = 0;
+
+    asm! {
+        "call listen"
+        : "=a"(result)
+        : "d"(socket.fd), "c"(backlog)
+        :
+        : volatile
+    }
+
+    if result < 0 {
+        return Result::Err("Failed to listen on socket".to_string());
+    }
+
+    return Result::Ok(TcpListener {
+        socket: *socket,
+        listen_address: SocketAddress {
+            family: socket.address_family,
+            port: 0,
+            address: [0; 16],
+        },
+        backlog: backlog,
+    });
+}
+
+pub fn socket_accept(listener: &TcpListener) -> Result<TcpStream, String> ! {io} {
+    let new_fd: i32 = 0;
+    let peer_addr: SocketAddress = SocketAddress {
+        family: AddressFamily::IPv4,
+        port: 0,
+        address: [0; 16],
+    };
+
+    asm! {
+        "call accept"
+        : "=a"(new_fd)
+        : "d"(listener.socket.fd), "c"(&peer_addr)
+        :
+        : volatile
+    }
+
+    if new_fd < 0 {
+        return Result::Err("Failed to accept connection".to_string());
+    }
+
+    return Result::Ok(TcpStream {
+        socket: Socket {
+            fd: new_fd,
+            address_family: listener.socket.address_family,
+            socket_type: listener.socket.socket_type,
+            protocol: 0,
+        },
+        peer_address: peer_addr,
+    });
+}
+
+pub fn socket_connect(socket: &Socket, address: &SocketAddress) -> Result<(), String> ! {io} {
+    let result: i32 = 0;
+
+    asm! {
+        "call connect"
+        : "=a"(result)
+        : "d"(socket.fd), "c"(address)
+        :
+        : volatile
+    }
+
+    if result < 0 {
+        return Result::Err("Failed to connect".to_string());
+    }
+
+    return Result::Ok(());
+}
+
+pub fn socket_send(socket: &Socket, data: &[u8]) -> Result<usize, String> ! {io} {
+    let bytes_sent: i32 = 0;
+
+    asm! {
+        "call send"
+        : "=a"(bytes_sent)
+        : "d"(socket.fd), "c"(data), "S"(data.len())
+        :
+        : volatile
+    }
+
+    if bytes_sent < 0 {
+        return Result::Err("Failed to send data".to_string());
+    }
+
+    return Result::Ok(bytes_sent as usize);
+}
+
+pub fn socket_recv(socket: &Socket, buffer: &mut [u8]) -> Result<usize, String> ! {io} {
+    let bytes_recv: i32 = 0;
+
+    asm! {
+        "call recv"
+        : "=a"(bytes_recv)
+        : "d"(socket.fd), "c"(buffer), "S"(buffer.len())
+        :
+        : volatile
+    }
+
+    if bytes_recv < 0 {
+        return Result::Err("Failed to receive data".to_string());
+    }
+
+    return Result::Ok(bytes_recv as usize);
+}
+
+pub fn socket_close(socket: &Socket) -> Result<(), String> ! {io} {
+    let result: i32 = 0;
+
+    asm! {
+        "call close"
+        : "=a"(result)
+        : "d"(socket.fd)
+        :
+        : volatile
+    }
+
+    if result < 0 {
+        return Result::Err("Failed to close socket".to_string());
+    }
+
+    return Result::Ok(());
+}
+
+// Socket options
+pub fn socket_set_nonblocking(socket: &Socket, nonblocking: bool) -> Result<(), String> ! {io} {
+    let flags: i32 = 0;
+
+    asm! {
+        "call fcntl_get"
+        : "=a"(flags)
+        : "d"(socket.fd)
+        :
+        : volatile
+    }
+
+    if nonblocking {
+        // Set O_NONBLOCK
+        asm! {
+            "call fcntl_set"
+            :
+            : "d"(socket.fd), "c"(flags | 0x800)
+            :
+            : volatile
+        }
+    }
+
+    return Result::Ok(());
+}
+
+pub fn socket_set_so_reuseaddr(socket: &Socket) -> Result<(), String> ! {io} {
+    let opt: i32 = 1;
+
+    asm! {
+        "call setsockopt"
+        :
+        : "d"(socket.fd), "c"(1), "S"(&opt)
+        :
+        : volatile
+    }
+
+    return Result::Ok(());
+}
+
+pub fn socket_set_so_keepalive(socket: &Socket) -> Result<(), String> ! {io} {
+    let opt: i32 = 1;
+
+    asm! {
+        "call setsockopt"
+        :
+        : "d"(socket.fd), "c"(9), "S"(&opt)
+        :
+        : volatile
+    }
+
+    return Result::Ok(());
+}
+
+pub fn socket_set_tcp_nodelay(socket: &Socket) -> Result<(), String> ! {io} {
+    let opt: i32 = 1;
+
+    asm! {
+        "call setsockopt"
+        :
+        : "d"(socket.fd), "c"(6), "S"(&opt)
+        :
+        : volatile
+    }
+
+    return Result::Ok(());
+}
+
+// High-level server implementation
+pub struct Server {
+    listener: TcpListener,
+    handler: fn(TcpStream) -> (),
+}
+
+impl Server {
+    pub fn new(address: &SocketAddress, handler: fn(TcpStream) -> ()) -> Result<Server, String> ! {io} {
+        let socket = socket_create(address.family, SocketType::Stream)?;
+        socket_set_so_reuseaddr(&socket)?;
+        socket_bind(&socket, address)?;
+
+        let listener = socket_listen(&socket, 128)?;
+
+        return Result::Ok(Server {
+            listener: listener,
+            handler: handler,
+        });
+    }
+
+    pub fn run(&self) -> Result<(), String> ! {io} {
+        loop {
+            match socket_accept(&self.listener) {
+                Result::Ok(stream) => {
+                    // Handle connection
+                    (self.handler)(stream);
+                }
+                Result::Err(e) => {
+                    return Result::Err(e);
+                }
+            }
+        }
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+
+    pub fn unwrap(&self) -> T {
+        match self {
+            Result::Ok(val) => return val,
+            Result::Err(_) => {
+                asm! { "hlt" : : : : volatile, noreturn }
+            }
+        }
+    }
+}
+
+fn to_string(&self) -> String {
+    return "";
+}

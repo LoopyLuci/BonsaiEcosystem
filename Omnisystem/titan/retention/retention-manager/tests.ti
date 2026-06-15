@@ -1,0 +1,3 @@
+// Tests: retention-manager
+
+pub fn test_module() -> i64 { return 111; }

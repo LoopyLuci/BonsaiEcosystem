@@ -1,0 +1,3 @@
+// Tests: data-governance-pro
+
+pub fn test_module() -> i64 { return 111; }

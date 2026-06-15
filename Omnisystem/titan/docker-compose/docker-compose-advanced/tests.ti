@@ -1,0 +1,3 @@
+// Tests: docker-compose-advanced
+
+pub fn test_module() -> i64 { return 111; }

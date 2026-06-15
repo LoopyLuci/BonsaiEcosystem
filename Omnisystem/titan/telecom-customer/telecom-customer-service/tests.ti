@@ -1,0 +1,3 @@
+// Tests: telecom-customer-service
+
+pub fn test_module() -> i64 { return 111; }

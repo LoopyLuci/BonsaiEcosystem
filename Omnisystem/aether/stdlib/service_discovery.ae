@@ -1,0 +1,250 @@
+// aether/stdlib/service_discovery.ae
+// Service discovery and cluster coordination in Aether
+
+actor ServiceRegistry {
+    services: Map[String, ServiceEntry]
+    watchers: List[ActorRef]
+
+    type ServiceEntry = {
+        name: String
+        host: String
+        port: Int
+        metadata: Map[String, String]
+        health: HealthStatus
+        version: String
+        last_heartbeat: i64
+    }
+
+    enum HealthStatus {
+        Healthy
+        Unhealthy
+        Unknown
+    }
+
+    fn on_init() {
+        this.services = Map::new()
+        this.watchers = []
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            Register(entry) => {
+                this.services[entry.name] = entry
+                this.notify_watchers(ServiceAdded(entry.name))
+                send Reply(Ok) to sender
+            }
+            Deregister(service_name) => {
+                let removed = this.services.remove(service_name)
+                if removed.is_some() {
+                    this.notify_watchers(ServiceRemoved(service_name))
+                }
+                send Reply(Ok) to sender
+            }
+            Discover(service_name, version) => {
+                let matching = []
+                for (name, entry) in this.services {
+                    if name.starts_with(service_name) &&
+                       entry.version == version &&
+                       entry.health == HealthStatus::Healthy {
+                        matching.push(entry)
+                    }
+                }
+                send Reply(matching) to sender
+            }
+            Heartbeat(service_name) => {
+                if let Some(entry) in this.services[service_name] {
+                    entry.last_heartbeat = now_nanos()
+                    entry.health = HealthStatus::Healthy
+                    send Reply(Ok) to sender
+                } else {
+                    send Reply(Error("Service not found")) to sender
+                }
+            }
+            Watch(watcher_ref) => {
+                this.watchers.push(watcher_ref)
+                send Reply(Ok) to sender
+            }
+            HealthCheck => {
+                let now = now_nanos()
+                let timeout_nanos = 10_000_000_000i64  // 10 seconds
+
+                for (name, entry) in this.services {
+                    if (now - entry.last_heartbeat) > timeout_nanos {
+                        entry.health = HealthStatus::Unhealthy
+                        this.notify_watchers(ServiceUnhealthy(name))
+                    }
+                }
+                send Reply(Ok) to sender
+            }
+        }
+    }
+
+    fn notify_watchers(event: ServiceEvent) {
+        for watcher in this.watchers {
+            send watcher ServiceUpdate(event)
+        }
+    }
+}
+
+actor LoadBalancer {
+    services: ActorRef[ServiceRegistry]
+    strategy: LoadBalancingStrategy
+    round_robin_counter: Atomic[Int]
+
+    enum LoadBalancingStrategy {
+        RoundRobin
+        LeastConnections
+        Random
+        SourceIP
+    }
+
+    fn on_init(registry: ActorRef, strategy: LoadBalancingStrategy) {
+        this.services = registry
+        this.strategy = strategy
+        this.round_robin_counter = Atomic::new(0)
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            RouteRequest(service_name, request) => {
+                ask this.services Discover(service_name, "1.0") with timeout 2s |instances| {
+                    let chosen = this.select_instance(instances, this.strategy)
+
+                    if let Some(instance) in chosen {
+                        -- Forward request to chosen instance
+                        send instance ForwardRequest(request)
+                    } else {
+                        send Reply(Error("No healthy instances")) to sender
+                    }
+                }
+            }
+        }
+    }
+
+    fn select_instance(instances: List[ServiceEntry], strategy: LoadBalancingStrategy) -> Option[ServiceEntry] {
+        match strategy {
+            LoadBalancingStrategy::RoundRobin => {
+                let idx = this.round_robin_counter.fetch_add(1, Relaxed) as usize % instances.len()
+                return Some(instances[idx])
+            }
+            LoadBalancingStrategy::Random => {
+                let idx = random(0, instances.len())
+                return Some(instances[idx])
+            }
+            LoadBalancingStrategy::LeastConnections => {
+                -- Select instance with fewest active connections
+                let mut min_connections = Int::MAX
+                let mut chosen = None
+
+                for instance in instances {
+                    let connection_count = get_connection_count(instance.name)
+                    if connection_count < min_connections {
+                        min_connections = connection_count
+                        chosen = Some(instance)
+                    }
+                }
+                return chosen
+            }
+            _ => return instances.first()
+        }
+    }
+}
+
+actor ServiceMesh {
+    registry: ActorRef[ServiceRegistry]
+    load_balancers: Map[String, ActorRef[LoadBalancer]]
+    circuit_breakers: Map[String, CircuitBreakerState]
+
+    type CircuitBreakerState = {
+        state: CircuitState
+        failure_count: Int
+        success_count: Int
+        last_failure_time: i64
+    }
+
+    enum CircuitState {
+        Closed
+        Open
+        HalfOpen
+    }
+
+    fn on_init(registry: ActorRef) {
+        this.registry = registry
+        this.load_balancers = Map::new()
+        this.circuit_breakers = Map::new()
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            RouteTraffic(service_name, request) => {
+                -- Check circuit breaker
+                let cb = this.circuit_breakers.get(service_name)
+
+                match cb.state {
+                    CircuitState::Open => {
+                        -- Circuit is open, fail fast
+                        send Reply(Error("Circuit breaker open")) to sender
+                    }
+                    CircuitState::HalfOpen => {
+                        -- Try one request
+                        ask this.load_balancers[service_name]
+                            RouteRequest(service_name, request)
+                            with timeout 5s |response| {
+
+                            match response {
+                                Ok(_) => {
+                                    cb.success_count = cb.success_count + 1
+                                    if cb.success_count > 5 {
+                                        cb.state = CircuitState::Closed
+                                        cb.failure_count = 0
+                                    }
+                                }
+                                Err(_) => {
+                                    cb.state = CircuitState::Open
+                                }
+                            }
+                        }
+                    }
+                    CircuitState::Closed => {
+                        -- Normal operation
+                        ask this.load_balancers[service_name]
+                            RouteRequest(service_name, request)
+                            with timeout 5s |response| {
+
+                            match response {
+                                Ok(_) => {
+                                    cb.failure_count = 0
+                                }
+                                Err(_) => {
+                                    cb.failure_count = cb.failure_count + 1
+                                    if cb.failure_count > 10 {
+                                        cb.state = CircuitState::Open
+                                        cb.last_failure_time = now_nanos()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+type ServiceEvent =
+    | ServiceAdded(String)
+    | ServiceRemoved(String)
+    | ServiceUnhealthy(String)
+    | ServiceHealthy(String)
+
+fn get_connection_count(service_name: String) -> Int {
+    return 0  // Placeholder
+}
+
+fn random(min: Int, max: Int) -> Int {
+    return min  // Placeholder
+}
+
+fn now_nanos() -> i64 {
+    return 0  // Placeholder - would use actual system time
+}

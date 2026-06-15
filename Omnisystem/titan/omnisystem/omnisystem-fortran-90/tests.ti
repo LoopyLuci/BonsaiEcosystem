@@ -1,0 +1,3 @@
+// Tests: omnisystem-fortran-90
+
+pub fn test_module() -> i64 { return 111; }

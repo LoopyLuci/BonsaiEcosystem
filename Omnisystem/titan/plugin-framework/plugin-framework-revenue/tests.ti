@@ -1,0 +1,3 @@
+// Tests: plugin-framework-revenue
+
+pub fn test_module() -> i64 { return 111; }

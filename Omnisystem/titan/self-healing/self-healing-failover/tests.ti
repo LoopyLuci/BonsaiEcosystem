@@ -1,0 +1,3 @@
+// Tests: self-healing-failover
+
+pub fn test_module() -> i64 { return 111; }

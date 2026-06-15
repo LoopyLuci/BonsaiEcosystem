@@ -1,0 +1,5 @@
+// Tests for feature-flags
+
+pub fn test_module() -> i64 {
+    return 111;
+}

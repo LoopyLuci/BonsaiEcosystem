@@ -1,0 +1,5 @@
+// Tests for total-rewards
+
+pub fn test_module() -> i64 {
+    return 111;
+}

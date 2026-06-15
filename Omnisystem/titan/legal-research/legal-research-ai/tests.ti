@@ -1,0 +1,3 @@
+// Tests: legal-research-ai
+
+pub fn test_module() -> i64 { return 111; }

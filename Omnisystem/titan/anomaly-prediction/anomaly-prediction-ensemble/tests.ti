@@ -1,0 +1,3 @@
+// Tests: anomaly-prediction-ensemble
+
+pub fn test_module() -> i64 { return 111; }

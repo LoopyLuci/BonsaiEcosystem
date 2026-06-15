@@ -1,0 +1,5 @@
+// Tests for course-delivery
+
+pub fn test_module() -> i64 {
+    return 111;
+}

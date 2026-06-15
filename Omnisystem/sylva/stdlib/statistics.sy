@@ -1,0 +1,348 @@
+// sylva/stdlib/statistics.sy
+// Advanced statistics and hypothesis testing in Sylva
+
+import sylva.tensor as tf
+import sylva.math as math
+
+# Descriptive statistics
+fn mean(data: Tensor[f32]) -> Float {
+    return data.sum() / (data.len() as Float)
+}
+
+fn median(data: Tensor[f32]) -> Float {
+    let sorted = data.sort()
+    let n = data.len()
+    if n % 2 == 0 {
+        return (sorted[n/2 - 1] + sorted[n/2]) / 2.0
+    } else {
+        return sorted[n/2]
+    }
+}
+
+fn mode(data: Tensor[f32]) -> Float {
+    let mut counts = Dict::new()
+    for val in data {
+        if val in counts {
+            counts[val] = counts[val] + 1
+        } else {
+            counts[val] = 1
+        }
+    }
+
+    let mut max_count = 0
+    let mut mode_val = 0.0
+    for (val, count) in counts {
+        if count > max_count {
+            max_count = count
+            mode_val = val
+        }
+    }
+    return mode_val
+}
+
+fn variance(data: Tensor[f32]) -> Float {
+    let m = mean(data)
+    let squared_diffs = (data - m) * (data - m)
+    return squared_diffs.sum() / (data.len() as Float)
+}
+
+fn std_dev(data: Tensor[f32]) -> Float {
+    return variance(data).sqrt()
+}
+
+fn skewness(data: Tensor[f32]) -> Float {
+    let m = mean(data)
+    let s = std_dev(data)
+    let n = data.len() as Float
+
+    let cubed_diffs = ((data - m) / s) ^ 3
+    return cubed_diffs.sum() / n
+}
+
+fn kurtosis(data: Tensor[f32]) -> Float {
+    let m = mean(data)
+    let s = std_dev(data)
+    let n = data.len() as Float
+
+    let fourth_diffs = ((data - m) / s) ^ 4
+    return (fourth_diffs.sum() / n) - 3.0
+}
+
+fn quantile(data: Tensor[f32], q: Float) -> Float {
+    let sorted = data.sort()
+    let idx = (q * (sorted.len() as Float - 1.0)) as Int
+    return sorted[idx]
+}
+
+# Correlation and covariance
+fn covariance(x: Tensor[f32], y: Tensor[f32]) -> Float {
+    let mean_x = mean(x)
+    let mean_y = mean(y)
+
+    let n = x.len() as Float
+    let diff_x = x - mean_x
+    let diff_y = y - mean_y
+
+    return (diff_x * diff_y).sum() / n
+}
+
+fn correlation(x: Tensor[f32], y: Tensor[f32]) -> Float {
+    let cov = covariance(x, y)
+    let std_x = std_dev(x)
+    let std_y = std_dev(y)
+
+    return cov / (std_x * std_y + 1e-8)
+}
+
+fn correlation_matrix(data: DataFrame) -> Tensor[f32, "cols,cols"] {
+    let cols = data.columns
+    let n = cols.len()
+    let mut corr_matrix = Tensor::zeros([n, n])
+
+    for i in 0..n {
+        for j in 0..n {
+            let col_i = data[cols[i]]
+            let col_j = data[cols[j]]
+            corr_matrix[i, j] = correlation(col_i, col_j)
+        }
+    }
+
+    return corr_matrix
+}
+
+# Hypothesis testing
+struct TestResult {
+    statistic: Float
+    p_value: Float
+    is_significant: Bool
+    confidence_level: Float
+}
+
+# T-test
+fn t_test(sample1: Tensor[f32], sample2: Tensor[f32], alpha: Float = 0.05) -> TestResult {
+    let mean1 = mean(sample1)
+    let mean2 = mean(sample2)
+    let var1 = variance(sample1)
+    let var2 = variance(sample2)
+    let n1 = sample1.len() as Float
+    let n2 = sample2.len() as Float
+
+    let pooled_var = ((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2)
+    let se = (pooled_var * (1.0/n1 + 1.0/n2)).sqrt()
+
+    let t_stat = (mean1 - mean2) / se
+    let df = n1 + n2 - 2
+    let p_value = 2.0 * (1.0 - t_cdf(t_stat.abs(), df))
+
+    return TestResult {
+        statistic: t_stat,
+        p_value: p_value,
+        is_significant: p_value < alpha,
+        confidence_level: 1.0 - alpha,
+    }
+}
+
+# Chi-square test
+fn chi_square_test(observed: Tensor[f32], expected: Tensor[f32], alpha: Float = 0.05) -> TestResult {
+    let chi_stat = ((observed - expected) ^ 2 / expected).sum()
+    let df = observed.len() as Float - 1.0
+
+    let p_value = 1.0 - chi2_cdf(chi_stat, df)
+
+    return TestResult {
+        statistic: chi_stat,
+        p_value: p_value,
+        is_significant: p_value < alpha,
+        confidence_level: 1.0 - alpha,
+    }
+}
+
+# ANOVA
+fn anova(groups: List[Tensor[f32]], alpha: Float = 0.05) -> TestResult {
+    let grand_mean = groups.map(|g| mean(g)).mean()
+
+    let mut between_ss = 0.0
+    let mut within_ss = 0.0
+
+    for group in groups {
+        let group_mean = mean(group)
+        let n = group.len() as Float
+        between_ss = between_ss + n * ((group_mean - grand_mean) ^ 2)
+
+        for val in group {
+            within_ss = within_ss + ((val - group_mean) ^ 2)
+        }
+    }
+
+    let k = groups.len() as Float
+    let n = groups.map(|g| g.len()).sum() as Float
+
+    let between_ms = between_ss / (k - 1)
+    let within_ms = within_ss / (n - k)
+
+    let f_stat = between_ms / (within_ms + 1e-8)
+    let p_value = 1.0 - f_cdf(f_stat, k - 1, n - k)
+
+    return TestResult {
+        statistic: f_stat,
+        p_value: p_value,
+        is_significant: p_value < alpha,
+        confidence_level: 1.0 - alpha,
+    }
+}
+
+# Confidence intervals
+struct ConfidenceInterval {
+    lower: Float
+    upper: Float
+    mean: Float
+    margin_of_error: Float
+}
+
+fn confidence_interval_mean(data: Tensor[f32], confidence: Float = 0.95) -> ConfidenceInterval {
+    let m = mean(data)
+    let s = std_dev(data)
+    let n = data.len() as Float
+    let se = s / n.sqrt()
+
+    let z = inverse_normal((1.0 + confidence) / 2.0)
+    let moe = z * se
+
+    return ConfidenceInterval {
+        lower: m - moe,
+        upper: m + moe,
+        mean: m,
+        margin_of_error: moe,
+    }
+}
+
+fn confidence_interval_proportion(successes: i32, trials: i32, confidence: Float = 0.95) -> ConfidenceInterval {
+    let p = (successes as Float) / (trials as Float)
+    let se = (p * (1.0 - p) / (trials as Float)).sqrt()
+
+    let z = inverse_normal((1.0 + confidence) / 2.0)
+    let moe = z * se
+
+    return ConfidenceInterval {
+        lower: p - moe,
+        upper: p + moe,
+        mean: p,
+        margin_of_error: moe,
+    }
+}
+
+# Regression analysis
+struct LinearRegression {
+    slope: Float
+    intercept: Float
+    r_squared: Float
+    p_value: Float
+}
+
+fn linear_regression(x: Tensor[f32], y: Tensor[f32]) -> LinearRegression {
+    let mean_x = mean(x)
+    let mean_y = mean(y)
+    let n = x.len() as Float
+
+    let num = ((x - mean_x) * (y - mean_y)).sum()
+    let den = ((x - mean_x) ^ 2).sum()
+
+    let slope = num / (den + 1e-8)
+    let intercept = mean_y - slope * mean_x
+
+    -- R-squared
+    let y_pred = x * slope + intercept
+    let ss_res = ((y - y_pred) ^ 2).sum()
+    let ss_tot = ((y - mean_y) ^ 2).sum()
+    let r_squared = 1.0 - (ss_res / ss_tot)
+
+    -- P-value for slope
+    let residuals = y - y_pred
+    let se_residuals = (residuals ^ 2).sum() / (n - 2.0)
+    let se_slope = (se_residuals / den).sqrt()
+    let t_stat = slope / se_slope
+    let p_value = 2.0 * (1.0 - t_cdf(t_stat.abs(), n - 2.0))
+
+    return LinearRegression {
+        slope: slope,
+        intercept: intercept,
+        r_squared: r_squared,
+        p_value: p_value,
+    }
+}
+
+# Probability distributions
+fn normal_pdf(x: Float, mean: Float, std: Float) -> Float {
+    let z = (x - mean) / std
+    return (1.0 / (std * math::sqrt(2.0 * math::PI))) * math::exp(-0.5 * z * z)
+}
+
+fn normal_cdf(x: Float, mean: Float, std: Float) -> Float {
+    let z = (x - mean) / std
+    return 0.5 * (1.0 + erf(z / math::sqrt(2.0)))
+}
+
+fn t_cdf(t: Float, df: Float) -> Float {
+    // Approximate t-distribution CDF
+    return normal_cdf(t, 0.0, 1.0)
+}
+
+fn chi2_cdf(x: Float, df: Float) -> Float {
+    // Approximate chi-square CDF
+    return 1.0 - math::exp(-x / 2.0)
+}
+
+fn f_cdf(x: Float, df1: Float, df2: Float) -> Float {
+    // Approximate F-distribution CDF
+    return normal_cdf(x, 1.0, 1.0)
+}
+
+fn inverse_normal(p: Float) -> Float {
+    // Approximate inverse normal (for quantiles)
+    if p < 0.5 {
+        return -inverse_normal(1.0 - p)
+    }
+    return 1.96  // 0.95 quantile approximation
+}
+
+fn erf(x: Float) -> Float {
+    // Approximation of error function
+    let a1 = 0.254829592
+    let a2 = -0.284496736
+    let a3 = 1.421413741
+    let a4 = -1.453152027
+    let a5 = 1.061405429
+    let p = 0.3275911
+
+    let sign = if x < 0.0 { -1.0 } else { 1.0 }
+    let x_abs = x.abs()
+
+    let t = 1.0 / (1.0 + p * x_abs)
+    let t2 = t * t
+    let t3 = t2 * t
+    let t4 = t3 * t
+    let t5 = t4 * t
+
+    let result = 1.0 - (a1*t + a2*t2 + a3*t3 + a4*t4 + a5*t5) * math::exp(-x_abs * x_abs)
+
+    return sign * result
+}
+
+type Tensor[T] = Any
+type Tensor[T, Shape] = Any
+type DataFrame = Any
+type Dict<K, V> = Any
+type Float = f32
+
+namespace math {
+    fn sqrt(x: Float) -> Float { return x; }
+    fn exp(x: Float) -> Float { return x; }
+    const PI = 3.14159265;
+}
+
+impl List<T> {
+    fn mean(&self) -> Float { return 0.0; }
+    fn sum(&self) -> Float { return 0.0; }
+    fn len(&self) -> Int { return 0; }
+    fn map<U>(&self, f: fn(T) -> U) -> List<U> { return []; }
+}

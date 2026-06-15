@@ -1,0 +1,360 @@
+// aether/crdts/crdt.ti
+// Conflict-free Replicated Data Types (CRDTs)
+
+pub struct GCounter {
+    vector: Vec<i64>,  // One counter per replica
+    replica_id: i32,
+}
+
+pub struct PNCounter {
+    increments: Vec<i64>,
+    decrements: Vec<i64>,
+    replica_id: i32,
+}
+
+pub struct GSet<T> {
+    elements: Vec<T>,
+}
+
+pub struct TwoPhaseSet<T> {
+    adds: Vec<T>,
+    removes: Vec<T>,
+}
+
+pub struct LWWRegister<T> {
+    value: T,
+    timestamp: i64,
+    replica_id: i32,
+}
+
+pub struct LWWElement<T> {
+    value: T,
+    timestamp: i64,
+}
+
+pub struct LWWElementSet<T> {
+    elements: Vec<LWWElement<T>>,
+}
+
+pub struct ORSet<T> {
+    elements: Vec<(T, i64, i32)>,  // (value, unique_id, replica_id)
+}
+
+// GCounter: Grow-only Counter
+pub fn gcounter_new(replica_id: i32, cluster_size: i32) -> GCounter {
+    let mut vector: Vec<i64> = Vec::new();
+    for i in 0..cluster_size {
+        vector.push(0);
+    }
+
+    return GCounter {
+        vector: vector,
+        replica_id: replica_id,
+    };
+}
+
+pub fn gcounter_increment(counter: &mut GCounter, amount: i64) ! {distributed} {
+    counter.vector[counter.replica_id as usize] =
+        counter.vector[counter.replica_id as usize] + amount;
+}
+
+pub fn gcounter_value(counter: &GCounter) -> i64 ! {distributed} {
+    let mut sum: i64 = 0;
+    for count in &counter.vector {
+        sum = sum + count;
+    }
+    return sum;
+}
+
+pub fn gcounter_merge(counter: &mut GCounter, other: &GCounter) ! {distributed} {
+    for i in 0..counter.vector.len() {
+        if other.vector[i] > counter.vector[i] {
+            counter.vector[i] = other.vector[i];
+        }
+    }
+}
+
+// PNCounter: Positive-Negative Counter
+pub fn pncounter_new(replica_id: i32, cluster_size: i32) -> PNCounter {
+    let mut inc: Vec<i64> = Vec::new();
+    let mut dec: Vec<i64> = Vec::new();
+
+    for i in 0..cluster_size {
+        inc.push(0);
+        dec.push(0);
+    }
+
+    return PNCounter {
+        increments: inc,
+        decrements: dec,
+        replica_id: replica_id,
+    };
+}
+
+pub fn pncounter_increment(counter: &mut PNCounter) ! {distributed} {
+    counter.increments[counter.replica_id as usize] =
+        counter.increments[counter.replica_id as usize] + 1;
+}
+
+pub fn pncounter_decrement(counter: &mut PNCounter) ! {distributed} {
+    counter.decrements[counter.replica_id as usize] =
+        counter.decrements[counter.replica_id as usize] + 1;
+}
+
+pub fn pncounter_value(counter: &PNCounter) -> i64 ! {distributed} {
+    let mut inc_sum: i64 = 0;
+    let mut dec_sum: i64 = 0;
+
+    for count in &counter.increments {
+        inc_sum = inc_sum + count;
+    }
+
+    for count in &counter.decrements {
+        dec_sum = dec_sum + count;
+    }
+
+    return inc_sum - dec_sum;
+}
+
+pub fn pncounter_merge(counter: &mut PNCounter, other: &PNCounter) ! {distributed} {
+    for i in 0..counter.increments.len() {
+        if other.increments[i] > counter.increments[i] {
+            counter.increments[i] = other.increments[i];
+        }
+        if other.decrements[i] > counter.decrements[i] {
+            counter.decrements[i] = other.decrements[i];
+        }
+    }
+}
+
+// GSet: Grow-only Set
+pub fn gset_new<T>() -> GSet<T> {
+    return GSet {
+        elements: Vec::new(),
+    };
+}
+
+pub fn gset_add<T: Clone>(set: &mut GSet<T>, element: &T) ! {distributed} {
+    set.elements.push(element.clone());
+}
+
+pub fn gset_lookup<T: PartialEq>(set: &GSet<T>, element: &T) -> bool ! {distributed} {
+    for elem in &set.elements {
+        if elem == element {
+            return true;
+        }
+    }
+    return false;
+}
+
+pub fn gset_merge<T: Clone>(set: &mut GSet<T>, other: &GSet<T>) ! {distributed} {
+    for elem in &other.elements {
+        if !gset_lookup(set, elem) {
+            set.elements.push(elem.clone());
+        }
+    }
+}
+
+// TwoPhaseSet: Set with adds and removes
+pub fn twoset_new<T>() -> TwoPhaseSet<T> {
+    return TwoPhaseSet {
+        adds: Vec::new(),
+        removes: Vec::new(),
+    };
+}
+
+pub fn twoset_add<T: Clone>(set: &mut TwoPhaseSet<T>, element: &T) ! {distributed} {
+    set.adds.push(element.clone());
+}
+
+pub fn twoset_remove<T: Clone + PartialEq>(set: &mut TwoPhaseSet<T>, element: &T) ! {distributed} {
+    // Element must have been added before removing
+    for add_elem in &set.adds {
+        if add_elem == element {
+            set.removes.push(element.clone());
+            return;
+        }
+    }
+}
+
+pub fn twoset_lookup<T: PartialEq>(set: &TwoPhaseSet<T>, element: &T) -> bool ! {distributed} {
+    let in_adds = false;
+    let in_removes = false;
+
+    for add_elem in &set.adds {
+        if add_elem == element {
+            break;
+        }
+    }
+
+    for rem_elem in &set.removes {
+        if rem_elem == element {
+            break;
+        }
+    }
+
+    return in_adds && !in_removes;
+}
+
+// LWWRegister: Last-Writer-Wins Register
+pub fn lww_register_new<T>(initial: T, replica_id: i32) -> LWWRegister<T> {
+    return LWWRegister {
+        value: initial,
+        timestamp: 0,
+        replica_id: replica_id,
+    };
+}
+
+pub fn lww_register_set<T>(reg: &mut LWWRegister<T>, value: T, timestamp: i64) ! {distributed} {
+    if timestamp > reg.timestamp {
+        reg.value = value;
+        reg.timestamp = timestamp;
+    }
+}
+
+pub fn lww_register_get<T: Clone>(reg: &LWWRegister<T>) -> T ! {distributed} {
+    return reg.value.clone();
+}
+
+pub fn lww_register_merge<T: Clone>(
+    reg: &mut LWWRegister<T>,
+    other: &LWWRegister<T>
+) ! {distributed} {
+    if other.timestamp > reg.timestamp {
+        reg.value = other.value.clone();
+        reg.timestamp = other.timestamp;
+    } else if other.timestamp == reg.timestamp && other.replica_id > reg.replica_id {
+        // Break ties using replica_id
+        reg.value = other.value.clone();
+    }
+}
+
+// ORSet: Observed-Remove Set (supports concurrent add/remove)
+pub fn orset_new<T>() -> ORSet<T> {
+    return ORSet {
+        elements: Vec::new(),
+    };
+}
+
+pub fn orset_add<T: Clone>(set: &mut ORSet<T>, element: &T, unique_id: i64, replica_id: i32) ! {distributed} {
+    set.elements.push((element.clone(), unique_id, replica_id));
+}
+
+pub fn orset_remove<T: Clone + PartialEq>(set: &mut ORSet<T>, element: &T, unique_id: i64) ! {distributed} {
+    // Remove all instances of (element, unique_id)
+    let mut new_elements: Vec<(T, i64, i32)> = Vec::new();
+
+    for (elem, id, rid) in &set.elements {
+        if !(elem == element && *id == unique_id) {
+            new_elements.push((elem.clone(), *id, *rid));
+        }
+    }
+
+    set.elements = new_elements;
+}
+
+pub fn orset_lookup<T: PartialEq>(set: &ORSet<T>, element: &T) -> bool ! {distributed} {
+    for (elem, _, _) in &set.elements {
+        if elem == element {
+            return true;
+        }
+    }
+    return false;
+}
+
+pub fn orset_merge<T: Clone + PartialEq>(set: &mut ORSet<T>, other: &ORSet<T>) ! {distributed} {
+    for (elem, id, rid) in &other.elements {
+        let mut found = false;
+        for (own_elem, own_id, own_rid) in &set.elements {
+            if own_elem == elem && *own_id == *id {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            set.elements.push((elem.clone(), *id, *rid));
+        }
+    }
+}
+
+// CRDT trait
+pub trait CRDT {
+    fn merge(&mut self, other: &Self) ! {distributed};
+}
+
+impl CRDT for GCounter {
+    fn merge(&mut self, other: &GCounter) ! {distributed} {
+        gcounter_merge(self, other);
+    }
+}
+
+// Timestamp generator for causal ordering
+pub struct TimestampGenerator {
+    vector_clock: Vec<i32>,
+    replica_id: i32,
+}
+
+pub fn timestamp_generator_new(replica_id: i32, cluster_size: i32) -> TimestampGenerator {
+    let mut vc: Vec<i32> = Vec::new();
+    for i in 0..cluster_size {
+        vc.push(0);
+    }
+
+    return TimestampGenerator {
+        vector_clock: vc,
+        replica_id: replica_id,
+    };
+}
+
+pub fn timestamp_generator_next(gen: &mut TimestampGenerator) -> Vec<i32> ! {distributed} {
+    gen.vector_clock[gen.replica_id as usize] =
+        gen.vector_clock[gen.replica_id as usize] + 1;
+
+    return gen.vector_clock.clone();
+}
+
+pub fn timestamp_happens_before(a: &Vec<i32>, b: &Vec<i32>) -> bool ! {distributed} {
+    let mut less = false;
+    for i in 0..a.len() {
+        if a[i] > b[i] {
+            return false;
+        }
+        if a[i] < b[i] {
+            less = true;
+        }
+    }
+    return less;
+}
+
+pub fn timestamp_merge_vector_clocks(a: &Vec<i32>, b: &Vec<i32>) -> Vec<i32> ! {distributed} {
+    let mut result: Vec<i32> = Vec::new();
+    for i in 0..a.len() {
+        if a[i] > b[i] {
+            result.push(a[i]);
+        } else {
+            result.push(b[i]);
+        }
+    }
+    return result;
+}
+
+trait Clone {
+    fn clone(&self) -> Self;
+}
+
+trait PartialEq<T> {
+    fn eq(&self, other: &T) -> bool;
+    fn ne(&self, other: &T) -> bool;
+}
+
+impl Clone for i64 {
+    fn clone(&self) -> i64 {
+        return *self;
+    }
+}
+
+impl Clone for i32 {
+    fn clone(&self) -> i32 {
+        return *self;
+    }
+}

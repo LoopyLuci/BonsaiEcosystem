@@ -1,0 +1,3 @@
+// Tests: omnisystem-module-factory
+
+pub fn test_module() -> i64 { return 111; }

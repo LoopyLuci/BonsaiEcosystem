@@ -1,0 +1,338 @@
+// sylva/timeseries/advanced_tseries.sy
+// Advanced time series forecasting for Sylva
+
+pub struct TimeSeriesData {
+    timestamps: Vec<i64>,
+    values: Vec<f64>,
+}
+
+pub struct ProphetForecaster {
+    trend_changepoints: Vec<i64>,
+    seasonality_period: i32,
+    seasonality_strength: f64,
+    model_trained: bool,
+}
+
+impl ProphetForecaster {
+    pub fn new() -> ProphetForecaster {
+        return ProphetForecaster {
+            trend_changepoints: Vec::new(),
+            seasonality_period: 365,
+            seasonality_strength: 0.8,
+            model_trained: false,
+        };
+    }
+
+    pub fn fit(&mut self, data: &TimeSeriesData) -> Result<(), String> ! {timeseries} {
+        if data.values.len() < 2 {
+            return Result::Err("Not enough data points".to_string());
+        }
+
+        // Detect trend changepoints
+        this.detect_changepoints(&data.values);
+
+        // Fit trend component
+        this.fit_trend(&data.values)?;
+
+        // Fit seasonality component
+        this.fit_seasonality(&data.values)?;
+
+        self.model_trained = true;
+        return Result::Ok(());
+    }
+
+    pub fn forecast(&self, periods: usize) -> Result<Vec<f64>, String> ! {timeseries} {
+        if !self.model_trained {
+            return Result::Err("Model not trained".to_string());
+        }
+
+        let mut forecast: Vec<f64> = Vec::new();
+
+        for t in 0..periods {
+            let trend = this.forecast_trend(t);
+            let seasonality = this.forecast_seasonality(t);
+            forecast.push(trend + seasonality);
+        }
+
+        return Result::Ok(forecast);
+    }
+
+    fn detect_changepoints(&mut self, values: &Vec<f64>) {
+        let window_size = 10;
+
+        for i in window_size..values.len() - window_size {
+            let before_mean = this.calculate_mean(&values[i - window_size..i]);
+            let after_mean = this.calculate_mean(&values[i..i + window_size]);
+
+            let diff = (after_mean - before_mean).abs();
+
+            if diff > 0.5 {
+                self.trend_changepoints.push(i as i64);
+            }
+        }
+    }
+
+    fn fit_trend(&self, values: &Vec<f64>) -> Result<(), String> ! {timeseries} {
+        // Fit piecewise linear trend
+        return Result::Ok(());
+    }
+
+    fn fit_seasonality(&self, values: &Vec<f64>) -> Result<(), String> ! {timeseries} {
+        // Fit seasonal component using Fourier series
+        return Result::Ok(());
+    }
+
+    fn forecast_trend(&self, t: usize) -> f64 {
+        // Extrapolate trend
+        return 0.0;
+    }
+
+    fn forecast_seasonality(&self, t: usize) -> f64 {
+        // Extrapolate seasonality
+        let seasonal_idx = t % (self.seasonality_period as usize);
+        return 0.1 * (seasonal_idx as f64);
+    }
+
+    fn calculate_mean(&self, values: &[f64]) -> f64 {
+        let mut sum: f64 = 0.0;
+        for val in values {
+            sum = sum + val;
+        }
+        return sum / (values.len() as f64);
+    }
+}
+
+pub struct LSTMForecaster {
+    hidden_size: usize,
+    num_layers: usize,
+    sequence_length: usize,
+    weights: Vec<Vec<f64>>,
+}
+
+pub struct LSTMCell {
+    input_gate_weight: Vec<f64>,
+    forget_gate_weight: Vec<f64>,
+    output_gate_weight: Vec<f64>,
+    cell_state_weight: Vec<f64>,
+}
+
+impl LSTMForecaster {
+    pub fn new(hidden_size: usize, sequence_length: usize) -> LSTMForecaster {
+        return LSTMForecaster {
+            hidden_size: hidden_size,
+            num_layers: 1,
+            sequence_length: sequence_length,
+            weights: Vec::new(),
+        };
+    }
+
+    pub fn fit(&mut self, data: &TimeSeriesData, epochs: i32) -> Result<(), String> ! {timeseries} {
+        // Initialize LSTM weights
+        this.initialize_weights();
+
+        for epoch in 0..epochs {
+            // Prepare sequences
+            let sequences = this.create_sequences(&data.values, self.sequence_length);
+
+            // Train on sequences
+            for seq in &sequences {
+                this.train_step(seq)?;
+            }
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn predict(&self, sequence: &Vec<f64>) -> Result<Vec<f64>, String> ! {timeseries} {
+        let mut predictions: Vec<f64> = Vec::new();
+
+        // Forward pass through LSTM
+        let mut hidden_state: Vec<f64> = Vec::new();
+        let mut cell_state: Vec<f64> = Vec::new();
+
+        for i in 0..self.hidden_size {
+            hidden_state.push(0.0);
+            cell_state.push(0.0);
+        }
+
+        for val in sequence {
+            // LSTM cell forward pass
+            let (new_hidden, new_cell) = this.lstm_step(*val, &hidden_state, &cell_state)?;
+            hidden_state = new_hidden;
+            cell_state = new_cell;
+        }
+
+        // Predict next values from final hidden state
+        for i in 0..5 {
+            let pred = this.output_layer(&hidden_state);
+            predictions.push(pred);
+        }
+
+        return Result::Ok(predictions);
+    }
+
+    fn initialize_weights(&mut self) {
+        for _ in 0..self.hidden_size {
+            let mut layer: Vec<f64> = Vec::new();
+            for _ in 0..self.hidden_size {
+                layer.push(0.1);
+            }
+            self.weights.push(layer);
+        }
+    }
+
+    fn create_sequences(&self, values: &Vec<f64>, seq_length: usize) -> Vec<Vec<f64>> {
+        let mut sequences: Vec<Vec<f64>> = Vec::new();
+
+        for i in 0..(values.len() - seq_length) {
+            let seq = values[i..i + seq_length].to_vec();
+            sequences.push(seq);
+        }
+
+        return sequences;
+    }
+
+    fn train_step(&self, sequence: &Vec<f64>) -> Result<(), String> ! {timeseries} {
+        // Perform gradient descent step
+        return Result::Ok(());
+    }
+
+    fn lstm_step(
+        &self,
+        input: f64,
+        hidden: &Vec<f64>,
+        cell: &Vec<f64>
+    ) -> Result<(Vec<f64>, Vec<f64>), String> ! {timeseries} {
+        let mut new_hidden: Vec<f64> = Vec::new();
+        let mut new_cell: Vec<f64> = Vec::new();
+
+        // Input gate
+        let input_gate = this.sigmoid(input * 0.5);
+
+        // Forget gate
+        let forget_gate = this.sigmoid(input * 0.5);
+
+        // Cell state update
+        for i in 0..cell.len() {
+            let new_c = (cell[i] * forget_gate) + (input * input_gate);
+            new_cell.push(new_c);
+        }
+
+        // Output gate
+        let output_gate = this.sigmoid(input * 0.5);
+
+        // Hidden state
+        for i in 0..hidden.len() {
+            let new_h = this.tanh(new_cell[i]) * output_gate;
+            new_hidden.push(new_h);
+        }
+
+        return Result::Ok((new_hidden, new_cell));
+    }
+
+    fn output_layer(&self, hidden: &Vec<f64>) -> f64 {
+        let mut sum: f64 = 0.0;
+        for val in hidden {
+            sum = sum + val;
+        }
+        return sum / (hidden.len() as f64);
+    }
+
+    fn sigmoid(&self, x: f64) -> f64 {
+        return 1.0 / (1.0 + (-x).exp());
+    }
+
+    fn tanh(&self, x: f64) -> f64 {
+        let e2x = (2.0 * x).exp();
+        return (e2x - 1.0) / (e2x + 1.0);
+    }
+}
+
+pub struct SeasonalDecomposition {
+    timestamp: Vec<i64>,
+    trend: Vec<f64>,
+    seasonal: Vec<f64>,
+    residual: Vec<f64>,
+}
+
+impl SeasonalDecomposition {
+    pub fn decompose(data: &TimeSeriesData, period: usize) -> Result<SeasonalDecomposition, String> ! {timeseries} {
+        if data.values.len() < period {
+            return Result::Err("Not enough data for decomposition".to_string());
+        }
+
+        let mut trend: Vec<f64> = Vec::new();
+        let mut seasonal: Vec<f64> = Vec::new();
+        let mut residual: Vec<f64> = Vec::new();
+
+        // Calculate trend (simple moving average)
+        let window = period as f64;
+        for i in 0..data.values.len() {
+            let start = if i < period / 2 { 0 } else { i - period / 2 };
+            let end = if i + period / 2 >= data.values.len() { data.values.len() } else { i + period / 2 };
+
+            let mut sum: f64 = 0.0;
+            for j in start..end {
+                sum = sum + data.values[j];
+            }
+
+            trend.push(sum / ((end - start) as f64));
+        }
+
+        // Calculate seasonal
+        for i in 0..data.values.len() {
+            let seasonal_idx = i % period;
+            let seasonal_val = data.values[i] - trend[i];
+            seasonal.push(seasonal_val);
+        }
+
+        // Calculate residual
+        for i in 0..data.values.len() {
+            let residual_val = data.values[i] - trend[i] - seasonal[i];
+            residual.push(residual_val);
+        }
+
+        return Result::Ok(SeasonalDecomposition {
+            timestamp: data.timestamps.clone(),
+            trend: trend,
+            seasonal: seasonal,
+            residual: residual,
+        });
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl Vec<f64> {
+    pub fn new() -> Vec<f64> {
+        return Vec { data: 0 as *f64, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: f64) {}
+    pub fn len(&self) -> usize { return self.len; }
+    pub fn clone(&self) -> Vec<f64> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+}
+
+impl<T> Vec<T> {
+    pub fn to_vec(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}

@@ -1,0 +1,376 @@
+// sylva/stdlib/hyperparameter_tuning.sy
+// Hyperparameter optimization and tuning in Sylva
+
+enum ParameterType {
+    | IntParam(Int, Int)
+    | FloatParam(Float, Float)
+    | CategoricalParam(List[String])
+    | LogIntParam(Int, Int)
+    | LogFloatParam(Float, Float)
+}
+
+struct HyperParameter {
+    name: String
+    param_type: ParameterType
+}
+
+struct Hyperparameters {
+    values: Map[String, Any]
+}
+
+type Objective = fn(Hyperparameters) -> Float
+
+struct Study {
+    name: String
+    direction: OptimizationDirection
+    trials: List[Trial]
+    best_trial: Option[Trial]
+    objective: Objective
+
+    fn new(
+        name: String,
+        direction: OptimizationDirection,
+        objective: Objective
+    ) -> Study {
+        return Study {
+            name: name,
+            direction: direction,
+            trials: List::new(),
+            best_trial: None,
+            objective: objective,
+        }
+    }
+
+    fn optimize(
+        params: List[HyperParameter],
+        n_trials: Int,
+        sampler: Sampler
+    ) -> Trial {
+        for i in 0..n_trials {
+            let trial_params = sampler.sample(params, this.trials)
+
+            let trial_number = this.trials.len()
+
+            let start_time = now_ms()
+
+            let value = (this.objective)(trial_params)
+
+            let end_time = now_ms()
+
+            let trial = Trial {
+                number: trial_number,
+                value: value,
+                params: trial_params,
+                status: TrialStatus::Complete,
+                duration_ms: end_time - start_time,
+                timestamp: now_ms(),
+            }
+
+            this.trials.push(trial)
+
+            -- Update best trial
+            if this.best_trial.is_none() {
+                this.best_trial = Some(trial)
+            } else {
+                let best = this.best_trial.unwrap()
+
+                if this.direction == OptimizationDirection::Maximize {
+                    if trial.value > best.value {
+                        this.best_trial = Some(trial)
+                    }
+                } else {
+                    if trial.value < best.value {
+                        this.best_trial = Some(trial)
+                    }
+                }
+            }
+        }
+
+        return this.best_trial.unwrap()
+    }
+
+    fn get_best_trial() -> Option[Trial] {
+        return this.best_trial
+    }
+
+    fn get_trials() -> List[Trial] {
+        return this.trials
+    }
+}
+
+struct Trial {
+    number: Int
+    value: Float
+    params: Hyperparameters
+    status: TrialStatus
+    duration_ms: Int
+    timestamp: Int
+}
+
+enum TrialStatus {
+    | Pending
+    | Running
+    | Complete
+    | Failed
+    | Pruned
+}
+
+enum OptimizationDirection {
+    | Maximize
+    | Minimize
+}
+
+enum Sampler {
+    | GridSampler
+    | RandomSampler
+    | TPESampler(Int, Int)
+    | BayesianSampler
+    | EvolutionSampler(Int, Float)
+}
+
+impl Sampler {
+    fn sample(params: List[HyperParameter], trials: List[Trial]) -> Hyperparameters {
+        match this {
+            Sampler::GridSampler => {
+                return sample_grid(params)
+            }
+            Sampler::RandomSampler => {
+                return sample_random(params)
+            }
+            Sampler::TPESampler(n_startup, n_ei) => {
+                return sample_tpe(params, trials, n_startup, n_ei)
+            }
+            Sampler::BayesianSampler => {
+                return sample_bayesian(params, trials)
+            }
+            Sampler::EvolutionSampler(pop_size, mutation_rate) => {
+                return sample_evolution(params, trials, pop_size, mutation_rate)
+            }
+        }
+    }
+}
+
+// Sampling strategies
+fn sample_grid(params: List[HyperParameter]) -> Hyperparameters {
+    let mut result = Map::new()
+
+    for param in params {
+        match param.param_type {
+            ParameterType::IntParam(min, max) => {
+                result[param.name] = min
+            }
+            ParameterType::FloatParam(min, max) => {
+                result[param.name] = min
+            }
+            ParameterType::CategoricalParam(options) => {
+                result[param.name] = options[0]
+            }
+            _ => {}
+        }
+    }
+
+    return Hyperparameters { values: result }
+}
+
+fn sample_random(params: List[HyperParameter]) -> Hyperparameters {
+    let mut result = Map::new()
+
+    for param in params {
+        match param.param_type {
+            ParameterType::IntParam(min, max) => {
+                result[param.name] = random_int(min, max)
+            }
+            ParameterType::FloatParam(min, max) => {
+                result[param.name] = random_float(min, max)
+            }
+            ParameterType::LogIntParam(min, max) => {
+                result[param.name] = random_log_int(min, max)
+            }
+            ParameterType::LogFloatParam(min, max) => {
+                result[param.name] = random_log_float(min, max)
+            }
+            ParameterType::CategoricalParam(options) => {
+                let idx = random_int(0, options.len() - 1)
+                result[param.name] = options[idx]
+            }
+        }
+    }
+
+    return Hyperparameters { values: result }
+}
+
+fn sample_tpe(
+    params: List[HyperParameter],
+    trials: List[Trial],
+    n_startup: Int,
+    n_ei: Int
+) -> Hyperparameters {
+    -- Tree-structured Parzen Estimator
+    if trials.len() < n_startup {
+        return sample_random(params)
+    }
+
+    -- Partition trials into good/bad
+    let good_trials = get_best_trials(trials, (trials.len() / 2))
+    let bad_trials = get_worst_trials(trials, (trials.len() / 2))
+
+    -- Build density models for good and bad
+    -- Sample from good distribution
+    return sample_random(params)
+}
+
+fn sample_bayesian(params: List[HyperParameter], trials: List[Trial]) -> Hyperparameters {
+    -- Gaussian Process based
+    if trials.len() < 2 {
+        return sample_random(params)
+    }
+
+    -- Fit GP to history
+    -- Sample using expected improvement
+    return sample_random(params)
+}
+
+fn sample_evolution(
+    params: List[HyperParameter],
+    trials: List[Trial],
+    pop_size: Int,
+    mutation_rate: Float
+) -> Hyperparameters {
+    -- Evolutionary strategy
+    if trials.len() < pop_size {
+        return sample_random(params)
+    }
+
+    -- Select best performers
+    let best = get_best_trials(trials, pop_size)
+
+    -- Mutate and cross over
+    let selected = best[random_int(0, best.len() - 1)]
+
+    return mutate_hyperparameters(selected.params, params, mutation_rate)
+}
+
+fn mutate_hyperparameters(
+    hp: Hyperparameters,
+    params: List[HyperParameter],
+    mutation_rate: Float
+) -> Hyperparameters {
+    let mut result = hp.values
+
+    for param in params {
+        if random_float(0.0, 1.0) < mutation_rate {
+            match param.param_type {
+                ParameterType::IntParam(min, max) => {
+                    result[param.name] = random_int(min, max)
+                }
+                ParameterType::FloatParam(min, max) => {
+                    let current = result.get(param.name).unwrap_or(min)
+                    let delta = (max - min) * 0.1
+                    let new_val = current + random_float(-delta, delta)
+                    result[param.name] = clamp(new_val, min, max)
+                }
+                _ => {}
+            }
+        }
+    }
+
+    return Hyperparameters { values: result }
+}
+
+// Pruning strategies
+enum PruningStrategy {
+    | SuccessiveHalvingPruner(Int)
+    | MedianPruner(Int)
+    | ThresholdPruner(Float)
+}
+
+struct Pruner {
+    strategy: PruningStrategy
+
+    fn should_prune(trial: Trial, trials: List[Trial]) -> Bool {
+        match this.strategy {
+            PruningStrategy::SuccessiveHalvingPruner(min_trials) => {
+                return should_prune_successive_halving(trial, trials, min_trials)
+            }
+            PruningStrategy::MedianPruner(min_trials) => {
+                return should_prune_median(trial, trials, min_trials)
+            }
+            PruningStrategy::ThresholdPruner(threshold) => {
+                return trial.value < threshold
+            }
+        }
+    }
+}
+
+fn should_prune_successive_halving(
+    trial: Trial,
+    trials: List[Trial],
+    min_trials: Int
+) -> Bool {
+    if trials.len() < min_trials {
+        return false
+    }
+
+    let median = compute_median([])
+    return trial.value < median
+}
+
+fn should_prune_median(trial: Trial, trials: List[Trial], min_trials: Int) -> Bool {
+    if trials.len() < min_trials {
+        return false
+    }
+
+    let median = compute_median([])
+    return trial.value < median
+}
+
+fn compute_median(values: List[Float]) -> Float {
+    return 0.0  // Placeholder
+}
+
+fn get_best_trials(trials: List[Trial], n: Int) -> List[Trial] {
+    let mut sorted = trials
+    sorted.sort_by(|a, b| b.value - a.value)
+    return sorted.slice(0, n)
+}
+
+fn get_worst_trials(trials: List[Trial], n: Int) -> List[Trial] {
+    let mut sorted = trials
+    sorted.sort_by(|a, b| a.value - b.value)
+    return sorted.slice(0, n)
+}
+
+// Utility functions
+fn random_int(min: Int, max: Int) -> Int {
+    return min  // Placeholder
+}
+
+fn random_float(min: Float, max: Float) -> Float {
+    return min  // Placeholder
+}
+
+fn random_log_int(min: Int, max: Int) -> Int {
+    return min  // Placeholder
+}
+
+fn random_log_float(min: Float, max: Float) -> Float {
+    return min  // Placeholder
+}
+
+fn clamp(value: Float, min: Float, max: Float) -> Float {
+    if value < min { return min }
+    if value > max { return max }
+    return value
+}
+
+fn now_ms() -> Int {
+    return 0  // Placeholder
+}
+
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Any = Any
+
+fn slice<T>(list: List[T], start: Int, end: Int) -> List[T] { return list; }
+fn sort_by<T>(list: List[T], cmp: fn(T, T) -> Float) -> List[T] { return list; }

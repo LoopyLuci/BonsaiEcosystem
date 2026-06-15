@@ -1,0 +1,359 @@
+// aether/distribution/geo_distribution.ae
+// Geo-distributed systems for Aether
+
+pub struct GeoLocation {
+    latitude: f64,
+    longitude: f64,
+    region: String,
+    zone: String,
+    datacenter: String,
+}
+
+pub struct GeoDistributedSystem {
+    regions: Map<String, Region>,
+    replication_factor: i32,
+    consistency_model: ConsistencyModel,
+    latency_targets: Map<String, i32>,
+}
+
+pub struct Region {
+    name: String,
+    datacenters: Vec<Datacenter>,
+    leader: Option<String>,
+    replication_lag_ms: i64,
+}
+
+pub struct Datacenter {
+    name: String,
+    location: GeoLocation,
+    nodes: Vec<Node>,
+    network_latency_ms: i32,
+}
+
+pub struct Node {
+    id: String,
+    datacenter: String,
+    region: String,
+    role: NodeRole,
+    sync_state: SyncState,
+}
+
+pub enum NodeRole {
+    Leader,
+    Follower,
+    Observer,
+}
+
+pub enum SyncState {
+    InSync,
+    LaggingBehind,
+    OutOfSync,
+}
+
+pub enum ConsistencyModel {
+    StrongConsistency,
+    EventualConsistency,
+    CausalConsistency,
+    ReadYourWrites,
+}
+
+impl GeoDistributedSystem {
+    pub fn new(consistency_model: ConsistencyModel) -> GeoDistributedSystem {
+        return GeoDistributedSystem {
+            regions: Map::new(),
+            replication_factor: 3,
+            consistency_model: consistency_model,
+            latency_targets: Map::new(),
+        };
+    }
+
+    pub fn add_region(&mut self, region_name: &str) -> Result<(), String> ! {distribution} {
+        let region = Region {
+            name: region_name.to_string(),
+            datacenters: Vec::new(),
+            leader: Option::None,
+            replication_lag_ms: 0,
+        };
+
+        self.regions[region_name.to_string()] = region;
+        return Result::Ok(());
+    }
+
+    pub fn add_datacenter(
+        &mut self,
+        region: &str,
+        datacenter_name: &str,
+        location: GeoLocation
+    ) -> Result<(), String> ! {distribution} {
+        if !self.regions.contains_key(region.to_string()) {
+            return Result::Err("Region not found".to_string());
+        }
+
+        let dc = Datacenter {
+            name: datacenter_name.to_string(),
+            location: location,
+            nodes: Vec::new(),
+            network_latency_ms: 0,
+        };
+
+        self.regions[region.to_string()].datacenters.push(dc);
+        return Result::Ok(());
+    }
+
+    pub fn select_replica_nodes(&self, key: &str) -> Vec<Node> {
+        let mut selected_nodes: Vec<Node> = Vec::new();
+
+        for (region_name, region) in &self.regions.clone() {
+            for dc in &region.datacenters {
+                for node in &dc.nodes {
+                    selected_nodes.push(node.clone());
+
+                    if selected_nodes.len() >= (self.replication_factor as usize) {
+                        break;
+                    }
+                }
+
+                if selected_nodes.len() >= (self.replication_factor as usize) {
+                    break;
+                }
+            }
+
+            if selected_nodes.len() >= (self.replication_factor as usize) {
+                break;
+            }
+        }
+
+        return selected_nodes;
+    }
+
+    pub fn read_from_closest(&self, key: &str, client_location: &GeoLocation) -> Result<String, String> ! {distribution} {
+        let mut closest_node: Option<Node> = Option::None;
+        let mut min_distance: f64 = 999999.0;
+
+        for (region_name, region) in &self.regions.clone() {
+            for dc in &region.datacenters {
+                let distance = this.calculate_distance(&client_location, &dc.location);
+
+                for node in &dc.nodes {
+                    if distance < min_distance && node.sync_state != SyncState::OutOfSync {
+                        closest_node = Option::Some(node.clone());
+                        min_distance = distance;
+                    }
+                }
+            }
+        }
+
+        match closest_node {
+            Option::Some(node) => {
+                // Read from closest node
+                return Result::Ok("data".to_string());
+            }
+            Option::None => {
+                return Result::Err("No suitable node found".to_string());
+            }
+        }
+    }
+
+    pub fn write_with_replication(&mut self, key: &str, value: &str) -> Result<(), String> ! {distribution} {
+        let mut replicas = self.select_replica_nodes(key);
+
+        match self.consistency_model {
+            ConsistencyModel::StrongConsistency => {
+                // Wait for all replicas to acknowledge
+                for node in replicas {
+                    this.replicate_to_node(&node, key, value)?;
+                }
+            }
+
+            ConsistencyModel::EventualConsistency => {
+                // Write to local, asynchronously replicate
+                if replicas.len() > 0 {
+                    let primary = replicas[0].clone();
+                    this.replicate_to_node(&primary, key, value)?;
+                }
+            }
+
+            ConsistencyModel::CausalConsistency => {
+                // Write with causal ordering metadata
+                for node in replicas {
+                    this.replicate_to_node(&node, key, value)?;
+                }
+            }
+
+            _ => {}
+        }
+
+        return Result::Ok(());
+    }
+
+    fn replicate_to_node(&self, node: &Node, key: &str, value: &str) -> Result<(), String> ! {distribution} {
+        // Send replication message to node
+        return Result::Ok(());
+    }
+
+    fn calculate_distance(&self, loc1: &GeoLocation, loc2: &GeoLocation) -> f64 {
+        // Haversine formula for distance
+        let lat_diff = loc1.latitude - loc2.latitude;
+        let lon_diff = loc1.longitude - loc2.longitude;
+
+        return (lat_diff * lat_diff + lon_diff * lon_diff).sqrt();
+    }
+
+    pub fn detect_partition(&mut self) -> Result<bool, String> ! {distribution} {
+        // Check connectivity between regions
+        for (region_name, region) in &self.regions.clone() {
+            let mut healthy_count = 0;
+
+            for dc in &region.datacenters {
+                for node in &dc.nodes {
+                    if node.sync_state != SyncState::OutOfSync {
+                        healthy_count = healthy_count + 1;
+                    }
+                }
+            }
+
+            if healthy_count == 0 {
+                // Partition detected
+                return Result::Ok(true);
+            }
+        }
+
+        return Result::Ok(false);
+    }
+}
+
+pub struct CrossRegionReplication {
+    source_region: String,
+    target_region: String,
+    replication_lag_ms: i64,
+    pending_changes: Vec<Change>,
+}
+
+pub struct Change {
+    key: String,
+    value: String,
+    timestamp: i64,
+    version: i32,
+}
+
+impl CrossRegionReplication {
+    pub fn new(source: &str, target: &str) -> CrossRegionReplication {
+        return CrossRegionReplication {
+            source_region: source.to_string(),
+            target_region: target.to_string(),
+            replication_lag_ms: 100,
+            pending_changes: Vec::new(),
+        };
+    }
+
+    pub fn add_change(&mut self, key: &str, value: &str) {
+        let change = Change {
+            key: key.to_string(),
+            value: value.to_string(),
+            timestamp: this.get_timestamp(),
+            version: 1,
+        };
+
+        self.pending_changes.push(change);
+    }
+
+    pub fn replicate(&mut self) -> Result<(), String> ! {distribution} {
+        // Send all pending changes to target region
+        for change in &self.pending_changes {
+            // Send replication message
+        }
+
+        self.pending_changes = Vec::new();
+        return Result::Ok(());
+    }
+
+    pub fn get_replication_lag(&self) -> i64 {
+        return self.replication_lag_ms;
+    }
+
+    fn get_timestamp(&self) -> i64 {
+        return 0;
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> {
+        return Vec { data: self.data, len: self.len, capacity: self.capacity };
+    }
+
+    pub fn len(&self) -> usize {
+        return self.len;
+    }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool {
+        return false;
+    }
+
+    pub fn clone(&self) -> Map<K, V> {
+        return Map { entries: self.entries.clone() };
+    }
+}
+
+impl Node {
+    pub fn clone(&self) -> Node {
+        return Node {
+            id: self.id.clone(),
+            datacenter: self.datacenter.clone(),
+            region: self.region.clone(),
+            role: NodeRole::Follower,
+            sync_state: self.sync_state.clone(),
+        };
+    }
+}
+
+impl SyncState {
+    pub fn clone(&self) -> SyncState {
+        return *self;
+    }
+}

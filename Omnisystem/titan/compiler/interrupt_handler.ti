@@ -1,0 +1,366 @@
+// titan/compiler/interrupt_handler.ti
+// Interrupt and exception handling support for Titan
+
+pub struct InterruptFrame {
+    rax: u64,
+    rbx: u64,
+    rcx: u64,
+    rdx: u64,
+    rsi: u64,
+    rdi: u64,
+    rbp: u64,
+    r8: u64,
+    r9: u64,
+    r10: u64,
+    r11: u64,
+    r12: u64,
+    r13: u64,
+    r14: u64,
+    r15: u64,
+    rip: u64,      // Instruction pointer
+    rcs: u64,      // Code segment
+    rflags: u64,   // CPU flags
+    rsp: u64,      // Stack pointer
+    rss: u64,      // Stack segment
+    error_code: u64, // Error code (if applicable)
+}
+
+pub struct InterruptDescriptorTable {
+    entries: [InterruptEntry; 256],
+}
+
+pub struct InterruptEntry {
+    handler_low: u16,      // Bits 0-15 of handler address
+    segment: u16,          // Code segment selector
+    ist: u8,               // Interrupt Stack Table
+    typ_attr: u8,          // Type and attributes (P, DPL, type)
+    handler_mid: u16,      // Bits 16-31 of handler address
+    handler_high: u32,     // Bits 32-63 of handler address
+    reserved: u32,         // Reserved, must be zero
+}
+
+pub fn idt_set_entry(
+    idt: &mut InterruptDescriptorTable,
+    vector: u8,
+    handler: u64,
+    segment: u16,
+    ist: u8,
+    dpl: u8
+) {
+    let vector_idx = vector as usize;
+
+    let mut entry = InterruptEntry {
+        handler_low: (handler & 0xFFFF) as u16,
+        segment: segment,
+        ist: ist,
+        typ_attr: 0,
+        handler_mid: ((handler >> 16) & 0xFFFF) as u16,
+        handler_high: ((handler >> 32) & 0xFFFFFFFF) as u32,
+        reserved: 0,
+    };
+
+    // Set type (0xE = interrupt gate, 0xF = trap gate)
+    // Set present bit (bit 7), DPL (bits 5-6)
+    let type_val = 0xE;  // Interrupt gate
+    entry.typ_attr = (0x80 | (dpl << 5) | type_val) as u8;
+
+    idt.entries[vector_idx] = entry;
+}
+
+pub fn idt_load(idt: &InterruptDescriptorTable) ! {irq} {
+    // Create IDT descriptor (base address and limit)
+    // Load with lidt instruction
+
+    asm! {
+        "lidt (%0)"
+        :
+        : "r"(idt as *const InterruptDescriptorTable)
+        :
+        : volatile
+    }
+}
+
+pub struct InterruptHandler {
+    vector: u8,
+    handler_fn: fn(*InterruptFrame) -> (),
+    privilege_level: u8,  // 0 = kernel, 3 = user
+}
+
+pub fn register_interrupt_handler(
+    vector: u8,
+    handler: fn(*InterruptFrame) -> ()
+) ! {irq} {
+    let idt = get_global_idt();
+    let handler_ptr = handler as u64;
+    let segment = 0x08;  // Kernel code segment
+    let ist = 0;         // Use current stack
+    let dpl = 0;         // Kernel mode only
+
+    idt_set_entry(idt, vector, handler_ptr, segment, ist, dpl);
+}
+
+pub fn register_user_interrupt_handler(
+    vector: u8,
+    handler: fn(*InterruptFrame) -> ()
+) ! {irq} {
+    let idt = get_global_idt();
+    let handler_ptr = handler as u64;
+    let segment = 0x08;  // Kernel code segment (must be kernel)
+    let ist = 0;
+    let dpl = 3;         // User mode accessible
+
+    idt_set_entry(idt, vector, handler_ptr, segment, ist, dpl);
+}
+
+// CPU Flags register manipulation
+pub fn read_rflags() -> u64 {
+    let result: u64 = 0;
+    asm! {
+        "pushfq; pop %0"
+        : "=r"(result)
+        :
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn write_rflags(flags: u64) {
+    asm! {
+        "push %0; popfq"
+        :
+        : "r"(flags)
+        :
+        : volatile
+    }
+}
+
+pub fn enable_interrupts() ! {irq} {
+    asm! {
+        "sti"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn disable_interrupts() ! {irq} {
+    asm! {
+        "cli"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub fn pause_instruction() {
+    asm! {
+        "pause"
+        :
+        :
+        :
+        :
+    }
+}
+
+// Control Register access (Ring 0 only)
+pub fn read_cr0() -> u64 ! {privileged} {
+    let result: u64 = 0;
+    asm! {
+        "mov %%cr0, %0"
+        : "=r"(result)
+        :
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn write_cr0(value: u64) ! {privileged} {
+    asm! {
+        "mov %0, %%cr0"
+        :
+        : "r"(value)
+        :
+        : volatile
+    }
+}
+
+pub fn read_cr2() -> u64 ! {privileged} {
+    // CR2 contains the faulting address for page faults
+    let result: u64 = 0;
+    asm! {
+        "mov %%cr2, %0"
+        : "=r"(result)
+        :
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn read_cr3() -> u64 ! {privileged} {
+    // CR3 contains the page table base
+    let result: u64 = 0;
+    asm! {
+        "mov %%cr3, %0"
+        : "=r"(result)
+        :
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn write_cr3(value: u64) ! {privileged} {
+    // Flush TLB by writing to CR3
+    asm! {
+        "mov %0, %%cr3"
+        :
+        : "r"(value)
+        :
+        : volatile
+    }
+}
+
+pub fn read_cr4() -> u64 ! {privileged} {
+    let result: u64 = 0;
+    asm! {
+        "mov %%cr4, %0"
+        : "=r"(result)
+        :
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn write_cr4(value: u64) ! {privileged} {
+    asm! {
+        "mov %0, %%cr4"
+        :
+        : "r"(value)
+        :
+        : volatile
+    }
+}
+
+// MSR (Model-Specific Register) access
+pub fn read_msr(msr: u32) -> u64 ! {privileged} {
+    let result_low: u32 = 0;
+    let result_high: u32 = 0;
+
+    asm! {
+        "rdmsr"
+        : "=a"(result_low), "=d"(result_high)
+        : "c"(msr)
+        :
+        : volatile
+    }
+
+    return ((result_high as u64) << 32) | (result_low as u64);
+}
+
+pub fn write_msr(msr: u32, value: u64) ! {privileged} {
+    let low = (value & 0xFFFFFFFF) as u32;
+    let high = ((value >> 32) & 0xFFFFFFFF) as u32;
+
+    asm! {
+        "wrmsr"
+        :
+        : "c"(msr), "a"(low), "d"(high)
+        :
+        : volatile
+    }
+}
+
+// Ring level manipulation
+pub enum PrivilegeLevel {
+    Kernel = 0,     // Ring 0
+    Driver = 1,     // Ring 1
+    Service = 2,    // Ring 2
+    User = 3,       // Ring 3
+}
+
+pub fn current_privilege_level() -> PrivilegeLevel ! {io} {
+    let cs: u16 = 0;
+    asm! {
+        "mov %%cs, %0"
+        : "=r"(cs)
+        :
+        :
+        : volatile
+    }
+
+    let cpl = (cs & 0x3) as i64;
+    if cpl == 0 {
+        return PrivilegeLevel::Kernel;
+    } else if cpl == 1 {
+        return PrivilegeLevel::Driver;
+    } else if cpl == 2 {
+        return PrivilegeLevel::Service;
+    } else {
+        return PrivilegeLevel::User;
+    }
+}
+
+pub fn verify_privilege(required: PrivilegeLevel) ! {io} {
+    let current = current_privilege_level();
+    if (current as i64) > (required as i64) {
+        emit_panic("Insufficient privilege level");
+    }
+}
+
+// Interrupt context switching
+pub fn switch_to_user_mode(entry_point: u64, stack: u64) ! {privileged} {
+    // Prepare return-from-interrupt frame
+    // IRETQ will pop: RIP, CS, RFLAGS, RSP, SS
+    asm! {
+        "mov $0x10, %%ax; mov %%ax, %%ss;"
+        "mov %1, %%rsp;"
+        "pushq $0x10;"           // SS (user data segment)
+        "pushq %1;"              // RSP (user stack)
+        "pushq $0x200;"          // RFLAGS (interrupts enabled)
+        "pushq $0x08;"           // CS (user code segment)
+        "pushq %0;"              // RIP (entry point)
+        "iretq"
+        :
+        : "r"(entry_point), "r"(stack)
+        :
+        : volatile
+    }
+}
+
+pub fn get_global_idt() -> &'static mut InterruptDescriptorTable {
+    // Return pointer to global IDT
+    // In a real kernel, this would be defined in a data section
+    return &mut GLOBAL_IDT;
+}
+
+// Global IDT (simplified)
+static mut GLOBAL_IDT: InterruptDescriptorTable = InterruptDescriptorTable {
+    entries: [InterruptEntry {
+        handler_low: 0,
+        segment: 0,
+        ist: 0,
+        typ_attr: 0,
+        handler_mid: 0,
+        handler_high: 0,
+        reserved: 0,
+    }; 256],
+};
+
+pub fn emit_panic(msg: String) ! {io} {
+    // Emergency output - would write to serial port or video memory
+    disable_interrupts();
+    // Halt CPU
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}

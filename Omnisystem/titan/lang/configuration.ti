@@ -1,0 +1,481 @@
+// titan/lang/configuration.ti
+// Configuration file parsing and management for Titan (YAML, TOML, INI)
+
+pub enum ConfigFormat {
+    Yaml,
+    Toml,
+    Ini,
+    Json,
+    Protobuf,
+}
+
+pub enum ConfigValue {
+    Null,
+    Boolean(bool),
+    Integer(i64),
+    Float(f64),
+    String(String),
+    Array(Vec<ConfigValue>),
+    Table(Map<String, ConfigValue>),
+}
+
+pub struct ConfigParser {
+    format: ConfigFormat,
+    input: String,
+}
+
+impl ConfigParser {
+    pub fn new(format: ConfigFormat, input: &str) -> ConfigParser {
+        return ConfigParser {
+            format: format,
+            input: input.to_string(),
+        };
+    }
+
+    pub fn parse(&self) -> Result<Config, String> ! {config} {
+        match self.format {
+            ConfigFormat::Yaml => {
+                return parse_yaml(&self.input);
+            }
+            ConfigFormat::Toml => {
+                return parse_toml(&self.input);
+            }
+            ConfigFormat::Ini => {
+                return parse_ini(&self.input);
+            }
+            ConfigFormat::Json => {
+                return parse_json(&self.input);
+            }
+            ConfigFormat::Protobuf => {
+                return parse_protobuf(&self.input);
+            }
+        }
+    }
+}
+
+pub struct Config {
+    values: Map<String, ConfigValue>,
+    metadata: ConfigMetadata,
+}
+
+pub struct ConfigMetadata {
+    source: String,
+    format: ConfigFormat,
+    loaded_at: u64,
+    valid: bool,
+}
+
+impl Config {
+    pub fn new() -> Config {
+        return Config {
+            values: Map::new(),
+            metadata: ConfigMetadata {
+                source: "".to_string(),
+                format: ConfigFormat::Yaml,
+                loaded_at: 0,
+                valid: true,
+            },
+        };
+    }
+
+    pub fn get(&self, key: &str) -> Option<ConfigValue> ! {config} {
+        return self.values.get(key);
+    }
+
+    pub fn get_string(&self, key: &str) -> Option<String> ! {config} {
+        match self.get(key) {
+            Option::Some(ConfigValue::String(s)) => {
+                return Option::Some(s);
+            }
+            _ => {
+                return Option::None;
+            }
+        }
+    }
+
+    pub fn get_int(&self, key: &str) -> Option<i64> ! {config} {
+        match self.get(key) {
+            Option::Some(ConfigValue::Integer(i)) => {
+                return Option::Some(i);
+            }
+            _ => {
+                return Option::None;
+            }
+        }
+    }
+
+    pub fn get_float(&self, key: &str) -> Option<f64> ! {config} {
+        match self.get(key) {
+            Option::Some(ConfigValue::Float(f)) => {
+                return Option::Some(f);
+            }
+            _ => {
+                return Option::None;
+            }
+        }
+    }
+
+    pub fn get_bool(&self, key: &str) -> Option<bool> ! {config} {
+        match self.get(key) {
+            Option::Some(ConfigValue::Boolean(b)) => {
+                return Option::Some(b);
+            }
+            _ => {
+                return Option::None;
+            }
+        }
+    }
+
+    pub fn get_array(&self, key: &str) -> Option<Vec<ConfigValue>> ! {config} {
+        match self.get(key) {
+            Option::Some(ConfigValue::Array(arr)) => {
+                return Option::Some(arr);
+            }
+            _ => {
+                return Option::None;
+            }
+        }
+    }
+
+    pub fn get_table(&self, key: &str) -> Option<Map<String, ConfigValue>> ! {config} {
+        match self.get(key) {
+            Option::Some(ConfigValue::Table(tbl)) => {
+                return Option::Some(tbl);
+            }
+            _ => {
+                return Option::None;
+            }
+        }
+    }
+
+    pub fn set(&mut self, key: String, value: ConfigValue) {
+        self.values[key] = value;
+    }
+
+    pub fn merge(&mut self, other: Config) {
+        for (key, value) in other.values.entries() {
+            self.values[key] = value;
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), String> ! {config} {
+        // Validation logic
+        return Result::Ok(());
+    }
+
+    pub fn to_string(&self) -> String ! {config} {
+        return "".to_string();
+    }
+}
+
+pub struct ConfigBuilder {
+    config: Config,
+}
+
+impl ConfigBuilder {
+    pub fn new() -> ConfigBuilder {
+        return ConfigBuilder {
+            config: Config::new(),
+        };
+    }
+
+    pub fn with_string(mut self, key: &str, value: &str) -> ConfigBuilder {
+        self.config.set(
+            key.to_string(),
+            ConfigValue::String(value.to_string()),
+        );
+        return self;
+    }
+
+    pub fn with_int(mut self, key: &str, value: i64) -> ConfigBuilder {
+        self.config.set(key.to_string(), ConfigValue::Integer(value));
+        return self;
+    }
+
+    pub fn with_float(mut self, key: &str, value: f64) -> ConfigBuilder {
+        self.config.set(key.to_string(), ConfigValue::Float(value));
+        return self;
+    }
+
+    pub fn with_bool(mut self, key: &str, value: bool) -> ConfigBuilder {
+        self.config.set(key.to_string(), ConfigValue::Boolean(value));
+        return self;
+    }
+
+    pub fn build(self) -> Config {
+        return self.config;
+    }
+}
+
+// YAML Parser
+fn parse_yaml(input: &str) -> Result<Config, String> ! {config} {
+    let mut config = Config::new();
+    let lines: Vec<String> = input.split("\n").collect();
+    let mut stack: Vec<(usize, String)> = Vec::new();
+    let mut current_table: Map<String, ConfigValue> = Map::new();
+
+    for line in lines {
+        let trimmed = line.trim();
+
+        if trimmed.len() == 0 || trimmed.starts_with("#") {
+            continue;
+        }
+
+        let indent = count_indent(&line);
+
+        // Pop stack until we find parent
+        while stack.len() > 0 && stack[stack.len() - 1].0 >= indent {
+            stack.pop();
+        }
+
+        if let Result::Ok(value) = parse_yaml_line(trimmed) {
+            let key = extract_key(trimmed);
+            config.set(key.to_string(), value);
+        }
+    }
+
+    return Result::Ok(config);
+}
+
+fn parse_yaml_line(line: &str) -> Result<ConfigValue, String> ! {config} {
+    if line.contains(":") {
+        let parts: Vec<String> = line.split(":").collect();
+        if parts.len() >= 2 {
+            let value_str = parts[1].trim();
+
+            if value_str == "true" {
+                return Result::Ok(ConfigValue::Boolean(true));
+            } else if value_str == "false" {
+                return Result::Ok(ConfigValue::Boolean(false));
+            } else if value_str.starts_with("\"") && value_str.ends_with("\"") {
+                return Result::Ok(ConfigValue::String(
+                    value_str[1..value_str.len() - 1].to_string(),
+                ));
+            } else if let Result::Ok(i) = value_str.parse::<i64>() {
+                return Result::Ok(ConfigValue::Integer(i));
+            } else if let Result::Ok(f) = value_str.parse::<f64>() {
+                return Result::Ok(ConfigValue::Float(f));
+            } else {
+                return Result::Ok(ConfigValue::String(value_str.to_string()));
+            }
+        }
+    }
+
+    return Result::Err("Invalid YAML line".to_string());
+}
+
+// TOML Parser
+fn parse_toml(input: &str) -> Result<Config, String> ! {config} {
+    let mut config = Config::new();
+    let lines: Vec<String> = input.split("\n").collect();
+
+    for line in lines {
+        let trimmed = line.trim();
+
+        if trimmed.len() == 0 || trimmed.starts_with("#") {
+            continue;
+        }
+
+        if trimmed.starts_with("[") && trimmed.ends_with("]") {
+            // Table header
+            let table_name = &trimmed[1..trimmed.len() - 1];
+        } else if let Result::Ok(value) = parse_toml_line(trimmed) {
+            let key = extract_key(trimmed);
+            config.set(key.to_string(), value);
+        }
+    }
+
+    return Result::Ok(config);
+}
+
+fn parse_toml_line(line: &str) -> Result<ConfigValue, String> ! {config} {
+    if line.contains("=") {
+        let parts: Vec<String> = line.split("=").collect();
+        if parts.len() >= 2 {
+            let value_str = parts[1].trim();
+
+            if value_str == "true" {
+                return Result::Ok(ConfigValue::Boolean(true));
+            } else if value_str == "false" {
+                return Result::Ok(ConfigValue::Boolean(false));
+            } else if value_str.starts_with("\"") && value_str.ends_with("\"") {
+                return Result::Ok(ConfigValue::String(
+                    value_str[1..value_str.len() - 1].to_string(),
+                ));
+            } else if let Result::Ok(i) = value_str.parse::<i64>() {
+                return Result::Ok(ConfigValue::Integer(i));
+            } else if let Result::Ok(f) = value_str.parse::<f64>() {
+                return Result::Ok(ConfigValue::Float(f));
+            } else {
+                return Result::Ok(ConfigValue::String(value_str.to_string()));
+            }
+        }
+    }
+
+    return Result::Err("Invalid TOML line".to_string());
+}
+
+// INI Parser
+fn parse_ini(input: &str) -> Result<Config, String> ! {config} {
+    let mut config = Config::new();
+    let lines: Vec<String> = input.split("\n").collect();
+    let mut current_section = "default";
+
+    for line in lines {
+        let trimmed = line.trim();
+
+        if trimmed.len() == 0 || trimmed.starts_with(";") {
+            continue;
+        }
+
+        if trimmed.starts_with("[") && trimmed.ends_with("]") {
+            current_section = &trimmed[1..trimmed.len() - 1];
+        } else if let Result::Ok(value) = parse_ini_line(trimmed) {
+            let key = extract_key(trimmed);
+            let full_key = current_section.to_string() + "." + &key;
+            config.set(full_key, value);
+        }
+    }
+
+    return Result::Ok(config);
+}
+
+fn parse_ini_line(line: &str) -> Result<ConfigValue, String> ! {config} {
+    if line.contains("=") {
+        let parts: Vec<String> = line.split("=").collect();
+        if parts.len() >= 2 {
+            let value_str = parts[1].trim();
+
+            if value_str == "true" {
+                return Result::Ok(ConfigValue::Boolean(true));
+            } else if value_str == "false" {
+                return Result::Ok(ConfigValue::Boolean(false));
+            } else {
+                return Result::Ok(ConfigValue::String(value_str.to_string()));
+            }
+        }
+    }
+
+    return Result::Err("Invalid INI line".to_string());
+}
+
+fn parse_json(input: &str) -> Result<Config, String> ! {config} {
+    // Delegate to JSON parser from serialization module
+    return Result::Err("Use JSON parser from serialization module".to_string());
+}
+
+fn parse_protobuf(input: &str) -> Result<Config, String> ! {config} {
+    return Result::Err("Protocol Buffer parsing not yet implemented".to_string());
+}
+
+fn count_indent(line: &str) -> usize {
+    let mut count = 0;
+    for ch in line.chars() {
+        if ch == ' ' {
+            count = count + 1;
+        } else if ch == '\t' {
+            count = count + 4;
+        } else {
+            break;
+        }
+    }
+    return count;
+}
+
+fn extract_key(line: &str) -> &str {
+    if let Result::Ok(idx) = line.find(":") {
+        return line[0..idx].trim();
+    }
+    if let Result::Ok(idx) = line.find("=") {
+        return line[0..idx].trim();
+    }
+    return line;
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn starts_with(&self, prefix: &str) -> bool {
+        return false;
+    }
+
+    pub fn trim(&self) -> &str {
+        return "";
+    }
+
+    pub fn split(&self, delimiter: &str) -> Vec<String> {
+        return Vec::new();
+    }
+
+    pub fn find(&self, pattern: &str) -> Result<usize, ()> {
+        return Result::Err(());
+    }
+
+    pub fn parse<T>(&self) -> Result<T, String> {
+        return Result::Err("Parse not implemented".to_string());
+    }
+
+    pub fn chars(&self) -> impl Iterator<Item = char> {
+        return [].iter().map(|c| *c);
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn pop(&mut self) -> Option<T> { return Option::None; }
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn get(&self, key: &K) -> Option<V> {
+        return Option::None;
+    }
+
+    pub fn entries(&self) -> &Vec<(K, V)> {
+        return &self.entries;
+    }
+}

@@ -1,0 +1,3 @@
+// Tests: root-cause-analysis-trace
+
+pub fn test_module() -> i64 { return 111; }

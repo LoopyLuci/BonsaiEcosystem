@@ -1,0 +1,213 @@
+// sylva/stdlib/dataframe_core.sy
+// DataFrame core implementation in Sylva
+
+struct DataFrame {
+    columns: Dict[String, Series]
+    index: Index
+    shape: (Int, Int)
+
+    fn new(data: Dict[String, List[Any]]) {
+        this.columns = {}
+        this.index = RangeIndex(0, data.values()[0].len())
+
+        for col_name, col_data in data {
+            this.columns[col_name] = Series::new(col_data)
+        }
+
+        this.shape = (this.index.len(), data.len())
+    }
+
+    fn get_column(col_name: String) -> Series {
+        return this.columns[col_name]
+    }
+
+    fn filter(predicate: Fn(Series) -> Series[Bool]) -> DataFrame {
+        let mask = predicate(this.get_column(this.columns.keys()[0]))
+        let filtered_indices = tf.where(mask)
+
+        let mut new_data = Dict::new()
+        for col_name, series in this.columns {
+            new_data[col_name] = series.values[filtered_indices]
+        }
+
+        return DataFrame::new(new_data)
+    }
+
+    fn group_by(col_name: String) -> GroupBy {
+        return GroupBy::new(this, col_name)
+    }
+
+    fn sort_by(col_name: String, ascending: Bool = true) -> DataFrame {
+        let indices = tf.argsort(this.columns[col_name].values, ascending)
+
+        let mut new_data = Dict::new()
+        for col_name, series in this.columns {
+            new_data[col_name] = series.values[indices]
+        }
+
+        return DataFrame::new(new_data)
+    }
+
+    fn describe() -> Dict[String, Dict[String, Float]] {
+        let mut stats = Dict::new()
+
+        for col_name, series in this.columns {
+            stats[col_name] = {
+                "mean": series.mean(),
+                "std": series.std(),
+                "min": series.min(),
+                "max": series.max(),
+            }
+        }
+
+        return stats
+    }
+
+    fn to_tensor() -> Tensor[f32, "rows,cols"] {
+        let mut result = []
+        for i in 0..this.shape[0] {
+            let row = []
+            for col_name in this.columns.keys() {
+                row.push(this.columns[col_name].values[i])
+            }
+            result.push(row)
+        }
+        return Tensor::new(result)
+    }
+}
+
+struct Series {
+    values: List[Any]
+    index: Index
+
+    fn new(values: List[Any]) {
+        this.values = values
+        this.index = RangeIndex(0, values.len())
+    }
+
+    fn sum() -> Float {
+        let mut total = 0.0
+        for val in this.values {
+            total = total + (val as Float)
+        }
+        return total
+    }
+
+    fn mean() -> Float {
+        return this.sum() / (this.values.len() as Float)
+    }
+
+    fn std() -> Float {
+        let m = this.mean()
+        let mut variance = 0.0
+        for val in this.values {
+            variance = variance + ((val as Float - m) ^ 2)
+        }
+        return (variance / (this.values.len() as Float)).sqrt()
+    }
+
+    fn min() -> Any {
+        let mut min_val = this.values[0]
+        for val in this.values {
+            if (val as Float) < (min_val as Float) {
+                min_val = val
+            }
+        }
+        return min_val
+    }
+
+    fn max() -> Any {
+        let mut max_val = this.values[0]
+        for val in this.values {
+            if (val as Float) > (max_val as Float) {
+                max_val = val
+            }
+        }
+        return max_val
+    }
+
+    fn apply(func: Fn(Any) -> Any) -> Series {
+        let new_values = []
+        for val in this.values {
+            new_values.push(func(val))
+        }
+        return Series::new(new_values)
+    }
+}
+
+struct GroupBy {
+    df: DataFrame
+    group_col: String
+
+    fn new(df: DataFrame, group_col: String) {
+        this.df = df
+        this.group_col = group_col
+    }
+
+    fn agg(func: String) -> DataFrame {
+        let grouped = Dict::new()
+        let unique_keys = this.df.get_column(this.group_col).values.unique()
+
+        for key in unique_keys {
+            let mask = this.df.get_column(this.group_col).values.map(|v| v == key)
+            let filtered_indices = tf.where(mask)
+
+            for col_name in this.df.columns.keys() {
+                if col_name != this.group_col {
+                    let group_values = []
+                    for idx in filtered_indices {
+                        group_values.push(this.df.columns[col_name].values[idx])
+                    }
+
+                    let result = match func {
+                        "sum" => group_values.iter().sum(),
+                        "mean" => group_values.iter().sum() / group_values.len(),
+                        "count" => group_values.len(),
+                        _ => 0,
+                    }
+
+                    if key not in grouped {
+                        grouped[key] = Dict::new()
+                    }
+                    grouped[key][col_name] = result
+                }
+            }
+        }
+
+        return DataFrame::new(grouped)
+    }
+
+    fn sum() -> DataFrame {
+        return this.agg("sum")
+    }
+
+    fn mean() -> DataFrame {
+        return this.agg("mean")
+    }
+}
+
+enum Index {
+    Range(Int, Int)
+    Integer(List[Int])
+    String(List[String])
+}
+
+fn read_csv(filename: String) -> DataFrame {
+    let file = File::open(filename)
+    let lines = file.read_lines()
+    let header = lines[0].split(",")
+
+    let mut data = Dict::new()
+    for col_name in header {
+        data[col_name] = []
+    }
+
+    for line in lines[1..] {
+        let values = line.split(",")
+        for (i, col_name) in header.enumerate() {
+            data[col_name].push(values[i])
+        }
+    }
+
+    return DataFrame::new(data)
+}

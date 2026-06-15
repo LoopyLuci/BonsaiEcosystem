@@ -1,0 +1,3 @@
+// Tests: stream-analytics-calculations
+
+pub fn test_module() -> i64 { return 111; }

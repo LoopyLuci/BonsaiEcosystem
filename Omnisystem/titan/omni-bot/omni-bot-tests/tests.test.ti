@@ -1,0 +1,5 @@
+// Tests for omni-bot-tests
+
+pub fn test_module() -> i64 {
+    return 111;
+}

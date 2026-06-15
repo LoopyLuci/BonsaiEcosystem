@@ -1,0 +1,5 @@
+// Tests for kubernetes-network-policy
+
+pub fn test_module() -> i64 {
+    return 111;
+}

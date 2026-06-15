@@ -1,0 +1,3 @@
+// Tests: access-control-delegation
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,5 @@
+// Tests for dashboard-core
+
+pub fn test_module() -> i64 {
+    return 111;
+}

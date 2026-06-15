@@ -1,0 +1,180 @@
+// axiom/examples/sorting_proof.ax
+// Formal verification of sorting algorithm correctness in Axiom
+
+-- Definition of a sorted list
+predicate IsSorted(list: List[Int]) =
+    forall i: Int, j: Int.
+        i < j -> list[i] <= list[j]
+
+-- Lemma: empty list is sorted
+lemma empty_list_sorted: IsSorted([]) by {
+    trivial
+}
+
+-- Lemma: single element list is sorted
+lemma single_element_sorted(x: Int): IsSorted([x]) by {
+    intro i j h_less
+    -- i < j contradicts list having single element
+    simp at h_less
+}
+
+-- Insertion function maintains sorted property
+fn insert_sorted(x: Int, list: List[Int]): List[Int]
+    requires IsSorted(list)
+    ensures IsSorted(insert_sorted(x, list))
+{
+    if list.is_empty() {
+        return [x]
+    }
+
+    if x <= list.head() {
+        return [x] ++ list
+    } else {
+        return [list.head()] ++ insert_sorted(x, list.tail())
+    }
+}
+
+-- Proof of insertion sort
+fn insertion_sort(list: List[Int]): List[Int]
+    ensures IsSorted(insertion_sort(list))
+{
+    if list.is_empty() {
+        return []
+    } else {
+        let sorted_tail = insertion_sort(list.tail())
+        return insert_sorted(list.head(), sorted_tail)
+    }
+}
+
+-- Proof by structural induction
+proof insertion_sort_correct(list: List[Int]): IsSorted(insertion_sort(list)) {
+    induction list {
+        case [] => {
+            -- Base case: empty list
+            simp [insertion_sort]
+            exact empty_list_sorted
+        }
+        case x :: xs => {
+            -- Inductive case: x :: xs
+            assume IsSorted(insertion_sort(xs))  -- IH
+
+            simp [insertion_sort]
+            let sorted_xs = insertion_sort(xs)
+
+            -- Need to show: IsSorted(insert_sorted(x, sorted_xs))
+            exact insert_sorted_correct(x, sorted_xs)
+        }
+    }
+}
+
+-- Lemma: insertion maintains sorted property
+lemma insert_sorted_correct(x: Int, list: List[Int]):
+    IsSorted(list) -> IsSorted(insert_sorted(x, list))
+by {
+    intro h_sorted
+    induction list {
+        case [] => {
+            simp [insert_sorted]
+            exact single_element_sorted(x)
+        }
+        case y :: ys => {
+            assume IsSorted(ys)
+
+            cases (x <= y) {
+                case true => {
+                    simp [insert_sorted]
+                    -- Prove IsSorted([x, y] ++ ys)
+                    intro i j h_less
+                    cases i {
+                        case 0 =>
+                            simp [h_less, h_sorted]
+                        case Succ(i') =>
+                            cases j {
+                                case 0 => omega
+                                case Succ(j') =>
+                                    simp [h_sorted]
+                            }
+                    }
+                }
+                case false => {
+                    simp [insert_sorted]
+                    -- Prove IsSorted([y] ++ insert_sorted(x, ys))
+                    have h_ih: IsSorted(insert_sorted(x, ys)) :=
+                        by exact IH h_sorted
+
+                    intro i j h_less
+                    cases i {
+                        case 0 =>
+                            simp [h_less, h_ih, h_sorted]
+                        case Succ(i') =>
+                            simp [h_ih]
+                    }
+                }
+            }
+        }
+    }
+}
+
+-- Verify quicksort partition is correct
+fn partition(pivot: Int, list: List[Int]): (List[Int], List[Int])
+    ensures let (left, right) = partition(pivot, list)
+            forall x in left. x <= pivot &&
+            forall y in right. y > pivot
+{
+    match list {
+        case [] => ([], [])
+        case x :: xs => {
+            let (left, right) = partition(pivot, xs)
+            if x <= pivot {
+                (x :: left, right)
+            } else {
+                (left, x :: right)
+            }
+        }
+    }
+}
+
+-- Runtime verification: check sorted property at execution time
+@runtime_check
+fn verify_sorted_at_runtime(list: List[Int]) -> Bool {
+    for i in 0..list.len() {
+        for j in (i+1)..list.len() {
+            if list[i] > list[j] {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+-- Distributed sorting with verification
+theorem distributed_merge_sort_correct(lists: List[List[Int]]) {
+    -- Sort each list locally
+    sorted_lists = lists.map(insertion_sort)
+
+    -- All sublists are sorted
+    have h_all_sorted: forall l in sorted_lists. IsSorted(l) := by {
+        intro l h_in
+        simp [h_in]
+        exact insertion_sort_correct(l)
+    }
+
+    -- Merge maintains sorted property
+    result = sorted_lists.reduce(merge_sorted)
+
+    -- Final result is sorted
+    exact merge_sorted_correct(sorted_lists)
+}
+
+-- SMT solver integration for performance analysis
+theorem insertion_sort_complexity {
+    time_complexity: Big_O(insertion_sort, fn(n) => n^2)
+    space_complexity: Big_O(insertion_sort, fn(n) => 1)
+}
+by {
+    -- Prove via SMT solver
+    z3_solve {
+        forall n: Nat. time(insertion_sort(n)) <= C * n^2
+        forall n: Nat. space(insertion_sort(n)) <= C
+    }
+}

@@ -1,0 +1,3 @@
+// Tests: fault-tolerance-framework
+
+pub fn test_module() -> i64 { return 111; }

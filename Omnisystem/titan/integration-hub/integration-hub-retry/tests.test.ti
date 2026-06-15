@@ -1,0 +1,5 @@
+// Tests for integration-hub-retry
+
+pub fn test_module() -> i64 {
+    return 111;
+}

@@ -1,0 +1,432 @@
+// sylva/stdlib/anomaly_detection.sy
+// Advanced anomaly detection for Sylva
+
+struct AnomalyDetectionModel {
+    algorithm: AnomalyAlgorithm
+    threshold: Float
+    fitted: Bool
+}
+
+enum AnomalyAlgorithm {
+    | IsolationForest(IsolationForestParams)
+    | LocalOutlierFactor(LOFParams)
+    | OneClassSVM(SVMParams)
+    | AutoEncoder(AutoEncoderParams)
+    | EllipticEnvelope(EllipticParams)
+    | RobustCovariance(RobustCovParams)
+}
+
+struct IsolationForestParams {
+    n_trees: Int
+    sample_size: Int
+    contamination: Float
+}
+
+struct LOFParams {
+    n_neighbors: Int
+    contamination: Float
+}
+
+struct SVMParams {
+    kernel: String
+    nu: Float
+    gamma: Float
+}
+
+struct AutoEncoderParams {
+    encoding_dim: Int
+    threshold: Float
+}
+
+struct EllipticParams {
+    contamination: Float
+    robust: Bool
+}
+
+struct RobustCovParams {
+    contamination: Float
+}
+
+impl AnomalyDetectionModel {
+    fn new(algorithm: AnomalyAlgorithm, threshold: Float) -> AnomalyDetectionModel {
+        return AnomalyDetectionModel {
+            algorithm: algorithm,
+            threshold: threshold,
+            fitted: false,
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n,d"]) -> AnomalyDetectionModel {
+        let mut model = AnomalyDetectionModel {
+            algorithm: this.algorithm,
+            threshold: this.threshold,
+            fitted: false,
+        }
+
+        match this.algorithm {
+            AnomalyAlgorithm::IsolationForest(params) => {
+                model = fit_isolation_forest(X, params)
+            }
+
+            AnomalyAlgorithm::LocalOutlierFactor(params) => {
+                model = fit_lof(X, params)
+            }
+
+            AnomalyAlgorithm::OneClassSVM(params) => {
+                model = fit_one_class_svm(X, params)
+            }
+
+            AnomalyAlgorithm::AutoEncoder(params) => {
+                model = fit_autoencoder(X, params)
+            }
+
+            AnomalyAlgorithm::EllipticEnvelope(params) => {
+                model = fit_elliptic_envelope(X, params)
+            }
+
+            AnomalyAlgorithm::RobustCovariance(params) => {
+                model = fit_robust_cov(X, params)
+            }
+        }
+
+        model.fitted = true
+        return model
+    }
+
+    fn predict(X: Tensor[f32, "n,d"]) -> Tensor[i32, "n"] {
+        if !this.fitted {
+            return zeros([X.shape[0]])
+        }
+
+        match this.algorithm {
+            AnomalyAlgorithm::IsolationForest(_) => {
+                return predict_isolation_forest(X, this)
+            }
+
+            AnomalyAlgorithm::LocalOutlierFactor(_) => {
+                return predict_lof(X, this)
+            }
+
+            _ => {
+                return zeros([X.shape[0]])
+            }
+        }
+    }
+
+    fn score_anomaly(X: Tensor[f32, "n,d"]) -> Tensor[f32, "n"] {
+        let mut scores = zeros([X.shape[0]])
+
+        match this.algorithm {
+            AnomalyAlgorithm::IsolationForest(_) => {
+                scores = score_isolation_forest(X, this)
+            }
+
+            AnomalyAlgorithm::LocalOutlierFactor(_) => {
+                scores = score_lof(X, this)
+            }
+
+            AnomalyAlgorithm::AutoEncoder(_) => {
+                scores = score_autoencoder(X, this)
+            }
+
+            _ => {}
+        }
+
+        return scores
+    }
+}
+
+// Isolation Forest
+struct IsolationForest {
+    trees: List[IsolationTree]
+    n_trees: Int
+    sample_size: Int
+    contamination: Float
+}
+
+struct IsolationTree {
+    nodes: List[TreeNode]
+}
+
+struct TreeNode {
+    feature: Int
+    threshold: Float
+    left: Option[Int]
+    right: Option[Int]
+    anomaly_score: Float
+}
+
+impl IsolationForest {
+    fn new(n_trees: Int, sample_size: Int, contamination: Float) -> IsolationForest {
+        return IsolationForest {
+            trees: List::new(),
+            n_trees: n_trees,
+            sample_size: sample_size,
+            contamination: contamination,
+        }
+    }
+
+    fn build_trees(X: Tensor[f32]) {
+        for t in 0..this.n_trees {
+            let tree = build_isolation_tree(X, this.sample_size)
+            this.trees.push(tree)
+        }
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[i32] {
+        let mut predictions = zeros([X.shape[0]])
+
+        for i in 0..X.shape[0] {
+            let score = compute_anomaly_score(X[i], this.trees)
+
+            if score > this.contamination {
+                predictions[i] = 1  // Anomaly
+            } else {
+                predictions[i] = 0  // Normal
+            }
+        }
+
+        return predictions
+    }
+}
+
+// Local Outlier Factor
+struct LocalOutlierFactor {
+    n_neighbors: Int
+    contamination: Float
+    k_distances: Tensor[f32]
+    reachability_distances: Tensor[f32]
+    lof_scores: Tensor[f32]
+    data: Tensor[f32]
+
+    fn new(n_neighbors: Int, contamination: Float) -> LocalOutlierFactor {
+        return LocalOutlierFactor {
+            n_neighbors: n_neighbors,
+            contamination: contamination,
+            k_distances: zeros([0]),
+            reachability_distances: zeros([0]),
+            lof_scores: zeros([0]),
+            data: zeros([0]),
+        }
+    }
+
+    fn fit(X: Tensor[f32]) -> LocalOutlierFactor {
+        let mut model = LocalOutlierFactor::new(this.n_neighbors, this.contamination)
+
+        model.data = X
+
+        // Compute k-distances
+        for i in 0..X.shape[0] {
+            let distances = compute_distances(X[i], X)
+            let k_dist = get_kth_distance(distances, this.n_neighbors)
+            model.k_distances[i] = k_dist
+        }
+
+        // Compute reachability distances
+        for i in 0..X.shape[0] {
+            let dist = 0.0
+
+            for j in 0..X.shape[0] {
+                let pairwise_dist = compute_distance(X[i], X[j])
+                dist = max(pairwise_dist, model.k_distances[j])
+            }
+
+            model.reachability_distances[i] = dist
+        }
+
+        // Compute LOF scores
+        for i in 0..X.shape[0] {
+            let lrd_i = compute_local_reachability_density(i, model)
+            let mut mean_lrd = 0.0
+
+            for j in 0..this.n_neighbors {
+                let neighbor = get_neighbor(i, j, model)
+                let lrd_j = compute_local_reachability_density(neighbor, model)
+                mean_lrd = mean_lrd + lrd_j
+            }
+
+            mean_lrd = mean_lrd / (this.n_neighbors as Float)
+            model.lof_scores[i] = mean_lrd / lrd_i
+        }
+
+        return model
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[i32] {
+        let mut predictions = zeros([X.shape[0]])
+        let threshold = compute_lof_threshold(this.lof_scores, this.contamination)
+
+        for i in 0..X.shape[0] {
+            if this.lof_scores[i] > threshold {
+                predictions[i] = 1  // Anomaly
+            } else {
+                predictions[i] = 0  // Normal
+            }
+        }
+
+        return predictions
+    }
+}
+
+// One-Class SVM
+struct OneClassSVM {
+    kernel: String
+    nu: Float
+    gamma: Float
+    support_vectors: Tensor[f32]
+    weights: Tensor[f32]
+    bias: Float
+}
+
+impl OneClassSVM {
+    fn new(kernel: String, nu: Float, gamma: Float) -> OneClassSVM {
+        return OneClassSVM {
+            kernel: kernel,
+            nu: nu,
+            gamma: gamma,
+            support_vectors: zeros([0]),
+            weights: zeros([0]),
+            bias: 0.0,
+        }
+    }
+
+    fn fit(X: Tensor[f32]) -> OneClassSVM {
+        let mut model = OneClassSVM::new(this.kernel, this.nu, this.gamma)
+
+        // Compute kernel matrix
+        let K = compute_kernel_matrix(X, this.kernel, this.gamma)
+
+        // Solve quadratic programming problem
+        // ...
+
+        return model
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[i32] {
+        let mut predictions = zeros([X.shape[0]])
+
+        for i in 0..X.shape[0] {
+            let score = predict_one_class_svm(X[i], this)
+
+            if score < 0.0 {
+                predictions[i] = 1  // Anomaly
+            } else {
+                predictions[i] = 0  // Normal
+            }
+        }
+
+        return predictions
+    }
+}
+
+// Helper functions
+fn fit_isolation_forest(X: Tensor[f32], params: IsolationForestParams) -> AnomalyDetectionModel {
+    return AnomalyDetectionModel::new(
+        AnomalyAlgorithm::IsolationForest(params),
+        0.5
+    )
+}
+
+fn fit_lof(X: Tensor[f32], params: LOFParams) -> AnomalyDetectionModel {
+    return AnomalyDetectionModel::new(
+        AnomalyAlgorithm::LocalOutlierFactor(params),
+        0.5
+    )
+}
+
+fn fit_one_class_svm(X: Tensor[f32], params: SVMParams) -> AnomalyDetectionModel {
+    return AnomalyDetectionModel::new(
+        AnomalyAlgorithm::OneClassSVM(params),
+        0.0
+    )
+}
+
+fn fit_autoencoder(X: Tensor[f32], params: AutoEncoderParams) -> AnomalyDetectionModel {
+    return AnomalyDetectionModel::new(
+        AnomalyAlgorithm::AutoEncoder(params),
+        params.threshold
+    )
+}
+
+fn fit_elliptic_envelope(X: Tensor[f32], params: EllipticParams) -> AnomalyDetectionModel {
+    return AnomalyDetectionModel::new(
+        AnomalyAlgorithm::EllipticEnvelope(params),
+        0.5
+    )
+}
+
+fn fit_robust_cov(X: Tensor[f32], params: RobustCovParams) -> AnomalyDetectionModel {
+    return AnomalyDetectionModel::new(
+        AnomalyAlgorithm::RobustCovariance(params),
+        0.5
+    )
+}
+
+fn predict_isolation_forest(X: Tensor[f32], model: AnomalyDetectionModel) -> Tensor[i32] {
+    return zeros([X.shape[0]])
+}
+
+fn predict_lof(X: Tensor[f32], model: AnomalyDetectionModel) -> Tensor[i32] {
+    return zeros([X.shape[0]])
+}
+
+fn score_isolation_forest(X: Tensor[f32], model: AnomalyDetectionModel) -> Tensor[f32] {
+    return zeros([X.shape[0]])
+}
+
+fn score_lof(X: Tensor[f32], model: AnomalyDetectionModel) -> Tensor[f32] {
+    return zeros([X.shape[0]])
+}
+
+fn score_autoencoder(X: Tensor[f32], model: AnomalyDetectionModel) -> Tensor[f32] {
+    return zeros([X.shape[0]])
+}
+
+fn build_isolation_tree(X: Tensor[f32], sample_size: Int) -> IsolationTree {
+    return IsolationTree { nodes: List::new() }
+}
+
+fn compute_anomaly_score(x: Tensor[f32], trees: List[IsolationTree]) -> Float {
+    return 0.5
+}
+
+fn compute_distances(x: Tensor[f32], X: Tensor[f32]) -> Tensor[f32] {
+    return zeros([X.shape[0]])
+}
+
+fn compute_distance(x: Tensor[f32], y: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn get_kth_distance(distances: Tensor[f32], k: Int) -> Float {
+    return 0.0
+}
+
+fn get_neighbor(i: Int, k: Int, model: LocalOutlierFactor) -> Int {
+    return 0
+}
+
+fn compute_local_reachability_density(i: Int, model: LocalOutlierFactor) -> Float {
+    return 1.0
+}
+
+fn compute_lof_threshold(scores: Tensor[f32], contamination: Float) -> Float {
+    return 1.5
+}
+
+fn compute_kernel_matrix(X: Tensor[f32], kernel: String, gamma: Float) -> Tensor[f32] {
+    return X
+}
+
+fn predict_one_class_svm(x: Tensor[f32], model: OneClassSVM) -> Float {
+    return 0.0
+}
+
+fn max(a: Float, b: Float) -> Float { return a; }
+fn zeros(shape: List[Int]) -> Tensor[i32] { return zeros_tensor(shape); }
+fn zeros_tensor(shape: List[Int]) -> Tensor[i32] { return zeros_tensor(shape); }
+
+type Tensor[T, Shape] = Any
+type Tensor[T] = Any
+type List<T> = Any
+type Option<T> = Any

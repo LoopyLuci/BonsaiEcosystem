@@ -1,0 +1,384 @@
+// sylva/stdlib/graph_neural_networks.sy
+// Graph Neural Networks for Sylva
+
+struct Graph {
+    nodes: List[Node]
+    edges: List[Edge]
+    node_features: Tensor[f32, "n_nodes,n_features"]
+    adjacency_matrix: Tensor[f32, "n_nodes,n_nodes"]
+}
+
+struct Node {
+    id: Int
+    label: Option[Int]
+    features: Tensor[f32]
+}
+
+struct Edge {
+    source: Int
+    target: Int
+    weight: Float
+    features: Option[Tensor[f32]]
+}
+
+// Graph Convolutional Network (GCN)
+struct GCNLayer {
+    in_features: Int
+    out_features: Int
+    weight: Tensor[f32, "in_features,out_features"]
+    bias: Tensor[f32, "out_features"]
+    use_bias: Bool
+}
+
+impl GCNLayer {
+    fn new(in_features: Int, out_features: Int, use_bias: Bool) -> GCNLayer {
+        return GCNLayer {
+            in_features: in_features,
+            out_features: out_features,
+            weight: randn([in_features, out_features]),
+            bias: zeros([out_features]),
+            use_bias: use_bias,
+        }
+    }
+
+    fn forward(
+        node_features: Tensor[f32, "n_nodes,in_features"],
+        adjacency: Tensor[f32, "n_nodes,n_nodes"]
+    ) -> Tensor[f32, "n_nodes,out_features"] {
+        // X' = D^-1/2 A D^-1/2 X W + b
+        let D = compute_degree_matrix(adjacency)
+        let D_inv_sqrt = matrix_sqrt(D, -0.5)
+
+        let normalized_A = D_inv_sqrt @ adjacency @ D_inv_sqrt
+
+        let output = normalized_A @ node_features @ this.weight
+
+        if this.use_bias {
+            return output + this.bias
+        } else {
+            return output
+        }
+    }
+
+    fn backward(
+        grad_output: Tensor[f32],
+        node_features: Tensor[f32],
+        adjacency: Tensor[f32]
+    ) {
+        // Compute gradients
+    }
+}
+
+// Graph Attention Network (GAT)
+struct GATLayer {
+    in_features: Int
+    out_features: Int
+    n_heads: Int
+    attention_weights: Tensor[f32]
+    bias: Tensor[f32]
+
+    fn new(in_features: Int, out_features: Int, n_heads: Int) -> GATLayer {
+        return GATLayer {
+            in_features: in_features,
+            out_features: out_features,
+            n_heads: n_heads,
+            attention_weights: randn([n_heads, out_features, out_features]),
+            bias: zeros([n_heads, out_features]),
+        }
+    }
+
+    fn forward(
+        node_features: Tensor[f32, "n_nodes,in_features"],
+        adjacency: Tensor[f32, "n_nodes,n_nodes"]
+    ) -> Tensor[f32, "n_nodes,n_heads,out_features"] {
+        let mut outputs = []
+
+        for head in 0..this.n_heads {
+            // Project features
+            let projected = node_features @ this.attention_weights[head]
+
+            // Compute attention scores
+            let attention_scores = compute_attention_scores(projected, adjacency)
+
+            // Apply softmax
+            let attention_probs = softmax(attention_scores)
+
+            // Apply attention
+            let head_output = attention_probs @ projected
+
+            outputs.push(head_output)
+        }
+
+        return stack_tensors(outputs)
+    }
+}
+
+// GraphSAGE - Graph Sampling and Aggregation
+struct GraphSAGELayer {
+    in_features: Int
+    out_features: Int
+    aggregator: AggregatorType
+    sampling_size: Int
+
+    fn new(
+        in_features: Int,
+        out_features: Int,
+        aggregator: AggregatorType,
+        sampling_size: Int
+    ) -> GraphSAGELayer {
+        return GraphSAGELayer {
+            in_features: in_features,
+            out_features: out_features,
+            aggregator: aggregator,
+            sampling_size: sampling_size,
+        }
+    }
+
+    fn forward(
+        node_features: Tensor[f32, "n_nodes,in_features"],
+        adjacency: Tensor[f32, "n_nodes,n_nodes"]
+    ) -> Tensor[f32, "n_nodes,out_features"] {
+        let mut output = zeros([node_features.shape[0], this.out_features])
+
+        for node_id in 0..node_features.shape[0] {
+            // Sample neighbors
+            let sampled_neighbors = sample_neighbors(node_id, adjacency, this.sampling_size)
+
+            // Aggregate neighbor features
+            let neighbor_features = gather_features(sampled_neighbors, node_features)
+            let aggregated = aggregate_features(neighbor_features, this.aggregator)
+
+            // Combine with node's own features
+            let combined = concat([node_features[node_id], aggregated])
+
+            // Apply transformation
+            output[node_id] = apply_mlp(combined, this.out_features)
+        }
+
+        return output
+    }
+}
+
+enum AggregatorType {
+    | Mean
+    | LSTM
+    | Pooling
+    | GCNAggregator
+}
+
+// Spectral methods
+struct SpectralGNNLayer {
+    chebyshev_order: Int
+    filters: List[Tensor[f32]]
+
+    fn new(chebyshev_order: Int, n_filters: Int) -> SpectralGNNLayer {
+        let mut filters = []
+
+        for i in 0..n_filters {
+            filters.push(randn([chebyshev_order]))
+        }
+
+        return SpectralGNNLayer {
+            chebyshev_order: chebyshev_order,
+            filters: filters,
+        }
+    }
+
+    fn forward(
+        node_features: Tensor[f32],
+        laplacian: Tensor[f32]
+    ) -> Tensor[f32] {
+        // Compute Chebyshev polynomials of Laplacian
+        let chebyshev_polys = compute_chebyshev_polynomials(laplacian, this.chebyshev_order)
+
+        // Apply filters
+        let mut output = zeros(node_features.shape)
+
+        for i in 0..this.filters.len() {
+            let filtered = apply_chebyshev_filter(
+                node_features,
+                chebyshev_polys,
+                this.filters[i]
+            )
+
+            output = output + filtered
+        }
+
+        return output
+    }
+}
+
+// Full GNN model
+struct GraphNeuralNetwork {
+    layers: List[GraphNeuralNetworkLayer]
+    dropout_rate: Float
+
+    fn new() -> GraphNeuralNetwork {
+        return GraphNeuralNetwork {
+            layers: List::new(),
+            dropout_rate: 0.0,
+        }
+    }
+
+    fn add_layer(layer: GraphNeuralNetworkLayer) {
+        this.layers.push(layer)
+    }
+
+    fn set_dropout(rate: Float) {
+        this.dropout_rate = rate
+    }
+
+    fn forward(graph: Graph) -> Tensor[f32] {
+        let mut x = graph.node_features
+
+        for layer in this.layers {
+            match layer {
+                GraphNeuralNetworkLayer::GCN(gcn) => {
+                    x = gcn.forward(x, graph.adjacency_matrix)
+                }
+                GraphNeuralNetworkLayer::GAT(gat) => {
+                    let out = gat.forward(x, graph.adjacency_matrix)
+                    x = reshape(out, [x.shape[0], -1])
+                }
+                GraphNeuralNetworkLayer::GraphSAGE(sage) => {
+                    x = sage.forward(x, graph.adjacency_matrix)
+                }
+                _ => {}
+            }
+
+            x = apply_activation(x, "relu")
+
+            if this.dropout_rate > 0.0 {
+                x = apply_dropout(x, this.dropout_rate)
+            }
+        }
+
+        return x
+    }
+
+    fn backward(grad_output: Tensor[f32]) {
+        // Backpropagation through graph layers
+    }
+}
+
+enum GraphNeuralNetworkLayer {
+    | GCN(GCNLayer)
+    | GAT(GATLayer)
+    | GraphSAGE(GraphSAGELayer)
+    | Spectral(SpectralGNNLayer)
+}
+
+// Graph classification and node classification
+struct GraphClassifier {
+    gnn: GraphNeuralNetwork
+    classifier: Tensor[f32, "hidden_dim,n_classes"]
+
+    fn new(gnn: GraphNeuralNetwork, n_classes: Int) -> GraphClassifier {
+        return GraphClassifier {
+            gnn: gnn,
+            classifier: randn([256, n_classes]),
+        }
+    }
+
+    fn predict(graph: Graph) -> Tensor[f32, "n_classes"] {
+        let node_embeddings = this.gnn.forward(graph)
+
+        // Global pooling
+        let graph_embedding = global_mean_pooling(node_embeddings)
+
+        // Classification
+        let logits = graph_embedding @ this.classifier
+
+        return softmax(logits)
+    }
+}
+
+// Helper functions
+fn compute_degree_matrix(adjacency: Tensor[f32]) -> Tensor[f32] {
+    let degrees = sum_rows(adjacency)
+    return diag(degrees)
+}
+
+fn matrix_sqrt(matrix: Tensor[f32], exponent: Float) -> Tensor[f32] {
+    // Compute eigendecomposition and apply exponent
+    return matrix
+}
+
+fn compute_attention_scores(features: Tensor[f32], adjacency: Tensor[f32]) -> Tensor[f32] {
+    let scores = features @ features.transpose()
+    return mask_with_adjacency(scores, adjacency)
+}
+
+fn softmax(x: Tensor[f32]) -> Tensor[f32] {
+    return x
+}
+
+fn sample_neighbors(node_id: Int, adjacency: Tensor[f32], sample_size: Int) -> List[Int] {
+    return List::new()
+}
+
+fn gather_features(node_ids: List[Int], features: Tensor[f32]) -> Tensor[f32] {
+    return features
+}
+
+fn aggregate_features(features: Tensor[f32], aggregator: AggregatorType) -> Tensor[f32] {
+    match aggregator {
+        AggregatorType::Mean => {
+            return mean_pooling(features)
+        }
+        AggregatorType::LSTM => {
+            return lstm_aggregation(features)
+        }
+        AggregatorType::Pooling => {
+            return max_pooling(features)
+        }
+        _ => {
+            return features
+        }
+    }
+}
+
+fn concat(tensors: List[Tensor[f32]]) -> Tensor[f32] {
+    return tensors[0]
+}
+
+fn apply_mlp(input: Tensor[f32], output_dim: Int) -> Tensor[f32] {
+    return input
+}
+
+fn compute_chebyshev_polynomials(laplacian: Tensor[f32], order: Int) -> List[Tensor[f32]] {
+    return List::new()
+}
+
+fn apply_chebyshev_filter(features: Tensor[f32], polys: List[Tensor[f32]], filter: Tensor[f32]) -> Tensor[f32] {
+    return features
+}
+
+fn apply_activation(x: Tensor[f32], activation: String) -> Tensor[f32] {
+    return x
+}
+
+fn apply_dropout(x: Tensor[f32], rate: Float) -> Tensor[f32] {
+    return x
+}
+
+fn global_mean_pooling(node_embeddings: Tensor[f32]) -> Tensor[f32] {
+    return mean_pooling(node_embeddings)
+}
+
+fn mean_pooling(x: Tensor[f32]) -> Tensor[f32] { return x; }
+fn max_pooling(x: Tensor[f32]) -> Tensor[f32] { return x; }
+fn lstm_aggregation(x: Tensor[f32]) -> Tensor[f32] { return x; }
+fn mask_with_adjacency(x: Tensor[f32], adj: Tensor[f32]) -> Tensor[f32] { return x; }
+fn sum_rows(x: Tensor[f32]) -> Tensor[f32] { return x; }
+fn diag(x: Tensor[f32]) -> Tensor[f32] { return x; }
+fn reshape(x: Tensor[f32], shape: List[Int]) -> Tensor[f32] { return x; }
+fn stack_tensors(tensors: List[Tensor[f32]]) -> Tensor[f32] { return tensors[0]; }
+fn randn(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn zeros(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+
+type Tensor[T, Shape] = Any
+type Tensor[T] = Any
+type List<T> = Any
+type Option<T> = Any

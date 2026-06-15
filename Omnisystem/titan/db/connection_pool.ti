@@ -1,0 +1,462 @@
+// titan/db/connection_pool.ti
+// Connection pooling for database access
+
+pub struct ConnectionPool {
+    connections: Vec<DbConnection>,
+    available: Vec<usize>,
+    in_use: Vec<bool>,
+    config: PoolConfig,
+}
+
+pub struct PoolConfig {
+    min_size: usize,
+    max_size: usize,
+    max_lifetime: u64,
+    idle_timeout: u64,
+    connection_timeout: u64,
+}
+
+pub struct DbConnection {
+    id: u64,
+    handle: u64,
+    created_at: u64,
+    last_used: u64,
+    valid: bool,
+}
+
+pub struct PreparedStatement {
+    handle: u64,
+    query: String,
+    params: Vec<QueryParam>,
+}
+
+pub enum QueryParam {
+    Null,
+    Integer(i64),
+    Float(f64),
+    String(String),
+    Bytes(Vec<u8>),
+    Boolean(bool),
+}
+
+pub struct QueryResult {
+    rows: Vec<Row>,
+    affected_rows: u64,
+    last_insert_id: u64,
+}
+
+pub struct Row {
+    columns: Vec<ColumnValue>,
+}
+
+pub enum ColumnValue {
+    Null,
+    Integer(i64),
+    Float(f64),
+    String(String),
+    Bytes(Vec<u8>),
+    Boolean(bool),
+    Timestamp(u64),
+}
+
+impl ConnectionPool {
+    pub fn new(config: PoolConfig) -> Result<ConnectionPool, String> ! {db} {
+        let mut pool = ConnectionPool {
+            connections: Vec::new(),
+            available: Vec::new(),
+            in_use: Vec::new(),
+            config: config,
+        };
+
+        for i in 0..config.min_size {
+            match pool.create_connection() {
+                Result::Ok(conn) => {
+                    pool.connections.push(conn);
+                    pool.in_use.push(false);
+                    pool.available.push(i);
+                }
+                Result::Err(e) => {
+                    return Result::Err(e);
+                }
+            }
+        }
+
+        return Result::Ok(pool);
+    }
+
+    pub fn acquire(&mut self) -> Result<DbConnection, String> ! {db} {
+        let start_time = get_timestamp();
+
+        loop {
+            for i in 0..self.available.len() {
+                let conn_idx = self.available[i];
+
+                if !self.in_use[conn_idx] {
+                    self.in_use[conn_idx] = true;
+                    self.available.remove(i);
+
+                    self.connections[conn_idx].last_used = get_timestamp();
+
+                    return Result::Ok(self.connections[conn_idx]);
+                }
+            }
+
+            if self.connections.len() < self.config.max_size {
+                match self.create_connection() {
+                    Result::Ok(conn) => {
+                        let conn_id = self.connections.len();
+                        self.connections.push(conn);
+                        self.in_use.push(true);
+
+                        return Result::Ok(self.connections[conn_id]);
+                    }
+                    Result::Err(e) => {
+                        return Result::Err(e);
+                    }
+                }
+            }
+
+            if get_timestamp() - start_time > self.config.connection_timeout {
+                return Result::Err("Connection timeout".to_string());
+            }
+
+            yield_cpu();
+        }
+    }
+
+    pub fn release(&mut self, conn: DbConnection) -> Result<(), String> ! {db} {
+        for i in 0..self.connections.len() {
+            if self.connections[i].id == conn.id {
+                self.in_use[i] = false;
+                self.available.push(i);
+
+                return Result::Ok(());
+            }
+        }
+
+        return Result::Err("Connection not found".to_string());
+    }
+
+    pub fn execute(
+        &mut self,
+        query: &str,
+        params: &[QueryParam]
+    ) -> Result<QueryResult, String> ! {db} {
+        let mut conn = self.acquire()?;
+
+        let result = execute_query(&conn, query, params)?;
+
+        self.release(conn)?;
+
+        return Result::Ok(result);
+    }
+
+    pub fn prepare(&mut self, query: &str) -> Result<PreparedStatement, String> ! {db} {
+        let conn = self.acquire()?;
+
+        let handle = prepare_statement(&conn, query)?;
+
+        self.release(conn)?;
+
+        return Result::Ok(PreparedStatement {
+            handle: handle,
+            query: query.to_string(),
+            params: Vec::new(),
+        });
+    }
+
+    fn create_connection(&mut self) -> Result<DbConnection, String> ! {db} {
+        let handle: u64 = 0;
+
+        asm! {
+            "call db_connect"
+            : "=a"(handle)
+            : "d"(0)
+            :
+            : volatile
+        }
+
+        if handle == 0 {
+            return Result::Err("Failed to create connection".to_string());
+        }
+
+        return Result::Ok(DbConnection {
+            id: self.connections.len() as u64,
+            handle: handle,
+            created_at: get_timestamp(),
+            last_used: get_timestamp(),
+            valid: true,
+        });
+    }
+
+    pub fn health_check(&mut self) -> Result<(), String> ! {db} {
+        for i in 0..self.connections.len() {
+            if !self.connections[i].valid {
+                continue;
+            }
+
+            if get_timestamp() - self.connections[i].last_used > self.config.idle_timeout {
+                self.connections[i].valid = false;
+                continue;
+            }
+
+            let now = get_timestamp();
+            let age = now - self.connections[i].created_at;
+
+            if age > self.config.max_lifetime {
+                self.connections[i].valid = false;
+                continue;
+            }
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn stats(&self) -> PoolStats {
+        let mut active = 0;
+        let mut idle = 0;
+
+        for in_use in &self.in_use {
+            if *in_use {
+                active = active + 1;
+            } else {
+                idle = idle + 1;
+            }
+        }
+
+        return PoolStats {
+            total_connections: self.connections.len(),
+            active_connections: active,
+            idle_connections: idle,
+            max_connections: self.config.max_size,
+        };
+    }
+}
+
+pub struct PoolStats {
+    total_connections: usize,
+    active_connections: usize,
+    idle_connections: usize,
+    max_connections: usize,
+}
+
+pub struct Transaction {
+    connection: DbConnection,
+    active: bool,
+}
+
+impl Transaction {
+    pub fn new(conn: DbConnection) -> Result<Transaction, String> ! {db} {
+        begin_transaction(&conn)?;
+
+        return Result::Ok(Transaction {
+            connection: conn,
+            active: true,
+        });
+    }
+
+    pub fn execute(
+        &mut self,
+        query: &str,
+        params: &[QueryParam]
+    ) -> Result<QueryResult, String> ! {db} {
+        return execute_query(&self.connection, query, params);
+    }
+
+    pub fn commit(&mut self) -> Result<(), String> ! {db} {
+        if !self.active {
+            return Result::Err("Transaction not active".to_string());
+        }
+
+        commit_transaction(&self.connection)?;
+        self.active = false;
+
+        return Result::Ok(());
+    }
+
+    pub fn rollback(&mut self) -> Result<(), String> ! {db} {
+        if !self.active {
+            return Result::Err("Transaction not active".to_string());
+        }
+
+        rollback_transaction(&self.connection)?;
+        self.active = false;
+
+        return Result::Ok(());
+    }
+}
+
+impl PreparedStatement {
+    pub fn bind(&mut self, param: QueryParam) -> Result<(), String> ! {db} {
+        self.params.push(param);
+        return Result::Ok(());
+    }
+
+    pub fn execute(&self) -> Result<QueryResult, String> ! {db} {
+        return Result::Err("Not implemented".to_string());
+    }
+
+    pub fn clear_bindings(&mut self) {
+        self.params = Vec::new();
+    }
+}
+
+fn execute_query(
+    conn: &DbConnection,
+    query: &str,
+    params: &[QueryParam]
+) -> Result<QueryResult, String> ! {db} {
+    let result: u64 = 0;
+
+    asm! {
+        "call db_execute"
+        : "=a"(result)
+        : "d"(conn.handle), "c"(query)
+        :
+        : volatile
+    }
+
+    if result == 0 {
+        return Result::Err("Query execution failed".to_string());
+    }
+
+    return Result::Ok(QueryResult {
+        rows: Vec::new(),
+        affected_rows: 0,
+        last_insert_id: 0,
+    });
+}
+
+fn prepare_statement(conn: &DbConnection, query: &str) -> Result<u64, String> ! {db} {
+    let handle: u64 = 0;
+
+    asm! {
+        "call db_prepare"
+        : "=a"(handle)
+        : "d"(conn.handle), "c"(query)
+        :
+        : volatile
+    }
+
+    if handle == 0 {
+        return Result::Err("Failed to prepare statement".to_string());
+    }
+
+    return Result::Ok(handle);
+}
+
+fn begin_transaction(conn: &DbConnection) -> Result<(), String> ! {db} {
+    asm! {
+        "call db_begin"
+        :
+        : "d"(conn.handle)
+        :
+        : volatile
+    }
+
+    return Result::Ok(());
+}
+
+fn commit_transaction(conn: &DbConnection) -> Result<(), String> ! {db} {
+    asm! {
+        "call db_commit"
+        :
+        : "d"(conn.handle)
+        :
+        : volatile
+    }
+
+    return Result::Ok(());
+}
+
+fn rollback_transaction(conn: &DbConnection) -> Result<(), String> ! {db} {
+    asm! {
+        "call db_rollback"
+        :
+        : "d"(conn.handle)
+        :
+        : volatile
+    }
+
+    return Result::Ok(());
+}
+
+fn get_timestamp() -> u64 {
+    let ts: u64 = 0;
+
+    asm! {
+        "call get_time"
+        : "=a"(ts)
+        :
+        :
+        : volatile
+    }
+
+    return ts;
+}
+
+fn yield_cpu() {
+    asm! {
+        "pause"
+        :
+        :
+        :
+        : volatile
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+
+    pub fn unwrap(&self) -> T {
+        match self {
+            Result::Ok(val) => return val,
+            Result::Err(_) => {
+                asm! { "hlt" : : : : volatile, noreturn }
+            }
+        }
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn new() -> String {
+        return String { data: 0 as *u8, len: 0 };
+    }
+
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn remove(&mut self, index: usize) {}
+    pub fn len(&self) -> usize {
+        return self.len;
+    }
+}

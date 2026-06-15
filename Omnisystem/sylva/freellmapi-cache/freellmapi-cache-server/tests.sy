@@ -1,0 +1,3 @@
+// Tests: freellmapi-cache-server
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,414 @@
+// titan/concurrency/atomic.ti
+// Atomic operations and lock-free synchronization primitives
+
+pub struct Atomic<T> {
+    value: T,
+}
+
+pub enum Ordering {
+    Relaxed,
+    Release,
+    Acquire,
+    AcqRel,
+    SeqCst,
+}
+
+// Atomic integer types
+pub type AtomicI32 = Atomic<i32>;
+pub type AtomicU32 = Atomic<u32>;
+pub type AtomicI64 = Atomic<i64>;
+pub type AtomicU64 = Atomic<u64>;
+pub type AtomicBool = Atomic<bool>;
+
+// Atomic pointer
+pub struct AtomicPtr<T> {
+    ptr: &T,
+}
+
+// Create atomic
+pub fn atomic_create<T>(value: T) -> Atomic<T> {
+    return Atomic { value: value };
+}
+
+// Load with ordering
+pub fn atomic_load<T>(atomic: &Atomic<T>, order: Ordering) -> T ! {concurrency} {
+    let result = atomic.value;
+
+    match order {
+        Ordering::Relaxed => {
+            asm! {
+                "mov (%0), %1"
+                : "=r"(result)
+                : "r"(&atomic.value)
+                :
+                : volatile
+            }
+        }
+        Ordering::Acquire => {
+            asm! {
+                "mov (%0), %1; lfence"
+                : "=r"(result)
+                : "r"(&atomic.value)
+                :
+                : volatile
+            }
+        }
+        Ordering::SeqCst => {
+            asm! {
+                "mfence; mov (%0), %1; mfence"
+                : "=r"(result)
+                : "r"(&atomic.value)
+                :
+                : volatile
+            }
+        }
+        _ => {}
+    }
+
+    return result;
+}
+
+// Store with ordering
+pub fn atomic_store<T>(atomic: &mut Atomic<T>, value: T, order: Ordering) ! {concurrency} {
+    match order {
+        Ordering::Relaxed => {
+            atomic.value = value;
+        }
+        Ordering::Release => {
+            asm! {
+                "sfence; mov %0, (%1)"
+                :
+                : "r"(value), "r"(&mut atomic.value)
+                :
+                : volatile
+            }
+        }
+        Ordering::SeqCst => {
+            asm! {
+                "mfence; mov %0, (%1); mfence"
+                :
+                : "r"(value), "r"(&mut atomic.value)
+                :
+                : volatile
+            }
+        }
+        _ => {}
+    }
+}
+
+// Compare and swap
+pub fn atomic_compare_exchange(
+    atomic: &mut Atomic<i64>,
+    expected: i64,
+    new: i64,
+    success_order: Ordering,
+    failure_order: Ordering
+) -> Result<i64, i64> ! {concurrency} {
+    let result: i64 = 0;
+
+    asm! {
+        "lock cmpxchgq %2, (%1)"
+        : "=a"(result)
+        : "r"(&mut atomic.value), "r"(new), "0"(expected)
+        : "cc"
+        : volatile
+    }
+
+    if result == expected {
+        return Result::Ok(expected);
+    } else {
+        return Result::Err(result);
+    }
+}
+
+// Fetch and add
+pub fn atomic_fetch_add(atomic: &mut Atomic<i64>, delta: i64, order: Ordering) -> i64 ! {concurrency} {
+    let result: i64 = 0;
+
+    asm! {
+        "lock xaddq %0, (%1)"
+        : "+r"(result)
+        : "r"(&mut atomic.value), "0"(delta)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+// Fetch and sub
+pub fn atomic_fetch_sub(atomic: &mut Atomic<i64>, delta: i64, order: Ordering) -> i64 ! {concurrency} {
+    return atomic_fetch_add(atomic, -delta, order);
+}
+
+// Fetch and OR
+pub fn atomic_fetch_or(atomic: &mut Atomic<i64>, val: i64, order: Ordering) -> i64 ! {concurrency} {
+    let result: i64 = 0;
+
+    asm! {
+        "lock orq %0, (%1)"
+        : "+r"(result)
+        : "r"(&mut atomic.value), "0"(val)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+// Fetch and AND
+pub fn atomic_fetch_and(atomic: &mut Atomic<i64>, val: i64, order: Ordering) -> i64 ! {concurrency} {
+    let result: i64 = 0;
+
+    asm! {
+        "lock andq %0, (%1)"
+        : "+r"(result)
+        : "r"(&mut atomic.value), "0"(val)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+// Fetch and XOR
+pub fn atomic_fetch_xor(atomic: &mut Atomic<i64>, val: i64, order: Ordering) -> i64 ! {concurrency} {
+    let result: i64 = 0;
+
+    asm! {
+        "lock xorq %0, (%1)"
+        : "+r"(result)
+        : "r"(&mut atomic.value), "0"(val)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+// Spin lock
+pub struct SpinLock<T> {
+    locked: AtomicBool,
+    value: T,
+}
+
+pub fn spinlock_create<T>(value: T) -> SpinLock<T> {
+    return SpinLock {
+        locked: atomic_create(false),
+        value: value,
+    };
+}
+
+pub fn spinlock_acquire<T>(lock: &mut SpinLock<T>) ! {concurrency} {
+    loop {
+        let was_locked = atomic_load::<bool>(&lock.locked, Ordering::Acquire);
+        if !was_locked {
+            // Try to acquire
+            match atomic_compare_exchange::<bool>(
+                &mut lock.locked,
+                false,
+                true,
+                Ordering::Acquire,
+                Ordering::Relaxed
+            ) {
+                Result::Ok(_) => return,
+                Result::Err(_) => {}
+            }
+        }
+
+        // Pause and retry
+        asm! {
+            "pause"
+            :
+            :
+            :
+            :
+        }
+    }
+}
+
+pub fn spinlock_release<T>(lock: &mut SpinLock<T>) ! {concurrency} {
+    atomic_store(&mut lock.locked, false, Ordering::Release);
+}
+
+pub fn spinlock_try_acquire<T>(lock: &mut SpinLock<T>) -> bool ! {concurrency} {
+    match atomic_compare_exchange::<bool>(
+        &mut lock.locked,
+        false,
+        true,
+        Ordering::Acquire,
+        Ordering::Relaxed
+    ) {
+        Result::Ok(_) => return true,
+        Result::Err(_) => return false,
+    }
+}
+
+// Mutex with fairness
+pub struct Mutex<T> {
+    state: Atomic<i32>,  // 0=unlocked, >0=locked, <0=waiting
+    value: T,
+}
+
+pub fn mutex_create<T>(value: T) -> Mutex<T> {
+    return Mutex {
+        state: atomic_create(0),
+        value: value,
+    };
+}
+
+pub fn mutex_lock<T>(mtx: &mut Mutex<T>) ! {concurrency} {
+    let mut state = atomic_load::<i32>(&mtx.state, Ordering::Acquire);
+
+    while state != 0 {
+        // Wait on futex
+        asm! {
+            "call futex_wait"
+            :
+            : "a"(&mtx.state), "d"(state)
+            :
+            : volatile
+        }
+        state = atomic_load::<i32>(&mtx.state, Ordering::Acquire);
+    }
+
+    atomic_store(&mtx.state, 1, Ordering::Acquire);
+}
+
+pub fn mutex_unlock<T>(mtx: &mut Mutex<T>) ! {concurrency} {
+    atomic_store(&mtx.state, 0, Ordering::Release);
+
+    // Wake waiting threads
+    asm! {
+        "call futex_wake"
+        :
+        : "a"(&mtx.state), "d"(1)
+        :
+        : volatile
+    }
+}
+
+pub fn mutex_try_lock<T>(mtx: &mut Mutex<T>) -> bool ! {concurrency} {
+    match atomic_compare_exchange::<i32>(
+        &mut mtx.state,
+        0,
+        1,
+        Ordering::Acquire,
+        Ordering::Relaxed
+    ) {
+        Result::Ok(_) => return true,
+        Result::Err(_) => return false,
+    }
+}
+
+// Reader-writer lock
+pub struct RwLock<T> {
+    state: Atomic<i32>,  // bits: [writers_waiting:8][writers:8][readers:16]
+    value: T,
+}
+
+pub fn rwlock_create<T>(value: T) -> RwLock<T> {
+    return RwLock {
+        state: atomic_create(0),
+        value: value,
+    };
+}
+
+pub fn rwlock_read_lock(lock: &mut RwLock<i32>) ! {concurrency} {
+    loop {
+        let state = atomic_load::<i32>(&lock.state, Ordering::Acquire);
+        let writers = (state >> 8) & 0xFF;
+        if writers == 0 {
+            match atomic_compare_exchange::<i32>(
+                &mut lock.state,
+                state,
+                state + 1,  // Increment reader count
+                Ordering::Acquire,
+                Ordering::Relaxed
+            ) {
+                Result::Ok(_) => return,
+                Result::Err(_) => {}
+            }
+        }
+        asm! { "pause" : : : : }
+    }
+}
+
+pub fn rwlock_write_lock(lock: &mut RwLock<i32>) ! {concurrency} {
+    loop {
+        let state = atomic_load::<i32>(&lock.state, Ordering::Acquire);
+        if state == 0 {
+            match atomic_compare_exchange::<i32>(
+                &mut lock.state,
+                0,
+                0x100,  // Mark as writer
+                Ordering::Acquire,
+                Ordering::Relaxed
+            ) {
+                Result::Ok(_) => return,
+                Result::Err(_) => {}
+            }
+        }
+        asm! { "pause" : : : : }
+    }
+}
+
+pub fn rwlock_read_unlock(lock: &mut RwLock<i32>) ! {concurrency} {
+    atomic_fetch_sub(&lock.state, 1, Ordering::Release);
+}
+
+pub fn rwlock_write_unlock(lock: &mut RwLock<i32>) ! {concurrency} {
+    atomic_fetch_sub(&lock.state, 0x100, Ordering::Release);
+}
+
+// Barriers
+pub struct Barrier {
+    state: Atomic<i32>,
+    count: i32,
+}
+
+pub fn barrier_create(count: i32) -> Barrier {
+    return Barrier {
+        state: atomic_create(0),
+        count: count,
+    };
+}
+
+pub fn barrier_wait(barrier: &mut Barrier) ! {concurrency} {
+    let old = atomic_fetch_add(&barrier.state, 1, Ordering::AcqRel);
+
+    if old == barrier.count - 1 {
+        // Last thread, reset for next barrier
+        atomic_store(&barrier.state, 0, Ordering::Release);
+    } else {
+        // Wait for others
+        loop {
+            let state = atomic_load::<i32>(&barrier.state, Ordering::Acquire);
+            if state == 0 {
+                return;
+            }
+            asm! { "pause" : : : : }
+        }
+    }
+}
+
+impl Clone for Ordering {
+    fn clone(&self) -> Ordering {
+        return *self;
+    }
+}
+
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+fn atomic_compare_exchange<T>(
+    atomic: &mut Atomic<T>,
+    expected: T,
+    new: T,
+    success: Ordering,
+    failure: Ordering
+) -> Result<T, T> {
+    return Result::Ok(expected);
+}

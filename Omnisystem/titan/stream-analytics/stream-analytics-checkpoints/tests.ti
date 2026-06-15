@@ -1,0 +1,3 @@
+// Tests: stream-analytics-checkpoints
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,446 @@
+// sylva/stdlib/ensemble_methods.sy
+// Ensemble machine learning methods for Sylva
+
+struct EnsembleModel {
+    models: List[Model]
+    weights: Tensor[f32]
+    combiner: EnsembleCombiner
+}
+
+enum EnsembleCombiner {
+    | Average
+    | WeightedAverage
+    | Voting
+    | Stacking
+    | Blending
+}
+
+trait Model {
+    fn predict(X: Tensor[f32]) -> Tensor[f32]
+    fn fit(X: Tensor[f32], y: Tensor[f32])
+}
+
+// Bagging
+struct BaggingEnsemble {
+    base_estimator: Model
+    n_estimators: Int
+    models: List[Model]
+    bootstrap_samples: List[List[Int]]
+
+    fn new(base_estimator: Model, n_estimators: Int) -> BaggingEnsemble {
+        return BaggingEnsemble {
+            base_estimator: base_estimator,
+            n_estimators: n_estimators,
+            models: List::new(),
+            bootstrap_samples: List::new(),
+        }
+    }
+
+    fn fit(X: Tensor[f32], y: Tensor[f32]) {
+        for i in 0..this.n_estimators {
+            // Bootstrap sample
+            let sample_indices = bootstrap_sample(X.shape[0])
+            this.bootstrap_samples.push(sample_indices)
+
+            // Create new model instance (clone base estimator)
+            let mut model = clone_model(this.base_estimator)
+
+            // Extract bootstrap data
+            let X_sample = gather_rows(X, sample_indices)
+            let y_sample = gather_rows(y, sample_indices)
+
+            // Fit model
+            model.fit(X_sample, y_sample)
+
+            this.models.push(model)
+        }
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[f32] {
+        let mut predictions = []
+
+        for model in this.models {
+            let pred = model.predict(X)
+            predictions.push(pred)
+        }
+
+        // Average predictions
+        return average_predictions(predictions)
+    }
+}
+
+// Boosting (AdaBoost)
+struct AdaBoostEnsemble {
+    base_estimator: Model
+    n_estimators: Int
+    learning_rate: Float
+    models: List[Model]
+    alphas: List[Float]
+    sample_weights: Tensor[f32]
+
+    fn new(base_estimator: Model, n_estimators: Int, learning_rate: Float) -> AdaBoostEnsemble {
+        return AdaBoostEnsemble {
+            base_estimator: base_estimator,
+            n_estimators: n_estimators,
+            learning_rate: learning_rate,
+            models: List::new(),
+            alphas: List::new(),
+            sample_weights: zeros([0]),
+        }
+    }
+
+    fn fit(X: Tensor[f32], y: Tensor[f32]) {
+        // Initialize sample weights
+        this.sample_weights = ones([X.shape[0]]) / (X.shape[0] as Float)
+
+        for i in 0..this.n_estimators {
+            // Fit weak learner
+            let mut model = clone_model(this.base_estimator)
+            model.fit(X, y)
+
+            // Get predictions
+            let predictions = model.predict(X)
+
+            // Compute weighted error
+            let errors = compute_errors(predictions, y)
+            let weighted_error = sum_weighted(errors, this.sample_weights)
+
+            if weighted_error > 0.5 {
+                // Skip this model
+                continue
+            }
+
+            // Compute alpha (model weight)
+            let alpha = 0.5 * ln((1.0 - weighted_error) / weighted_error)
+            this.alphas.push(alpha)
+            this.models.push(model)
+
+            // Update sample weights
+            let multipliers = update_sample_weights(errors, alpha)
+            this.sample_weights = element_multiply(this.sample_weights, multipliers)
+            this.sample_weights = normalize(this.sample_weights)
+        }
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[f32] {
+        let mut weighted_predictions = zeros([X.shape[0]])
+
+        for i in 0..this.models.len() {
+            let pred = this.models[i].predict(X)
+            weighted_predictions = weighted_predictions + this.alphas[i] * pred
+        }
+
+        return sign_of(weighted_predictions)
+    }
+}
+
+// Gradient Boosting
+struct GradientBoostingEnsemble {
+    base_estimator: Model
+    n_estimators: Int
+    learning_rate: Float
+    subsample: Float
+    models: List[Model]
+    init_prediction: Float
+
+    fn new(
+        base_estimator: Model,
+        n_estimators: Int,
+        learning_rate: Float,
+        subsample: Float
+    ) -> GradientBoostingEnsemble {
+        return GradientBoostingEnsemble {
+            base_estimator: base_estimator,
+            n_estimators: n_estimators,
+            learning_rate: learning_rate,
+            subsample: subsample,
+            models: List::new(),
+            init_prediction: 0.0,
+        }
+    }
+
+    fn fit(X: Tensor[f32], y: Tensor[f32]) {
+        // Initialize with mean
+        this.init_prediction = mean_of(y)
+
+        let mut residuals = y - this.init_prediction
+
+        for i in 0..this.n_estimators {
+            // Sample subset
+            let sample_indices = subsample_indices(X.shape[0], this.subsample)
+            let X_sample = gather_rows(X, sample_indices)
+            let residuals_sample = gather_rows(residuals, sample_indices)
+
+            // Fit model to residuals
+            let mut model = clone_model(this.base_estimator)
+            model.fit(X_sample, residuals_sample)
+
+            this.models.push(model)
+
+            // Update residuals
+            let predictions = model.predict(X)
+            residuals = residuals - this.learning_rate * predictions
+        }
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[f32] {
+        let mut predictions = zeros([X.shape[0]]) + this.init_prediction
+
+        for model in this.models {
+            let pred = model.predict(X)
+            predictions = predictions + this.learning_rate * pred
+        }
+
+        return predictions
+    }
+}
+
+// Random Forest
+struct RandomForest {
+    n_trees: Int
+    max_depth: Int
+    min_samples_split: Int
+    trees: List[DecisionTree]
+
+    fn new(n_trees: Int, max_depth: Int, min_samples_split: Int) -> RandomForest {
+        return RandomForest {
+            n_trees: n_trees,
+            max_depth: max_depth,
+            min_samples_split: min_samples_split,
+            trees: List::new(),
+        }
+    }
+
+    fn fit(X: Tensor[f32], y: Tensor[f32]) {
+        for i in 0..this.n_trees {
+            // Bootstrap sample
+            let sample_indices = bootstrap_sample(X.shape[0])
+
+            let X_sample = gather_rows(X, sample_indices)
+            let y_sample = gather_rows(y, sample_indices)
+
+            // Build tree
+            let tree = build_decision_tree(
+                X_sample,
+                y_sample,
+                0,
+                this.max_depth,
+                this.min_samples_split
+            )
+
+            this.trees.push(tree)
+        }
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[f32] {
+        let mut predictions = zeros([X.shape[0]])
+
+        for tree in this.trees {
+            let tree_pred = predict_tree(X, tree)
+            predictions = predictions + tree_pred
+        }
+
+        return predictions / (this.n_trees as Float)
+    }
+}
+
+type DecisionTree = Any
+
+// Stacking
+struct StackingEnsemble {
+    level0_models: List[Model]
+    level1_model: Model
+    level0_predictions: Tensor[f32]
+
+    fn new(level0_models: List[Model], level1_model: Model) -> StackingEnsemble {
+        return StackingEnsemble {
+            level0_models: level0_models,
+            level1_model: level1_model,
+            level0_predictions: zeros([0]),
+        }
+    }
+
+    fn fit(X: Tensor[f32], y: Tensor[f32]) {
+        // Fit level 0 models
+        for model in this.level0_models {
+            model.fit(X, y)
+        }
+
+        // Generate meta-features using cross-validation
+        let mut meta_features = zeros([X.shape[0], this.level0_models.len()])
+
+        for i in 0..this.level0_models.len() {
+            let predictions = this.level0_models[i].predict(X)
+            meta_features[i] = predictions
+        }
+
+        // Fit level 1 model on meta-features
+        this.level1_model.fit(meta_features, y)
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[f32] {
+        // Generate meta-features
+        let mut meta_features = zeros([X.shape[0], this.level0_models.len()])
+
+        for i in 0..this.level0_models.len() {
+            let predictions = this.level0_models[i].predict(X)
+            meta_features[i] = predictions
+        }
+
+        // Predict with level 1 model
+        return this.level1_model.predict(meta_features)
+    }
+}
+
+// Voting
+struct VotingEnsemble {
+    models: List[Model]
+    voting_strategy: VotingStrategy
+
+    fn new(models: List[Model], strategy: VotingStrategy) -> VotingEnsemble {
+        return VotingEnsemble {
+            models: models,
+            voting_strategy: strategy,
+        }
+    }
+
+    fn fit(X: Tensor[f32], y: Tensor[f32]) {
+        for model in this.models {
+            model.fit(X, y)
+        }
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[f32] {
+        let mut predictions = []
+
+        for model in this.models {
+            let pred = model.predict(X)
+            predictions.push(pred)
+        }
+
+        match this.voting_strategy {
+            VotingStrategy::Hard => {
+                return hard_voting(predictions)
+            }
+            VotingStrategy::Soft => {
+                return soft_voting(predictions)
+            }
+            VotingStrategy::Weighted => {
+                return weighted_voting(predictions, weights)
+            }
+        }
+    }
+}
+
+enum VotingStrategy {
+    | Hard
+    | Soft
+    | Weighted(Tensor[f32])
+}
+
+// Helper functions
+fn bootstrap_sample(n: Int) -> List[Int] {
+    let mut sample = []
+
+    for i in 0..n {
+        let idx = random_int(0, n - 1)
+        sample.push(idx)
+    }
+
+    return sample
+}
+
+fn clone_model(model: Model) -> Model {
+    return model
+}
+
+fn gather_rows(X: Tensor[f32], indices: List[Int]) -> Tensor[f32] {
+    return X
+}
+
+fn average_predictions(predictions: List[Tensor[f32]]) -> Tensor[f32] {
+    return predictions[0]
+}
+
+fn ones(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+fn zeros(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+fn compute_errors(predictions: Tensor[f32], y: Tensor[f32]) -> Tensor[f32] {
+    return predictions
+}
+
+fn sum_weighted(x: Tensor[f32], weights: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn ln(x: Float) -> Float {
+    return 0.0
+}
+
+fn update_sample_weights(errors: Tensor[f32], alpha: Float) -> Tensor[f32] {
+    return errors
+}
+
+fn element_multiply(x: Tensor[f32], y: Tensor[f32]) -> Tensor[f32] {
+    return x
+}
+
+fn normalize(x: Tensor[f32]) -> Tensor[f32] {
+    return x
+}
+
+fn sign_of(x: Tensor[f32]) -> Tensor[f32] {
+    return x
+}
+
+fn mean_of(x: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn subsample_indices(n: Int, fraction: Float) -> List[Int] {
+    return List::new()
+}
+
+fn build_decision_tree(
+    X: Tensor[f32],
+    y: Tensor[f32],
+    depth: Int,
+    max_depth: Int,
+    min_samples: Int
+) -> DecisionTree {
+    return null
+}
+
+fn predict_tree(X: Tensor[f32], tree: DecisionTree) -> Tensor[f32] {
+    return X
+}
+
+fn random_int(min: Int, max: Int) -> Int {
+    return min
+}
+
+fn hard_voting(predictions: List[Tensor[f32]]) -> Tensor[f32] {
+    return predictions[0]
+}
+
+fn soft_voting(predictions: List[Tensor[f32]]) -> Tensor[f32] {
+    return predictions[0]
+}
+
+fn weighted_voting(predictions: List[Tensor[f32]], weights: Tensor[f32]) -> Tensor[f32] {
+    return predictions[0]
+}
+
+type Tensor[T, Shape] = Any
+type Tensor[T] = Any
+type List<T> = Any
+type Option<T> = Any

@@ -1,0 +1,302 @@
+// sylva/stdlib/optimizer.sy
+// Optimizers for neural network training in Sylva
+
+abstract class Optimizer {
+    learning_rate: Float
+    iterations: Int
+
+    abstract fn step(params: List[Tensor], grads: List[Tensor])
+    abstract fn zero_grad()
+}
+
+class SGD extends Optimizer {
+    momentum: Float
+    weight_decay: Float
+    velocity: List[Tensor]
+
+    fn __init__(lr: Float = 0.01, momentum: Float = 0.9, weight_decay: Float = 0.0) {
+        this.learning_rate = lr
+        this.momentum = momentum
+        this.weight_decay = weight_decay
+        this.iterations = 0
+        this.velocity = []
+    }
+
+    fn step(params: List[Tensor], grads: List[Tensor]) {
+        if this.velocity.len() == 0 {
+            for param in params {
+                this.velocity.push(Tensor::zeros(param.shape))
+            }
+        }
+
+        for i in 0..params.len() {
+            let param = params[i]
+            let grad = grads[i]
+
+            # L2 regularization
+            let grad_with_decay = grad + (this.weight_decay * param)
+
+            # v = momentum * v - lr * grad
+            this.velocity[i] = (this.momentum * this.velocity[i]) -
+                              (this.learning_rate * grad_with_decay)
+
+            # params = params + v
+            params[i] = param + this.velocity[i]
+        }
+
+        this.iterations = this.iterations + 1
+    }
+
+    fn zero_grad() {
+        # Momentum already decays gradients
+    }
+}
+
+class Adam extends Optimizer {
+    beta1: Float
+    beta2: Float
+    epsilon: Float
+    m: List[Tensor]  # First moment
+    v: List[Tensor]  # Second moment
+
+    fn __init__(lr: Float = 0.001, beta1: Float = 0.9, beta2: Float = 0.999,
+                epsilon: Float = 1e-8) {
+        this.learning_rate = lr
+        this.beta1 = beta1
+        this.beta2 = beta2
+        this.epsilon = epsilon
+        this.iterations = 0
+        this.m = []
+        this.v = []
+    }
+
+    fn step(params: List[Tensor], grads: List[Tensor]) {
+        if this.m.len() == 0 {
+            for param in params {
+                this.m.push(Tensor::zeros(param.shape))
+                this.v.push(Tensor::zeros(param.shape))
+            }
+        }
+
+        for i in 0..params.len() {
+            let param = params[i]
+            let grad = grads[i]
+
+            # m = beta1 * m + (1 - beta1) * grad
+            this.m[i] = (this.beta1 * this.m[i]) +
+                       ((1.0 - this.beta1) * grad)
+
+            # v = beta2 * v + (1 - beta2) * grad^2
+            this.v[i] = (this.beta2 * this.v[i]) +
+                       ((1.0 - this.beta2) * (grad * grad))
+
+            # Bias correction
+            let m_hat = this.m[i] / (1.0 - (this.beta1 ^ (this.iterations + 1)))
+            let v_hat = this.v[i] / (1.0 - (this.beta2 ^ (this.iterations + 1)))
+
+            # params = params - lr * m_hat / (sqrt(v_hat) + eps)
+            let delta = this.learning_rate * m_hat /
+                       (v_hat.sqrt() + this.epsilon)
+            params[i] = param - delta
+        }
+
+        this.iterations = this.iterations + 1
+    }
+
+    fn zero_grad() {
+        # Moments are maintained, no need to zero
+    }
+}
+
+class RMSprop extends Optimizer {
+    alpha: Float
+    epsilon: Float
+    square_avg: List[Tensor]
+
+    fn __init__(lr: Float = 0.01, alpha: Float = 0.99, epsilon: Float = 1e-8) {
+        this.learning_rate = lr
+        this.alpha = alpha
+        this.epsilon = epsilon
+        this.iterations = 0
+        this.square_avg = []
+    }
+
+    fn step(params: List[Tensor], grads: List[Tensor]) {
+        if this.square_avg.len() == 0 {
+            for param in params {
+                this.square_avg.push(Tensor::zeros(param.shape))
+            }
+        }
+
+        for i in 0..params.len() {
+            let param = params[i]
+            let grad = grads[i]
+
+            # v = alpha * v + (1 - alpha) * grad^2
+            this.square_avg[i] = (this.alpha * this.square_avg[i]) +
+                                ((1.0 - this.alpha) * (grad * grad))
+
+            # params = params - lr * grad / (sqrt(v) + eps)
+            let delta = this.learning_rate * grad /
+                       (this.square_avg[i].sqrt() + this.epsilon)
+            params[i] = param - delta
+        }
+
+        this.iterations = this.iterations + 1
+    }
+
+    fn zero_grad() {
+        # RMSprop doesn't require zero_grad
+    }
+}
+
+class AdaGrad extends Optimizer {
+    epsilon: Float
+    accumulated_grad: List[Tensor]
+
+    fn __init__(lr: Float = 0.01, epsilon: Float = 1e-8) {
+        this.learning_rate = lr
+        this.epsilon = epsilon
+        this.iterations = 0
+        this.accumulated_grad = []
+    }
+
+    fn step(params: List[Tensor], grads: List[Tensor]) {
+        if this.accumulated_grad.len() == 0 {
+            for param in params {
+                this.accumulated_grad.push(Tensor::zeros(param.shape))
+            }
+        }
+
+        for i in 0..params.len() {
+            let param = params[i]
+            let grad = grads[i]
+
+            # Accumulate squared gradient
+            this.accumulated_grad[i] = this.accumulated_grad[i] + (grad * grad)
+
+            # params = params - lr * grad / (sqrt(acc_grad) + eps)
+            let delta = this.learning_rate * grad /
+                       (this.accumulated_grad[i].sqrt() + this.epsilon)
+            params[i] = param - delta
+        }
+
+        this.iterations = this.iterations + 1
+    }
+
+    fn zero_grad() {
+        # AdaGrad accumulates indefinitely
+    }
+}
+
+# Learning rate schedulers
+abstract class LRScheduler {
+    base_lr: Float
+    abstract fn get_lr(iteration: Int) -> Float
+}
+
+class StepDecay extends LRScheduler {
+    step_size: Int
+    gamma: Float
+
+    fn __init__(base_lr: Float, step_size: Int, gamma: Float = 0.1) {
+        this.base_lr = base_lr
+        this.step_size = step_size
+        this.gamma = gamma
+    }
+
+    fn get_lr(iteration: Int) -> Float {
+        let steps = iteration / this.step_size
+        return this.base_lr * (this.gamma ^ steps)
+    }
+}
+
+class ExponentialDecay extends LRScheduler {
+    decay_rate: Float
+
+    fn __init__(base_lr: Float, decay_rate: Float = 0.95) {
+        this.base_lr = base_lr
+        this.decay_rate = decay_rate
+    }
+
+    fn get_lr(iteration: Int) -> Float {
+        return this.base_lr * (this.decay_rate ^ iteration)
+    }
+}
+
+class LinearWarmup extends LRScheduler {
+    warmup_steps: Int
+    total_steps: Int
+
+    fn __init__(base_lr: Float, warmup_steps: Int, total_steps: Int) {
+        this.base_lr = base_lr
+        this.warmup_steps = warmup_steps
+        this.total_steps = total_steps
+    }
+
+    fn get_lr(iteration: Int) -> Float {
+        if iteration < this.warmup_steps {
+            return this.base_lr * (iteration as Float) / (this.warmup_steps as Float)
+        } else {
+            let remaining = this.total_steps - iteration
+            return this.base_lr * (remaining as Float) / (this.total_steps as Float)
+        }
+    }
+}
+
+# Optimizer with learning rate scheduling
+class ScheduledOptimizer {
+    optimizer: Optimizer
+    scheduler: LRScheduler
+
+    fn __init__(optimizer: Optimizer, scheduler: LRScheduler) {
+        this.optimizer = optimizer
+        this.scheduler = scheduler
+    }
+
+    fn step(params: List[Tensor], grads: List[Tensor]) {
+        # Update learning rate
+        this.optimizer.learning_rate =
+            this.scheduler.get_lr(this.optimizer.iterations)
+
+        # Take optimization step
+        this.optimizer.step(params, grads)
+    }
+
+    fn zero_grad() {
+        this.optimizer.zero_grad()
+    }
+}
+
+# Gradient clipping to prevent exploding gradients
+fn clip_grad_norm(grads: List[Tensor], max_norm: Float) -> List[Tensor] {
+    let mut total_norm = 0.0
+
+    for grad in grads {
+        total_norm = total_norm + (grad * grad).sum()
+    }
+
+    total_norm = total_norm.sqrt()
+
+    if total_norm > max_norm {
+        let scale = max_norm / (total_norm + 1e-8)
+        return grads.map(|g| g * scale)
+    } else {
+        return grads
+    }
+}
+
+fn clip_grad_value(grads: List[Tensor], max_value: Float) -> List[Tensor] {
+    return grads.map(|g| {
+        return g.clamp(-max_value, max_value)
+    })
+}
+
+# Weight decay regularization
+fn apply_weight_decay(params: List[Tensor], weight_decay: Float) {
+    for param in params {
+        param = param * (1.0 - weight_decay)
+    }
+}
+
+type Tensor = Any  # Placeholder

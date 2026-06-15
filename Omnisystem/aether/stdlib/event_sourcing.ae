@@ -1,0 +1,389 @@
+// aether/stdlib/event_sourcing.ae
+// Event sourcing and CQRS pattern in Aether
+
+actor EventStore {
+    events: List[Event]
+    snapshots: Map[String, Snapshot]
+    event_subscribers: List[ActorRef]
+    version: i64
+    compaction_enabled: Bool
+
+    type Event = {
+        event_id: String
+        aggregate_id: String
+        event_type: String
+        data: Map[String, Any]
+        timestamp: i64
+        version: i64
+    }
+
+    type Snapshot = {
+        aggregate_id: String
+        state: Any
+        version: i64
+        timestamp: i64
+    }
+
+    fn on_init() {
+        this.events = []
+        this.snapshots = Map::new()
+        this.event_subscribers = []
+        this.version = 0
+        this.compaction_enabled = true
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            AppendEvent(aggregate_id, event_type, data) => {
+                let event = Event {
+                    event_id: generate_event_id(),
+                    aggregate_id: aggregate_id,
+                    event_type: event_type,
+                    data: data,
+                    timestamp: now_nanos(),
+                    version: this.version,
+                }
+
+                this.events.push(event)
+                this.version = this.version + 1
+
+                -- Publish to subscribers
+                for subscriber in this.event_subscribers {
+                    send subscriber EventPublished(event)
+                }
+
+                send Reply(Ok(event.event_id)) to sender
+            }
+
+            GetEventStream(aggregate_id, from_version) => {
+                let mut stream = []
+
+                for event in this.events {
+                    if event.aggregate_id == aggregate_id &&
+                       event.version >= from_version {
+                        stream.push(event)
+                    }
+                }
+
+                send Reply(stream) to sender
+            }
+
+            ReplayAggregate(aggregate_id) => {
+                -- Get snapshot if available
+                let mut state = null
+                let mut from_version = 0i64
+
+                if aggregate_id in this.snapshots {
+                    let snapshot = this.snapshots[aggregate_id]
+                    state = snapshot.state
+                    from_version = snapshot.version
+                }
+
+                -- Replay events since snapshot
+                ask this GetEventStream(aggregate_id, from_version) |events| {
+                    for event in events {
+                        state = this.apply_event(state, event)
+                    }
+
+                    send Reply(state) to sender
+                }
+            }
+
+            CreateSnapshot(aggregate_id, state) => {
+                let snapshot = Snapshot {
+                    aggregate_id: aggregate_id,
+                    state: state,
+                    version: this.version,
+                    timestamp: now_nanos(),
+                }
+
+                this.snapshots[aggregate_id] = snapshot
+                send Reply(Ok) to sender
+            }
+
+            Subscribe(subscriber_ref) => {
+                this.event_subscribers.push(subscriber_ref)
+                send Reply(Ok) to sender
+            }
+
+            Unsubscribe(subscriber_ref) => {
+                this.event_subscribers = this.event_subscribers.filter(|s| s != subscriber_ref)
+                send Reply(Ok) to sender
+            }
+
+            Compact => {
+                if this.compaction_enabled {
+                    this.compact_events()
+                    send Reply(Ok) to sender
+                } else {
+                    send Reply(Error("Compaction disabled")) to sender
+                }
+            }
+
+            GetStats => {
+                send Reply({
+                    total_events: this.events.len(),
+                    current_version: this.version,
+                    snapshots: this.snapshots.len(),
+                    subscribers: this.event_subscribers.len(),
+                }) to sender
+            }
+        }
+    }
+
+    fn apply_event(state: Any, event: Event) -> Any {
+        match event.event_type {
+            "Created" => return this.handle_created(state, event),
+            "Updated" => return this.handle_updated(state, event),
+            "Deleted" => return null,
+            _ => return state,
+        }
+    }
+
+    fn handle_created(state: Any, event: Event) -> Any {
+        return event.data
+    }
+
+    fn handle_updated(state: Any, event: Event) -> Any {
+        let mut updated = state
+        for (key, value) in event.data {
+            updated[key] = value
+        }
+        return updated
+    }
+
+    fn compact_events() {
+        -- Keep snapshots and remove old events
+        let mut compacted = []
+
+        for (aggregate_id, snapshot) in this.snapshots {
+            for event in this.events {
+                if event.aggregate_id == aggregate_id &&
+                   event.version > snapshot.version {
+                    compacted.push(event)
+                }
+            }
+        }
+
+        this.events = compacted
+    }
+}
+
+// CQRS Query Model
+actor QueryModel {
+    projections: Map[String, Projection]
+    read_model: Map[String, Any]
+
+    type Projection = {
+        name: String
+        handler: fn(Event) -> Any
+        updated_at: i64
+    }
+
+    fn on_init() {
+        this.projections = Map::new()
+        this.read_model = Map::new()
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            RegisterProjection(name, handler) => {
+                this.projections[name] = Projection {
+                    name: name,
+                    handler: handler,
+                    updated_at: now_nanos(),
+                }
+                send Reply(Ok) to sender
+            }
+
+            HandleEvent(event) => {
+                for (proj_name, projection) in this.projections {
+                    let result = projection.handler(event)
+
+                    if proj_name not in this.read_model {
+                        this.read_model[proj_name] = []
+                    }
+
+                    this.read_model[proj_name].push(result)
+                    projection.updated_at = now_nanos()
+                }
+
+                send Reply(Ok) to sender
+            }
+
+            Query(projection_name, filter) => {
+                if projection_name in this.read_model {
+                    let data = this.read_model[projection_name]
+                    let filtered = data.filter(filter)
+                    send Reply(filtered) to sender
+                } else {
+                    send Reply([]) to sender
+                }
+            }
+
+            GetProjectionStats => {
+                let stats = {}
+                for (name, proj) in this.projections {
+                    stats[name] = {
+                        last_updated: proj.updated_at,
+                        item_count: this.read_model.get(name, []).len(),
+                    }
+                }
+                send Reply(stats) to sender
+            }
+        }
+    }
+}
+
+// Aggregate root pattern
+abstract actor AggregateRoot {
+    aggregate_id: String
+    version: i64
+    uncommitted_events: List[Event]
+    event_store: ActorRef
+
+    abstract fn handle_command(cmd: Command) -> Event
+
+    fn on_message(msg: Message) {
+        match msg {
+            ExecuteCommand(cmd) => {
+                let event = this.handle_command(cmd)
+                this.uncommitted_events.push(event)
+                send Reply(Ok(event)) to sender
+            }
+
+            Commit => {
+                for event in this.uncommitted_events {
+                    ask this.event_store AppendEvent(
+                        this.aggregate_id,
+                        event.event_type,
+                        event.data
+                    ) |result| {
+                        // Event committed
+                    }
+                }
+
+                this.version = this.version + this.uncommitted_events.len() as i64
+                this.uncommitted_events.clear()
+                send Reply(Ok) to sender
+            }
+
+            LoadFromHistory(aggregate_id) => {
+                ask this.event_store ReplayAggregate(aggregate_id) |state| {
+                    this.aggregate_id = aggregate_id
+                    // Restore state from events
+                    send Reply(Ok) to sender
+                }
+            }
+        }
+    }
+}
+
+// Saga pattern for long-running transactions
+actor Saga {
+    saga_id: String
+    steps: List[SagaStep]
+    current_step: i32
+    status: SagaStatus
+    compensation_log: List[CompensationAction]
+
+    type SagaStep = {
+        name: String
+        action: fn() -> Result[Any, Error],
+        compensation: fn() -> Result[Any, Error],
+    }
+
+    type CompensationAction = {
+        step_name: String
+        executed_at: i64,
+    }
+
+    enum SagaStatus {
+        Started
+        InProgress
+        Completed
+        Failed
+        Compensating
+        Compensated
+    }
+
+    fn on_init(saga_id: String, steps: List[SagaStep]) {
+        this.saga_id = saga_id
+        this.steps = steps
+        this.current_step = 0
+        this.status = SagaStatus::Started
+        this.compensation_log = []
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            Execute => {
+                this.status = SagaStatus::InProgress
+                this.execute_steps()
+                send Reply(Ok) to sender
+            }
+
+            Rollback => {
+                this.status = SagaStatus::Compensating
+                this.compensate_steps()
+                this.status = SagaStatus::Compensated
+                send Reply(Ok) to sender
+            }
+        }
+    }
+
+    fn execute_steps() {
+        while this.current_step < this.steps.len() {
+            let step = this.steps[this.current_step]
+
+            match step.action() {
+                Ok(result) => {
+                    this.current_step = this.current_step + 1
+                }
+                Err(error) => {
+                    this.status = SagaStatus::Failed
+                    this.compensate_steps()
+                    return
+                }
+            }
+        }
+
+        this.status = SagaStatus::Completed
+    }
+
+    fn compensate_steps() {
+        for i in (0..this.current_step).rev() {
+            let step = this.steps[i]
+
+            match step.compensation() {
+                Ok(_) => {
+                    this.compensation_log.push(CompensationAction {
+                        step_name: step.name,
+                        executed_at: now_nanos(),
+                    })
+                }
+                Err(_) => {
+                    // Log compensation failure
+                }
+            }
+        }
+    }
+}
+
+type Event = Any
+type Snapshot = Any
+type Message = Any
+type ActorRef = i32
+type Command = Any
+type Map<K, V> = Any
+type List<T> = Any
+type Result<T, E> = Any
+type Error = String
+
+enum Option<T> {
+    Some(T),
+    None,
+}
+
+fn generate_event_id() -> String { return "evt_0"; }
+fn now_nanos() -> i64 { return 0; }

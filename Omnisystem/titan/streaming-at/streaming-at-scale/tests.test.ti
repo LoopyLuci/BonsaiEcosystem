@@ -1,0 +1,5 @@
+// Tests for streaming-at-scale
+
+pub fn test_module() -> i64 {
+    return 111;
+}

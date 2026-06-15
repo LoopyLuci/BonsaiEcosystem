@@ -1,0 +1,3 @@
+// Tests: incident-response-routing
+
+pub fn test_module() -> i64 { return 111; }

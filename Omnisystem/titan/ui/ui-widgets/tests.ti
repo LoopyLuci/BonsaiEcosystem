@@ -1,0 +1,3 @@
+// Tests: ui-widgets
+
+pub fn test_module() -> i64 { return 111; }

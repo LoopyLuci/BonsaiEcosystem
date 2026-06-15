@@ -1,0 +1,195 @@
+// aether/stdlib/concurrent_hash_map.ae
+// Lock-free concurrent hash map for Aether distributed systems
+
+actor ConcurrentHashMap {
+    buckets: List[Bucket]
+    size: Atomic[Int]
+    load_factor: Float = 0.75
+    capacity: Int
+
+    type Bucket = List[(Key, Value)]
+    type Key = String
+    type Value = Any
+
+    fn on_init(initial_capacity: Int = 16) {
+        this.capacity = initial_capacity
+        this.buckets = List::with_capacity(initial_capacity)
+        for i in 0..initial_capacity {
+            this.buckets.push(Bucket::new())
+        }
+        this.size.store(0, Acquire)
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            Get(key) => {
+                let value = this.get_internal(key)
+                send Reply(value) to sender
+            }
+            Put(key, value) => {
+                let old_value = this.put_internal(key, value)
+                let load = (this.size.load(Acquire) as Float) / (this.capacity as Float)
+                if load > this.load_factor {
+                    send this Rehash
+                }
+                send Reply(old_value) to sender
+            }
+            Remove(key) => {
+                let value = this.remove_internal(key)
+                send Reply(value) to sender
+            }
+            Rehash => {
+                this.rehash()
+                send Reply(Ok) to sender
+            }
+            Size => {
+                let sz = this.size.load(Acquire)
+                send Reply(sz) to sender
+            }
+            Snapshot => {
+                let snapshot = this.snapshot_internal()
+                send Reply(snapshot) to sender
+            }
+        }
+    }
+
+    fn get_internal(key: Key) -> Option[Value] {
+        let bucket_idx = this.hash(key) % this.capacity
+        let bucket = this.buckets[bucket_idx]
+
+        for (k, v) in bucket {
+            if k == key {
+                return Some(v)
+            }
+        }
+        return None
+    }
+
+    fn put_internal(key: Key, value: Value) -> Option[Value] {
+        let bucket_idx = this.hash(key) % this.capacity
+        let bucket = this.buckets[bucket_idx]
+
+        for (k, v) in bucket {
+            if k == key {
+                -- Update existing
+                let old_value = v
+                bucket.update(key, value)
+                return Some(old_value)
+            }
+        }
+
+        -- Insert new
+        bucket.push((key, value))
+        this.size.fetch_add(1, Release)
+        return None
+    }
+
+    fn remove_internal(key: Key) -> Option[Value] {
+        let bucket_idx = this.hash(key) % this.capacity
+        let bucket = this.buckets[bucket_idx]
+
+        for (k, v) in bucket {
+            if k == key {
+                bucket.remove(key)
+                this.size.fetch_sub(1, Release)
+                return Some(v)
+            }
+        }
+        return None
+    }
+
+    fn rehash() {
+        let old_capacity = this.capacity
+        let old_buckets = this.buckets
+        let old_size = this.size.load(Acquire)
+
+        -- Double capacity
+        this.capacity = old_capacity * 2
+        this.buckets = List::with_capacity(this.capacity)
+
+        for i in 0..this.capacity {
+            this.buckets.push(Bucket::new())
+        }
+
+        -- Redistribute entries
+        for bucket in old_buckets {
+            for (key, value) in bucket {
+                let new_bucket_idx = this.hash(key) % this.capacity
+                this.buckets[new_bucket_idx].push((key, value))
+            }
+        }
+
+        println(f"Rehashed from {old_capacity} to {this.capacity}")
+    }
+
+    fn snapshot_internal() -> Map[Key, Value] {
+        let mut snapshot = Map::new()
+        for bucket in this.buckets {
+            for (key, value) in bucket {
+                snapshot.insert(key, value)
+            }
+        }
+        return snapshot
+    }
+
+    fn hash(key: Key) -> Int {
+        let mut h: Int = 0
+        for ch in key.chars() {
+            h = h * 31 + (ch as Int)
+        }
+        return h.abs()
+    }
+}
+
+-- Usage example
+actor MapUser {
+    map: ActorRef[ConcurrentHashMap]
+
+    fn on_init(map_ref: ActorRef) {
+        this.map = map_ref
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            Write(key, value) => {
+                ask this.map Put(key, value) with timeout 1s |_| {
+                    send Reply(Ok) to sender
+                }
+            }
+            Read(key) => {
+                ask this.map Get(key) with timeout 1s |result| {
+                    send Reply(result) to sender
+                }
+            }
+            GetSnapshot => {
+                ask this.map Snapshot with timeout 5s |snapshot| {
+                    send Reply(snapshot) to sender
+                }
+            }
+        }
+    }
+}
+
+-- Replication across nodes
+system ReplicatedHashMap {
+    primary: ActorRef[ConcurrentHashMap] on node("primary")
+    replicas: List[ActorRef[ConcurrentHashMap]]
+
+    fn on_write(key: String, value: Any) {
+        -- Write to primary
+        ask this.primary Put(key, value) with timeout 1s |result| {
+            -- Asynchronously replicate
+            for replica in this.replicas {
+                send replica Put(key, value)
+            }
+        }
+    }
+
+    fn on_read(key: String) {
+        -- Read from any available replica
+        let replica = this.replicas[0]
+        ask replica Get(key) with timeout 1s |result| {
+            return result
+        }
+    }
+}

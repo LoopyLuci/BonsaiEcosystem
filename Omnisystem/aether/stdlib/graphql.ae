@@ -1,0 +1,382 @@
+// aether/stdlib/graphql.ae
+// GraphQL support for Aether distributed systems
+
+type TypeName = String
+type FieldName = String
+type ArgumentName = String
+
+enum GraphQLType {
+    | Scalar(String)
+    | Object(ObjectType)
+    | Interface(InterfaceType)
+    | Union(UnionType)
+    | Enum(EnumType)
+    | InputObject(InputObjectType)
+    | List(Box[GraphQLType])
+    | NonNull(Box[GraphQLType])
+}
+
+type ObjectType = {
+    name: TypeName
+    fields: Map[FieldName, Field]
+    interfaces: List[String]
+}
+
+type Field = {
+    name: FieldName
+    type_: GraphQLType
+    arguments: Map[ArgumentName, InputValue]
+    resolver: fn(Any, Map[String, Any]) -> Any
+}
+
+type InputValue = {
+    name: String
+    type_: GraphQLType
+    default_value: Option[Any]
+}
+
+type InterfaceType = {
+    name: TypeName
+    fields: Map[FieldName, Field]
+}
+
+type UnionType = {
+    name: TypeName
+    types: List[String]
+}
+
+type EnumType = {
+    name: TypeName
+    values: Map[String, Int]
+}
+
+type InputObjectType = {
+    name: TypeName
+    fields: Map[String, InputValue]
+}
+
+struct GraphQLSchema {
+    query_type: ObjectType
+    mutation_type: Option[ObjectType]
+    subscription_type: Option[ObjectType]
+    types: Map[TypeName, GraphQLType]
+    directives: List[Directive]
+
+    fn new(query: ObjectType) -> GraphQLSchema {
+        return GraphQLSchema {
+            query_type: query,
+            mutation_type: None,
+            subscription_type: None,
+            types: Map::new(),
+            directives: List::new(),
+        }
+    }
+
+    fn add_type(type_def: GraphQLType) {
+        match type_def {
+            GraphQLType::Object(obj) => {
+                this.types[obj.name] = type_def
+            }
+            GraphQLType::Enum(en) => {
+                this.types[en.name] = type_def
+            }
+            GraphQLType::Interface(iface) => {
+                this.types[iface.name] = type_def
+            }
+            _ => {}
+        }
+    }
+
+    fn set_mutation_type(mutation: ObjectType) {
+        this.mutation_type = Some(mutation)
+    }
+
+    fn set_subscription_type(subscription: ObjectType) {
+        this.subscription_type = Some(subscription)
+    }
+}
+
+type Directive = {
+    name: String
+    arguments: Map[String, InputValue]
+    locations: List[String]
+}
+
+-- GraphQL Query execution
+struct QueryExecutor {
+    schema: GraphQLSchema
+    root_value: Any
+
+    fn new(schema: GraphQLSchema, root: Any) -> QueryExecutor {
+        return QueryExecutor {
+            schema: schema,
+            root_value: root,
+        }
+    }
+
+    fn execute(query_string: String) -> Result[ExecutionResult] {
+        let parsed = parse_graphql_query(query_string)
+
+        match parsed {
+            Result::Ok(document) => {
+                return this.execute_document(document)
+            }
+            Result::Err(e) => {
+                return Result::Err(e)
+            }
+        }
+    }
+
+    fn execute_document(document: Document) -> Result[ExecutionResult] {
+        let mut errors = List::new()
+        let mut data: Map[String, Any] = Map::new()
+
+        for definition in document.definitions {
+            match definition {
+                Definition::Query(op) => {
+                    let result = this.execute_operation(op)
+
+                    match result {
+                        Result::Ok(fields) => {
+                            for (key, value) in fields.entries() {
+                                data[key] = value
+                            }
+                        }
+                        Result::Err(e) => {
+                            errors.push(GraphQLError { message: e, path: List::new() })
+                        }
+                    }
+                }
+                Definition::Mutation(op) => {
+                    let result = this.execute_operation(op)
+
+                    match result {
+                        Result::Ok(fields) => {
+                            for (key, value) in fields.entries() {
+                                data[key] = value
+                            }
+                        }
+                        Result::Err(e) => {
+                            errors.push(GraphQLError { message: e, path: List::new() })
+                        }
+                    }
+                }
+                Definition::Subscription(op) => {
+                    -- Handle subscription
+                }
+            }
+        }
+
+        return Result::Ok(ExecutionResult {
+            data: data,
+            errors: errors,
+        })
+    }
+
+    fn execute_operation(operation: Operation) -> Result[Map[String, Any]] {
+        return this.execute_selection_set(
+            operation.selection_set,
+            this.schema.query_type,
+            this.root_value
+        )
+    }
+
+    fn execute_selection_set(
+        selection_set: SelectionSet,
+        type_: ObjectType,
+        object_value: Any
+    ) -> Result[Map[String, Any]] {
+        let mut result: Map[String, Any] = Map::new()
+
+        for selection in selection_set.selections {
+            match selection {
+                Selection::Field(field) => {
+                    let schema_field = type_.fields.get(field.name)
+
+                    if schema_field.is_none() {
+                        return Result::Err("Unknown field: " + field.name)
+                    }
+
+                    let schema_f = schema_field.unwrap()
+
+                    -- Resolve field value
+                    let field_value = (schema_f.resolver)(object_value, field.arguments)
+
+                    -- If field has sub-selections, recurse
+                    if field.selection_set.selections.len() > 0 {
+                        match schema_f.type_ {
+                            GraphQLType::Object(obj) => {
+                                let sub_result = this.execute_selection_set(
+                                    field.selection_set,
+                                    obj,
+                                    field_value
+                                )
+
+                                match sub_result {
+                                    Result::Ok(sub_data) => {
+                                        result[field.name] = sub_data
+                                    }
+                                    Result::Err(e) => {
+                                        return Result::Err(e)
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        result[field.name] = field_value
+                    }
+                }
+
+                Selection::InlineFragment(fragment) => {
+                    -- Handle inline fragments
+                }
+
+                Selection::FragmentSpread(name) => {
+                    -- Handle fragment spreads
+                }
+            }
+        }
+
+        return Result::Ok(result)
+    }
+}
+
+type Document = {
+    definitions: List[Definition]
+}
+
+enum Definition {
+    | Query(Operation)
+    | Mutation(Operation)
+    | Subscription(Operation)
+    | Fragment(FragmentDefinition)
+}
+
+type Operation = {
+    name: Option[String]
+    operation_type: String
+    selection_set: SelectionSet
+}
+
+type SelectionSet = {
+    selections: List[Selection]
+}
+
+enum Selection {
+    | Field(FieldSelection)
+    | InlineFragment(InlineFragment)
+    | FragmentSpread(String)
+}
+
+type FieldSelection = {
+    name: String
+    arguments: Map[String, Any]
+    selection_set: SelectionSet
+}
+
+type InlineFragment = {
+    type_condition: Option[String]
+    selection_set: SelectionSet
+}
+
+type FragmentDefinition = {
+    name: String
+    type_condition: String
+    selection_set: SelectionSet
+}
+
+type ExecutionResult = {
+    data: Map[String, Any]
+    errors: List[GraphQLError]
+}
+
+type GraphQLError = {
+    message: String
+    path: List[String]
+}
+
+-- Query validation
+struct QueryValidator {
+    schema: GraphQLSchema
+
+    fn new(schema: GraphQLSchema) -> QueryValidator {
+        return QueryValidator { schema: schema }
+    }
+
+    fn validate(document: Document) -> List[ValidationError] {
+        let mut errors = List::new()
+
+        for definition in document.definitions {
+            match definition {
+                Definition::Query(op) => {
+                    let op_errors = this.validate_operation(op)
+                    for err in op_errors {
+                        errors.push(err)
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        return errors
+    }
+
+    fn validate_operation(operation: Operation) -> List[ValidationError] {
+        let mut errors = List::new()
+
+        -- Validate selection set
+        let ss_errors = this.validate_selection_set(
+            operation.selection_set,
+            this.schema.query_type
+        )
+
+        for err in ss_errors {
+            errors.push(err)
+        }
+
+        return errors
+    }
+
+    fn validate_selection_set(ss: SelectionSet, type_: ObjectType) -> List[ValidationError] {
+        let mut errors = List::new()
+
+        for selection in ss.selections {
+            match selection {
+                Selection::Field(field) => {
+                    if !type_.fields.get(field.name).is_some() {
+                        errors.push(ValidationError {
+                            message: "Unknown field: " + field.name,
+                            locations: List::new(),
+                        })
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        return errors
+    }
+}
+
+type ValidationError = {
+    message: String
+    locations: List[String]
+}
+
+-- Query parsing
+fn parse_graphql_query(query_string: String) -> Result[Document] {
+    return Result::Ok(Document { definitions: List::new() })
+}
+
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Any = Any
+type Result<T> = Any
+
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }
+
+fn Ok<T>(val: T) -> Result[T] { return val; }
+fn Err<T>(msg: String) -> Result[T] { return msg; }

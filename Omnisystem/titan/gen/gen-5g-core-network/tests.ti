@@ -1,0 +1,3 @@
+// Tests: gen-5g-core-network
+
+pub fn test_module() -> i64 { return 111; }

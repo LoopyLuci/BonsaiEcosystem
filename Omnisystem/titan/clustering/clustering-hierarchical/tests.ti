@@ -1,0 +1,3 @@
+// Tests: clustering-hierarchical
+
+pub fn test_module() -> i64 { return 111; }

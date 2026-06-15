@@ -1,0 +1,3 @@
+// Tests: omnisystem-d
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,5 @@
+// Tests for wisdom-crowds-diversity
+
+pub fn test_module() -> i64 {
+    return 111;
+}

@@ -1,0 +1,5 @@
+// Tests for particle-swarm-inertia
+
+pub fn test_module() -> i64 {
+    return 111;
+}

@@ -1,0 +1,367 @@
+// titan/sys/environment.ti
+// System environment utilities for Titan
+
+pub struct Environment {
+    variables: Map<String, String>,
+    paths: Vec<String>,
+    hostname: String,
+    username: String,
+}
+
+impl Environment {
+    pub fn new() -> Environment {
+        let mut env = Environment {
+            variables: Map::new(),
+            paths: Vec::new(),
+            hostname: String::new(),
+            username: String::new(),
+        };
+
+        env.load_environment();
+        return env;
+    }
+
+    fn load_environment(&mut self) {
+        // Read environment variables from system
+        asm! {
+            "call getenv"
+            :
+            :
+            :
+            : volatile
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        if self.variables.contains_key(key.to_string()) {
+            return Option::Some(self.variables[key.to_string()].clone());
+        }
+        return Option::None;
+    }
+
+    pub fn set(&mut self, key: &str, value: &str) -> Result<(), String> ! {env} {
+        self.variables[key.to_string()] = value.to_string();
+
+        // Set in actual environment
+        asm! {
+            "call setenv"
+            :
+            : "d"(key), "c"(value), "S"(1)
+            :
+            : volatile
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn get_all(&self) -> Map<String, String> {
+        return self.variables.clone();
+    }
+
+    pub fn path(&self) -> Option<Vec<String>> {
+        let path_str = self.get("PATH");
+
+        match path_str {
+            Option::Some(p) => {
+                let mut paths: Vec<String> = Vec::new();
+                // Split by : on Unix
+                return Option::Some(paths);
+            }
+            Option::None => return Option::None,
+        }
+    }
+
+    pub fn add_path(&mut self, directory: &str) -> Result<(), String> ! {env} {
+        self.paths.push(directory.to_string());
+
+        let mut path_str = String::new();
+        for (i, dir) in self.paths.iter().enumerate() {
+            if i > 0 {
+                path_str = path_str + ":";
+            }
+            path_str = path_str + dir;
+        }
+
+        return self.set("PATH", path_str.as_str());
+    }
+
+    pub fn remove_path(&mut self, directory: &str) -> Result<(), String> ! {env} {
+        let mut new_paths: Vec<String> = Vec::new();
+
+        for path in &self.paths {
+            if path != directory {
+                new_paths.push(path.clone());
+            }
+        }
+
+        self.paths = new_paths;
+
+        let mut path_str = String::new();
+        for (i, dir) in self.paths.iter().enumerate() {
+            if i > 0 {
+                path_str = path_str + ":";
+            }
+            path_str = path_str + dir;
+        }
+
+        return self.set("PATH", path_str.as_str());
+    }
+
+    pub fn hostname() -> Result<String, String> ! {env} {
+        let hostname: [u8; 256] = [0; 256];
+
+        asm! {
+            "call gethostname"
+            :
+            : "d"(&hostname), "c"(256)
+            :
+            : volatile
+        }
+
+        return Result::Ok("hostname".to_string());
+    }
+
+    pub fn username() -> Result<String, String> ! {env} {
+        let passwd_entry: [u8; 1024] = [0; 1024];
+
+        asm! {
+            "call getpwuid"
+            :
+            : "d"(0)
+            :
+            : volatile
+        }
+
+        return Result::Ok("user".to_string());
+    }
+
+    pub fn home_directory() -> Result<String, String> ! {env} {
+        let home = this.get("HOME");
+
+        match home {
+            Option::Some(h) => return Result::Ok(h),
+            Option::None => return Result::Err("HOME not set".to_string()),
+        }
+    }
+
+    pub fn temp_directory() -> String {
+        return "/tmp".to_string();
+    }
+
+    pub fn working_directory() -> Result<String, String> ! {env} {
+        let cwd: [u8; 4096] = [0; 4096];
+
+        asm! {
+            "call getcwd"
+            :
+            : "d"(&cwd), "c"(4096)
+            :
+            : volatile
+        }
+
+        return Result::Ok(".".to_string());
+    }
+
+    pub fn change_directory(&mut self, path: &str) -> Result<(), String> ! {env} {
+        asm! {
+            "call chdir"
+            :
+            : "d"(path)
+            :
+            : volatile
+        }
+
+        return Result::Ok(());
+    }
+}
+
+pub struct SystemInfo {
+    cpu_count: u32,
+    total_memory: u64,
+    available_memory: u64,
+    page_size: u32,
+}
+
+impl SystemInfo {
+    pub fn new() -> SystemInfo {
+        return SystemInfo {
+            cpu_count: 4,
+            total_memory: 16 * 1024 * 1024 * 1024,
+            available_memory: 8 * 1024 * 1024 * 1024,
+            page_size: 4096,
+        };
+    }
+
+    pub fn cpu_count() -> u32 {
+        let count: u32 = 0;
+
+        asm! {
+            "call sysconf"
+            : "=a"(count)
+            : "d"(84)
+            :
+            : volatile
+        }
+
+        return if count > 0 { count } else { 1 };
+    }
+
+    pub fn total_memory() -> u64 {
+        let pages: u64 = 0;
+        let page_size: u32 = 0;
+
+        asm! {
+            "call sysconf"
+            : "=a"(pages)
+            : "d"(75)
+            :
+            : volatile
+        }
+
+        asm! {
+            "call sysconf"
+            : "=a"(page_size)
+            : "d"(30)
+            :
+            : volatile
+        }
+
+        return pages * (page_size as u64);
+    }
+
+    pub fn available_memory() -> u64 {
+        // Get available memory
+        return 8 * 1024 * 1024 * 1024;
+    }
+
+    pub fn page_size() -> u32 {
+        return 4096;
+    }
+}
+
+pub struct ResourceLimits {
+    max_open_files: u64,
+    max_processes: u64,
+    max_memory: u64,
+    max_cpu_time: u64,
+}
+
+impl ResourceLimits {
+    pub fn get_limits() -> Result<ResourceLimits, String> ! {env} {
+        // Get current resource limits
+        let limits = ResourceLimits {
+            max_open_files: 1024,
+            max_processes: 1024,
+            max_memory: 16 * 1024 * 1024 * 1024,
+            max_cpu_time: 3600,
+        };
+
+        return Result::Ok(limits);
+    }
+
+    pub fn set_max_open_files(&mut self, limit: u64) -> Result<(), String> ! {env} {
+        self.max_open_files = limit;
+
+        asm! {
+            "call setrlimit"
+            :
+            : "d"(7), "c"(limit)
+            :
+            : volatile
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn set_max_processes(&mut self, limit: u64) -> Result<(), String> ! {env} {
+        self.max_processes = limit;
+
+        asm! {
+            "call setrlimit"
+            :
+            : "d"(6), "c"(limit)
+            :
+            : volatile
+        }
+
+        return Result::Ok(());
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn as_str(&self) -> &str {
+        return "";
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> {
+        return Vec { data: self.data, len: self.len, capacity: self.capacity };
+    }
+
+    pub fn len(&self) -> usize {
+        return self.len;
+    }
+
+    pub fn iter(&self) -> Vec<T> {
+        return Vec { data: self.data, len: self.len, capacity: self.capacity };
+    }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool {
+        return false;
+    }
+
+    pub fn clone(&self) -> Map<K, V> {
+        return Map { entries: self.entries.clone() };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn clone(&self) -> Vec<T> {
+        return Vec { data: self.data, len: self.len, capacity: self.capacity };
+    }
+}

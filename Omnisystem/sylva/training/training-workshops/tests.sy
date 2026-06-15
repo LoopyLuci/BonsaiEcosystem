@@ -1,0 +1,3 @@
+// Tests: training-workshops
+
+pub fn test_module() -> i64 { return 111; }

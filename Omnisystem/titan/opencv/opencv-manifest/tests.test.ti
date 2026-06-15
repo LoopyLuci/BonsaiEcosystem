@@ -1,0 +1,5 @@
+// Tests for opencv-manifest
+
+pub fn test_module() -> i64 {
+    return 111;
+}

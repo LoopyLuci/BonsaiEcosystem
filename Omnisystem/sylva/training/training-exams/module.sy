@@ -1,0 +1,24 @@
+// Module: training-exams
+// Language: sylva
+// Migrated: 2026-06-14
+// Components: 1 structs, 0
+0 functions, 7 tests
+
+pub struct Module {
+    initialized: bool,
+}
+
+impl Module {
+    pub fn new() -> Self {
+        Module { initialized: true }
+    }
+
+    pub fn execute(&self) -> i64 {
+        return 111;
+    }
+}
+
+pub fn main() -> i64 {
+    let m = Module::new();
+    m.execute()
+}

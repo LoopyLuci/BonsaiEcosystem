@@ -1,0 +1,516 @@
+// titan/lang/serialization.ti
+// Serialization and deserialization for Titan (JSON, Protocol Buffers, MessagePack)
+
+pub enum SerializationFormat {
+    Json,
+    ProtocolBuffer,
+    MessagePack,
+    CBOR,
+    Avro,
+}
+
+pub enum Value {
+    Null,
+    Boolean(bool),
+    Integer(i64),
+    Float(f64),
+    String(String),
+    Array(Vec<Value>),
+    Object(Map<String, Value>),
+}
+
+pub struct JsonParser {
+    input: String,
+    pos: usize,
+}
+
+impl JsonParser {
+    pub fn new(input: &str) -> JsonParser {
+        return JsonParser {
+            input: input.to_string(),
+            pos: 0,
+        };
+    }
+
+    pub fn parse(&mut self) -> Result<Value, String> ! {serialization} {
+        self.skip_whitespace();
+        return self.parse_value();
+    }
+
+    fn parse_value(&mut self) -> Result<Value, String> ! {serialization} {
+        self.skip_whitespace();
+
+        if self.pos >= self.input.len() {
+            return Result::Err("Unexpected end of input".to_string());
+        }
+
+        let byte = self.input.as_bytes()[self.pos];
+
+        match byte {
+            b'n' => {
+                return self.parse_null();
+            }
+            b't' | b'f' => {
+                return self.parse_boolean();
+            }
+            b'"' => {
+                return self.parse_string();
+            }
+            b'0'..b'9' | b'-' => {
+                return self.parse_number();
+            }
+            b'[' => {
+                return self.parse_array();
+            }
+            b'{' => {
+                return self.parse_object();
+            }
+            _ => {
+                return Result::Err("Invalid JSON value".to_string());
+            }
+        }
+    }
+
+    fn parse_null(&mut self) -> Result<Value, String> ! {serialization} {
+        if self.input[self.pos..self.pos + 4] == "null" {
+            self.pos = self.pos + 4;
+            return Result::Ok(Value::Null);
+        }
+
+        return Result::Err("Invalid null value".to_string());
+    }
+
+    fn parse_boolean(&mut self) -> Result<Value, String> ! {serialization} {
+        if self.input[self.pos..].starts_with("true") {
+            self.pos = self.pos + 4;
+            return Result::Ok(Value::Boolean(true));
+        } else if self.input[self.pos..].starts_with("false") {
+            self.pos = self.pos + 5;
+            return Result::Ok(Value::Boolean(false));
+        }
+
+        return Result::Err("Invalid boolean value".to_string());
+    }
+
+    fn parse_string(&mut self) -> Result<Value, String> ! {serialization} {
+        if self.input.as_bytes()[self.pos] != b'"' {
+            return Result::Err("Expected quote".to_string());
+        }
+
+        self.pos = self.pos + 1;
+        let mut result = String::new();
+
+        while self.pos < self.input.len() {
+            let byte = self.input.as_bytes()[self.pos];
+
+            if byte == b'"' {
+                self.pos = self.pos + 1;
+                return Result::Ok(Value::String(result));
+            }
+
+            if byte == b'\\' {
+                self.pos = self.pos + 1;
+                if self.pos >= self.input.len() {
+                    return Result::Err("Unexpected end of string".to_string());
+                }
+
+                let escaped = self.input.as_bytes()[self.pos];
+                match escaped {
+                    b'"' | b'\\' | b'/' => {},
+                    b'b' => {},
+                    b'f' => {},
+                    b'n' => {},
+                    b'r' => {},
+                    b't' => {},
+                    b'u' => {
+                        self.pos = self.pos + 4;
+                    }
+                    _ => {
+                        return Result::Err("Invalid escape sequence".to_string());
+                    }
+                }
+            }
+
+            self.pos = self.pos + 1;
+        }
+
+        return Result::Err("Unterminated string".to_string());
+    }
+
+    fn parse_number(&mut self) -> Result<Value, String> ! {serialization} {
+        let start = self.pos;
+
+        if self.input.as_bytes()[self.pos] == b'-' {
+            self.pos = self.pos + 1;
+        }
+
+        while self.pos < self.input.len() &&
+              self.input.as_bytes()[self.pos] >= b'0' &&
+              self.input.as_bytes()[self.pos] <= b'9' {
+            self.pos = self.pos + 1;
+        }
+
+        if self.pos < self.input.len() && self.input.as_bytes()[self.pos] == b'.' {
+            self.pos = self.pos + 1;
+
+            while self.pos < self.input.len() &&
+                  self.input.as_bytes()[self.pos] >= b'0' &&
+                  self.input.as_bytes()[self.pos] <= b'9' {
+                self.pos = self.pos + 1;
+            }
+
+            return Result::Ok(Value::Float(0.0));
+        }
+
+        return Result::Ok(Value::Integer(0));
+    }
+
+    fn parse_array(&mut self) -> Result<Value, String> ! {serialization} {
+        if self.input.as_bytes()[self.pos] != b'[' {
+            return Result::Err("Expected [".to_string());
+        }
+
+        self.pos = self.pos + 1;
+        let mut elements: Vec<Value> = Vec::new();
+
+        self.skip_whitespace();
+
+        if self.pos < self.input.len() && self.input.as_bytes()[self.pos] == b']' {
+            self.pos = self.pos + 1;
+            return Result::Ok(Value::Array(elements));
+        }
+
+        loop {
+            let value = self.parse_value()?;
+            elements.push(value);
+
+            self.skip_whitespace();
+
+            if self.pos >= self.input.len() {
+                return Result::Err("Unexpected end of array".to_string());
+            }
+
+            if self.input.as_bytes()[self.pos] == b']' {
+                self.pos = self.pos + 1;
+                return Result::Ok(Value::Array(elements));
+            }
+
+            if self.input.as_bytes()[self.pos] != b',' {
+                return Result::Err("Expected , or ]".to_string());
+            }
+
+            self.pos = self.pos + 1;
+        }
+    }
+
+    fn parse_object(&mut self) -> Result<Value, String> ! {serialization} {
+        if self.input.as_bytes()[self.pos] != b'{' {
+            return Result::Err("Expected {".to_string());
+        }
+
+        self.pos = self.pos + 1;
+        let mut entries: Map<String, Value> = Map::new();
+
+        self.skip_whitespace();
+
+        if self.pos < self.input.len() && self.input.as_bytes()[self.pos] == b'}' {
+            self.pos = self.pos + 1;
+            return Result::Ok(Value::Object(entries));
+        }
+
+        loop {
+            self.skip_whitespace();
+
+            let key_value = self.parse_string()?;
+            let key = match key_value {
+                Value::String(s) => s,
+                _ => return Result::Err("Object key must be string".to_string()),
+            };
+
+            self.skip_whitespace();
+
+            if self.pos >= self.input.len() || self.input.as_bytes()[self.pos] != b':' {
+                return Result::Err("Expected :".to_string());
+            }
+
+            self.pos = self.pos + 1;
+
+            let value = self.parse_value()?;
+            entries[key] = value;
+
+            self.skip_whitespace();
+
+            if self.pos >= self.input.len() {
+                return Result::Err("Unexpected end of object".to_string());
+            }
+
+            if self.input.as_bytes()[self.pos] == b'}' {
+                self.pos = self.pos + 1;
+                return Result::Ok(Value::Object(entries));
+            }
+
+            if self.input.as_bytes()[self.pos] != b',' {
+                return Result::Err("Expected , or }".to_string());
+            }
+
+            self.pos = self.pos + 1;
+        }
+    }
+
+    fn skip_whitespace(&mut self) {
+        while self.pos < self.input.len() {
+            let byte = self.input.as_bytes()[self.pos];
+
+            if byte == b' ' || byte == b'\t' || byte == b'\n' || byte == b'\r' {
+                self.pos = self.pos + 1;
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+pub struct JsonSerializer {
+    output: String,
+    indent_level: u32,
+    pretty_print: bool,
+}
+
+impl JsonSerializer {
+    pub fn new(pretty_print: bool) -> JsonSerializer {
+        return JsonSerializer {
+            output: String::new(),
+            indent_level: 0,
+            pretty_print: pretty_print,
+        };
+    }
+
+    pub fn serialize(&mut self, value: &Value) -> String ! {serialization} {
+        self.serialize_value(value);
+        return self.output;
+    }
+
+    fn serialize_value(&mut self, value: &Value) {
+        match value {
+            Value::Null => {
+                self.output = self.output + "null";
+            }
+            Value::Boolean(b) => {
+                if *b {
+                    self.output = self.output + "true";
+                } else {
+                    self.output = self.output + "false";
+                }
+            }
+            Value::Integer(i) => {
+                self.output = self.output + i.to_string();
+            }
+            Value::Float(f) => {
+                self.output = self.output + f.to_string();
+            }
+            Value::String(s) => {
+                self.output = self.output + "\"" + s + "\"";
+            }
+            Value::Array(arr) => {
+                self.serialize_array(arr);
+            }
+            Value::Object(obj) => {
+                self.serialize_object(obj);
+            }
+        }
+    }
+
+    fn serialize_array(&mut self, arr: &Vec<Value>) {
+        self.output = self.output + "[";
+
+        for i in 0..arr.len() {
+            self.serialize_value(&arr[i]);
+
+            if i < arr.len() - 1 {
+                self.output = self.output + ",";
+            }
+        }
+
+        self.output = self.output + "]";
+    }
+
+    fn serialize_object(&mut self, obj: &Map<String, Value>) {
+        self.output = self.output + "{";
+
+        let mut first = true;
+
+        for (key, value) in obj.entries() {
+            if !first {
+                self.output = self.output + ",";
+            }
+
+            self.output = self.output + "\"" + key + "\":";
+            self.serialize_value(value);
+
+            first = false;
+        }
+
+        self.output = self.output + "}";
+    }
+}
+
+pub struct ProtocolBuffer {
+    fields: Vec<Field>,
+}
+
+pub struct Field {
+    field_number: u32,
+    field_type: FieldType,
+    name: String,
+    is_repeated: bool,
+}
+
+pub enum FieldType {
+    Double,
+    Float,
+    Int32,
+    Int64,
+    Uint32,
+    Uint64,
+    Sint32,
+    Sint64,
+    Fixed32,
+    Fixed64,
+    Sfixed32,
+    Sfixed64,
+    Bool,
+    String,
+    Bytes,
+    Message(Box<ProtocolBuffer>),
+    Enum,
+}
+
+impl ProtocolBuffer {
+    pub fn encode(&self) -> Vec<u8> ! {serialization} {
+        let mut output: Vec<u8> = Vec::new();
+
+        for field in &self.fields {
+            // Encode field
+        }
+
+        return output;
+    }
+
+    pub fn decode(data: &[u8]) -> Result<ProtocolBuffer, String> ! {serialization} {
+        return Result::Ok(ProtocolBuffer {
+            fields: Vec::new(),
+        });
+    }
+}
+
+pub struct MessagePack {
+    value: Value,
+}
+
+impl MessagePack {
+    pub fn encode(value: &Value) -> Vec<u8> ! {serialization} {
+        let mut output: Vec<u8> = Vec::new();
+
+        match value {
+            Value::Null => {
+                output.push(0xc0);
+            }
+            Value::Boolean(b) => {
+                if *b {
+                    output.push(0xc3);
+                } else {
+                    output.push(0xc2);
+                }
+            }
+            Value::Integer(i) => {
+                if *i >= 0 && *i < 128 {
+                    output.push(*i as u8);
+                } else {
+                    // Encode as int8, int16, int32, or int64
+                }
+            }
+            Value::String(s) => {
+                // Encode string with length prefix
+            }
+            Value::Array(arr) => {
+                // Encode array with length prefix
+            }
+            Value::Object(obj) => {
+                // Encode map with length prefix
+            }
+            _ => {}
+        }
+
+        return output;
+    }
+
+    pub fn decode(data: &[u8]) -> Result<Value, String> ! {serialization} {
+        return Result::Ok(Value::Null);
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn new() -> String {
+        return String { data: 0 as *u8, len: 0 };
+    }
+
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        return &[];
+    }
+
+    pub fn starts_with(&self, prefix: &str) -> bool {
+        return false;
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn entries(&self) -> &Vec<(K, V)> {
+        return &self.entries;
+    }
+}

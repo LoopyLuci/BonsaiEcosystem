@@ -13,10 +13,12 @@ name = "omnisystem-gui"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
 tauri = { version = "2", features = ["default"] }
-tokio = { version = "1", features = ["full"] }
+omnisystem-async-runtime = { path = "../omnisystem-async-runtime" }
+omnisystem-collections = { path = "../omnisystem-collections" }
+omnisystem-time = { path = "../omnisystem-time" }
+omnisystem-id-generation = { path = "../omnisystem-id-generation" }
+omnisystem-observability = { path = "../omnisystem-observability" }
 
 [[bin]]
 name = "omnisystem-gui"

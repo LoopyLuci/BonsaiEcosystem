@@ -1,0 +1,5 @@
+// Tests for manager-metrics
+
+pub fn test_module() -> i64 {
+    return 111;
+}

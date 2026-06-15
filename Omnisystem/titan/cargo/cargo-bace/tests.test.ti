@@ -1,0 +1,5 @@
+// Tests for cargo-bace
+
+pub fn test_module() -> i64 {
+    return 111;
+}

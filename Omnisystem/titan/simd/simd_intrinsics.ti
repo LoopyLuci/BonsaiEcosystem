@@ -1,0 +1,575 @@
+// titan/simd/simd_intrinsics.ti
+// SIMD arithmetic, logical, and comparison intrinsics
+
+// ARITHMETIC OPERATIONS (128-bit)
+pub fn vec128_add_i8(a: Vec128i8, b: Vec128i8) -> Vec128i8 ! {simd} {
+    let mut result = a;
+    asm! {
+        "paddb %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_add_i16(a: Vec128i16, b: Vec128i16) -> Vec128i16 ! {simd} {
+    let mut result = a;
+    asm! {
+        "paddw %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_add_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "paddd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_add_i64(a: Vec128i64, b: Vec128i64) -> Vec128i64 ! {simd} {
+    let mut result = a;
+    asm! {
+        "paddq %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_add_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "addps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_add_f64(a: Vec128f64, b: Vec128f64) -> Vec128f64 ! {simd} {
+    let mut result = a;
+    asm! {
+        "addpd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// SUBTRACTION
+pub fn vec128_sub_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "psubd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_sub_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "subps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_sub_f64(a: Vec128f64, b: Vec128f64) -> Vec128f64 ! {simd} {
+    let mut result = a;
+    asm! {
+        "subpd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// MULTIPLICATION
+pub fn vec128_mul_i16(a: Vec128i16, b: Vec128i16) -> Vec128i16 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pmullw %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_mul_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pmulld %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_mul_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "mulps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_mul_f64(a: Vec128f64, b: Vec128f64) -> Vec128f64 ! {simd} {
+    let mut result = a;
+    asm! {
+        "mulpd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// DIVISION
+pub fn vec128_div_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "divps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_div_f64(a: Vec128f64, b: Vec128f64) -> Vec128f64 ! {simd} {
+    let mut result = a;
+    asm! {
+        "divpd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// MIN/MAX OPERATIONS
+pub fn vec128_min_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pminsd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_max_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pmaxsd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_min_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "minps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_max_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "maxps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_min_f64(a: Vec128f64, b: Vec128f64) -> Vec128f64 ! {simd} {
+    let mut result = a;
+    asm! {
+        "minpd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_max_f64(a: Vec128f64, b: Vec128f64) -> Vec128f64 ! {simd} {
+    let mut result = a;
+    asm! {
+        "maxpd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// BITWISE OPERATIONS
+pub fn vec128_and_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pand %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_or_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "por %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_xor_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pxor %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// SHIFTS (immediate)
+pub fn vec128_sll_i32(a: Vec128i32, shift: i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pslld $1, %0"
+        : "+x"(result)
+        : "i"(shift)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_srl_i32(a: Vec128i32, shift: i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "psrld $1, %0"
+        : "+x"(result)
+        : "i"(shift)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// COMPARISONS
+pub fn vec128_cmp_eq_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pcmpeqd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_cmp_lt_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pcmpltd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_cmp_le_i32(a: Vec128i32, b: Vec128i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pcmpled %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_cmp_eq_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "cmpeqps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_cmp_lt_f32(a: Vec128f32, b: Vec128f32) -> Vec128f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "cmpltps %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// SHUFFLE (element reordering)
+pub fn vec128_shuffle_i32(a: Vec128i32, imm: i32) -> Vec128i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "pshufd $1, %2, %0"
+        : "=x"(result)
+        : "0"(result), "x"(a)
+        : "i"(imm)
+        : volatile
+    }
+    return result;
+}
+
+// PACK/UNPACK (change element width)
+pub fn vec128_pack_i32_i16(a: Vec128i32, b: Vec128i32) -> Vec128i16 ! {simd} {
+    // Packs two i32 vectors into one i16 vector (with saturation)
+    let mut result: Vec128i16 = vec128_zero();
+    asm! {
+        "packssdw %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec128_unpack_lo_i16(a: Vec128i16, b: Vec128i16) -> Vec128i32 ! {simd} {
+    // Unpack low elements to wider type
+    let mut result: Vec128i32 = vec128_zero();
+    asm! {
+        "punpcklwd %1, %0"
+        : "+x"(result)
+        : "x"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// AVX2 256-bit operations
+pub fn vec256_add_i32(a: Vec256i32, b: Vec256i32) -> Vec256i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vpaddd %1, %0, %0"
+        : "+y"(result)
+        : "y"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec256_mul_i32(a: Vec256i32, b: Vec256i32) -> Vec256i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vpmulld %1, %0, %0"
+        : "+y"(result)
+        : "y"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec256_add_f32(a: Vec256f32, b: Vec256f32) -> Vec256f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vaddps %1, %0, %0"
+        : "+y"(result)
+        : "y"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec256_mul_f32(a: Vec256f32, b: Vec256f32) -> Vec256f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vmulps %1, %0, %0"
+        : "+y"(result)
+        : "y"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec256_min_f32(a: Vec256f32, b: Vec256f32) -> Vec256f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vminps %1, %0, %0"
+        : "+y"(result)
+        : "y"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec256_max_f32(a: Vec256f32, b: Vec256f32) -> Vec256f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vmaxps %1, %0, %0"
+        : "+y"(result)
+        : "y"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+// AVX512 512-bit operations
+pub fn vec512_add_i32(a: Vec512i32, b: Vec512i32) -> Vec512i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vpaddd %1, %0, %0"
+        : "+z"(result)
+        : "z"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec512_mul_i32(a: Vec512i32, b: Vec512i32) -> Vec512i32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vpmulld %1, %0, %0"
+        : "+z"(result)
+        : "z"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec512_add_f32(a: Vec512f32, b: Vec512f32) -> Vec512f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vaddps %1, %0, %0"
+        : "+z"(result)
+        : "z"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+pub fn vec512_mul_f32(a: Vec512f32, b: Vec512f32) -> Vec512f32 ! {simd} {
+    let mut result = a;
+    asm! {
+        "vmulps %1, %0, %0"
+        : "+z"(result)
+        : "z"(b)
+        :
+        : volatile
+    }
+    return result;
+}
+
+fn vec128_zero<T>() -> Vec128<T> {
+    return Vec128<T> {
+        data: [0 as T; 16],
+        alignment: 0,
+    };
+}
+
+pub struct Vec128<T> {
+    data: [T; 16],
+    alignment: u8,
+}
+
+pub struct Vec256<T> {
+    data: [T; 32],
+    alignment: u8,
+}
+
+pub struct Vec512<T> {
+    data: [T; 64],
+    alignment: u8,
+}
+
+pub type Vec128i32 = Vec128<i32>;
+pub type Vec128f32 = Vec128<f32>;
+pub type Vec128f64 = Vec128<f64>;
+pub type Vec128i16 = Vec128<i16>;
+pub type Vec256i32 = Vec256<i32>;
+pub type Vec256f32 = Vec256<f32>;
+pub type Vec512i32 = Vec512<i32>;
+pub type Vec512f32 = Vec512<f32>;

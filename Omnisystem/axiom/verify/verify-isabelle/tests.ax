@@ -1,0 +1,3 @@
+// Tests: verify-isabelle
+
+pub fn test_module() -> i64 { return 111; }

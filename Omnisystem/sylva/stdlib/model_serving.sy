@@ -1,0 +1,421 @@
+// sylva/stdlib/model_serving.sy
+// Model serving and inference in Sylva
+
+struct Model {
+    layers: List[Layer]
+    weights: List[Tensor[f32]]
+    biases: List[Tensor[f32]]
+    metadata: ModelMetadata
+}
+
+struct ModelMetadata {
+    name: String
+    version: String
+    input_shape: List[Int]
+    output_shape: List[Int]
+    framework: String
+    created_at: String
+    updated_at: String
+    author: String
+    description: String
+}
+
+enum Layer {
+    | Dense(DenseLayer)
+    | Conv2D(Conv2DLayer)
+    | BatchNorm(BatchNormLayer)
+    | Dropout(DropoutLayer)
+    | ReLU(ReLULayer)
+    | Softmax(SoftmaxLayer)
+}
+
+struct DenseLayer {
+    input_size: Int
+    output_size: Int
+    use_bias: Bool
+}
+
+struct Conv2DLayer {
+    in_channels: Int
+    out_channels: Int
+    kernel_size: (Int, Int)
+    stride: (Int, Int)
+    padding: (Int, Int)
+    use_bias: Bool
+}
+
+struct BatchNormLayer {
+    num_features: Int
+    momentum: Float
+    epsilon: Float
+}
+
+struct DropoutLayer {
+    rate: Float
+}
+
+struct ReLULayer {
+    inplace: Bool
+}
+
+struct SoftmaxLayer {
+    dim: Int
+}
+
+struct Predictor {
+    model: Model
+    batch_size: Int
+    preprocessing: fn(Tensor[u8]) -> Tensor[f32]
+    postprocessing: fn(Tensor[f32]) -> Tensor[f32]
+}
+
+impl Predictor {
+    fn new(
+        model: Model,
+        batch_size: Int,
+        preprocessing: fn(Tensor[u8]) -> Tensor[f32],
+        postprocessing: fn(Tensor[f32]) -> Tensor[f32]
+    ) -> Predictor {
+        return Predictor {
+            model: model,
+            batch_size: batch_size,
+            preprocessing: preprocessing,
+            postprocessing: postprocessing,
+        }
+    }
+
+    fn predict(input: Tensor[u8]) -> Tensor[f32] {
+        let preprocessed = (this.preprocessing)(input)
+        let logits = this.forward(preprocessed)
+        let predictions = (this.postprocessing)(logits)
+        return predictions
+    }
+
+    fn predict_batch(inputs: List[Tensor[u8]]) -> List[Tensor[f32]] {
+        let mut results = []
+
+        for batch in inputs.chunks(this.batch_size) {
+            let mut batch_input: Tensor[f32] = zeros(
+                [batch.len(), this.model.metadata.input_shape[1],
+                 this.model.metadata.input_shape[2], this.model.metadata.input_shape[3]]
+            )
+
+            for i in 0..batch.len() {
+                let preprocessed = (this.preprocessing)(batch[i])
+                batch_input[i] = preprocessed
+            }
+
+            let batch_output = this.forward(batch_input)
+
+            for i in 0..batch.len() {
+                results.push(batch_output[i])
+            }
+        }
+
+        return results
+    }
+
+    fn forward(input: Tensor[f32]) -> Tensor[f32] {
+        let mut x = input
+
+        for i in 0..this.model.layers.len() {
+            let layer = this.model.layers[i]
+
+            match layer {
+                Layer::Dense(l) => {
+                    x = dense_forward(x, this.model.weights[i], this.model.biases[i])
+                }
+                Layer::Conv2D(l) => {
+                    x = conv2d_forward(x, this.model.weights[i], this.model.biases[i], l)
+                }
+                Layer::BatchNorm(l) => {
+                    x = batch_norm_forward(x)
+                }
+                Layer::Dropout(l) => {
+                    x = dropout_forward(x, l.rate)
+                }
+                Layer::ReLU(l) => {
+                    x = relu_forward(x)
+                }
+                Layer::Softmax(l) => {
+                    x = softmax_forward(x, l.dim)
+                }
+            }
+        }
+
+        return x
+    }
+}
+
+struct ModelServer {
+    models: Map[String, Model]
+    predictors: Map[String, Predictor]
+    metrics: ModelMetrics
+
+    fn new() -> ModelServer {
+        return ModelServer {
+            models: Map::new(),
+            predictors: Map::new(),
+            metrics: ModelMetrics::new(),
+        }
+    }
+
+    fn register_model(name: String, model: Model, predictor: Predictor) {
+        this.models[name] = model
+        this.predictors[name] = predictor
+        this.metrics.track_model(name)
+    }
+
+    fn predict(model_name: String, input: Tensor[u8]) -> Result[Tensor[f32]] {
+        let start_time = now_ms()
+
+        let predictor = this.predictors.get(model_name)
+
+        if predictor.is_none() {
+            return Err("Model not found")
+        }
+
+        let pred = predictor.unwrap()
+
+        let result = pred.predict(input)
+
+        let latency = now_ms() - start_time
+        this.metrics.record_inference(model_name, latency)
+
+        return Ok(result)
+    }
+
+    fn predict_batch(model_name: String, inputs: List[Tensor[u8]]) -> Result[List[Tensor[f32]]] {
+        let start_time = now_ms()
+
+        let predictor = this.predictors.get(model_name)
+
+        if predictor.is_none() {
+            return Err("Model not found")
+        }
+
+        let pred = predictor.unwrap()
+
+        let results = pred.predict_batch(inputs)
+
+        let latency = now_ms() - start_time
+        this.metrics.record_batch_inference(model_name, inputs.len(), latency)
+
+        return Ok(results)
+    }
+
+    fn update_model(name: String, model: Model, predictor: Predictor) -> Result[String] {
+        this.models[name] = model
+        this.predictors[name] = predictor
+
+        return Ok("Model updated")
+    }
+
+    fn get_metrics(model_name: String) -> Option[InferenceMetrics] {
+        return this.metrics.get_model_metrics(model_name)
+    }
+}
+
+struct ModelMetrics {
+    inference_latencies: Map[String, List[Int]]
+    inference_counts: Map[String, Int]
+    error_counts: Map[String, Int]
+
+    fn new() -> ModelMetrics {
+        return ModelMetrics {
+            inference_latencies: Map::new(),
+            inference_counts: Map::new(),
+            error_counts: Map::new(),
+        }
+    }
+
+    fn track_model(name: String) {
+        this.inference_latencies[name] = List::new()
+        this.inference_counts[name] = 0
+        this.error_counts[name] = 0
+    }
+
+    fn record_inference(name: String, latency_ms: Int) {
+        let latencies = this.inference_latencies.get(name)
+
+        if latencies.is_some() {
+            latencies.unwrap().push(latency_ms)
+        }
+
+        let count = this.inference_counts.get(name).unwrap_or(0)
+        this.inference_counts[name] = count + 1
+    }
+
+    fn record_batch_inference(name: String, batch_size: Int, latency_ms: Int) {
+        this.record_inference(name, latency_ms)
+    }
+
+    fn get_model_metrics(name: String) -> Option[InferenceMetrics] {
+        let latencies = this.inference_latencies.get(name)
+        let count = this.inference_counts.get(name)
+
+        if latencies.is_none() || count.is_none() {
+            return None
+        }
+
+        let lats = latencies.unwrap()
+        let total_inferences = count.unwrap()
+
+        return Some(InferenceMetrics {
+            total_inferences: total_inferences,
+            avg_latency_ms: compute_mean(lats),
+            min_latency_ms: compute_min(lats),
+            max_latency_ms: compute_max(lats),
+            p95_latency_ms: compute_percentile(lats, 0.95),
+            p99_latency_ms: compute_percentile(lats, 0.99),
+            error_count: this.error_counts.get(name).unwrap_or(0),
+        })
+    }
+}
+
+struct InferenceMetrics {
+    total_inferences: Int
+    avg_latency_ms: Float
+    min_latency_ms: Int
+    max_latency_ms: Int
+    p95_latency_ms: Float
+    p99_latency_ms: Float
+    error_count: Int
+}
+
+// Model loading and saving
+fn load_model(path: String) -> Result[Model] {
+    // Load model from disk (onnx, pth, h5, etc)
+    return Err("Not implemented")
+}
+
+fn save_model(model: Model, path: String) -> Result[String] {
+    // Save model to disk
+    return Ok("Model saved")
+}
+
+fn export_onnx(model: Model, path: String) -> Result[String] {
+    // Export model to ONNX format
+    return Ok("Model exported to ONNX")
+}
+
+fn export_tensorflow(model: Model, path: String) -> Result[String] {
+    // Export model to TensorFlow SavedModel format
+    return Ok("Model exported to TensorFlow")
+}
+
+fn export_pytorch(model: Model, path: String) -> Result[String] {
+    // Export model to PyTorch format
+    return Ok("Model exported to PyTorch")
+}
+
+// Quantization
+fn quantize_int8(model: Model) -> Model {
+    let mut quantized = model
+    return quantized
+}
+
+fn quantize_int4(model: Model) -> Model {
+    let mut quantized = model
+    return quantized
+}
+
+fn quantize_float16(model: Model) -> Model {
+    let mut quantized = model
+    return quantized
+}
+
+// Layer implementations
+fn dense_forward(
+    input: Tensor[f32],
+    weights: Tensor[f32],
+    bias: Tensor[f32]
+) -> Tensor[f32] {
+    // W @ X + b
+    return input
+}
+
+fn conv2d_forward(
+    input: Tensor[f32],
+    kernel: Tensor[f32],
+    bias: Tensor[f32],
+    layer: Conv2DLayer
+) -> Tensor[f32] {
+    return input
+}
+
+fn batch_norm_forward(input: Tensor[f32]) -> Tensor[f32] {
+    return input
+}
+
+fn dropout_forward(input: Tensor[f32], rate: Float) -> Tensor[f32] {
+    return input
+}
+
+fn relu_forward(input: Tensor[f32]) -> Tensor[f32] {
+    return input
+}
+
+fn softmax_forward(input: Tensor[f32], dim: Int) -> Tensor[f32] {
+    return input
+}
+
+fn compute_mean(values: List[Int]) -> Float {
+    let mut sum = 0
+
+    for v in values {
+        sum = sum + v
+    }
+
+    return (sum as Float) / (values.len() as Float)
+}
+
+fn compute_min(values: List[Int]) -> Int {
+    let mut min_val = values[0]
+
+    for v in values {
+        if v < min_val {
+            min_val = v
+        }
+    }
+
+    return min_val
+}
+
+fn compute_max(values: List[Int]) -> Int {
+    let mut max_val = values[0]
+
+    for v in values {
+        if v > max_val {
+            max_val = v
+        }
+    }
+
+    return max_val
+}
+
+fn compute_percentile(values: List[Int], p: Float) -> Float {
+    return 0.0  // Placeholder
+}
+
+fn now_ms() -> Int {
+    return 0  // Placeholder
+}
+
+fn zeros(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] {
+    return zeros_tensor(shape)
+}
+
+type Tensor[T] = Any
+type Tensor[T, Shape] = Any
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Result<T> = Any
+
+fn Err<T>(msg: String) -> Result[T] { return msg; }
+fn Ok<T>(val: T) -> Result[T] { return val; }

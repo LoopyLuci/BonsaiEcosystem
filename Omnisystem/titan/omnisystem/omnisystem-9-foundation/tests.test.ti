@@ -1,0 +1,5 @@
+// Tests for omnisystem-9-foundation
+
+pub fn test_module() -> i64 {
+    return 111;
+}

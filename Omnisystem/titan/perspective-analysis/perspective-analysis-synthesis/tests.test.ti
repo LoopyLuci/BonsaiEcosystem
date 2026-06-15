@@ -1,0 +1,5 @@
+// Tests for perspective-analysis-synthesis
+
+pub fn test_module() -> i64 {
+    return 111;
+}

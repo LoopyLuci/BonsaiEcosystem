@@ -1,0 +1,403 @@
+// titan/simd/vec_types.ti
+// SIMD vector type definitions for Titan
+// Supports Vec128<T>, Vec256<T>, Vec512<T>
+
+// Base vector types (aligned to cache line boundaries)
+pub struct Vec128<T> {
+    data: [T; 16],  // 128-bit = 16 bytes, can hold 16x i8, 8x i16, 4x i32, 2x i64, 4x f32, 2x f64
+    alignment: u8,  // Ensure 16-byte alignment for SSE/NEON
+}
+
+pub struct Vec256<T> {
+    data: [T; 32],  // 256-bit = 32 bytes
+    alignment: u8,  // Ensure 32-byte alignment for AVX2
+}
+
+pub struct Vec512<T> {
+    data: [T; 64],  // 512-bit = 64 bytes
+    alignment: u8,  // Ensure 64-byte alignment for AVX512
+}
+
+// Type aliases for common SIMD types
+pub type Vec128i8 = Vec128<i8>;
+pub type Vec128i16 = Vec128<i16>;
+pub type Vec128i32 = Vec128<i32>;
+pub type Vec128i64 = Vec128<i64>;
+pub type Vec128u8 = Vec128<u8>;
+pub type Vec128u16 = Vec128<u16>;
+pub type Vec128u32 = Vec128<u32>;
+pub type Vec128u64 = Vec128<u64>;
+pub type Vec128f32 = Vec128<f32>;
+pub type Vec128f64 = Vec128<f64>;
+
+pub type Vec256i8 = Vec256<i8>;
+pub type Vec256i16 = Vec256<i16>;
+pub type Vec256i32 = Vec256<i32>;
+pub type Vec256i64 = Vec256<i64>;
+pub type Vec256u8 = Vec256<u8>;
+pub type Vec256u16 = Vec256<u16>;
+pub type Vec256u32 = Vec256<u32>;
+pub type Vec256u64 = Vec256<u64>;
+pub type Vec256f32 = Vec256<f32>;
+pub type Vec256f64 = Vec256<f64>;
+
+pub type Vec512i8 = Vec512<i8>;
+pub type Vec512i16 = Vec512<i16>;
+pub type Vec512i32 = Vec512<i32>;
+pub type Vec512i64 = Vec512<i64>;
+pub type Vec512u8 = Vec512<u8>;
+pub type Vec512u16 = Vec512<u16>;
+pub type Vec512u32 = Vec512<u32>;
+pub type Vec512u64 = Vec512<u64>;
+pub type Vec512f32 = Vec512<f32>;
+pub type Vec512f64 = Vec512<f64>;
+
+// Vector mask types (all bits set = true, all bits clear = false)
+pub struct Mask128 {
+    data: u128,
+}
+
+pub struct Mask256 {
+    data: [u64; 4],  // 4 x 64-bit mask registers
+}
+
+pub struct Mask512 {
+    data: [u64; 8],  // 8 x 64-bit mask registers
+}
+
+// Vector creation constructors
+pub fn vec128_splat<T>(value: T) -> Vec128<T> {
+    return Vec128<T> {
+        data: [value; 16],
+        alignment: 0,
+    };
+}
+
+pub fn vec256_splat<T>(value: T) -> Vec256<T> {
+    return Vec256<T> {
+        data: [value; 32],
+        alignment: 0,
+    };
+}
+
+pub fn vec512_splat<T>(value: T) -> Vec512<T> {
+    return Vec512<T> {
+        data: [value; 64],
+        alignment: 0,
+    };
+}
+
+// Zero initialization
+pub fn vec128_zero<T>() -> Vec128<T> {
+    return Vec128<T> {
+        data: [0 as T; 16],
+        alignment: 0,
+    };
+}
+
+pub fn vec256_zero<T>() -> Vec256<T> {
+    return Vec256<T> {
+        data: [0 as T; 32],
+        alignment: 0,
+    };
+}
+
+pub fn vec512_zero<T>() -> Vec512<T> {
+    return Vec512<T> {
+        data: [0 as T; 64],
+        alignment: 0,
+    };
+}
+
+// Load from aligned memory
+pub fn vec128_load<T>(ptr: &T) -> Vec128<T> ! {simd} {
+    // In actual Titan, this would use inline asm: movdqa (SSE) or equivalent
+    let mut result = Vec128<T> {
+        data: [*ptr; 16],
+        alignment: 0,
+    };
+
+    asm! {
+        "movdqa (%0), %%xmm0"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+pub fn vec256_load<T>(ptr: &T) -> Vec256<T> ! {simd} {
+    // AVX2: vmovdqa (256-bit aligned load)
+    let mut result = Vec256<T> {
+        data: [*ptr; 32],
+        alignment: 0,
+    };
+
+    asm! {
+        "vmovdqa (%0), %%ymm0"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+pub fn vec512_load<T>(ptr: &T) -> Vec512<T> ! {simd} {
+    // AVX512: vmovdqa64 (512-bit aligned load)
+    let mut result = Vec512<T> {
+        data: [*ptr; 64],
+        alignment: 0,
+    };
+
+    asm! {
+        "vmovdqa64 (%0), %%zmm0"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+// Unaligned load
+pub fn vec128_loadu<T>(ptr: &T) -> Vec128<T> ! {simd} {
+    // SSE: movdqu (unaligned load)
+    let mut result = Vec128<T> {
+        data: [*ptr; 16],
+        alignment: 0,
+    };
+
+    asm! {
+        "movdqu (%0), %%xmm0"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+pub fn vec256_loadu<T>(ptr: &T) -> Vec256<T> ! {simd} {
+    // AVX2: vmovdqu
+    let mut result = Vec256<T> {
+        data: [*ptr; 32],
+        alignment: 0,
+    };
+
+    asm! {
+        "vmovdqu (%0), %%ymm0"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+pub fn vec512_loadu<T>(ptr: &T) -> Vec512<T> ! {simd} {
+    // AVX512: vmovdqu64
+    let mut result = Vec512<T> {
+        data: [*ptr; 64],
+        alignment: 0,
+    };
+
+    asm! {
+        "vmovdqu64 (%0), %%zmm0"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+
+    return result;
+}
+
+// Store to aligned memory
+pub fn vec128_store<T>(ptr: &mut T, vec: Vec128<T>) ! {simd} {
+    // SSE: movdqa (aligned store)
+    asm! {
+        "movdqa %%xmm0, (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn vec256_store<T>(ptr: &mut T, vec: Vec256<T>) ! {simd} {
+    // AVX2: vmovdqa
+    asm! {
+        "vmovdqa %%ymm0, (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn vec512_store<T>(ptr: &mut T, vec: Vec512<T>) ! {simd} {
+    // AVX512: vmovdqa64
+    asm! {
+        "vmovdqa64 %%zmm0, (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+// Unaligned store
+pub fn vec128_storeu<T>(ptr: &mut T, vec: Vec128<T>) ! {simd} {
+    // SSE: movdqu
+    asm! {
+        "movdqu %%xmm0, (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn vec256_storeu<T>(ptr: &mut T, vec: Vec256<T>) ! {simd} {
+    // AVX2: vmovdqu
+    asm! {
+        "vmovdqu %%ymm0, (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+pub fn vec512_storeu<T>(ptr: &mut T, vec: Vec512<T>) ! {simd} {
+    // AVX512: vmovdqu64
+    asm! {
+        "vmovdqu64 %%zmm0, (%0)"
+        :
+        : "r"(ptr)
+        :
+        : volatile
+    }
+}
+
+// Element access
+pub fn vec128_extract<T>(vec: Vec128<T>, index: i32) -> T {
+    if index < 0 || index >= 16 {
+        emit_panic("Vector index out of bounds");
+    }
+    return vec.data[index as usize];
+}
+
+pub fn vec128_insert<T>(vec: &mut Vec128<T>, index: i32, value: T) {
+    if index < 0 || index >= 16 {
+        emit_panic("Vector index out of bounds");
+    }
+    vec.data[index as usize] = value;
+}
+
+pub fn vec256_extract<T>(vec: Vec256<T>, index: i32) -> T {
+    if index < 0 || index >= 32 {
+        emit_panic("Vector index out of bounds");
+    }
+    return vec.data[index as usize];
+}
+
+pub fn vec256_insert<T>(vec: &mut Vec256<T>, index: i32, value: T) {
+    if index < 0 || index >= 32 {
+        emit_panic("Vector index out of bounds");
+    }
+    vec.data[index as usize] = value;
+}
+
+pub fn vec512_extract<T>(vec: Vec512<T>, index: i32) -> T {
+    if index < 0 || index >= 64 {
+        emit_panic("Vector index out of bounds");
+    }
+    return vec.data[index as usize];
+}
+
+pub fn vec512_insert<T>(vec: &mut Vec512<T>, index: i32, value: T) {
+    if index < 0 || index >= 64 {
+        emit_panic("Vector index out of bounds");
+    }
+    vec.data[index as usize] = value;
+}
+
+// Get element count for type
+pub fn vec128_len<T>() -> i32 {
+    return 16;
+}
+
+pub fn vec256_len<T>() -> i32 {
+    return 32;
+}
+
+pub fn vec512_len<T>() -> i32 {
+    return 64;
+}
+
+// Broadcast/splat (fill all elements with value)
+pub fn vec128_broadcast<T>(value: T) -> Vec128<T> ! {simd} {
+    // Example for SSE: pinsrw for 16-bit, then shuffle
+    return vec128_splat(value);
+}
+
+pub fn vec256_broadcast<T>(value: T) -> Vec256<T> ! {simd} {
+    // Example for AVX2: vbroadcastd (4-byte) or equivalent
+    return vec256_splat(value);
+}
+
+pub fn vec512_broadcast<T>(value: T) -> Vec512<T> ! {simd} {
+    // Example for AVX512: vbroadcastd
+    return vec512_splat(value);
+}
+
+// Alignment helpers
+pub fn vec128_align(ptr: &T) -> &T ! {simd} {
+    // Ensure pointer is 16-byte aligned
+    let addr = ptr as i64;
+    let aligned = (addr + 15) & (!15);  // Round up to next 16-byte boundary
+    return aligned as &T;
+}
+
+pub fn vec256_align(ptr: &T) -> &T ! {simd} {
+    // Ensure pointer is 32-byte aligned
+    let addr = ptr as i64;
+    let aligned = (addr + 31) & (!31);
+    return aligned as &T;
+}
+
+pub fn vec512_align(ptr: &T) -> &T ! {simd} {
+    // Ensure pointer is 64-byte aligned
+    let addr = ptr as i64;
+    let aligned = (addr + 63) & (!63);
+    return aligned as &T;
+}
+
+pub fn emit_panic(msg: String) ! {io} {
+    disable_interrupts();
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+pub fn disable_interrupts() ! {privileged} {
+    asm! {
+        "cli"
+        :
+        :
+        :
+        : volatile
+    }
+}

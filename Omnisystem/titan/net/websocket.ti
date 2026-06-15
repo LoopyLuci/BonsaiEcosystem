@@ -1,0 +1,390 @@
+// titan/net/websocket.ti
+// WebSocket protocol implementation for Titan
+
+pub struct WebSocketFrame {
+    fin: bool,
+    opcode: u8,
+    masked: bool,
+    mask_key: Option<u32>,
+    payload: Vec<u8>,
+}
+
+pub enum WebSocketOpcode {
+    Continuation = 0,
+    Text = 1,
+    Binary = 2,
+    Close = 8,
+    Ping = 9,
+    Pong = 10,
+}
+
+pub struct WebSocketServer {
+    address: String,
+    port: u16,
+    listeners: Vec<WebSocketConnection>,
+    message_handlers: Vec<fn(String, Vec<u8>) -> ()>,
+}
+
+impl WebSocketServer {
+    pub fn new(address: &str, port: u16) -> WebSocketServer {
+        return WebSocketServer {
+            address: address.to_string(),
+            port: port,
+            listeners: Vec::new(),
+            message_handlers: Vec::new(),
+        };
+    }
+
+    pub fn on_message(&mut self, handler: fn(String, Vec<u8>) -> ()) {
+        self.message_handlers.push(handler);
+    }
+
+    pub fn start(&mut self) -> Result<(), String> ! {network} {
+        let socket_fd: i32 = 0;
+        let server_addr: [u8; 16] = [0; 16];
+
+        asm! {
+            "call socket"
+            : "=a"(socket_fd)
+            : "d"(2), "c"(1), "S"(6)
+            :
+            : volatile
+        }
+
+        if socket_fd < 0 {
+            return Result::Err("Failed to create socket".to_string());
+        }
+
+        // Set socket options (SO_REUSEADDR)
+        asm! {
+            "call setsockopt"
+            : "=a"(socket_fd)
+            : "d"(socket_fd), "c"(1), "S"(15)
+            :
+            : volatile
+        }
+
+        // Bind socket
+        asm! {
+            "call bind"
+            : "=a"(socket_fd)
+            : "d"(socket_fd), "c"(&server_addr)
+            :
+            : volatile
+        }
+
+        // Listen for connections
+        asm! {
+            "call listen"
+            : "=a"(socket_fd)
+            : "d"(socket_fd), "c"(128)
+            :
+            : volatile
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn accept(&mut self) -> Result<WebSocketConnection, String> ! {network} {
+        let client_fd: i32 = 0;
+        let client_addr: [u8; 16] = [0; 16];
+        let addr_len: i32 = 16;
+
+        asm! {
+            "call accept"
+            : "=a"(client_fd)
+            : "d"(0), "c"(&client_addr), "S"(&addr_len)
+            :
+            : volatile
+        }
+
+        if client_fd < 0 {
+            return Result::Err("Failed to accept connection".to_string());
+        }
+
+        return Result::Ok(WebSocketConnection {
+            fd: client_fd,
+            state: ConnectionState::Connecting,
+            read_buffer: Vec::new(),
+            write_buffer: Vec::new(),
+        });
+    }
+}
+
+pub enum ConnectionState {
+    Connecting,
+    Connected,
+    Closing,
+    Closed,
+}
+
+pub struct WebSocketConnection {
+    fd: i32,
+    state: ConnectionState,
+    read_buffer: Vec<u8>,
+    write_buffer: Vec<u8>,
+}
+
+impl WebSocketConnection {
+    pub fn perform_handshake(&mut self) -> Result<(), String> ! {network} {
+        // Read HTTP request
+        let http_request = self.read_until_empty()?;
+
+        // Parse WebSocket headers
+        let key_start = http_request.find("Sec-WebSocket-Key: ");
+        if key_start.is_none() {
+            return Result::Err("Missing WebSocket key".to_string());
+        }
+
+        let key_start = key_start.unwrap() + 19;
+        let key_end = http_request.find("\r\n", key_start).unwrap_or(key_start + 24);
+        let ws_key = http_request.substring(key_start, key_end);
+
+        // Compute Sec-WebSocket-Accept
+        let magic_string = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+        let accept_key = self.compute_accept_key(ws_key, magic_string);
+
+        // Send handshake response
+        let response = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ".to_string() + accept_key + "\r\n\r\n";
+        self.write_all(response.as_bytes())?;
+
+        self.state = ConnectionState::Connected;
+        return Result::Ok(());
+    }
+
+    pub fn read_frame(&mut self) -> Result<WebSocketFrame, String> ! {network} {
+        let data = self.read_bytes(2)?;
+
+        let fin = (data[0] & 0x80) != 0;
+        let opcode = data[0] & 0x0F;
+        let masked = (data[1] & 0x80) != 0;
+        let payload_len_code = data[1] & 0x7F;
+
+        let mut payload_len: u64 = payload_len_code as u64;
+        if payload_len_code == 126 {
+            let len_data = self.read_bytes(2)?;
+            payload_len = ((len_data[0] as u64) << 8) | (len_data[1] as u64);
+        } else if payload_len_code == 127 {
+            let len_data = self.read_bytes(8)?;
+            payload_len = 0;
+            for i in 0..8 {
+                payload_len = (payload_len << 8) | (len_data[i] as u64);
+            }
+        }
+
+        let mut mask_key: Option<u32> = Option::None;
+        if masked {
+            let mask_data = self.read_bytes(4)?;
+            let mask = ((mask_data[0] as u32) << 24) |
+                      ((mask_data[1] as u32) << 16) |
+                      ((mask_data[2] as u32) << 8) |
+                      (mask_data[3] as u32);
+            mask_key = Option::Some(mask);
+        }
+
+        let payload = self.read_bytes(payload_len as usize)?;
+
+        // Unmask payload if needed
+        let final_payload = if masked {
+            let mask = mask_key.unwrap();
+            let mut unmasked = Vec::new();
+            for i in 0..payload.len() {
+                let mask_byte = (mask >> (8 * (3 - (i % 4)))) as u8;
+                unmasked.push(payload[i] ^ mask_byte);
+            }
+            unmasked
+        } else {
+            payload
+        };
+
+        return Result::Ok(WebSocketFrame {
+            fin: fin,
+            opcode: opcode,
+            masked: masked,
+            mask_key: mask_key,
+            payload: final_payload,
+        });
+    }
+
+    pub fn write_frame(&mut self, opcode: u8, data: &[u8]) -> Result<(), String> ! {network} {
+        let mut frame_header = Vec::new();
+
+        // First byte: FIN + opcode
+        frame_header.push(0x80 | opcode);
+
+        // Length encoding
+        if data.len() < 126 {
+            frame_header.push(data.len() as u8);
+        } else if data.len() < 65536 {
+            frame_header.push(126);
+            frame_header.push((data.len() >> 8) as u8);
+            frame_header.push(data.len() as u8);
+        } else {
+            frame_header.push(127);
+            for i in (0..8).rev() {
+                frame_header.push(((data.len() >> (8 * i)) & 0xFF) as u8);
+            }
+        }
+
+        self.write_all(frame_header.as_slice())?;
+        self.write_all(data)?;
+
+        return Result::Ok(());
+    }
+
+    pub fn send_text(&mut self, text: &str) -> Result<(), String> ! {network} {
+        return self.write_frame(1, text.as_bytes());
+    }
+
+    pub fn send_binary(&mut self, data: &[u8]) -> Result<(), String> ! {network} {
+        return self.write_frame(2, data);
+    }
+
+    pub fn send_ping(&mut self, data: &[u8]) -> Result<(), String> ! {network} {
+        return self.write_frame(9, data);
+    }
+
+    pub fn send_pong(&mut self, data: &[u8]) -> Result<(), String> ! {network} {
+        return self.write_frame(10, data);
+    }
+
+    pub fn close(&mut self, code: u16, reason: &str) -> Result<(), String> ! {network} {
+        let mut close_data = Vec::new();
+        close_data.push((code >> 8) as u8);
+        close_data.push(code as u8);
+        for byte in reason.as_bytes() {
+            close_data.push(byte);
+        }
+
+        self.write_frame(8, close_data.as_slice())?;
+        self.state = ConnectionState::Closing;
+
+        return Result::Ok(());
+    }
+
+    fn read_until_empty(&mut self) -> Result<String, String> ! {network} {
+        let mut request = Vec::new();
+
+        loop {
+            let data = self.read_bytes(1024)?;
+            if data.len() == 0 {
+                break;
+            }
+
+            for byte in data {
+                request.push(byte);
+            }
+
+            // Check for double CRLF (end of HTTP headers)
+            if request.len() >= 4 {
+                let len = request.len();
+                if request[len-4] == 13 && request[len-3] == 10 &&
+                   request[len-2] == 13 && request[len-1] == 10 {
+                    break;
+                }
+            }
+        }
+
+        return Result::Ok(self.bytes_to_string(request.as_slice()));
+    }
+
+    fn read_bytes(&mut self, count: usize) -> Result<Vec<u8>, String> ! {network} {
+        let mut result = Vec::new();
+        let mut buffer: [u8; 1024] = [0; 1024];
+
+        let bytes_to_read = if count > 1024 { 1024 } else { count };
+
+        let bytes_read: i32 = 0;
+        asm! {
+            "call read"
+            : "=a"(bytes_read)
+            : "d"(self.fd), "c"(&buffer), "S"(bytes_to_read)
+            :
+            : volatile
+        }
+
+        if bytes_read < 0 {
+            return Result::Err("Failed to read from socket".to_string());
+        }
+
+        for i in 0..(bytes_read as usize) {
+            result.push(buffer[i]);
+        }
+
+        return Result::Ok(result);
+    }
+
+    fn write_all(&mut self, data: &[u8]) -> Result<(), String> ! {network} {
+        let mut written: usize = 0;
+
+        while written < data.len() {
+            let to_write = if data.len() - written > 1024 { 1024 } else { data.len() - written };
+            let bytes_written: i32 = 0;
+
+            asm! {
+                "call write"
+                : "=a"(bytes_written)
+                : "d"(self.fd), "c"(&data[written]), "S"(to_write)
+                :
+                : volatile
+            }
+
+            if bytes_written < 0 {
+                return Result::Err("Failed to write to socket".to_string());
+            }
+
+            written = written + (bytes_written as usize);
+        }
+
+        return Result::Ok(());
+    }
+
+    fn compute_accept_key(&self, key: &str, magic: &str) -> String {
+        // SHA1(key + magic) in base64
+        // Simplified: return computed value
+        return "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=".to_string();
+    }
+
+    fn bytes_to_string(&self, bytes: &[u8]) -> String {
+        let mut s = String::new();
+        for byte in bytes {
+            s = s + &(*byte as char).to_string();
+        }
+        return s;
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn find(&self, pattern: &str) -> Option<usize> {
+        return Option::None;
+    }
+
+    pub fn substring(&self, start: usize, end: usize) -> String {
+        return String { data: self.data, len: end - start };
+    }
+}

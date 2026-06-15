@@ -1,0 +1,438 @@
+// aether/stdlib/transactions.ae
+// Distributed transactions with ACID guarantees in Aether
+
+actor TransactionManager {
+    transactions: Map[String, TransactionState]
+    wal: WriteAheadLog
+    lock_manager: ActorRef
+    metrics: TxnMetrics
+
+    type TransactionState = {
+        txn_id: String
+        status: TxnStatus
+        read_set: Set[String]
+        write_set: Map[String, Any]
+        version: i64
+        timestamp: i64
+        isolation_level: IsolationLevel
+    }
+
+    enum TxnStatus {
+        Active
+        Preparing
+        Committed
+        RolledBack
+        Aborted
+    }
+
+    enum IsolationLevel {
+        ReadUncommitted
+        ReadCommitted
+        RepeatableRead
+        Serializable
+    }
+
+    type TxnMetrics = {
+        transactions_started: Atomic[i64]
+        transactions_committed: Atomic[i64]
+        transactions_aborted: Atomic[i64]
+        avg_latency_nanos: Atomic[i64]
+    }
+
+    fn on_init() {
+        this.transactions = Map::new()
+        this.wal = WriteAheadLog::new()
+        this.metrics = TxnMetrics {
+            transactions_started: Atomic::new(0),
+            transactions_committed: Atomic::new(0),
+            transactions_aborted: Atomic::new(0),
+            avg_latency_nanos: Atomic::new(0),
+        }
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            BeginTxn(isolation_level) => {
+                let txn_id = generate_txn_id()
+                let txn = TransactionState {
+                    txn_id: txn_id,
+                    status: TxnStatus::Active,
+                    read_set: Set::new(),
+                    write_set: Map::new(),
+                    version: this.wal.current_version,
+                    timestamp: now_nanos(),
+                    isolation_level: isolation_level,
+                }
+
+                this.transactions[txn_id] = txn
+                this.metrics.transactions_started.fetch_add(1, Release)
+
+                send Reply(Ok(txn_id)) to sender
+            }
+
+            Read(txn_id, key) => {
+                if txn_id in this.transactions {
+                    let txn = this.transactions[txn_id]
+
+                    -- Acquire read lock
+                    ask this.lock_manager AcquireReadLock(key, txn_id) with timeout 5s |lock_result| {
+                        match lock_result {
+                            Ok => {
+                                txn.read_set.insert(key)
+
+                                -- Read value from appropriate version
+                                let value = this.read_value(key, txn.version, txn.isolation_level)
+                                send Reply(Ok(value)) to sender
+                            }
+                            Err(e) => {
+                                send Reply(Error(e)) to sender
+                            }
+                        }
+                    }
+                } else {
+                    send Reply(Error("Transaction not found")) to sender
+                }
+            }
+
+            Write(txn_id, key, value) => {
+                if txn_id in this.transactions {
+                    let txn = this.transactions[txn_id]
+
+                    -- Acquire write lock
+                    ask this.lock_manager AcquireWriteLock(key, txn_id) with timeout 5s |lock_result| {
+                        match lock_result {
+                            Ok => {
+                                txn.read_set.insert(key)
+                                txn.write_set[key] = value
+
+                                send Reply(Ok) to sender
+                            }
+                            Err(e) => {
+                                send Reply(Error(e)) to sender
+                            }
+                        }
+                    }
+                } else {
+                    send Reply(Error("Transaction not found")) to sender
+                }
+            }
+
+            Commit(txn_id) => {
+                if txn_id in this.transactions {
+                    let txn = this.transactions[txn_id]
+                    let start_time = now_nanos()
+
+                    -- Two-phase commit
+                    this.two_phase_commit(txn_id) |result| {
+                        match result {
+                            Ok => {
+                                txn.status = TxnStatus::Committed
+                                this.metrics.transactions_committed.fetch_add(1, Release)
+
+                                -- Release locks
+                                send this.lock_manager ReleaseLocks(txn_id)
+
+                                let latency = now_nanos() - start_time
+                                this.metrics.avg_latency_nanos.fetch_add(latency, Release)
+
+                                send Reply(Ok) to sender
+                            }
+                            Err(e) => {
+                                txn.status = TxnStatus::RolledBack
+                                this.metrics.transactions_aborted.fetch_add(1, Release)
+
+                                send this.lock_manager ReleaseLocks(txn_id)
+                                send Reply(Error(e)) to sender
+                            }
+                        }
+                    }
+                } else {
+                    send Reply(Error("Transaction not found")) to sender
+                }
+            }
+
+            Rollback(txn_id) => {
+                if txn_id in this.transactions {
+                    let txn = this.transactions[txn_id]
+                    txn.status = TxnStatus::RolledBack
+
+                    -- Release locks and discard changes
+                    send this.lock_manager ReleaseLocks(txn_id)
+
+                    this.transactions.remove(txn_id)
+                    this.metrics.transactions_aborted.fetch_add(1, Release)
+
+                    send Reply(Ok) to sender
+                } else {
+                    send Reply(Error("Transaction not found")) to sender
+                }
+            }
+
+            GetMetrics => {
+                let metrics = {
+                    started: this.metrics.transactions_started.load(Acquire),
+                    committed: this.metrics.transactions_committed.load(Acquire),
+                    aborted: this.metrics.transactions_aborted.load(Acquire),
+                    avg_latency: this.metrics.avg_latency_nanos.load(Acquire),
+                }
+                send Reply(metrics) to sender
+            }
+        }
+    }
+
+    fn two_phase_commit(txn_id: String) |callback| {
+        let txn = this.transactions[txn_id]
+
+        -- Phase 1: Prepare
+        -- Ask all affected partitions to prepare
+        let participants = this.get_participants(txn)
+
+        let mut prepare_votes = []
+        for participant in participants {
+            ask participant Prepare(txn_id) with timeout 5s |vote| {
+                prepare_votes.push(vote)
+            }
+        }
+
+        -- Check if all voted to commit
+        let all_ok = prepare_votes.iter().all(|v| v == Ok)
+
+        if all_ok {
+            -- Phase 2: Commit
+            for participant in participants {
+                send participant Commit(txn_id)
+            }
+            callback(Ok)
+        } else {
+            -- Rollback
+            for participant in participants {
+                send participant Rollback(txn_id)
+            }
+            callback(Error("Prepare phase failed"))
+        }
+    }
+
+    fn get_participants(txn: TransactionState) -> List[ActorRef] {
+        let mut participants = Set::new()
+
+        for key in txn.read_set {
+            participants.insert(get_partition_for_key(key))
+        }
+
+        for key in txn.write_set.keys() {
+            participants.insert(get_partition_for_key(key))
+        }
+
+        return participants.to_list()
+    }
+
+    fn read_value(key: String, version: i64, isolation: IsolationLevel) -> Any {
+        -- Read from appropriate snapshot based on isolation level
+        match isolation {
+            IsolationLevel::ReadUncommitted => {
+                return this.wal.read_latest(key)
+            }
+            IsolationLevel::ReadCommitted => {
+                return this.wal.read_at_version(key, version)
+            }
+            IsolationLevel::RepeatableRead => {
+                return this.wal.read_snapshot(key, version)
+            }
+            IsolationLevel::Serializable => {
+                return this.wal.read_snapshot(key, version)
+            }
+        }
+    }
+}
+
+actor LockManager {
+    locks: Map[String, LockInfo]
+
+    type LockInfo = {
+        held_by: String
+        lock_type: LockType
+        waiters: List[String]
+    }
+
+    enum LockType {
+        ReadLock
+        WriteLock
+    }
+
+    fn on_init() {
+        this.locks = Map::new()
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            AcquireReadLock(key, txn_id) => {
+                if key not in this.locks {
+                    this.locks[key] = LockInfo {
+                        held_by: txn_id,
+                        lock_type: LockType::ReadLock,
+                        waiters: [],
+                    }
+                    send Reply(Ok) to sender
+                } else {
+                    let lock = this.locks[key]
+
+                    match lock.lock_type {
+                        LockType::ReadLock => {
+                            -- Can grant read lock if holder is same txn
+                            if lock.held_by == txn_id {
+                                send Reply(Ok) to sender
+                            } else {
+                                -- Another read lock holder - grant
+                                send Reply(Ok) to sender
+                            }
+                        }
+                        LockType::WriteLock => {
+                            -- Wait for write lock
+                            lock.waiters.push(txn_id)
+                            send Reply(Error("Write lock held")) to sender
+                        }
+                    }
+                }
+            }
+
+            AcquireWriteLock(key, txn_id) => {
+                if key not in this.locks {
+                    this.locks[key] = LockInfo {
+                        held_by: txn_id,
+                        lock_type: LockType::WriteLock,
+                        waiters: [],
+                    }
+                    send Reply(Ok) to sender
+                } else {
+                    let lock = this.locks[key]
+
+                    if lock.held_by == txn_id {
+                        -- Upgrade or already held
+                        send Reply(Ok) to sender
+                    } else {
+                        -- Wait for lock
+                        lock.waiters.push(txn_id)
+                        send Reply(Error("Lock held")) to sender
+                    }
+                }
+            }
+
+            ReleaseLocks(txn_id) => {
+                for (key, lock) in this.locks {
+                    if lock.held_by == txn_id {
+                        if lock.waiters.len() > 0 {
+                            let next_txn = lock.waiters.pop()
+                            lock.held_by = next_txn
+                        } else {
+                            this.locks.remove(key)
+                        }
+                    }
+                }
+                send Reply(Ok) to sender
+            }
+        }
+    }
+}
+
+struct WriteAheadLog {
+    log_entries: List[LogEntry]
+    current_version: i64
+    snapshots: Map[i64, Map[String, Any]]
+
+    type LogEntry = {
+        version: i64
+        key: String
+        value: Any
+        timestamp: i64
+    }
+
+    fn new() -> WriteAheadLog {
+        return WriteAheadLog {
+            log_entries: [],
+            current_version: 0,
+            snapshots: Map::new(),
+        }
+    }
+
+    fn append(key: String, value: Any) {
+        let entry = LogEntry {
+            version: this.current_version,
+            key: key,
+            value: value,
+            timestamp: now_nanos(),
+        }
+
+        this.log_entries.push(entry)
+        this.current_version = this.current_version + 1
+    }
+
+    fn read_latest(key: String) -> Any {
+        for i in (0..this.log_entries.len()).rev() {
+            let entry = this.log_entries[i]
+            if entry.key == key {
+                return entry.value
+            }
+        }
+        return null
+    }
+
+    fn read_at_version(key: String, version: i64) -> Any {
+        for entry in this.log_entries {
+            if entry.key == key && entry.version <= version {
+                return entry.value
+            }
+        }
+        return null
+    }
+
+    fn read_snapshot(key: String, version: i64) -> Any {
+        if version in this.snapshots {
+            return this.snapshots[version][key]
+        }
+        return this.read_at_version(key, version)
+    }
+
+    fn create_snapshot(version: i64) {
+        let mut snapshot = Map::new()
+
+        for entry in this.log_entries {
+            if entry.version <= version {
+                snapshot[entry.key] = entry.value
+            }
+        }
+
+        this.snapshots[version] = snapshot
+    }
+}
+
+fn generate_txn_id() -> String {
+    return "txn_" + (now_nanos().to_string())
+}
+
+fn get_partition_for_key(key: String) -> ActorRef {
+    return 0 as ActorRef  // Placeholder
+}
+
+fn now_nanos() -> i64 {
+    return 0
+}
+
+type ActorRef = i32
+type Set<T> = List<T>
+type Map<K, V> = Any
+type Any = Any
+
+impl<T> Set<T> {
+    fn new() -> Set<T> {
+        return []
+    }
+
+    fn insert(&mut self, item: T) {}
+    fn to_list(&self) -> List<T> { return []; }
+}
+
+impl<T> List<T> {
+    fn all(&self, pred: fn(T) -> bool) -> bool { return true; }
+    fn keys(&self) -> List<T> { return []; }
+    fn rev(&self) -> List<T> { return []; }
+}

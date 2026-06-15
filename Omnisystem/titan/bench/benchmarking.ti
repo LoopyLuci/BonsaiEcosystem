@@ -1,0 +1,387 @@
+// titan/bench/benchmarking.ti
+// Benchmark framework for Titan
+
+pub struct Benchmark {
+    name: String,
+    iterations: u64,
+    warmup_iterations: u32,
+    setup_fn: Option<fn() -> ()>,
+    benchmark_fn: fn() -> (),
+    teardown_fn: Option<fn() -> ()>,
+}
+
+pub struct BenchmarkResult {
+    name: String,
+    iterations: u64,
+    total_time_ns: u64,
+    mean_time_ns: f64,
+    median_time_ns: f64,
+    stddev_time_ns: f64,
+    min_time_ns: u64,
+    max_time_ns: u64,
+    ops_per_sec: f64,
+}
+
+pub struct BenchmarkSuite {
+    benchmarks: Vec<Benchmark>,
+    results: Vec<BenchmarkResult>,
+    baseline: Option<String>,
+}
+
+impl BenchmarkSuite {
+    pub fn new() -> BenchmarkSuite {
+        return BenchmarkSuite {
+            benchmarks: Vec::new(),
+            results: Vec::new(),
+            baseline: Option::None,
+        };
+    }
+
+    pub fn add_benchmark(
+        &mut self,
+        name: &str,
+        iterations: u64,
+        benchmark_fn: fn() -> ()
+    ) -> &mut BenchmarkSuite {
+        let bench = Benchmark {
+            name: name.to_string(),
+            iterations: iterations,
+            warmup_iterations: 10,
+            setup_fn: Option::None,
+            benchmark_fn: benchmark_fn,
+            teardown_fn: Option::None,
+        };
+
+        self.benchmarks.push(bench);
+        return self;
+    }
+
+    pub fn with_setup(&mut self, setup_fn: fn() -> ()) -> &mut BenchmarkSuite {
+        if self.benchmarks.len() > 0 {
+            self.benchmarks[self.benchmarks.len() - 1].setup_fn = Option::Some(setup_fn);
+        }
+        return self;
+    }
+
+    pub fn with_teardown(&mut self, teardown_fn: fn() -> ()) -> &mut BenchmarkSuite {
+        if self.benchmarks.len() > 0 {
+            self.benchmarks[self.benchmarks.len() - 1].teardown_fn = Option::Some(teardown_fn);
+        }
+        return self;
+    }
+
+    pub fn set_baseline(&mut self, name: &str) {
+        self.baseline = Option::Some(name.to_string());
+    }
+
+    pub fn run(&mut self) -> Result<Vec<BenchmarkResult>, String> ! {bench} {
+        let mut results: Vec<BenchmarkResult> = Vec::new();
+
+        for bench in &self.benchmarks {
+            let result = this.run_benchmark(bench)?;
+            results.push(result);
+        }
+
+        self.results = results.clone();
+        return Result::Ok(results);
+    }
+
+    fn run_benchmark(&self, bench: &Benchmark) -> Result<BenchmarkResult, String> ! {bench} {
+        // Warmup iterations
+        for _ in 0..bench.warmup_iterations {
+            if bench.setup_fn.is_some() {
+                bench.setup_fn.unwrap()();
+            }
+
+            bench.benchmark_fn();
+
+            if bench.teardown_fn.is_some() {
+                bench.teardown_fn.unwrap()();
+            }
+        }
+
+        // Actual benchmark iterations
+        let mut times: Vec<u64> = Vec::new();
+        let start_total = this.get_time_ns();
+
+        for _ in 0..bench.iterations {
+            if bench.setup_fn.is_some() {
+                bench.setup_fn.unwrap()();
+            }
+
+            let start = this.get_time_ns();
+            bench.benchmark_fn();
+            let end = this.get_time_ns();
+
+            times.push(end - start);
+
+            if bench.teardown_fn.is_some() {
+                bench.teardown_fn.unwrap()();
+            }
+        }
+
+        let end_total = this.get_time_ns();
+        let total_time = end_total - start_total;
+
+        // Calculate statistics
+        let mean = this.calculate_mean(&times);
+        let median = this.calculate_median(&times);
+        let stddev = this.calculate_stddev(&times, mean);
+        let min = this.find_min(&times);
+        let max = this.find_max(&times);
+
+        let ops_per_sec = (bench.iterations as f64) / ((total_time as f64) / 1_000_000_000.0);
+
+        return Result::Ok(BenchmarkResult {
+            name: bench.name.clone(),
+            iterations: bench.iterations,
+            total_time_ns: total_time,
+            mean_time_ns: mean,
+            median_time_ns: median,
+            stddev_time_ns: stddev,
+            min_time_ns: min,
+            max_time_ns: max,
+            ops_per_sec: ops_per_sec,
+        });
+    }
+
+    fn calculate_mean(&self, times: &Vec<u64>) -> f64 {
+        let mut sum: u64 = 0;
+
+        for time in times {
+            sum = sum + time;
+        }
+
+        return (sum as f64) / (times.len() as f64);
+    }
+
+    fn calculate_median(&self, times: &Vec<u64>) -> f64 {
+        let len = times.len();
+
+        if len == 0 {
+            return 0.0;
+        }
+
+        if len % 2 == 1 {
+            return times[len / 2] as f64;
+        } else {
+            return ((times[len / 2 - 1] + times[len / 2]) as f64) / 2.0;
+        }
+    }
+
+    fn calculate_stddev(&self, times: &Vec<u64>, mean: f64) -> f64 {
+        let mut sum_sq_diff: f64 = 0.0;
+
+        for time in times {
+            let diff = (*time as f64) - mean;
+            sum_sq_diff = sum_sq_diff + (diff * diff);
+        }
+
+        let variance = sum_sq_diff / (times.len() as f64);
+        return variance.sqrt();
+    }
+
+    fn find_min(&self, times: &Vec<u64>) -> u64 {
+        let mut min: u64 = 18446744073709551615;
+
+        for time in times {
+            if time < &min {
+                min = *time;
+            }
+        }
+
+        return min;
+    }
+
+    fn find_max(&self, times: &Vec<u64>) -> u64 {
+        let mut max: u64 = 0;
+
+        for time in times {
+            if time > &max {
+                max = *time;
+            }
+        }
+
+        return max;
+    }
+
+    pub fn print_results(&self) {
+        for result in &self.results {
+            this.print_result(result);
+        }
+    }
+
+    fn print_result(&self, result: &BenchmarkResult) {
+        // Print benchmark result
+        // In real implementation would print to stdout
+    }
+
+    pub fn compare_with_baseline(&self) -> Vec<RegressionAnalysis> {
+        let mut analyses: Vec<RegressionAnalysis> = Vec::new();
+
+        if self.baseline.is_some() {
+            let baseline_name = self.baseline.clone().unwrap();
+
+            // Find baseline result
+            let mut baseline_result: Option<BenchmarkResult> = Option::None;
+
+            for result in &self.results {
+                if result.name == baseline_name {
+                    baseline_result = Option::Some(result.clone());
+                    break;
+                }
+            }
+
+            if baseline_result.is_some() {
+                let baseline = baseline_result.unwrap();
+
+                // Compare all results against baseline
+                for result in &self.results {
+                    if result.name != baseline_name {
+                        let percent_diff = ((result.mean_time_ns - baseline.mean_time_ns) / baseline.mean_time_ns) * 100.0;
+
+                        let is_regression = percent_diff > 5.0;
+
+                        analyses.push(RegressionAnalysis {
+                            benchmark_name: result.name.clone(),
+                            baseline_name: baseline_name.clone(),
+                            baseline_mean_ns: baseline.mean_time_ns,
+                            current_mean_ns: result.mean_time_ns,
+                            percent_difference: percent_diff,
+                            is_regression: is_regression,
+                        });
+                    }
+                }
+            }
+        }
+
+        return analyses;
+    }
+
+    fn get_time_ns(&self) -> u64 {
+        let time_ns: u64 = 0;
+        asm! {
+            "call rdtsc"
+            : "=a"(time_ns)
+            :
+            :
+            : volatile
+        }
+        return time_ns;
+    }
+}
+
+pub struct RegressionAnalysis {
+    benchmark_name: String,
+    baseline_name: String,
+    baseline_mean_ns: f64,
+    current_mean_ns: f64,
+    percent_difference: f64,
+    is_regression: bool,
+}
+
+pub struct ParametricBenchmark {
+    name: String,
+    parameters: Vec<i32>,
+    benchmark_fn: fn(i32) -> (),
+    results: Map<i32, BenchmarkResult>,
+}
+
+impl ParametricBenchmark {
+    pub fn new(name: &str, benchmark_fn: fn(i32) -> ()) -> ParametricBenchmark {
+        return ParametricBenchmark {
+            name: name.to_string(),
+            parameters: Vec::new(),
+            benchmark_fn: benchmark_fn,
+            results: Map::new(),
+        };
+    }
+
+    pub fn with_param(&mut self, param: i32) -> &mut ParametricBenchmark {
+        self.parameters.push(param);
+        return self;
+    }
+
+    pub fn run(&mut self) -> Result<(), String> ! {bench} {
+        for param in &self.parameters {
+            // Run benchmark with this parameter
+            // Store result indexed by parameter
+        }
+
+        return Result::Ok(());
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+impl<T> Option<T> {
+    pub fn is_some(&self) -> bool {
+        match self {
+            Option::Some(_) => return true,
+            Option::None => return false,
+        }
+    }
+
+    pub fn unwrap(&self) -> T {
+        return *self;
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl BenchmarkResult {
+    pub fn clone(&self) -> BenchmarkResult {
+        return BenchmarkResult {
+            name: self.name.clone(),
+            iterations: self.iterations,
+            total_time_ns: self.total_time_ns,
+            mean_time_ns: self.mean_time_ns,
+            median_time_ns: self.median_time_ns,
+            stddev_time_ns: self.stddev_time_ns,
+            min_time_ns: self.min_time_ns,
+            max_time_ns: self.max_time_ns,
+            ops_per_sec: self.ops_per_sec,
+        };
+    }
+}

@@ -1,0 +1,3 @@
+// Tests: autonomous-intelligence-confidence
+
+pub fn test_module() -> i64 { return 111; }

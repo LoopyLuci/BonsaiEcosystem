@@ -1,0 +1,5 @@
+// Tests for lint-treesitter-axiom
+
+pub fn test_module() -> i64 {
+    return 111;
+}

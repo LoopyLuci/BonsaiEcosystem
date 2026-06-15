@@ -1,0 +1,420 @@
+// axiom/stdlib/model_checking.ax
+// Temporal logic and model checking in Axiom
+
+-- Temporal Logic Formulas
+type Proposition = String
+
+type Formula =
+    | Atom(Proposition)
+    | Negation(Formula)
+    | Conjunction(Formula, Formula)
+    | Disjunction(Formula, Formula)
+    | Implication(Formula, Formula)
+    | Next(Formula)
+    | Eventually(Formula)
+    | Always(Formula)
+    | Until(Formula, Formula)
+    | Release(Formula, Formula)
+
+-- System states and transitions
+type State = Map[Proposition, Bool]
+
+type Transition = {
+    from_state: State
+    to_state: State
+    action: String
+}
+
+-- Kripke structure (system model)
+type KripkeStructure = {
+    states: List[State]
+    initial_states: List[State]
+    transitions: List[Transition]
+    atomic_propositions: List[Proposition]
+}
+
+-- Model checking results
+type ModelCheckingResult = {
+    formula_holds: Bool
+    counterexample: Option[Trace]
+    witness: Option[Trace]
+}
+
+type Trace = {
+    states: List[State]
+    actions: List[String]
+}
+
+-- CTL (Computation Tree Logic) Model Checker
+struct CTLModelChecker {
+    kripke: KripkeStructure
+
+    fn new(kripke: KripkeStructure) -> CTLModelChecker {
+        return CTLModelChecker { kripke: kripke }
+    }
+
+    fn check(formula: Formula) -> ModelCheckingResult {
+        let sat = this.sat(formula, this.kripke.initial_states[0])
+
+        if sat {
+            return ModelCheckingResult {
+                formula_holds: true,
+                counterexample: None,
+                witness: None,
+            }
+        } else {
+            let trace = this.find_counterexample(formula)
+
+            return ModelCheckingResult {
+                formula_holds: false,
+                counterexample: trace,
+                witness: None,
+            }
+        }
+    }
+
+    fn sat(formula: Formula, state: State) -> Bool {
+        match formula {
+            Formula::Atom(prop) => {
+                return state.get(prop).unwrap_or(false)
+            }
+
+            Formula::Negation(f) => {
+                return !this.sat(f, state)
+            }
+
+            Formula::Conjunction(f1, f2) => {
+                return this.sat(f1, state) && this.sat(f2, state)
+            }
+
+            Formula::Disjunction(f1, f2) => {
+                return this.sat(f1, state) || this.sat(f2, state)
+            }
+
+            Formula::Implication(f1, f2) => {
+                return !this.sat(f1, state) || this.sat(f2, state)
+            }
+
+            Formula::Next(f) => {
+                let next_states = this.get_next_states(state)
+                for next_state in next_states {
+                    if this.sat(f, next_state) {
+                        return true
+                    }
+                }
+                return false
+            }
+
+            Formula::Eventually(f) => {
+                return this.check_eventually(f, state)
+            }
+
+            Formula::Always(f) => {
+                return this.check_always(f, state)
+            }
+
+            Formula::Until(f1, f2) => {
+                return this.check_until(f1, f2, state)
+            }
+
+            Formula::Release(f1, f2) => {
+                return this.check_release(f1, f2, state)
+            }
+        }
+    }
+
+    fn check_eventually(formula: Formula, state: State) -> Bool {
+        -- Eventually: EF formula
+        -- Check if there exists a path to a state satisfying formula
+        let visited = Map::new()
+        return this.check_eventually_dfs(formula, state, visited)
+    }
+
+    fn check_eventually_dfs(
+        formula: Formula,
+        state: State,
+        visited: Map[State, Bool]
+    ) -> Bool {
+        if visited.get(state).is_some() {
+            return false
+        }
+
+        visited[state] = true
+
+        if this.sat(formula, state) {
+            return true
+        }
+
+        let next_states = this.get_next_states(state)
+
+        for next_state in next_states {
+            if this.check_eventually_dfs(formula, next_state, visited) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    fn check_always(formula: Formula, state: State) -> Bool {
+        -- Always: AG formula
+        -- Check all paths from state satisfy formula
+        let visited = Map::new()
+        return this.check_always_dfs(formula, state, visited)
+    }
+
+    fn check_always_dfs(
+        formula: Formula,
+        state: State,
+        visited: Map[State, Bool]
+    ) -> Bool {
+        if visited.get(state).is_some() {
+            return true
+        }
+
+        visited[state] = true
+
+        if !this.sat(formula, state) {
+            return false
+        }
+
+        let next_states = this.get_next_states(state)
+
+        for next_state in next_states {
+            if !this.check_always_dfs(formula, next_state, visited) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    fn check_until(f1: Formula, f2: Formula, state: State) -> Bool {
+        -- Until: E[f1 U f2]
+        -- Check if f1 holds until f2 becomes true
+        let visited = Map::new()
+        return this.check_until_dfs(f1, f2, state, visited)
+    }
+
+    fn check_until_dfs(
+        f1: Formula,
+        f2: Formula,
+        state: State,
+        visited: Map[State, Bool]
+    ) -> Bool {
+        if visited.get(state).is_some() {
+            return false
+        }
+
+        if this.sat(f2, state) {
+            return true
+        }
+
+        if !this.sat(f1, state) {
+            return false
+        }
+
+        visited[state] = true
+
+        let next_states = this.get_next_states(state)
+
+        for next_state in next_states {
+            if this.check_until_dfs(f1, f2, next_state, visited) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    fn check_release(f1: Formula, f2: Formula, state: State) -> Bool {
+        -- Release: A[f1 R f2]
+        let visited = Map::new()
+        return this.check_release_dfs(f1, f2, state, visited)
+    }
+
+    fn check_release_dfs(
+        f1: Formula,
+        f2: Formula,
+        state: State,
+        visited: Map[State, Bool]
+    ) -> Bool {
+        if visited.get(state).is_some() {
+            return true
+        }
+
+        if !this.sat(f2, state) {
+            return false
+        }
+
+        if !this.sat(f1, state) {
+            return true
+        }
+
+        visited[state] = true
+
+        let next_states = this.get_next_states(state)
+
+        for next_state in next_states {
+            if !this.check_release_dfs(f1, f2, next_state, visited) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    fn get_next_states(state: State) -> List[State] {
+        let mut next_states = List::new()
+
+        for transition in this.kripke.transitions {
+            if transition.from_state == state {
+                next_states.push(transition.to_state)
+            }
+        }
+
+        return next_states
+    }
+
+    fn find_counterexample(formula: Formula) -> Option[Trace] {
+        -- Find a trace that violates the formula
+        return None  -- Placeholder
+    }
+}
+
+-- LTL (Linear Temporal Logic) Model Checker
+struct LTLModelChecker {
+    kripke: KripkeStructure
+
+    fn new(kripke: KripkeStructure) -> LTLModelChecker {
+        return LTLModelChecker { kripke: kripke }
+    }
+
+    fn check(formula: Formula) -> ModelCheckingResult {
+        -- LTL model checking using Buchi automata
+        let automaton = this.formula_to_automaton(formula)
+        let product = this.product_automaton(this.kripke, automaton)
+
+        let has_cycle = this.has_accepting_cycle(product)
+
+        return ModelCheckingResult {
+            formula_holds: !has_cycle,
+            counterexample: None,
+            witness: None,
+        }
+    }
+
+    fn formula_to_automaton(formula: Formula) -> BuchiAutomaton {
+        return BuchiAutomaton {
+            states: List::new(),
+            initial_state: 0,
+            accepting_states: List::new(),
+            transitions: List::new(),
+        }
+    }
+
+    fn product_automaton(
+        kripke: KripkeStructure,
+        automaton: BuchiAutomaton
+    ) -> BuchiAutomaton {
+        -- Create product of Kripke structure and Buchi automaton
+        return automaton
+    }
+
+    fn has_accepting_cycle(automaton: BuchiAutomaton) -> Bool {
+        -- Check if automaton has cycle through accepting state
+        for start in automaton.accepting_states {
+            let visited = Map::new()
+            let rec_stack = List::new()
+
+            if this.has_path_back_to(automaton, start, start, visited, rec_stack) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    fn has_path_back_to(
+        automaton: BuchiAutomaton,
+        current: Int,
+        target: Int,
+        visited: Map[Int, Bool],
+        rec_stack: List[Int]
+    ) -> Bool {
+        if current == target && rec_stack.len() > 0 {
+            return true
+        }
+
+        if visited.get(current).is_some() {
+            return false
+        }
+
+        visited[current] = true
+        rec_stack.push(current)
+
+        for transition in automaton.transitions {
+            if transition.from_state == current {
+                if this.has_path_back_to(
+                    automaton,
+                    transition.to_state,
+                    target,
+                    visited,
+                    rec_stack
+                ) {
+                    return true
+                }
+            }
+        }
+
+        rec_stack.pop()
+        return false
+    }
+}
+
+-- Buchi Automaton for LTL
+type BuchiAutomaton = {
+    states: List[Int]
+    initial_state: Int
+    accepting_states: List[Int]
+    transitions: List[AutomatonTransition]
+}
+
+type AutomatonTransition = {
+    from_state: Int
+    to_state: Int
+    label: Formula
+}
+
+-- Theorems about model checking
+theorem ctl_model_checking_correctness:
+    forall kripke: KripkeStructure, formula: Formula.
+        (CTLModelChecker::new(kripke)).check(formula).formula_holds <==>
+        forall initial_state in kripke.initial_states.
+            satisfies(initial_state, formula)
+by {
+    intro kripke formula
+    -- Proof by structural induction on formula
+    induction formula {
+        case Atom(prop) => {
+            simp [satisfies]
+        }
+        case Negation(f) => {
+            simp [satisfies]
+            exact ih
+        }
+        case Eventually(f) => {
+            -- Eventually: forall paths exists state
+            sorry
+        }
+    }
+}
+
+fn satisfies(state: State, formula: Formula) -> Bool {
+    return false  -- Placeholder
+}
+
+type State = Map[String, Bool]
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any

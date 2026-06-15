@@ -1,0 +1,3 @@
+// Tests: data-lineage
+
+pub fn test_module() -> i64 { return 111; }

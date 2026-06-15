@@ -1,0 +1,5 @@
+// Tests for pathfinder-notification-service
+
+pub fn test_module() -> i64 {
+    return 111;
+}

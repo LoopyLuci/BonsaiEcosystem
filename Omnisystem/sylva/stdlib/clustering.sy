@@ -1,0 +1,482 @@
+// sylva/stdlib/clustering.sy
+// Clustering algorithms for Sylva
+
+struct KMeans {
+    n_clusters: Int
+    max_iterations: Int
+    tolerance: Float
+    centroids: Tensor[f32, "n_clusters,n_features"]
+    cluster_labels: Tensor[i32]
+    inertia: Float
+
+    fn new(n_clusters: Int, max_iterations: Int, tolerance: Float) -> KMeans {
+        return KMeans {
+            n_clusters: n_clusters,
+            max_iterations: max_iterations,
+            tolerance: tolerance,
+            centroids: zeros([n_clusters, 0]),
+            cluster_labels: zeros([0]),
+            inertia: 0.0,
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n_samples,n_features"]) {
+        // Initialize centroids randomly
+        let n_features = X.shape[1]
+        this.centroids = randn([this.n_clusters, n_features])
+
+        for iteration in 0..this.max_iterations {
+            // Assign samples to nearest centroid
+            let labels = assign_clusters(X, this.centroids)
+
+            // Update centroids
+            let new_centroids = update_centroids(X, labels, this.n_clusters)
+
+            // Check convergence
+            let centroid_shift = compute_centroid_shift(this.centroids, new_centroids)
+
+            this.centroids = new_centroids
+            this.cluster_labels = labels
+
+            if centroid_shift < this.tolerance {
+                break
+            }
+        }
+
+        // Compute inertia
+        this.inertia = compute_inertia(X, this.centroids, this.cluster_labels)
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[i32] {
+        return assign_clusters(X, this.centroids)
+    }
+
+    fn fit_predict(X: Tensor[f32]) -> Tensor[i32] {
+        this.fit(X)
+        return this.cluster_labels
+    }
+}
+
+struct DBSCAN {
+    eps: Float
+    min_samples: Int
+    labels: Tensor[i32]
+
+    fn new(eps: Float, min_samples: Int) -> DBSCAN {
+        return DBSCAN {
+            eps: eps,
+            min_samples: min_samples,
+            labels: zeros([0]),
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n_samples,n_features"]) {
+        let n_samples = X.shape[0]
+        let mut labels = zeros([n_samples]) - 1  // -1 for unlabeled
+
+        let mut cluster_id = 0
+
+        for i in 0..n_samples {
+            if labels[i] != -1 {
+                continue
+            }
+
+            // Find neighbors
+            let neighbors = find_neighbors(X, i, this.eps)
+
+            if neighbors.len() < this.min_samples {
+                // Mark as noise
+                labels[i] = -1
+                continue
+            }
+
+            // Start new cluster
+            cluster_id = cluster_id + 1
+            this.expand_cluster(X, labels, i, cluster_id, this.eps, this.min_samples)
+        }
+
+        this.labels = labels
+    }
+
+    fn expand_cluster(
+        X: Tensor[f32],
+        labels: Tensor[i32],
+        start_idx: Int,
+        cluster_id: Int,
+        eps: Float,
+        min_samples: Int
+    ) {
+        let mut queue = [start_idx]
+        labels[start_idx] = cluster_id
+
+        let mut queue_idx = 0
+
+        while queue_idx < queue.len() {
+            let current_idx = queue[queue_idx]
+            queue_idx = queue_idx + 1
+
+            let neighbors = find_neighbors(X, current_idx, eps)
+
+            if neighbors.len() >= min_samples {
+                for neighbor_idx in neighbors {
+                    if labels[neighbor_idx] == -1 {
+                        labels[neighbor_idx] = cluster_id
+                        queue.push(neighbor_idx)
+                    }
+                }
+            }
+        }
+    }
+
+    fn fit_predict(X: Tensor[f32]) -> Tensor[i32] {
+        this.fit(X)
+        return this.labels
+    }
+}
+
+struct HierarchicalClustering {
+    linkage: LinkageMethod
+    n_clusters: Int
+    distance_matrix: Tensor[f32]
+    dendrogram: Dendrogram
+
+    fn new(linkage: LinkageMethod, n_clusters: Int) -> HierarchicalClustering {
+        return HierarchicalClustering {
+            linkage: linkage,
+            n_clusters: n_clusters,
+            distance_matrix: zeros([0, 0]),
+            dendrogram: Dendrogram { nodes: List::new() },
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n_samples,n_features"]) {
+        let n_samples = X.shape[0]
+
+        // Compute pairwise distances
+        this.distance_matrix = compute_pairwise_distances(X)
+
+        // Perform hierarchical clustering
+        let mut clusters = initialize_clusters(n_samples)
+
+        while clusters.len() > this.n_clusters {
+            // Find closest pair of clusters
+            let (i, j) = find_closest_clusters(this.distance_matrix, clusters)
+
+            // Merge clusters
+            merge_clusters(&mut clusters, i, j, this.linkage, this.distance_matrix)
+        }
+    }
+
+    fn fit_predict(X: Tensor[f32]) -> Tensor[i32] {
+        this.fit(X)
+        // Convert dendrogram to labels
+        return zeros([X.shape[0]])
+    }
+}
+
+enum LinkageMethod {
+    | Single
+    | Complete
+    | Average
+    | Weighted
+    | Centroid
+    | Ward
+}
+
+type Dendrogram = {
+    nodes: List[DendrogramNode]
+}
+
+type DendrogramNode = {
+    cluster_id: Int
+    left_id: Int
+    right_id: Int
+    distance: Float
+    n_samples: Int
+}
+
+struct GaussianMixture {
+    n_components: Int
+    weights: Tensor[f32, "n_components"]
+    means: Tensor[f32, "n_components,n_features"]
+    covariances: Tensor[f32, "n_components,n_features,n_features"]
+    n_iterations: Int
+    tolerance: Float
+
+    fn new(n_components: Int) -> GaussianMixture {
+        return GaussianMixture {
+            n_components: n_components,
+            weights: ones([n_components]) / (n_components as Float),
+            means: randn([n_components, 0]),
+            covariances: zeros([n_components, 0, 0]),
+            n_iterations: 100,
+            tolerance: 1e-3,
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n_samples,n_features"]) {
+        let n_features = X.shape[1]
+
+        // Initialize means randomly
+        this.means = randn([this.n_components, n_features])
+
+        // Initialize covariances
+        this.covariances = initialize_covariances(this.n_components, n_features)
+
+        for iteration in 0..this.n_iterations {
+            // E-step: compute responsibilities
+            let responsibilities = compute_responsibilities(
+                X,
+                this.means,
+                this.covariances,
+                this.weights
+            )
+
+            // M-step: update parameters
+            let (new_weights, new_means, new_covariances) = update_parameters(
+                X,
+                responsibilities,
+                this.n_components
+            )
+
+            // Check convergence
+            let weight_shift = compute_weight_shift(this.weights, new_weights)
+
+            this.weights = new_weights
+            this.means = new_means
+            this.covariances = new_covariances
+
+            if weight_shift < this.tolerance {
+                break
+            }
+        }
+    }
+
+    fn predict(X: Tensor[f32]) -> Tensor[i32] {
+        let responsibilities = compute_responsibilities(
+            X,
+            this.means,
+            this.covariances,
+            this.weights
+        )
+
+        return argmax_along_axis(responsibilities, 1)
+    }
+}
+
+struct SpectralClustering {
+    n_clusters: Int
+    n_neighbors: Int
+    affinity_matrix: Tensor[f32]
+    laplacian_matrix: Tensor[f32]
+
+    fn new(n_clusters: Int, n_neighbors: Int) -> SpectralClustering {
+        return SpectralClustering {
+            n_clusters: n_clusters,
+            n_neighbors: n_neighbors,
+            affinity_matrix: zeros([0, 0]),
+            laplacian_matrix: zeros([0, 0]),
+        }
+    }
+
+    fn fit(X: Tensor[f32, "n_samples,n_features"]) {
+        let n_samples = X.shape[0]
+
+        // Compute affinity matrix (k-NN graph)
+        this.affinity_matrix = compute_knn_affinity(X, this.n_neighbors)
+
+        // Compute Laplacian
+        this.laplacian_matrix = compute_laplacian(this.affinity_matrix)
+
+        // Compute eigenvectors
+        let eigenvectors = compute_eigenvectors(this.laplacian_matrix, this.n_clusters)
+
+        // Cluster eigenvector rows using k-means
+        let km = KMeans::new(this.n_clusters, 100, 1e-4)
+        km.fit(eigenvectors)
+    }
+
+    fn fit_predict(X: Tensor[f32]) -> Tensor[i32] {
+        this.fit(X)
+        return zeros([X.shape[0]])
+    }
+}
+
+// Helper functions
+fn assign_clusters(X: Tensor[f32], centroids: Tensor[f32]) -> Tensor[i32] {
+    let mut labels = zeros([X.shape[0]])
+
+    for i in 0..X.shape[0] {
+        let point = X[i]
+        let mut min_dist = Float::INFINITY
+        let mut nearest = 0
+
+        for j in 0..centroids.shape[0] {
+            let centroid = centroids[j]
+            let dist = euclidean_distance(point, centroid)
+
+            if dist < min_dist {
+                min_dist = dist
+                nearest = j
+            }
+        }
+
+        labels[i] = nearest as i32
+    }
+
+    return labels
+}
+
+fn update_centroids(X: Tensor[f32], labels: Tensor[i32], n_clusters: Int) -> Tensor[f32] {
+    let mut centroids = zeros([n_clusters, X.shape[1]])
+
+    for k in 0..n_clusters {
+        let cluster_points = gather_by_label(X, labels, k)
+
+        if cluster_points.shape[0] > 0 {
+            centroids[k] = mean_along_axis(cluster_points, 0)
+        }
+    }
+
+    return centroids
+}
+
+fn compute_centroid_shift(old: Tensor[f32], new: Tensor[f32]) -> Float {
+    let mut shift = 0.0
+
+    for i in 0..old.shape[0] {
+        shift = shift + euclidean_distance(old[i], new[i])
+    }
+
+    return shift / (old.shape[0] as Float)
+}
+
+fn compute_inertia(X: Tensor[f32], centroids: Tensor[f32], labels: Tensor[i32]) -> Float {
+    let mut inertia = 0.0
+
+    for i in 0..X.shape[0] {
+        let centroid = centroids[labels[i] as usize]
+        inertia = inertia + euclidean_distance(X[i], centroid)
+    }
+
+    return inertia
+}
+
+fn find_neighbors(X: Tensor[f32], idx: Int, eps: Float) -> List[Int] {
+    let mut neighbors = List::new()
+
+    for i in 0..X.shape[0] {
+        let dist = euclidean_distance(X[idx], X[i])
+
+        if dist <= eps {
+            neighbors.push(i)
+        }
+    }
+
+    return neighbors
+}
+
+fn compute_pairwise_distances(X: Tensor[f32]) -> Tensor[f32] {
+    let n_samples = X.shape[0]
+    let mut distances = zeros([n_samples, n_samples])
+
+    for i in 0..n_samples {
+        for j in i..n_samples {
+            let dist = euclidean_distance(X[i], X[j])
+            distances[i][j] = dist
+            distances[j][i] = dist
+        }
+    }
+
+    return distances
+}
+
+fn initialize_clusters(n_samples: Int) -> List[Int] {
+    let mut clusters = List::new()
+
+    for i in 0..n_samples {
+        clusters.push(i)
+    }
+
+    return clusters
+}
+
+fn find_closest_clusters(dist_matrix: Tensor[f32], clusters: List[Int]) -> (Int, Int) {
+    return (0, 1)
+}
+
+fn merge_clusters(
+    clusters: &List[Int],
+    i: Int,
+    j: Int,
+    linkage: LinkageMethod,
+    dist_matrix: Tensor[f32]
+) {
+    // Merge clusters i and j
+}
+
+fn compute_responsibilities(
+    X: Tensor[f32],
+    means: Tensor[f32],
+    covariances: Tensor[f32],
+    weights: Tensor[f32]
+) -> Tensor[f32] {
+    return zeros([X.shape[0], weights.shape[0]])
+}
+
+fn update_parameters(
+    X: Tensor[f32],
+    responsibilities: Tensor[f32],
+    n_components: Int
+) -> (Tensor[f32], Tensor[f32], Tensor[f32]) {
+    return (zeros([n_components]), zeros([0, 0]), zeros([0, 0, 0]))
+}
+
+fn compute_weight_shift(old: Tensor[f32], new: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn initialize_covariances(n_components: Int, n_features: Int) -> Tensor[f32] {
+    return zeros([n_components, n_features, n_features])
+}
+
+fn compute_knn_affinity(X: Tensor[f32], k: Int) -> Tensor[f32] {
+    return zeros([X.shape[0], X.shape[0]])
+}
+
+fn compute_laplacian(affinity: Tensor[f32]) -> Tensor[f32] {
+    return affinity
+}
+
+fn compute_eigenvectors(matrix: Tensor[f32], n: Int) -> Tensor[f32] {
+    return zeros([matrix.shape[0], n])
+}
+
+fn argmax_along_axis(X: Tensor[f32], axis: Int) -> Tensor[i32] {
+    return zeros([X.shape[0]])
+}
+
+fn euclidean_distance(a: Tensor[f32], b: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn gather_by_label(X: Tensor[f32], labels: Tensor[i32], label: Int) -> Tensor[f32] {
+    return X
+}
+
+fn mean_along_axis(X: Tensor[f32], axis: Int) -> Tensor[f32] {
+    return X[0]
+}
+
+fn zeros(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn ones(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn randn(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+
+type Tensor[T, Shape] = Any
+type Tensor[T] = Any
+type List<T> = Any
+type Int = i32
+type Float = f32
+
+const Float::INFINITY = 3.40282347e+38;

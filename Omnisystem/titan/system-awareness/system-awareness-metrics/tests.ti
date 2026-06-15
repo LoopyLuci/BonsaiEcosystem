@@ -1,0 +1,3 @@
+// Tests: system-awareness-metrics
+
+pub fn test_module() -> i64 { return 111; }

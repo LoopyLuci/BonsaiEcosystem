@@ -1,0 +1,5 @@
+// Tests for compliance-audit-logging
+
+pub fn test_module() -> i64 {
+    return 111;
+}

@@ -1,0 +1,434 @@
+// aether/stdlib/stream_processing.ae
+// Stream processing and event processing in Aether
+
+actor StreamProcessor<T> {
+    processors: List[Processor]
+    state: ProcessorState
+    metrics: StreamMetrics
+
+    type Processor = {
+        name: String
+        fn_ptr: fn(T) -> T
+        state: Any
+    }
+
+    enum ProcessorState {
+        Running
+        Paused
+        Stopped
+    }
+
+    type StreamMetrics = {
+        events_processed: Atomic[i64]
+        events_failed: Atomic[i64]
+        processing_time_nanos: Atomic[i64]
+        latency_p99: Atomic[i64]
+        throughput_events_per_sec: Atomic[i64]
+    }
+
+    fn on_init() {
+        this.processors = []
+        this.state = ProcessorState::Stopped
+        this.metrics = StreamMetrics {
+            events_processed: Atomic::new(0),
+            events_failed: Atomic::new(0),
+            processing_time_nanos: Atomic::new(0),
+            latency_p99: Atomic::new(0),
+            throughput_events_per_sec: Atomic::new(0),
+        }
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            AddProcessor(name, fn_ptr) => {
+                this.processors.push(Processor {
+                    name: name,
+                    fn_ptr: fn_ptr,
+                    state: null,
+                })
+                send Reply(Ok) to sender
+            }
+
+            ProcessEvent(event) => {
+                let start_time = now_nanos()
+
+                match this.state {
+                    ProcessorState::Running => {
+                        try {
+                            let mut result = event
+
+                            for processor in this.processors {
+                                result = processor.fn_ptr(result)
+                            }
+
+                            this.metrics.events_processed.fetch_add(1, Release)
+
+                            let latency = now_nanos() - start_time
+                            this.metrics.processing_time_nanos.fetch_add(latency, Release)
+
+                            send Reply(Ok(result)) to sender
+                        } catch error {
+                            this.metrics.events_failed.fetch_add(1, Release)
+                            send Reply(Error(error)) to sender
+                        }
+                    }
+                    _ => {
+                        send Reply(Error("Processor not running")) to sender
+                    }
+                }
+            }
+
+            Start => {
+                this.state = ProcessorState::Running
+                send Reply(Ok) to sender
+            }
+
+            Pause => {
+                this.state = ProcessorState::Paused
+                send Reply(Ok) to sender
+            }
+
+            Stop => {
+                this.state = ProcessorState::Stopped
+                send Reply(Ok) to sender
+            }
+
+            GetMetrics => {
+                let events = this.metrics.events_processed.load(Acquire)
+                let time_nanos = this.metrics.processing_time_nanos.load(Acquire)
+                let throughput = if time_nanos > 0 {
+                    (events * 1_000_000_000) / time_nanos
+                } else {
+                    0
+                }
+
+                send Reply({
+                    processed: events,
+                    failed: this.metrics.events_failed.load(Acquire),
+                    avg_latency_nanos: if events > 0 { time_nanos / events } else { 0 },
+                    throughput_events_per_sec: throughput,
+                }) to sender
+            }
+        }
+    }
+}
+
+// Time-windowed aggregation
+actor TimeWindowAggregator<T> {
+    window_duration_millis: i64
+    windows: Map[i64, Window]
+    slide_interval_millis: i64
+
+    type Window = {
+        start_time: i64
+        end_time: i64
+        events: List[T]
+        aggregate_result: Any
+    }
+
+    fn on_init(window_millis: i64, slide_millis: i64) {
+        this.window_duration_millis = window_millis
+        this.windows = Map::new()
+        this.slide_interval_millis = slide_millis
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            AddEvent(event, timestamp) => {
+                let window_id = (timestamp / this.window_duration_millis)
+
+                if window_id not in this.windows {
+                    this.windows[window_id] = Window {
+                        start_time: window_id * this.window_duration_millis,
+                        end_time: (window_id + 1) * this.window_duration_millis,
+                        events: [],
+                        aggregate_result: null,
+                    }
+                }
+
+                this.windows[window_id].events.push(event)
+
+                -- Check if window is complete
+                let current_time = now_millis()
+                if current_time >= this.windows[window_id].end_time {
+                    let result = this.aggregate_window(window_id)
+                    send Reply(Ok(result)) to sender
+                } else {
+                    send Reply(Pending) to sender
+                }
+            }
+
+            AggregateWindow(window_id) => {
+                if window_id in this.windows {
+                    let result = this.aggregate_window(window_id)
+                    this.windows.remove(window_id)
+                    send Reply(result) to sender
+                } else {
+                    send Reply(Error("Window not found")) to sender
+                }
+            }
+
+            GetCurrentWindow => {
+                let current_time = now_millis()
+                let window_id = (current_time / this.window_duration_millis)
+
+                if window_id in this.windows {
+                    send Reply(this.windows[window_id]) to sender
+                } else {
+                    send Reply(null) to sender
+                }
+            }
+        }
+    }
+
+    fn aggregate_window(window_id: i64) -> Any {
+        let window = this.windows[window_id]
+        let mut sum = 0
+        let mut count = 0
+
+        for event in window.events {
+            sum = sum + (event as i64)
+            count = count + 1
+        }
+
+        return {
+            window_id: window_id,
+            count: count,
+            sum: sum,
+            avg: if count > 0 { sum / count } else { 0 },
+        }
+    }
+}
+
+// Session windowing
+actor SessionWindowAggregator<T> {
+    session_timeout_millis: i64
+    sessions: Map[String, Session]
+
+    type Session = {
+        session_id: String
+        user_id: String
+        events: List[(i64, T)>
+        last_event_time: i64
+        is_active: Bool
+    }
+
+    fn on_init(timeout_millis: i64) {
+        this.session_timeout_millis = timeout_millis
+        this.sessions = Map::new()
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            AddSessionEvent(user_id, event, timestamp) => {
+                let current_time = now_millis()
+
+                -- Find active session for user
+                let mut session_id: Option[String] = None
+                for (sid, session) in this.sessions {
+                    if session.user_id == user_id &&
+                       (current_time - session.last_event_time) < this.session_timeout_millis {
+                        session_id = Some(sid)
+                        break
+                    }
+                }
+
+                if session_id.is_none() {
+                    -- Create new session
+                    session_id = Some(generate_session_id())
+                    this.sessions[session_id.unwrap()] = Session {
+                        session_id: session_id.unwrap(),
+                        user_id: user_id,
+                        events: [],
+                        last_event_time: current_time,
+                        is_active: true,
+                    }
+                } else {
+                    -- Add to existing session
+                    let sid = session_id.unwrap()
+                    this.sessions[sid].events.push((timestamp, event))
+                    this.sessions[sid].last_event_time = current_time
+                }
+
+                send Reply(Ok(session_id.unwrap())) to sender
+            }
+
+            GetSession(session_id) => {
+                if session_id in this.sessions {
+                    send Reply(this.sessions[session_id]) to sender
+                } else {
+                    send Reply(Error("Session not found")) to sender
+                }
+            }
+
+            CloseExpiredSessions => {
+                let current_time = now_millis()
+                let mut expired = []
+
+                for (sid, session) in this.sessions {
+                    if (current_time - session.last_event_time) > this.session_timeout_millis {
+                        expired.push(sid)
+                    }
+                }
+
+                for sid in expired {
+                    this.sessions.remove(sid)
+                }
+
+                send Reply(expired.len()) to sender
+            }
+        }
+    }
+}
+
+// Event deduplication
+actor EventDeduplicator {
+    seen_events: Map[String, EventMetadata]
+    dedup_window_millis: i64
+
+    type EventMetadata = {
+        event_id: String
+        timestamp: i64
+        content_hash: i64
+    }
+
+    fn on_init(window_millis: i64) {
+        this.seen_events = Map::new()
+        this.dedup_window_millis = window_millis
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            CheckAndDeduplicate(event_id, content_hash) => {
+                let current_time = now_millis()
+
+                if event_id in this.seen_events {
+                    let metadata = this.seen_events[event_id]
+
+                    if (current_time - metadata.timestamp) < this.dedup_window_millis {
+                        -- Duplicate within window
+                        send Reply(Duplicate) to sender
+                        return
+                    }
+                }
+
+                -- New or expired event
+                this.seen_events[event_id] = EventMetadata {
+                    event_id: event_id,
+                    timestamp: current_time,
+                    content_hash: content_hash,
+                }
+
+                send Reply(New) to sender
+            }
+
+            PurgeExpired => {
+                let current_time = now_millis()
+                let mut count = 0
+
+                for (event_id, metadata) in this.seen_events {
+                    if (current_time - metadata.timestamp) > this.dedup_window_millis {
+                        this.seen_events.remove(event_id)
+                        count = count + 1
+                    }
+                }
+
+                send Reply(count) to sender
+            }
+        }
+    }
+}
+
+// Backpressure handling
+actor BackpressureManager {
+    queue_depth_limit: i32
+    current_depth: Atomic[i32]
+    drop_policy: DropPolicy
+
+    enum DropPolicy {
+        DropOldest
+        DropNewest
+        DropRandom
+    }
+
+    fn on_init(limit: i32, policy: DropPolicy) {
+        this.queue_depth_limit = limit
+        this.current_depth = Atomic::new(0)
+        this.drop_policy = policy
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            CheckBackpressure => {
+                let depth = this.current_depth.load(Acquire)
+
+                if depth >= this.queue_depth_limit {
+                    send Reply(Error("Queue full")) to sender
+                } else {
+                    this.current_depth.fetch_add(1, Release)
+                    send Reply(Ok) to sender
+                }
+            }
+
+            EventProcessed => {
+                this.current_depth.fetch_sub(1, Release)
+                send Reply(Ok) to sender
+            }
+
+            GetQueueDepth => {
+                let depth = this.current_depth.load(Acquire)
+                send Reply(depth) to sender
+            }
+        }
+    }
+}
+
+// Event filtering
+fn filter_by_condition<T>(event: T, predicate: fn(T) -> Bool) -> Option[T] {
+    if predicate(event) {
+        return Some(event)
+    } else {
+        return None
+    }
+}
+
+// Event mapping/transformation
+fn map_event<T, U>(event: T, transform: fn(T) -> U) -> U {
+    return transform(event)
+}
+
+// Event splitting/branching
+fn split_event<T>(event: T, splitter: fn(T) -> List[T]) -> List[T] {
+    return splitter(event)
+}
+
+// Event merging/combining
+fn merge_events<T>(events: List[T], merger: fn(List[T]) -> T) -> T {
+    return merger(events)
+}
+
+fn now_nanos() -> i64 { return 0; }
+fn now_millis() -> i64 { return 0; }
+fn generate_session_id() -> String { return "session_0"; }
+
+enum Message {
+    AddProcessor(String, fn(Any) -> Any),
+    ProcessEvent(Any),
+    Start,
+    Pause,
+    Stop,
+    GetMetrics,
+}
+
+enum Option<T> {
+    Some(T),
+    None,
+}
+
+type Map<K, V> = Any
+type List<T> = Any
+type Atomic<T> = Any
+
+fn try_catch<T>(block: fn() -> T, error_handler: fn(Error) -> T) -> T {
+    return block()
+}

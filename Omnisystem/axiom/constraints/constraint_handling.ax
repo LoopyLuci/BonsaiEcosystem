@@ -1,0 +1,304 @@
+// axiom/constraints/constraint_handling.ax
+// Constraint Handling Rules (CHR) for Axiom
+
+type Constraint = String
+type ConstraintStore = List[Constraint]
+
+enum CHRRule {
+    | SimplificationRule(Constraint, Constraint, Goal)
+    | PropagationRule(Constraint, Goal)
+    | TheoryRule(Constraint, Constraint, Goal)
+}
+
+struct ConstraintHandler {
+    constraints: ConstraintStore
+    rules: List[CHRRule]
+    removed: List[Constraint]
+
+    fn new() -> ConstraintHandler {
+        return ConstraintHandler {
+            constraints: List::new(),
+            rules: List::new(),
+            removed: List::new(),
+        }
+    }
+
+    fn add_rule(rule: CHRRule) {
+        this.rules.push(rule)
+    }
+
+    fn add_constraint(constraint: Constraint) -> Result[(), String] {
+        this.constraints.push(constraint)
+        return this.process_constraint(constraint)
+    }
+
+    fn process_constraint(constraint: Constraint) -> Result[(), String] {
+        // Try to apply simplification rules
+        for rule in this.rules {
+            match rule {
+                CHRRule::SimplificationRule(head1, head2, body) => {
+                    if this.unify(constraint, head1) {
+                        // Apply simplification: remove head1, add goal
+                        this.remove_constraint(constraint)
+                        return this.process_goal(body)
+                    }
+                }
+
+                CHRRule::PropagationRule(head, body) => {
+                    if this.unify(constraint, head) {
+                        // Don't remove constraint, just add goal
+                        return this.process_goal(body)
+                    }
+                }
+
+                CHRRule::TheoryRule(head1, head2, body) => {
+                    // Try to unify with multiple constraints
+                    for other_constraint in this.constraints {
+                        if this.unify(constraint, head1) && this.unify(other_constraint, head2) {
+                            return this.process_goal(body)
+                        }
+                    }
+                }
+
+                _ => {}
+            }
+        }
+
+        return Result::Ok(())
+    }
+
+    fn process_goal(goal: Goal) -> Result[(), String] {
+        // Process a goal (could be a single constraint or conjunction)
+        return Result::Ok(())
+    }
+
+    fn remove_constraint(constraint: Constraint) {
+        // Mark constraint as removed
+        this.removed.push(constraint)
+    }
+
+    fn unify(c1: Constraint, c2: Constraint) -> Bool {
+        // Simple unification: check if constraints match
+        return c1 == c2
+    }
+
+    fn get_store() -> ConstraintStore {
+        return this.constraints.clone()
+    }
+}
+
+// Specific constraint domains
+
+struct ArithmeticConstraintSolver {
+    variables: Map[String, Interval]
+    constraints: List[ArithmeticConstraint]
+
+    fn new() -> ArithmeticConstraintSolver {
+        return ArithmeticConstraintSolver {
+            variables: Map::new(),
+            constraints: List::new(),
+        }
+    }
+
+    fn add_variable(name: String, min_val: Int, max_val: Int) {
+        this.variables[name] = Interval { min: min_val, max: max_val }
+    }
+
+    fn add_constraint(constraint: ArithmeticConstraint) -> Result[Bool, String] {
+        this.constraints.push(constraint)
+        return this.propagate()
+    }
+
+    fn propagate() -> Result[Bool, String] {
+        let mut changed = true
+
+        while changed {
+            changed = false
+
+            for constraint in this.constraints {
+                let old_domains = this.variables.clone()
+                this.apply_constraint(constraint)
+
+                if old_domains != this.variables {
+                    changed = true
+                }
+            }
+
+            // Check for infeasibility
+            for (var, interval) in this.variables {
+                if interval.min > interval.max {
+                    return Result::Err("Unsatisfiable constraint")
+                }
+            }
+        }
+
+        return Result::Ok(true)
+    }
+
+    fn apply_constraint(constraint: ArithmeticConstraint) {
+        match constraint {
+            ArithmeticConstraint::Equal(var, val) => {
+                if this.variables.contains_key(var) {
+                    this.variables[var].min = val
+                    this.variables[var].max = val
+                }
+            }
+
+            ArithmeticConstraint::GreaterThan(var1, var2) => {
+                // Update domain based on inequality
+            }
+
+            ArithmeticConstraint::LessThan(var1, var2) => {
+                // Update domain based on inequality
+            }
+
+            _ => {}
+        }
+    }
+}
+
+enum ArithmeticConstraint {
+    | Equal(String, Int)
+    | GreaterThan(String, String)
+    | LessThan(String, String)
+    | GreaterEqual(String, Int)
+    | LessEqual(String, Int)
+}
+
+struct Interval {
+    min: Int
+    max: Int
+}
+
+// Domain constraint handling
+struct DomainConstraintHandler {
+    domains: Map[String, List[Any]]
+    constraints: List[DomainConstraint]
+
+    fn new() -> DomainConstraintHandler {
+        return DomainConstraintHandler {
+            domains: Map::new(),
+            constraints: List::new(),
+        }
+    }
+
+    fn add_variable(var: String, domain: List[Any]) {
+        this.domains[var] = domain
+    }
+
+    fn add_constraint(constraint: DomainConstraint) -> Result[Bool, String] {
+        this.constraints.push(constraint)
+        return this.arc_consistency()
+    }
+
+    fn arc_consistency() -> Result[Bool, String] {
+        let mut changed = true
+
+        while changed {
+            changed = false
+
+            for constraint in this.constraints {
+                let old_size = this.count_domain_size()
+                this.enforce_arc_consistency(constraint)
+                let new_size = this.count_domain_size()
+
+                if new_size < old_size {
+                    changed = true
+                }
+
+                // Check for empty domain
+                for (var, domain) in this.domains {
+                    if domain.len() == 0 {
+                        return Result::Err("Empty domain - unsatisfiable")
+                    }
+                }
+            }
+        }
+
+        return Result::Ok(true)
+    }
+
+    fn enforce_arc_consistency(constraint: DomainConstraint) {
+        match constraint {
+            DomainConstraint::NotEqual(var1, var2) => {
+                // Remove values from domains that violate constraint
+            }
+
+            DomainConstraint::AllDifferent(vars) => {
+                // Ensure all variables have different values
+            }
+
+            _ => {}
+        }
+    }
+
+    fn count_domain_size() -> Int {
+        let mut total = 0
+        for (var, domain) in this.domains {
+            total = total + domain.len()
+        }
+        return total
+    }
+}
+
+enum DomainConstraint {
+    | NotEqual(String, String)
+    | AllDifferent(List[String])
+    | InDomain(String, List[Any])
+}
+
+// Global constraints
+struct GlobalConstraintHandler {
+    variables: List[String]
+    constraints: List[GlobalConstraint]
+
+    fn new() -> GlobalConstraintHandler {
+        return GlobalConstraintHandler {
+            variables: List::new(),
+            constraints: List::new(),
+        }
+    }
+
+    fn add_global_constraint(constraint: GlobalConstraint) -> Result[Bool, String] {
+        this.constraints.push(constraint)
+        return this.propagate_globals()
+    }
+
+    fn propagate_globals() -> Result[Bool, String] {
+        for constraint in this.constraints {
+            match constraint {
+                GlobalConstraint::Sum(vars, target) => {
+                    // Propagate sum constraint
+                }
+
+                GlobalConstraint::Element(index, array, value) => {
+                    // Propagate element constraint
+                }
+
+                GlobalConstraint::Cardinality(vars, count) => {
+                    // Propagate cardinality constraint
+                }
+
+                _ => {}
+            }
+        }
+
+        return Result::Ok(true)
+    }
+}
+
+enum GlobalConstraint {
+    | Sum(List[String], Int)
+    | Element(String, List[Any], String)
+    | Cardinality(List[String], Int)
+    | Cumulative(List[String], List[String], List[String])
+}
+
+type Goal = String
+type List<T> = Any
+type Map<K, V> = Any
+type Result<T, E> = Any
+type Any = *void
+
+fn Ok<T, E>(val: T) -> Result<T, E> { return val; }
+fn Err<T, E>(msg: String) -> Result<T, E> { return null; }

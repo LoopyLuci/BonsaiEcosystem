@@ -1,0 +1,350 @@
+// aether/sharding/sharding.ti
+// Data sharding and partitioning for distributed systems
+
+pub struct Shard<T> {
+    shard_id: i32,
+    key_range: (i64, i64),
+    data: Vec<(i64, T)>,
+    replica_id: i32,
+}
+
+pub struct ShardMap {
+    num_shards: i32,
+    key_space_size: i64,
+    shards: Vec<i32>,  // shard_id per key
+}
+
+pub enum ShardingStrategy {
+    Range,
+    Hash,
+    Consistent,
+    Directory,
+}
+
+pub fn create_shard_map(num_shards: i32, strategy: ShardingStrategy) -> ShardMap {
+    return ShardMap {
+        num_shards: num_shards,
+        key_space_size: 9223372036854775807,  // i64::MAX
+        shards: Vec::new(),
+    };
+}
+
+pub fn shard_map_get_shard<T>(map: &ShardMap, key: i64) -> i32 {
+    let shard_id = match map.shards.len() > 0 {
+        true => map.shards[(key % (map.num_shards as i64)) as usize],
+        false => (key % (map.num_shards as i64)) as i32,
+    };
+
+    return shard_id;
+}
+
+pub fn shard_insert<T: Clone>(shard: &mut Shard<T>, key: i64, value: T) ! {distributed} {
+    if key < shard.key_range.0 || key > shard.key_range.1 {
+        emit_panic("Key out of shard range");
+    }
+
+    // Check if key already exists
+    for (k, _) in &shard.data {
+        if *k == key {
+            // Update existing
+            return;
+        }
+    }
+
+    // Insert new entry
+    shard.data.push((key, value));
+}
+
+pub fn shard_get<T: Clone>(shard: &Shard<T>, key: i64) -> Option<T> ! {distributed} {
+    for (k, v) in &shard.data {
+        if *k == key {
+            return Option::Some(v.clone());
+        }
+    }
+
+    return Option::None;
+}
+
+pub fn shard_remove<T>(shard: &mut Shard<T>, key: i64) ! {distributed} {
+    let mut new_data: Vec<(i64, T)> = Vec::new();
+
+    for (k, v) in &shard.data {
+        if *k != key {
+            new_data.push((*k, v.clone()));
+        }
+    }
+
+    shard.data = new_data;
+}
+
+// Consistent hashing for dynamic scaling
+pub struct ConsistentHashRing {
+    nodes: Vec<(i32, u64)>,  // (node_id, hash)
+    virtual_nodes: i32,
+}
+
+pub fn consistent_hash_ring_create(num_nodes: i32, virtual_nodes: i32) -> ConsistentHashRing {
+    return ConsistentHashRing {
+        nodes: Vec::new(),
+        virtual_nodes: virtual_nodes,
+    };
+}
+
+pub fn consistent_hash_ring_add_node(ring: &mut ConsistentHashRing, node_id: i32) ! {distributed} {
+    for i in 0..ring.virtual_nodes {
+        let virtual_key = hash_key((node_id * ring.virtual_nodes + i) as i64);
+        ring.nodes.push((node_id, virtual_key));
+    }
+
+    // Sort by hash
+    sort_nodes(ring);
+}
+
+pub fn consistent_hash_ring_remove_node(ring: &mut ConsistentHashRing, node_id: i32) ! {distributed} {
+    let mut new_nodes: Vec<(i32, u64)> = Vec::new();
+
+    for (nid, hash) in &ring.nodes {
+        if *nid != node_id {
+            new_nodes.push((*nid, *hash));
+        }
+    }
+
+    ring.nodes = new_nodes;
+}
+
+pub fn consistent_hash_ring_lookup(ring: &ConsistentHashRing, key: i64) -> i32 ! {distributed} {
+    let key_hash = hash_key(key);
+
+    // Find first node with hash >= key_hash
+    for (node_id, hash) in &ring.nodes {
+        if *hash >= key_hash {
+            return *node_id;
+        }
+    }
+
+    // Wrap around to first node
+    if ring.nodes.len() > 0 {
+        return ring.nodes[0].0;
+    }
+
+    return 0;
+}
+
+// Rebalancing on topology changes
+pub fn calculate_rebalance_operations(
+    old_ring: &ConsistentHashRing,
+    new_ring: &ConsistentHashRing
+) -> Vec<RebalanceOp> ! {distributed} {
+    let mut ops: Vec<RebalanceOp> = Vec::new();
+
+    // For each key range, determine source and destination
+    for i in 0..1000 {
+        let key = (i as i64) * 1000;
+        let old_shard = consistent_hash_ring_lookup(old_ring, key);
+        let new_shard = consistent_hash_ring_lookup(new_ring, key);
+
+        if old_shard != new_shard {
+            ops.push(RebalanceOp {
+                key_range: (key, key + 1000),
+                source_shard: old_shard,
+                dest_shard: new_shard,
+            });
+        }
+    }
+
+    return ops;
+}
+
+pub struct RebalanceOp {
+    key_range: (i64, i64),
+    source_shard: i32,
+    dest_shard: i32,
+}
+
+pub fn execute_rebalance(op: &RebalanceOp) ! {distributed, io} {
+    // Transfer data from source shard to destination
+    asm! {
+        "call shard_transfer"
+        :
+        : "a"(op.source_shard), "d"(op.dest_shard), "c"(op.key_range.0)
+        :
+        : volatile
+    }
+}
+
+// Partition tolerance and availability trade-off
+pub enum ConsistencyModel {
+    StrongConsistency,
+    EventualConsistency,
+    CausalConsistency,
+    SessionConsistency,
+}
+
+pub struct PartitionMode {
+    model: ConsistencyModel,
+    write_quorum: i32,
+    read_quorum: i32,
+    replication_factor: i32,
+}
+
+pub fn partition_mode_create(
+    model: ConsistencyModel,
+    replication_factor: i32
+) -> PartitionMode {
+    let (w_quorum, r_quorum) = match model {
+        ConsistencyModel::StrongConsistency => (replication_factor, replication_factor),
+        ConsistencyModel::EventualConsistency => (1, 1),
+        ConsistencyModel::CausalConsistency => (replication_factor, 1),
+        ConsistencyModel::SessionConsistency => ((replication_factor / 2) + 1, 1),
+    };
+
+    return PartitionMode {
+        model: model,
+        write_quorum: w_quorum,
+        read_quorum: r_quorum,
+        replication_factor: replication_factor,
+    };
+}
+
+pub fn can_write(mode: &PartitionMode, available_replicas: i32) -> bool ! {distributed} {
+    return available_replicas >= mode.write_quorum;
+}
+
+pub fn can_read(mode: &PartitionMode, available_replicas: i32) -> bool ! {distributed} {
+    return available_replicas >= mode.read_quorum;
+}
+
+// Hot spot detection and mitigation
+pub struct ShardHotSpot {
+    shard_id: i32,
+    access_count: i64,
+    data_size_bytes: i64,
+    last_checked: i64,
+}
+
+pub fn detect_hot_spots(shards: &Vec<ShardHotSpot>, threshold: f32) -> Vec<ShardHotSpot> ! {distributed} {
+    let mean_accesses = calculate_mean_access(&shards);
+
+    let mut hot_spots: Vec<ShardHotSpot> = Vec::new();
+
+    for shard in shards {
+        let ratio = (shard.access_count as f32) / mean_accesses;
+        if ratio > threshold {
+            hot_spots.push(shard.clone());
+        }
+    }
+
+    return hot_spots;
+}
+
+pub fn split_hot_shard(shard: &Shard<i32>, split_key: i64) -> (Shard<i32>, Shard<i32>) ! {distributed} {
+    let mut left_data: Vec<(i64, i32)> = Vec::new();
+    let mut right_data: Vec<(i64, i32)> = Vec::new();
+
+    for (key, value) in &shard.data {
+        if *key < split_key {
+            left_data.push((*key, *value));
+        } else {
+            right_data.push((*key, *value));
+        }
+    }
+
+    let left_shard = Shard {
+        shard_id: shard.shard_id,
+        key_range: (shard.key_range.0, split_key - 1),
+        data: left_data,
+        replica_id: shard.replica_id,
+    };
+
+    let right_shard = Shard {
+        shard_id: shard.shard_id + 1,
+        key_range: (split_key, shard.key_range.1),
+        data: right_data,
+        replica_id: shard.replica_id,
+    };
+
+    return (left_shard, right_shard);
+}
+
+// Cross-shard transactions
+pub struct DistributedTransaction {
+    transaction_id: i64,
+    affected_shards: Vec<i32>,
+    read_set: Vec<i64>,
+    write_set: Vec<(i64, Vec<u8>)>,
+    status: String,
+}
+
+pub fn begin_distributed_transaction(shards: &Vec<i32>) -> DistributedTransaction {
+    return DistributedTransaction {
+        transaction_id: generate_txn_id(),
+        affected_shards: shards.clone(),
+        read_set: Vec::new(),
+        write_set: Vec::new(),
+        status: "pending".to_string(),
+    };
+}
+
+pub fn commit_distributed_transaction(txn: &mut DistributedTransaction) ! {distributed} {
+    // Two-phase commit
+    // Phase 1: Prepare (acquire locks)
+    // Phase 2: Commit (apply changes)
+
+    txn.status = "committed".to_string();
+}
+
+fn hash_key(key: i64) -> u64 {
+    return ((key.wrapping_mul(2654435761)) % 4294967296) as u64;
+}
+
+fn sort_nodes(ring: &mut ConsistentHashRing) ! {distributed} {
+    // Sort nodes by hash (simplified)
+}
+
+fn calculate_mean_access(shards: &Vec<ShardHotSpot>) -> f32 {
+    let mut sum: i64 = 0;
+    for shard in shards {
+        sum = sum + shard.access_count;
+    }
+    return (sum as f32) / (shards.len() as f32);
+}
+
+fn generate_txn_id() -> i64 {
+    return 0;
+}
+
+fn emit_panic(msg: &str) {
+    asm! {
+        "hlt"
+        :
+        :
+        :
+        : volatile, noreturn
+    }
+}
+
+trait Clone {
+    fn clone(&self) -> Self;
+}
+
+impl Clone for Vec<i32> {
+    fn clone(&self) -> Vec<i32> {
+        return *self;
+    }
+}
+
+impl Clone for ShardHotSpot {
+    fn clone(&self) -> ShardHotSpot {
+        return ShardHotSpot {
+            shard_id: self.shard_id,
+            access_count: self.access_count,
+            data_size_bytes: self.data_size_bytes,
+            last_checked: self.last_checked,
+        };
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}

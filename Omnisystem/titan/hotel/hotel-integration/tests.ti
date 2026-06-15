@@ -1,0 +1,3 @@
+// Tests: hotel-integration
+
+pub fn test_module() -> i64 { return 111; }

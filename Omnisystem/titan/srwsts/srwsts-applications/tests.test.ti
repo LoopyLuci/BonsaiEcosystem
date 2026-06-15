@@ -1,0 +1,5 @@
+// Tests for srwsts-applications
+
+pub fn test_module() -> i64 {
+    return 111;
+}

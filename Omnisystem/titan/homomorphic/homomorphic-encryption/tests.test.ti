@@ -1,0 +1,5 @@
+// Tests for homomorphic-encryption
+
+pub fn test_module() -> i64 {
+    return 111;
+}

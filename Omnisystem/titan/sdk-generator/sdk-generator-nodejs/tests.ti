@@ -1,0 +1,3 @@
+// Tests: sdk-generator-nodejs
+
+pub fn test_module() -> i64 { return 111; }

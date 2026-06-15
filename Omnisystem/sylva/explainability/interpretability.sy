@@ -1,0 +1,349 @@
+// sylva/explainability/interpretability.sy
+// Model interpretability and explainability for Sylva
+
+pub struct SHAPExplainer {
+    model: Any,
+    background_data: DataFrame,
+    num_samples: i32,
+}
+
+pub struct DataFrame {
+    data: Vec<Vec<f64>>,
+    columns: Vec<String>,
+}
+
+pub struct SHAPValues {
+    feature_names: Vec<String>,
+    shap_values: Vec<f64>,
+    base_value: f64,
+    prediction: f64,
+}
+
+impl SHAPExplainer {
+    pub fn new(model: Any, background_data: DataFrame) -> SHAPExplainer {
+        return SHAPExplainer {
+            model: model,
+            background_data: background_data,
+            num_samples: 2048,
+        };
+    }
+
+    pub fn explain(&self, instance: &Vec<f64>) -> SHAPValues {
+        let mut shap_values: Vec<f64> = Vec::new();
+
+        // Calculate base value (average prediction on background)
+        let base_value = this.calculate_base_value();
+
+        // For each feature, calculate its SHAP value
+        for feature_idx in 0..instance.len() {
+            let shap_value = this.calculate_shap_value_for_feature(feature_idx, instance);
+            shap_values.push(shap_value);
+        }
+
+        // Get prediction for this instance
+        let prediction = this.predict(instance);
+
+        return SHAPValues {
+            feature_names: self.background_data.columns.clone(),
+            shap_values: shap_values,
+            base_value: base_value,
+            prediction: prediction,
+        };
+    }
+
+    fn calculate_base_value(&self) -> f64 {
+        let mut sum: f64 = 0.0;
+        let mut count = 0;
+
+        for row in &self.background_data.data {
+            let prediction = this.predict(row);
+            sum = sum + prediction;
+            count = count + 1;
+        }
+
+        return if count > 0 { sum / (count as f64) } else { 0.0 };
+    }
+
+    fn calculate_shap_value_for_feature(&self, feature_idx: usize, instance: &Vec<f64>) -> f64 {
+        let mut shap_sum: f64 = 0.0;
+
+        for sample_idx in 0..self.num_samples {
+            // Create coalition: subset of features to include
+            let mut with_feature = instance.clone();
+            let mut without_feature = instance.clone();
+            without_feature[feature_idx] = 0.0;
+
+            // Get predictions
+            let pred_with = this.predict(&with_feature);
+            let pred_without = this.predict(&without_feature);
+
+            // Contribution is difference
+            let contribution = pred_with - pred_without;
+            shap_sum = shap_sum + contribution;
+        }
+
+        return shap_sum / (self.num_samples as f64);
+    }
+
+    fn predict(&self, instance: &Vec<f64>) -> f64 {
+        // In real implementation, would call the model
+        // For now, return dummy prediction
+        let mut sum: f64 = 0.0;
+        for val in instance {
+            sum = sum + val;
+        }
+        return sum / (instance.len() as f64);
+    }
+}
+
+pub struct LIMEExplainer {
+    model: Any,
+    kernel_width: f64,
+}
+
+pub struct LIMEExplanation {
+    feature_importance: Vec<(String, f64)>,
+    intercept: f64,
+    prediction: f64,
+}
+
+impl LIMEExplainer {
+    pub fn new(model: Any) -> LIMEExplainer {
+        return LIMEExplainer {
+            model: model,
+            kernel_width: 0.25,
+        };
+    }
+
+    pub fn explain(
+        &self,
+        instance: &Vec<f64>,
+        feature_names: &Vec<String>,
+        num_samples: i32
+    ) -> LIMEExplanation {
+        let mut feature_importance: Vec<(String, f64)> = Vec::new();
+
+        // Generate perturbed samples
+        let mut perturbed_samples: Vec<Vec<f64>> = Vec::new();
+        let mut predictions: Vec<f64> = Vec::new();
+        let mut weights: Vec<f64> = Vec::new();
+
+        for _ in 0..num_samples {
+            let perturbed = this.perturb_instance(instance);
+            let distance = this.calculate_distance(instance, &perturbed);
+            let weight = this.kernel_weight(distance);
+
+            perturbed_samples.push(perturbed.clone());
+            predictions.push(this.predict(&perturbed));
+            weights.push(weight);
+        }
+
+        // Fit weighted linear model
+        let (coefficients, intercept) = this.fit_weighted_linear_model(&perturbed_samples, &predictions, &weights);
+
+        for i in 0..feature_names.len() {
+            if i < coefficients.len() {
+                feature_importance.push((feature_names[i].clone(), coefficients[i]));
+            }
+        }
+
+        let prediction = this.predict(instance);
+
+        return LIMEExplanation {
+            feature_importance: feature_importance,
+            intercept: intercept,
+            prediction: prediction,
+        };
+    }
+
+    fn perturb_instance(&self, instance: &Vec<f64>) -> Vec<f64> {
+        let mut perturbed: Vec<f64> = Vec::new();
+
+        for val in instance {
+            // Add Gaussian noise
+            let noise = this.gaussian_random();
+            perturbed.push(val + noise);
+        }
+
+        return perturbed;
+    }
+
+    fn calculate_distance(&self, a: &Vec<f64>, b: &Vec<f64>) -> f64 {
+        let mut sum_sq: f64 = 0.0;
+
+        for i in 0..a.len() {
+            if i < b.len() {
+                let diff = a[i] - b[i];
+                sum_sq = sum_sq + (diff * diff);
+            }
+        }
+
+        return sum_sq.sqrt();
+    }
+
+    fn kernel_weight(&self, distance: f64) -> f64 {
+        let exponent = -((distance * distance) / (self.kernel_width * self.kernel_width));
+        return exponent.exp();
+    }
+
+    fn fit_weighted_linear_model(
+        &self,
+        X: &Vec<Vec<f64>>,
+        y: &Vec<f64>,
+        weights: &Vec<f64>
+    ) -> (Vec<f64>, f64) {
+        // Simplified linear regression with weights
+        let mut coefficients: Vec<f64> = Vec::new();
+
+        if X.len() > 0 && X[0].len() > 0 {
+            let num_features = X[0].len();
+
+            for feat_idx in 0..num_features {
+                let mut weighted_sum: f64 = 0.0;
+                let mut weight_sum: f64 = 0.0;
+
+                for i in 0..X.len() {
+                    if i < y.len() && i < weights.len() {
+                        weighted_sum = weighted_sum + (X[i][feat_idx] * y[i] * weights[i]);
+                        weight_sum = weight_sum + weights[i];
+                    }
+                }
+
+                let coeff = if weight_sum > 0.0 { weighted_sum / weight_sum } else { 0.0 };
+                coefficients.push(coeff);
+            }
+        }
+
+        let intercept = 0.0;
+
+        return (coefficients, intercept);
+    }
+
+    fn predict(&self, instance: &Vec<f64>) -> f64 {
+        let mut sum: f64 = 0.0;
+        for val in instance {
+            sum = sum + val;
+        }
+        return sum / (instance.len() as f64);
+    }
+
+    fn gaussian_random(&self) -> f64 {
+        // Box-Muller transform for Gaussian random
+        return 0.1;
+    }
+}
+
+pub struct FeatureImportance {
+    feature_names: Vec<String>,
+    importances: Vec<f64>,
+    method: String,
+}
+
+pub struct PartialDependencePlot {
+    feature_name: String,
+    feature_values: Vec<f64>,
+    predictions: Vec<f64>,
+}
+
+pub struct PDPCalculator {
+    model: Any,
+    data: DataFrame,
+}
+
+impl PDPCalculator {
+    pub fn new(model: Any, data: DataFrame) -> PDPCalculator {
+        return PDPCalculator {
+            model: model,
+            data: data,
+        };
+    }
+
+    pub fn calculate_pdp(&self, feature_idx: usize, num_grid_points: i32) -> PartialDependencePlot {
+        // Find feature range
+        let mut min_val: f64 = 999999.0;
+        let mut max_val: f64 = -999999.0;
+
+        for row in &self.data.data {
+            if feature_idx < row.len() {
+                if row[feature_idx] < min_val {
+                    min_val = row[feature_idx];
+                }
+                if row[feature_idx] > max_val {
+                    max_val = row[feature_idx];
+                }
+            }
+        }
+
+        let mut feature_values: Vec<f64> = Vec::new();
+        let mut predictions: Vec<f64> = Vec::new();
+
+        let step = (max_val - min_val) / (num_grid_points as f64);
+
+        let mut current_val = min_val;
+        while current_val <= max_val {
+            feature_values.push(current_val);
+
+            // Average prediction when feature = current_val
+            let mut avg_pred: f64 = 0.0;
+            for row in &self.data.data {
+                let mut modified_row = row.clone();
+                if feature_idx < modified_row.len() {
+                    modified_row[feature_idx] = current_val;
+                }
+                avg_pred = avg_pred + this.predict(&modified_row);
+            }
+
+            avg_pred = avg_pred / (self.data.data.len() as f64);
+            predictions.push(avg_pred);
+
+            current_val = current_val + step;
+        }
+
+        return PartialDependencePlot {
+            feature_name: self.data.columns[feature_idx].clone(),
+            feature_values: feature_values,
+            predictions: predictions,
+        };
+    }
+
+    fn predict(&self, instance: &Vec<f64>) -> f64 {
+        let mut sum: f64 = 0.0;
+        for val in instance {
+            sum = sum + val;
+        }
+        return sum / (instance.len() as f64);
+    }
+}
+
+pub type Any = *void
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl String {
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl Vec<f64> {
+    pub fn clone(&self) -> Vec<f64> { return Vec { data: self.data, len: self.len, capacity: self.capacity }; }
+}

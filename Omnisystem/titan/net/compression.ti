@@ -1,0 +1,403 @@
+// titan/net/compression.ti
+// Compression and decompression for Titan networks
+
+pub struct CompressionCodec {
+    algorithm: CompressionAlgorithm,
+    level: u8,
+}
+
+pub enum CompressionAlgorithm {
+    Deflate,
+    Gzip,
+    Brotli,
+    Zstd,
+    Lz4,
+}
+
+pub struct Deflate {
+    state: [u32; 256],
+    crc: u32,
+    window: [u8; 32768],
+    window_pos: usize,
+}
+
+pub fn deflate_init() -> Deflate {
+    return Deflate {
+        state: [0; 256],
+        crc: 0xFFFFFFFF,
+        window: [0; 32768],
+        window_pos: 0,
+    };
+}
+
+pub fn deflate_compress(data: &[u8]) -> Vec<u8> ! {compression} {
+    let mut output: Vec<u8> = Vec::new();
+    let mut ctx = deflate_init();
+
+    for byte in data {
+        let (code, len) = find_longest_match(&ctx.window, &ctx.window_pos, byte);
+
+        if len > 3 {
+            output.push((code >> 8) as u8);
+            output.push(code as u8);
+            output.push(len as u8);
+        } else {
+            output.push(*byte);
+        }
+
+        sliding_window_insert(&mut ctx.window, &mut ctx.window_pos, *byte);
+    }
+
+    return output;
+}
+
+pub fn deflate_decompress(data: &[u8]) -> Vec<u8> ! {compression} {
+    let mut output: Vec<u8> = Vec::new();
+    let mut pos = 0;
+
+    while pos < data.len() {
+        let byte = data[pos];
+
+        if byte == 0xFF {
+            if pos + 2 < data.len() {
+                let code = ((data[pos + 1] as u16) << 8) | (data[pos + 2] as u16);
+                let len = data[pos + 3] as usize;
+                let distance = ((code >> 8) as usize) + ((code & 0xFF) as usize * 256);
+
+                for i in 0..len {
+                    if distance < output.len() {
+                        let src_idx = output.len() - distance;
+                        output.push(output[src_idx]);
+                    }
+                }
+
+                pos = pos + 4;
+            } else {
+                output.push(byte);
+                pos = pos + 1;
+            }
+        } else {
+            output.push(byte);
+            pos = pos + 1;
+        }
+    }
+
+    return output;
+}
+
+pub struct Gzip {
+    deflate: Deflate,
+    header: [u8; 10],
+    trailer: [u8; 8],
+}
+
+pub fn gzip_compress(data: &[u8]) -> Vec<u8> ! {compression} {
+    let mut output: Vec<u8> = Vec::new();
+
+    output.push(0x1F);
+    output.push(0x8B);
+    output.push(0x08);
+    output.push(0x00);
+    output.push(0x00);
+    output.push(0x00);
+    output.push(0x00);
+    output.push(0x00);
+    output.push(0x00);
+    output.push(0xFF);
+
+    let compressed = deflate_compress(data);
+    for byte in &compressed {
+        output.push(*byte);
+    }
+
+    let crc32 = compute_crc32(data);
+    output.push((crc32 & 0xFF) as u8);
+    output.push(((crc32 >> 8) & 0xFF) as u8);
+    output.push(((crc32 >> 16) & 0xFF) as u8);
+    output.push(((crc32 >> 24) & 0xFF) as u8);
+
+    let isize = data.len() as u32;
+    output.push((isize & 0xFF) as u8);
+    output.push(((isize >> 8) & 0xFF) as u8);
+    output.push(((isize >> 16) & 0xFF) as u8);
+    output.push(((isize >> 24) & 0xFF) as u8);
+
+    return output;
+}
+
+pub fn gzip_decompress(data: &[u8]) -> Vec<u8> ! {compression} {
+    if data.len() < 10 {
+        return Vec::new();
+    }
+
+    if data[0] != 0x1F || data[1] != 0x8B {
+        return Vec::new();
+    }
+
+    let compressed_start = 10;
+    let compressed_end = data.len() - 8;
+
+    return deflate_decompress(&data[compressed_start..compressed_end]);
+}
+
+pub struct Brotli {
+    window: [u8; 262144],
+    window_pos: usize,
+}
+
+pub fn brotli_compress(data: &[u8], quality: u8) -> Vec<u8> ! {compression} {
+    let mut output: Vec<u8> = Vec::new();
+    let mut ctx = Brotli {
+        window: [0; 262144],
+        window_pos: 0,
+    };
+
+    for chunk in data.chunks(8192) {
+        let mut block: Vec<u8> = Vec::new();
+
+        for byte in chunk {
+            let (code, len) = find_longest_match(&ctx.window, &ctx.window_pos, byte);
+
+            if len > 4 {
+                block.push(0xFF);
+                block.push((code >> 8) as u8);
+                block.push(code as u8);
+                block.push(len as u8);
+            } else {
+                block.push(*byte);
+            }
+
+            sliding_window_insert(&mut ctx.window, &mut ctx.window_pos, *byte);
+        }
+
+        output.push((block.len() >> 8) as u8);
+        output.push(block.len() as u8);
+
+        for byte in &block {
+            output.push(*byte);
+        }
+    }
+
+    return output;
+}
+
+pub fn brotli_decompress(data: &[u8]) -> Vec<u8> ! {compression} {
+    let mut output: Vec<u8> = Vec::new();
+    let mut pos = 0;
+
+    while pos + 2 < data.len() {
+        let block_len = ((data[pos] as usize) << 8) | (data[pos + 1] as usize);
+        pos = pos + 2;
+
+        if pos + block_len > data.len() {
+            break;
+        }
+
+        let block_end = pos + block_len;
+
+        while pos < block_end {
+            let byte = data[pos];
+
+            if byte == 0xFF && pos + 3 < block_end {
+                let code = ((data[pos + 1] as u16) << 8) | (data[pos + 2] as u16);
+                let len = data[pos + 3] as usize;
+                let distance = (code as usize) + 1;
+
+                for i in 0..len {
+                    if distance <= output.len() {
+                        let src_idx = output.len() - distance;
+                        output.push(output[src_idx]);
+                    }
+                }
+
+                pos = pos + 4;
+            } else {
+                output.push(byte);
+                pos = pos + 1;
+            }
+        }
+    }
+
+    return output;
+}
+
+pub struct Zstd {
+    dict: Vec<u8>,
+    level: u8,
+}
+
+pub fn zstd_compress(data: &[u8], level: u8) -> Vec<u8> ! {compression} {
+    let mut output: Vec<u8> = Vec::new();
+
+    output.push(0x28);
+    output.push(0xB5);
+    output.push(0x2F);
+    output.push(0xFD);
+
+    let frame_header: u8 = 0x60 | (level & 0x0F);
+    output.push(frame_header);
+
+    let compressed = deflate_compress(data);
+    for byte in &compressed {
+        output.push(*byte);
+    }
+
+    return output;
+}
+
+pub fn zstd_decompress(data: &[u8]) -> Vec<u8> ! {compression} {
+    if data.len() < 4 {
+        return Vec::new();
+    }
+
+    if data[0] != 0x28 || data[1] != 0xB5 || data[2] != 0x2F || data[3] != 0xFD {
+        return Vec::new();
+    }
+
+    return deflate_decompress(&data[5..]);
+}
+
+pub struct Lz4 {
+    dict: Vec<u8>,
+}
+
+pub fn lz4_compress(data: &[u8]) -> Vec<u8> ! {compression} {
+    let mut output: Vec<u8> = Vec::new();
+
+    output.push(0x04);
+    output.push(0x22);
+    output.push(0x4D);
+    output.push(0x18);
+
+    let mut pos = 0;
+
+    while pos < data.len() {
+        let chunk_len = if data.len() - pos > 65536 { 65536 } else { data.len() - pos };
+
+        let compressed = compress_chunk(&data[pos..pos + chunk_len]);
+
+        output.push((chunk_len >> 8) as u8);
+        output.push(chunk_len as u8);
+        output.push(0xB8);
+
+        output.push((compressed.len() >> 8) as u8);
+        output.push(compressed.len() as u8);
+
+        for byte in &compressed {
+            output.push(*byte);
+        }
+
+        pos = pos + chunk_len;
+    }
+
+    return output;
+}
+
+pub fn lz4_decompress(data: &[u8]) -> Vec<u8> ! {compression} {
+    if data.len() < 4 {
+        return Vec::new();
+    }
+
+    let mut output: Vec<u8> = Vec::new();
+    let mut pos = 4;
+
+    while pos + 5 < data.len() {
+        let chunk_len = ((data[pos] as usize) << 8) | (data[pos + 1] as usize);
+        let compressed_len = ((data[pos + 3] as usize) << 8) | (data[pos + 4] as usize);
+        pos = pos + 5;
+
+        if pos + compressed_len > data.len() {
+            break;
+        }
+
+        let decompressed = decompress_chunk(&data[pos..pos + compressed_len]);
+
+        for byte in &decompressed {
+            output.push(*byte);
+        }
+
+        pos = pos + compressed_len;
+    }
+
+    return output;
+}
+
+fn find_longest_match(window: &[u8], pos: &usize, byte: &u8) -> (u16, u8) {
+    let mut best_len: u8 = 0;
+    let mut best_dist: u16 = 0;
+
+    let max_dist = if *pos > 32768 { 32768 } else { *pos };
+
+    for dist in 1..max_dist {
+        let cmp_pos = (*pos - dist) % 32768;
+
+        if window[cmp_pos] == *byte {
+            let mut len = 1;
+
+            while len < 258 && (cmp_pos + len) < *pos && len < 258 {
+                if window[(cmp_pos + len) % 32768] != window[(*pos + len) % 32768] {
+                    break;
+                }
+                len = len + 1;
+            }
+
+            if len as u8 > best_len {
+                best_len = len as u8;
+                best_dist = dist as u16;
+            }
+        }
+    }
+
+    return (best_dist, best_len);
+}
+
+fn sliding_window_insert(window: &mut [u8], pos: &mut usize, byte: u8) {
+    window[*pos % 32768] = byte;
+    *pos = *pos + 1;
+}
+
+fn compress_chunk(data: &[u8]) -> Vec<u8> {
+    let mut output: Vec<u8> = Vec::new();
+    for byte in data {
+        output.push(*byte);
+    }
+    return output;
+}
+
+fn decompress_chunk(data: &[u8]) -> Vec<u8> {
+    let mut output: Vec<u8> = Vec::new();
+    for byte in data {
+        output.push(*byte);
+    }
+    return output;
+}
+
+fn compute_crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFFFFFF;
+
+    for byte in data {
+        let index = ((crc ^ (*byte as u32)) & 0xFF) as usize;
+        crc = CRC32_TABLE[index] ^ (crc >> 8);
+    }
+
+    return crc ^ 0xFFFFFFFF;
+}
+
+static CRC32_TABLE: [u32; 256] = [
+    0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
+    // ... remaining CRC table truncated
+];
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+}

@@ -1,0 +1,463 @@
+// aether/stdlib/workflow.ae
+// Workflow orchestration and execution in Aether
+
+type WorkflowId = String
+type TaskId = String
+type ExecutionId = String
+
+enum TaskStatus {
+    | Pending
+    | Running
+    | Completed
+    | Failed
+    | Retrying
+    | Skipped
+    | Cancelled
+}
+
+enum WorkflowStatus {
+    | Idle
+    | Running
+    | Paused
+    | Completed
+    | Failed
+    | Cancelled
+}
+
+type TaskDef = {
+    id: TaskId
+    name: String
+    handler: fn(TaskContext) -> Result[Any]
+    timeout: Int
+    max_retries: Int
+    retry_delay: Int
+    dependencies: List[TaskId]
+    compensation: Option[fn(TaskContext) -> Result[Any]]
+}
+
+type WorkflowDef = {
+    id: WorkflowId
+    name: String
+    version: String
+    tasks: List[TaskDef]
+    event_handlers: Map[String, fn(WorkflowEvent) -> ()]
+    timeout: Int
+}
+
+type TaskContext = {
+    task_id: TaskId
+    execution_id: ExecutionId
+    workflow_id: WorkflowId
+    input: Map[String, Any]
+    output: Map[String, Any]
+    state: Map[String, Any]
+    attempt: Int
+}
+
+type WorkflowEvent = {
+    event_type: String
+    timestamp: Int
+    workflow_id: WorkflowId
+    execution_id: ExecutionId
+    task_id: Option[TaskId]
+    data: Map[String, Any]
+}
+
+type WorkflowExecution = {
+    execution_id: ExecutionId
+    workflow_id: WorkflowId
+    status: WorkflowStatus
+    start_time: Int
+    end_time: Option[Int]
+    tasks: Map[TaskId, TaskExecution]
+    results: Map[String, Any]
+    errors: List[String]
+}
+
+type TaskExecution = {
+    task_id: TaskId
+    status: TaskStatus
+    start_time: Int
+    end_time: Option[Int]
+    attempts: Int
+    result: Option[Any]
+    error: Option[String]
+    duration_ms: Int
+}
+
+struct WorkflowEngine {
+    definitions: Map[WorkflowId, WorkflowDef]
+    executions: Map[ExecutionId, WorkflowExecution]
+    event_queue: List[WorkflowEvent]
+
+    fn new() -> WorkflowEngine {
+        return WorkflowEngine {
+            definitions: Map::new(),
+            executions: Map::new(),
+            event_queue: List::new(),
+        }
+    }
+
+    fn register_workflow(def: WorkflowDef) {
+        this.definitions[def.id] = def
+    }
+
+    fn start_execution(workflow_id: WorkflowId, input: Map[String, Any]) -> ExecutionId {
+        let execution_id = generate_execution_id()
+
+        let execution = WorkflowExecution {
+            execution_id: execution_id,
+            workflow_id: workflow_id,
+            status: WorkflowStatus::Running,
+            start_time: now_ms(),
+            end_time: None,
+            tasks: Map::new(),
+            results: Map::new(),
+            errors: List::new(),
+        }
+
+        this.executions[execution_id] = execution
+
+        -- Emit started event
+        let event = WorkflowEvent {
+            event_type: "workflow_started",
+            timestamp: now_ms(),
+            workflow_id: workflow_id,
+            execution_id: execution_id,
+            task_id: None,
+            data: input,
+        }
+
+        this.emit_event(event)
+
+        return execution_id
+    }
+
+    fn execute_workflow(execution_id: ExecutionId) -> Result[Map[String, Any]] {
+        let execution = this.executions.get(execution_id)
+
+        if execution.is_none() {
+            return Result::Err("Execution not found")
+        }
+
+        let exec = execution.unwrap()
+        let workflow = this.definitions.get(exec.workflow_id)
+
+        if workflow.is_none() {
+            return Result::Err("Workflow not found")
+        }
+
+        let wf = workflow.unwrap()
+
+        -- Build dependency graph
+        let graph = build_dependency_graph(wf.tasks)
+
+        -- Execute tasks in topological order
+        let mut task_order = topological_sort(graph)
+
+        for task_id in task_order {
+            let task = find_task(wf.tasks, task_id)
+
+            if task.is_none() {
+                continue
+            }
+
+            let t = task.unwrap()
+
+            -- Check if all dependencies are complete
+            let deps_ready = check_dependencies_ready(exec.tasks, t.dependencies)
+
+            if !deps_ready {
+                this.executions[execution_id].tasks[t.id] = TaskExecution {
+                    task_id: t.id,
+                    status: TaskStatus::Skipped,
+                    start_time: now_ms(),
+                    end_time: Some(now_ms()),
+                    attempts: 0,
+                    result: None,
+                    error: None,
+                    duration_ms: 0,
+                }
+
+                continue
+            }
+
+            -- Execute task with retries
+            let result = this.execute_task_with_retries(execution_id, t)
+
+            match result {
+                Result::Ok(output) => {
+                    this.executions[execution_id].results[t.id] = output
+                    this.executions[execution_id].tasks[t.id].status = TaskStatus::Completed
+                    this.executions[execution_id].tasks[t.id].result = Some(output)
+                }
+                Result::Err(e) => {
+                    this.executions[execution_id].errors.push(e)
+                    this.executions[execution_id].tasks[t.id].status = TaskStatus::Failed
+                    this.executions[execution_id].tasks[t.id].error = Some(e)
+
+                    -- Run compensation if available
+                    if t.compensation.is_some() {
+                        this.run_compensation(execution_id, t)
+                    }
+
+                    return Result::Err(e)
+                }
+            }
+        }
+
+        this.executions[execution_id].status = WorkflowStatus::Completed
+        this.executions[execution_id].end_time = Some(now_ms())
+
+        return Result::Ok(this.executions[execution_id].results)
+    }
+
+    fn execute_task_with_retries(
+        execution_id: ExecutionId,
+        task: TaskDef
+    ) -> Result[Any] {
+        let mut attempt = 0
+
+        loop {
+            attempt = attempt + 1
+
+            let ctx = TaskContext {
+                task_id: task.id,
+                execution_id: execution_id,
+                workflow_id: this.executions[execution_id].workflow_id,
+                input: Map::new(),
+                output: Map::new(),
+                state: Map::new(),
+                attempt: attempt,
+            }
+
+            -- Emit task started event
+            let event = WorkflowEvent {
+                event_type: "task_started",
+                timestamp: now_ms(),
+                workflow_id: ctx.workflow_id,
+                execution_id: execution_id,
+                task_id: Some(task.id),
+                data: Map::new(),
+            }
+            this.emit_event(event)
+
+            -- Execute task
+            let result = (task.handler)(ctx)
+
+            match result {
+                Result::Ok(output) => {
+                    -- Emit task completed event
+                    let event = WorkflowEvent {
+                        event_type: "task_completed",
+                        timestamp: now_ms(),
+                        workflow_id: ctx.workflow_id,
+                        execution_id: execution_id,
+                        task_id: Some(task.id),
+                        data: Map::new(),
+                    }
+                    this.emit_event(event)
+
+                    return Result::Ok(output)
+                }
+                Result::Err(e) => {
+                    if attempt < task.max_retries {
+                        -- Emit retry event
+                        let event = WorkflowEvent {
+                            event_type: "task_retrying",
+                            timestamp: now_ms(),
+                            workflow_id: ctx.workflow_id,
+                            execution_id: execution_id,
+                            task_id: Some(task.id),
+                            data: Map::new(),
+                        }
+                        this.emit_event(event)
+
+                        sleep(task.retry_delay)
+                    } else {
+                        -- Emit failed event
+                        let event = WorkflowEvent {
+                            event_type: "task_failed",
+                            timestamp: now_ms(),
+                            workflow_id: ctx.workflow_id,
+                            execution_id: execution_id,
+                            task_id: Some(task.id),
+                            data: Map::new(),
+                        }
+                        this.emit_event(event)
+
+                        return Result::Err(e)
+                    }
+                }
+            }
+        }
+    }
+
+    fn run_compensation(execution_id: ExecutionId, task: TaskDef) {
+        if task.compensation.is_none() {
+            return
+        }
+
+        let comp = task.compensation.unwrap()
+
+        let ctx = TaskContext {
+            task_id: task.id,
+            execution_id: execution_id,
+            workflow_id: this.executions[execution_id].workflow_id,
+            input: Map::new(),
+            output: Map::new(),
+            state: Map::new(),
+            attempt: 1,
+        }
+
+        let result = (comp)(ctx)
+
+        -- Emit compensation event
+        let event = WorkflowEvent {
+            event_type: "compensation_executed",
+            timestamp: now_ms(),
+            workflow_id: ctx.workflow_id,
+            execution_id: execution_id,
+            task_id: Some(task.id),
+            data: Map::new(),
+        }
+        this.emit_event(event)
+    }
+
+    fn emit_event(event: WorkflowEvent) {
+        this.event_queue.push(event)
+
+        -- Find registered handlers
+        let workflow = this.definitions.get(event.workflow_id)
+        if workflow.is_some() {
+            let wf = workflow.unwrap()
+            let handler = wf.event_handlers.get(event.event_type)
+
+            if handler.is_some() {
+                let h = handler.unwrap()
+                h(event)
+            }
+        }
+    }
+
+    fn pause_execution(execution_id: ExecutionId) {
+        if this.executions.get(execution_id).is_some() {
+            this.executions[execution_id].status = WorkflowStatus::Paused
+        }
+    }
+
+    fn resume_execution(execution_id: ExecutionId) -> Result[Map[String, Any]] {
+        if this.executions.get(execution_id).is_some() {
+            this.executions[execution_id].status = WorkflowStatus::Running
+            return this.execute_workflow(execution_id)
+        }
+
+        return Result::Err("Execution not found")
+    }
+
+    fn cancel_execution(execution_id: ExecutionId) {
+        if this.executions.get(execution_id).is_some() {
+            this.executions[execution_id].status = WorkflowStatus::Cancelled
+        }
+    }
+
+    fn get_execution(execution_id: ExecutionId) -> Option[WorkflowExecution] {
+        return this.executions.get(execution_id)
+    }
+}
+
+-- Helper functions
+fn build_dependency_graph(tasks: List[TaskDef]) -> Map[TaskId, List[TaskId]] {
+    let mut graph = Map::new()
+
+    for task in tasks {
+        graph[task.id] = task.dependencies
+    }
+
+    return graph
+}
+
+fn topological_sort(graph: Map[TaskId, List[TaskId]]) -> List[TaskId] {
+    let mut result = List::new()
+    let mut visited = Map::new()
+
+    for task_id in graph.keys() {
+        if !visited.get(task_id).is_some() {
+            topological_sort_visit(task_id, graph, visited, result)
+        }
+    }
+
+    return result
+}
+
+fn topological_sort_visit(
+    task_id: TaskId,
+    graph: Map[TaskId, List[TaskId]],
+    visited: Map[TaskId, Bool],
+    result: List[TaskId]
+) {
+    visited[task_id] = true
+
+    let deps = graph.get(task_id)
+    if deps.is_some() {
+        for dep in deps.unwrap() {
+            if !visited.get(dep).is_some() {
+                topological_sort_visit(dep, graph, visited, result)
+            }
+        }
+    }
+
+    result.push(task_id)
+}
+
+fn find_task(tasks: List[TaskDef], id: TaskId) -> Option[TaskDef] {
+    for task in tasks {
+        if task.id == id {
+            return Some(task)
+        }
+    }
+
+    return None
+}
+
+fn check_dependencies_ready(executions: Map[TaskId, TaskExecution], deps: List[TaskId]) -> Bool {
+    for dep_id in deps {
+        let exec = executions.get(dep_id)
+
+        if exec.is_none() {
+            return false
+        }
+
+        let e = exec.unwrap()
+
+        if e.status != TaskStatus::Completed {
+            return false
+        }
+    }
+
+    return true
+}
+
+fn generate_execution_id() -> ExecutionId {
+    return "exec-" + random_string(16)
+}
+
+fn now_ms() -> Int {
+    return 0  -- Placeholder
+}
+
+fn sleep(ms: Int) {
+    -- Platform specific sleep
+}
+
+fn random_string(len: Int) -> String {
+    return ""  -- Placeholder
+}
+
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Result<T> = Any
+type Any = Any
+
+fn random_string(len: Int) -> String { return ""; }

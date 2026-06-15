@@ -1,0 +1,435 @@
+// titan/concurrency/threadpool.ti
+// Thread pool implementation for task parallelism in Titan
+
+pub struct ThreadPool {
+    workers: Vec<Worker>,
+    task_queue: WorkQueue,
+    num_threads: i32,
+    shutdown: Atomic<bool>,
+}
+
+pub struct Worker {
+    thread_id: i32,
+    state: Atomic<WorkerState>,
+    current_task: Atomic<u64>,
+}
+
+pub enum WorkerState {
+    Idle,
+    Running,
+    Blocked,
+    Shutdown,
+}
+
+pub struct WorkQueue {
+    tasks: Vec<Task>,
+    front: Atomic<usize>,
+    rear: Atomic<usize>,
+    size: Atomic<usize>,
+    capacity: usize,
+    lock: Mutex<i32>,
+}
+
+pub struct Task {
+    fn_ptr: u64,
+    arg_ptr: u64,
+    arg_size: i32,
+    return_size: i32,
+}
+
+pub fn threadpool_create(num_threads: i32) -> ThreadPool ! {concurrency} {
+    let queue = WorkQueue {
+        tasks: Vec::with_capacity(1000),
+        front: Atomic::new(0),
+        rear: Atomic::new(0),
+        size: Atomic::new(0),
+        capacity: 1000,
+        lock: Mutex::new(0),
+    };
+
+    let mut workers: Vec<Worker> = Vec::new();
+
+    for i in 0..num_threads {
+        let worker = Worker {
+            thread_id: i,
+            state: Atomic::new(WorkerState::Idle),
+            current_task: Atomic::new(0),
+        };
+
+        workers.push(worker);
+
+        // Spawn worker thread
+        spawn_worker_thread(i, &queue);
+    }
+
+    return ThreadPool {
+        workers: workers,
+        task_queue: queue,
+        num_threads: num_threads,
+        shutdown: Atomic::new(false),
+    };
+}
+
+pub fn threadpool_submit(
+    pool: &ThreadPool,
+    fn_ptr: u64,
+    arg_ptr: u64,
+    arg_size: i32
+) -> bool ! {concurrency} {
+    if pool.shutdown.load(Acquire) {
+        return false;
+    }
+
+    let task = Task {
+        fn_ptr: fn_ptr,
+        arg_ptr: arg_ptr,
+        arg_size: arg_size,
+        return_size: 0,
+    };
+
+    // Acquire lock and add to queue
+    {
+        let _lock = pool.task_queue.lock.lock();
+
+        if pool.task_queue.size.load(Acquire) >= pool.task_queue.capacity {
+            return false;  // Queue full
+        }
+
+        let rear = pool.task_queue.rear.load(Acquire);
+        pool.task_queue.tasks[rear] = task;
+
+        let new_rear = (rear + 1) % pool.task_queue.capacity;
+        pool.task_queue.rear.store(new_rear, Release);
+        pool.task_queue.size.fetch_add(1, Release);
+    }
+
+    // Wake idle worker
+    wake_idle_worker(pool);
+
+    return true;
+}
+
+pub fn threadpool_shutdown(pool: &mut ThreadPool) ! {concurrency} {
+    pool.shutdown.store(true, Release);
+
+    // Wait for all workers to finish
+    let mut all_done = false;
+    while !all_done {
+        all_done = true;
+        for worker in &pool.workers {
+            let state = worker.state.load(Acquire);
+            if state != WorkerState::Idle {
+                all_done = false;
+            }
+        }
+
+        if !all_done {
+            // Yield and retry
+            asm! { "pause" : : : : }
+        }
+    }
+
+    // Mark workers as shutdown
+    for worker in &mut pool.workers {
+        worker.state.store(WorkerState::Shutdown, Release);
+    }
+}
+
+pub fn threadpool_wait_all(pool: &ThreadPool) ! {concurrency} {
+    // Wait for queue to be empty and all workers idle
+    loop {
+        let size = pool.task_queue.size.load(Acquire);
+        let mut all_idle = true;
+
+        for worker in &pool.workers {
+            let state = worker.state.load(Acquire);
+            if state == WorkerState::Running {
+                all_idle = false;
+            }
+        }
+
+        if size == 0 && all_idle {
+            return;
+        }
+
+        asm! { "pause" : : : : }
+    }
+}
+
+pub fn threadpool_stats(pool: &ThreadPool) -> ThreadPoolStats {
+    let queue_size = pool.task_queue.size.load(Acquire);
+
+    let mut num_idle: i32 = 0;
+    let mut num_running: i32 = 0;
+
+    for worker in &pool.workers {
+        match worker.state.load(Acquire) {
+            WorkerState::Idle => num_idle = num_idle + 1,
+            WorkerState::Running => num_running = num_running + 1,
+            _ => {}
+        }
+    }
+
+    return ThreadPoolStats {
+        num_threads: pool.num_threads,
+        num_idle: num_idle,
+        num_running: num_running,
+        queue_size: queue_size as i32,
+    };
+}
+
+pub struct ThreadPoolStats {
+    num_threads: i32,
+    num_idle: i32,
+    num_running: i32,
+    queue_size: i32,
+}
+
+// Work-stealing scheduler
+pub struct WorkStealingPool {
+    workers: Vec<WorkStealingWorker>,
+    num_workers: i32,
+}
+
+pub struct WorkStealingWorker {
+    worker_id: i32,
+    local_queue: Vec<Task>,
+    queue_lock: Mutex<i32>,
+}
+
+pub fn work_stealing_pool_create(num_workers: i32) -> WorkStealingPool ! {concurrency} {
+    let mut workers: Vec<WorkStealingWorker> = Vec::new();
+
+    for i in 0..num_workers {
+        let worker = WorkStealingWorker {
+            worker_id: i,
+            local_queue: Vec::new(),
+            queue_lock: Mutex::new(0),
+        };
+
+        workers.push(worker);
+        spawn_work_stealing_thread(i, num_workers);
+    }
+
+    return WorkStealingPool {
+        workers: workers,
+        num_workers: num_workers,
+    };
+}
+
+pub fn work_stealing_submit(pool: &WorkStealingPool, worker_id: i32, task: Task) ! {concurrency} {
+    if worker_id >= 0 && worker_id < pool.num_workers {
+        let worker = &pool.workers[worker_id as usize];
+
+        {
+            let _lock = worker.queue_lock.lock();
+            worker.local_queue.push(task);
+        }
+    }
+}
+
+pub fn work_stealing_try_steal(
+    pool: &WorkStealingPool,
+    victim_id: i32
+) -> Option<Task> ! {concurrency} {
+    if victim_id >= 0 && victim_id < pool.num_workers {
+        let victim = &pool.workers[victim_id as usize];
+
+        {
+            let _lock = victim.queue_lock.lock();
+            if victim.local_queue.len() > 0 {
+                return Option::Some(victim.local_queue.pop());
+            }
+        }
+    }
+
+    return Option::None;
+}
+
+// Parallel for loop
+pub fn parallel_for(
+    start: i32,
+    end: i32,
+    fn_ptr: fn(i32) -> (),
+    pool: &ThreadPool
+) ! {concurrency} {
+    let num_threads = pool.num_threads;
+    let range_size = (end - start + num_threads - 1) / num_threads;
+
+    for i in 0..num_threads {
+        let chunk_start = start + (i * range_size);
+        let chunk_end = min(chunk_start + range_size, end);
+
+        if chunk_start < end {
+            // Create closure that captures fn_ptr and range
+            let closure_ptr = create_closure_for_range(fn_ptr, chunk_start, chunk_end);
+            threadpool_submit(pool, closure_ptr, 0, 0);
+        }
+    }
+
+    threadpool_wait_all(pool);
+}
+
+// Parallel reduce
+pub fn parallel_reduce<T>(
+    data: &Vec<T>,
+    identity: T,
+    op: fn(T, T) -> T,
+    pool: &ThreadPool
+) -> T ! {concurrency} {
+    // TODO: Implement parallel reduction
+    return identity;
+}
+
+// Barrier synchronization
+pub struct Barrier {
+    count: i32,
+    arrived: Atomic<i32>,
+    generation: Atomic<i32>,
+    cv: CondVar,
+}
+
+pub fn barrier_create(count: i32) -> Barrier ! {concurrency} {
+    return Barrier {
+        count: count,
+        arrived: Atomic::new(0),
+        generation: Atomic::new(0),
+        cv: CondVar::new(),
+    };
+}
+
+pub fn barrier_wait(barrier: &Barrier) ! {concurrency} {
+    let gen = barrier.generation.load(Acquire);
+    let arrived = barrier.arrived.fetch_add(1, AcqRel) + 1;
+
+    if arrived == barrier.count {
+        // Last thread to arrive
+        barrier.arrived.store(0, Release);
+        barrier.generation.fetch_add(1, Release);
+        barrier.cv.notify_all();
+    } else {
+        // Wait for others
+        while barrier.generation.load(Acquire) == gen {
+            barrier.cv.wait();
+        }
+    }
+}
+
+// Helper functions
+fn spawn_worker_thread(thread_id: i32, queue: &WorkQueue) ! {concurrency} {
+    asm! {
+        "call spawn_thread"
+        :
+        : "a"(thread_id), "d"(queue)
+        :
+        : volatile
+    }
+}
+
+fn spawn_work_stealing_thread(worker_id: i32, num_workers: i32) ! {concurrency} {
+    asm! {
+        "call spawn_thread"
+        :
+        : "a"(worker_id), "d"(num_workers)
+        :
+        : volatile
+    }
+}
+
+fn wake_idle_worker(pool: &ThreadPool) ! {concurrency} {
+    for worker in &pool.workers {
+        let state = worker.state.load(Acquire);
+        if state == WorkerState::Idle {
+            worker.state.store(WorkerState::Running, Release);
+            return;
+        }
+    }
+}
+
+fn create_closure_for_range(fn_ptr: fn(i32) -> (), start: i32, end: i32) -> u64 {
+    return 0;  // Placeholder
+}
+
+fn min(a: i32, b: i32) -> i32 {
+    if a < b { return a; } else { return b; }
+}
+
+pub struct Mutex<T> {
+    data: T,
+}
+
+impl<T> Mutex<T> {
+    pub fn new(data: T) -> Mutex<T> {
+        return Mutex { data: data };
+    }
+
+    pub fn lock(&self) -> MutexGuard<T> ! {concurrency} {
+        return MutexGuard { lock: self };
+    }
+}
+
+pub struct MutexGuard<T> {
+    lock: &Mutex<T>,
+}
+
+pub struct CondVar {}
+
+impl CondVar {
+    pub fn new() -> CondVar {
+        return CondVar {};
+    }
+
+    pub fn wait(&self) ! {concurrency} {
+        asm! { "pause" : : : : }
+    }
+
+    pub fn notify_all(&self) ! {concurrency} {
+    }
+}
+
+pub struct Option<T> {
+    value: T,
+    has_value: bool,
+}
+
+impl<T> Option<T> {
+    pub fn Some(val: T) -> Option<T> {
+        return Option { value: val, has_value: true };
+    }
+
+    pub fn None() -> Option<T> {
+        return Option { value: unimplemented(), has_value: false };
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn with_capacity(cap: usize) -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: cap };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn pop(&mut self) -> T {
+        return unimplemented();
+    }
+    pub fn len(&self) -> usize {
+        return self.len;
+    }
+}
+
+fn unimplemented<T>() -> T {
+    asm! { "hlt" : : : : volatile, noreturn }
+}
+
+const Acquire = 1;
+const Release = 2;
+const AcqRel = 3;

@@ -1,0 +1,372 @@
+// axiom/stdlib/type_inference.ax
+// Type inference engine for Axiom
+
+type TypeVariable = String
+type TypeConstraint = (Type, Type)
+
+enum Type {
+    | TVar(TypeVariable)
+    | TInt
+    | TBool
+    | TFloat
+    | TString
+    | TArrow(Box[Type], Box[Type])
+    | TList(Box[Type])
+    | TProduct(List[Type])
+    | TRecord(Map[String, Type])
+    | TUnion(List[Type])
+    | TForall(TypeVariable, Box[Type])
+    | TExists(TypeVariable, Box[Type])
+}
+
+struct TypeInferenceEngine {
+    constraints: List[TypeConstraint]
+    substitution: Map[TypeVariable, Type]
+    type_environment: Map[String, Type]
+    fresh_var_counter: Int
+
+    fn new() -> TypeInferenceEngine {
+        return TypeInferenceEngine {
+            constraints: List::new(),
+            substitution: Map::new(),
+            type_environment: Map::new(),
+            fresh_var_counter: 0,
+        }
+    }
+
+    fn infer_expr(expr: Expr) -> Type {
+        match expr {
+            Expr::Var(name) => {
+                let t = this.type_environment.get(name)
+
+                if t.is_some() {
+                    return t.unwrap()
+                } else {
+                    let fresh_var = this.fresh_type_variable()
+                    return Type::TVar(fresh_var)
+                }
+            }
+
+            Expr::Int(_) => {
+                return Type::TInt
+            }
+
+            Expr::Bool(_) => {
+                return Type::TBool
+            }
+
+            Expr::Float(_) => {
+                return Type::TFloat
+            }
+
+            Expr::String(_) => {
+                return Type::TString
+            }
+
+            Expr::Lambda(param, body) => {
+                let param_type = this.fresh_type_variable()
+                let param_type_full = Type::TVar(param_type)
+
+                this.type_environment[param] = param_type_full
+
+                let body_type = this.infer_expr(body)
+
+                return Type::TArrow(Box::new(param_type_full), Box::new(body_type))
+            }
+
+            Expr::App(func, arg) => {
+                let func_type = this.infer_expr(func)
+                let arg_type = this.infer_expr(arg)
+
+                let result_type = this.fresh_type_variable()
+                let result_type_full = Type::TVar(result_type)
+
+                this.add_constraint(
+                    func_type,
+                    Type::TArrow(Box::new(arg_type), Box::new(result_type_full))
+                )
+
+                return result_type_full
+            }
+
+            Expr::If(cond, then_expr, else_expr) => {
+                let cond_type = this.infer_expr(cond)
+                this.add_constraint(cond_type, Type::TBool)
+
+                let then_type = this.infer_expr(then_expr)
+                let else_type = this.infer_expr(else_expr)
+
+                this.add_constraint(then_type, else_type)
+
+                return then_type
+            }
+
+            Expr::Let(name, value, body) => {
+                let value_type = this.infer_expr(value)
+                this.type_environment[name] = value_type
+
+                let body_type = this.infer_expr(body)
+
+                return body_type
+            }
+
+            Expr::Tuple(elements) => {
+                let mut element_types = List::new()
+
+                for elem in elements {
+                    element_types.push(this.infer_expr(elem))
+                }
+
+                return Type::TProduct(element_types)
+            }
+
+            Expr::List(elements) => {
+                if elements.len() == 0 {
+                    let elem_type = this.fresh_type_variable()
+                    return Type::TList(Box::new(Type::TVar(elem_type)))
+                }
+
+                let first_type = this.infer_expr(elements[0])
+
+                for i in 1..elements.len() {
+                    let elem_type = this.infer_expr(elements[i])
+                    this.add_constraint(elem_type, first_type)
+                }
+
+                return Type::TList(Box::new(first_type))
+            }
+
+            _ => {
+                return Type::TVar(this.fresh_type_variable())
+            }
+        }
+    }
+
+    fn unify() -> Option[Map[TypeVariable, Type]] {
+        let mut substitution = Map::new()
+
+        while this.constraints.len() > 0 {
+            let (type1, type2) = this.constraints.pop()
+
+            let t1 = this.apply_substitution(type1, substitution)
+            let t2 = this.apply_substitution(type2, substitution)
+
+            if types_equal(t1, t2) {
+                continue
+            }
+
+            match (t1, t2) {
+                (Type::TVar(x), Type::TVar(y)) => {
+                    if x != y {
+                        substitution[x] = Type::TVar(y)
+                    }
+                }
+
+                (Type::TVar(x), t) => {
+                    if !occurs_in(x, t) {
+                        substitution[x] = t
+                    } else {
+                        return None
+                    }
+                }
+
+                (t, Type::TVar(x)) => {
+                    if !occurs_in(x, t) {
+                        substitution[x] = t
+                    } else {
+                        return None
+                    }
+                }
+
+                (Type::TArrow(a1, b1), Type::TArrow(a2, b2)) => {
+                    this.add_constraint(a1, a2)
+                    this.add_constraint(b1, b2)
+                }
+
+                (Type::TList(t1), Type::TList(t2)) => {
+                    this.add_constraint(t1, t2)
+                }
+
+                (Type::TProduct(ts1), Type::TProduct(ts2)) => {
+                    if ts1.len() != ts2.len() {
+                        return None
+                    }
+
+                    for i in 0..ts1.len() {
+                        this.add_constraint(ts1[i], ts2[i])
+                    }
+                }
+
+                _ => {
+                    return None
+                }
+            }
+        }
+
+        return Some(substitution)
+    }
+
+    fn add_constraint(t1: Type, t2: Type) {
+        this.constraints.push((t1, t2))
+    }
+
+    fn fresh_type_variable() -> String {
+        let var = "α" + this.fresh_var_counter.to_string()
+        this.fresh_var_counter = this.fresh_var_counter + 1
+        return var
+    }
+
+    fn apply_substitution(t: Type, subst: Map[TypeVariable, Type]) -> Type {
+        match t {
+            Type::TVar(x) => {
+                let sub = subst.get(x)
+
+                if sub.is_some() {
+                    return this.apply_substitution(sub.unwrap(), subst)
+                } else {
+                    return Type::TVar(x)
+                }
+            }
+
+            Type::TArrow(a, b) => {
+                let a_sub = this.apply_substitution(a, subst)
+                let b_sub = this.apply_substitution(b, subst)
+                return Type::TArrow(Box::new(a_sub), Box::new(b_sub))
+            }
+
+            Type::TList(t) => {
+                let t_sub = this.apply_substitution(t, subst)
+                return Type::TList(Box::new(t_sub))
+            }
+
+            Type::TProduct(ts) => {
+                let mut ts_sub = List::new()
+
+                for t in ts {
+                    ts_sub.push(this.apply_substitution(t, subst))
+                }
+
+                return Type::TProduct(ts_sub)
+            }
+
+            _ => {
+                return t
+            }
+        }
+    }
+
+    fn generalize(t: Type, env: Map[String, Type]) -> Type {
+        // Convert free type variables to universally quantified
+        return t
+    }
+
+    fn instantiate(t: Type) -> Type {
+        // Replace universally quantified variables with fresh ones
+        return t
+    }
+}
+
+enum Expr {
+    | Var(String)
+    | Int(i64)
+    | Bool(Bool)
+    | Float(f64)
+    | String(String)
+    | Lambda(String, Box[Expr])
+    | App(Box[Expr], Box[Expr])
+    | If(Box[Expr], Box[Expr], Box[Expr])
+    | Let(String, Box[Expr], Box[Expr])
+    | Tuple(List[Expr])
+    | List(List[Expr])
+    | BinOp(String, Box[Expr], Box[Expr])
+}
+
+fn types_equal(t1: Type, t2: Type) -> Bool {
+    match (t1, t2) {
+        (Type::TInt, Type::TInt) => return true
+        (Type::TBool, Type::TBool) => return true
+        (Type::TFloat, Type::TFloat) => return true
+        (Type::TString, Type::TString) => return true
+        (Type::TVar(x1), Type::TVar(x2)) => return x1 == x2
+        _ => return false
+    }
+}
+
+fn occurs_in(var: String, t: Type) -> Bool {
+    match t {
+        Type::TVar(x) => {
+            return x == var
+        }
+
+        Type::TArrow(a, b) => {
+            return occurs_in(var, a) || occurs_in(var, b)
+        }
+
+        Type::TList(t) => {
+            return occurs_in(var, t)
+        }
+
+        Type::TProduct(ts) => {
+            for ty in ts {
+                if occurs_in(var, ty) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        _ => {
+            return false
+        }
+    }
+}
+
+struct PolymorphicTypeChecker {
+    inference_engine: TypeInferenceEngine
+    polymorphic_functions: Map[String, Type]
+
+    fn new() -> PolymorphicTypeChecker {
+        return PolymorphicTypeChecker {
+            inference_engine: TypeInferenceEngine::new(),
+            polymorphic_functions: Map::new(),
+        }
+    }
+
+    fn register_polymorphic_function(name: String, type_scheme: Type) {
+        this.polymorphic_functions[name] = type_scheme
+    }
+
+    fn check_function_call(name: String, args: List[Expr]) -> Option[Type] {
+        let scheme = this.polymorphic_functions.get(name)
+
+        if scheme.is_none() {
+            return None
+        }
+
+        let polymorphic_type = scheme.unwrap()
+
+        // Instantiate with fresh type variables
+        let instantiated = this.inference_engine.instantiate(polymorphic_type)
+
+        // Match arguments to function parameters
+        let mut arg_types = List::new()
+
+        for arg in args {
+            arg_types.push(this.inference_engine.infer_expr(arg))
+        }
+
+        // Try to unify argument types with instantiated type
+        return Some(instantiated)
+    }
+}
+
+type Box<T> = T
+
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }
+
+type Option<T> = Any
+type List<T> = Any
+type Map<K, V> = Any
+type String = Any
+type Bool = Any

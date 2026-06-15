@@ -1,0 +1,156 @@
+// sylva/examples/neural_network_training.sy
+// Neural network training in Sylva language
+
+import sylva.tensor as tf
+import sylva.nn as nn
+import sylva.optim as optim
+import sylva.data as data
+
+# Load dataset
+@lazy
+fn load_mnist_data() -> (Tensor[f32, "batch,784"], Tensor[f32, "batch,10"]) {
+    dataset = data.load_csv("mnist_train.csv")
+
+    # Normalize to [0, 1]
+    x_train = dataset.select_columns(["pixel_0", ..., "pixel_783"]) / 255.0
+    y_train = dataset.select_columns(["label"])
+
+    return (x_train, y_train)
+}
+
+# Define neural network model
+model NeuralNet {
+    fc1: Dense(784, 128, activation="relu")
+    dropout1: Dropout(0.2)
+    fc2: Dense(128, 64, activation="relu")
+    dropout2: Dropout(0.2)
+    fc3: Dense(64, 10, activation="softmax")
+
+    fn forward(x: Tensor[f32, "batch,784"]) -> Tensor[f32, "batch,10"] {
+        h1 = this.fc1(x)
+        h1 = this.dropout1(h1, training=true)
+
+        h2 = this.fc2(h1)
+        h2 = this.dropout2(h2, training=true)
+
+        output = this.fc3(h2)
+        return output
+    }
+
+    fn backward(loss: f32) {
+        loss.backward()
+    }
+}
+
+# Training loop
+fn train() {
+    let (x_train, y_train) = load_mnist_data()
+
+    model = NeuralNet()
+    optimizer = optim.Adam(lr=0.001, beta1=0.9, beta2=0.999)
+    loss_fn = nn.CrossEntropyLoss()
+
+    # Training hyperparameters
+    batch_size: Int = 32
+    num_epochs: Int = 10
+
+    for epoch in 0..num_epochs {
+        # Shuffle data
+        indices = tf.randperm(x_train.shape[0])
+        x_shuffled = x_train[indices]
+        y_shuffled = y_train[indices]
+
+        # Mini-batch training
+        total_loss: f32 = 0.0
+        num_batches: Int = 0
+
+        for batch_start in range(0, x_train.shape[0], batch_size) {
+            batch_end = min(batch_start + batch_size, x_train.shape[0])
+
+            x_batch = x_shuffled[batch_start:batch_end]
+            y_batch = y_shuffled[batch_start:batch_end]
+
+            # Forward pass
+            logits = model.forward(x_batch)
+            loss = loss_fn(logits, y_batch)
+
+            # Backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss = total_loss + loss.item()
+            num_batches = num_batches + 1
+        }
+
+        avg_loss = total_loss / (num_batches as f32)
+        println(f"Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}")
+    }
+
+    # Evaluation
+    println("Training complete!")
+    return model
+}
+
+# Visualization of training progress
+@notebook
+fn visualize_training() {
+    losses = []
+    accuracies = []
+
+    for epoch in 0..10 {
+        loss = train_one_epoch()
+        losses.append(loss)
+
+        accuracy = evaluate_model()
+        accuracies.append(accuracy)
+    }
+
+    # Plot results
+    plot.figure(figsize=(12, 4))
+
+    plot.subplot(1, 2, 1)
+    plot.plot(losses)
+    plot.xlabel("Epoch")
+    plot.ylabel("Loss")
+    plot.title("Training Loss")
+
+    plot.subplot(1, 2, 2)
+    plot.plot(accuracies)
+    plot.xlabel("Epoch")
+    plot.ylabel("Accuracy")
+    plot.title("Validation Accuracy")
+
+    plot.show()
+}
+
+# Time-travel debugging example
+@time_travel_debug
+fn debug_forward_pass() {
+    model = NeuralNet()
+    x = tf.randn([32, 784])
+
+    # Can rewind and inspect any intermediate value
+    h1 = model.fc1(x)
+    println(f"h1 shape: {h1.shape}, min: {tf.min(h1)}, max: {tf.max(h1)}")
+
+    h2 = model.fc2(h1)
+    println(f"h2 shape: {h2.shape}, mean: {tf.mean(h2)}")
+
+    output = model.fc3(h2)
+    println(f"output shape: {output.shape}")
+}
+
+# Main execution
+fn main() {
+    println("Starting MNIST training with Sylva...")
+
+    trained_model = train()
+
+    println("Evaluating on test set...")
+    test_accuracy = evaluate_model(trained_model)
+    println(f"Test Accuracy: {test_accuracy:.2%}")
+
+    # Save model
+    trained_model.save("mnist_model.spm")
+}

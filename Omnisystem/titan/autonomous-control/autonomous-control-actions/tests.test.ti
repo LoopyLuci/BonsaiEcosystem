@@ -1,0 +1,5 @@
+// Tests for autonomous-control-actions
+
+pub fn test_module() -> i64 {
+    return 111;
+}

@@ -1,0 +1,479 @@
+// aether/stdlib/observability.ae
+// Observability, metrics, and tracing in Aether
+
+type MetricName = String
+type TagKey = String
+type TagValue = String
+type TraceId = String
+type SpanId = String
+
+enum MetricType {
+    | Counter
+    | Gauge
+    | Histogram
+    | Summary
+}
+
+enum AggregationType {
+    | Sum
+    | Average
+    | Min
+    | Max
+    | Count
+    | Percentile(Float)
+}
+
+type Tags = Map[TagKey, TagValue]
+
+type MetricDataPoint = {
+    timestamp: Int
+    value: Float
+    tags: Tags
+}
+
+type HistogramBucket = {
+    boundary: Float
+    count: Int
+}
+
+type Histogram = {
+    buckets: List[HistogramBucket]
+    sum: Float
+    count: Int
+}
+
+type Gauge = {
+    value: Float
+    timestamp: Int
+    tags: Tags
+}
+
+type Counter = {
+    value: Float
+    timestamp: Int
+    tags: Tags
+}
+
+type Summary = {
+    count: Int
+    sum: Float
+    quantiles: Map[Float, Float]
+}
+
+type Metric = {
+    name: MetricName
+    metric_type: MetricType
+    help: String
+    tags: Tags
+    timestamp: Int
+    data: Any
+}
+
+struct MetricsRegistry {
+    counters: Map[MetricName, List[MetricDataPoint]]
+    gauges: Map[MetricName, List[MetricDataPoint]]
+    histograms: Map[MetricName, List[Histogram]]
+    summaries: Map[MetricName, List[Summary]]
+    labels_registry: Map[MetricName, Tags]
+
+    fn new() -> MetricsRegistry {
+        return MetricsRegistry {
+            counters: Map::new(),
+            gauges: Map::new(),
+            histograms: Map::new(),
+            summaries: Map::new(),
+            labels_registry: Map::new(),
+        }
+    }
+
+    fn counter(name: MetricName, help: String, tags: Tags) {
+        this.counters[name] = List::new()
+        this.labels_registry[name] = tags
+    }
+
+    fn gauge(name: MetricName, help: String, tags: Tags) {
+        this.gauges[name] = List::new()
+        this.labels_registry[name] = tags
+    }
+
+    fn histogram(name: MetricName, help: String, buckets: List[Float], tags: Tags) {
+        this.histograms[name] = List::new()
+        this.labels_registry[name] = tags
+    }
+
+    fn summary(name: MetricName, help: String, tags: Tags) {
+        this.summaries[name] = List::new()
+        this.labels_registry[name] = tags
+    }
+
+    fn increment_counter(name: MetricName, value: Float, tags: Tags) {
+        if !this.counters.get(name).is_some() {
+            this.counter(name, "", tags)
+        }
+
+        let datapoint = MetricDataPoint {
+            timestamp: now_ms(),
+            value: value,
+            tags: tags,
+        }
+
+        this.counters[name].push(datapoint)
+    }
+
+    fn set_gauge(name: MetricName, value: Float, tags: Tags) {
+        if !this.gauges.get(name).is_some() {
+            this.gauge(name, "", tags)
+        }
+
+        let datapoint = MetricDataPoint {
+            timestamp: now_ms(),
+            value: value,
+            tags: tags,
+        }
+
+        this.gauges[name].push(datapoint)
+    }
+
+    fn observe_histogram(name: MetricName, value: Float, tags: Tags) {
+        if !this.histograms.get(name).is_some() {
+            let default_buckets = [
+                0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0
+            ]
+            this.histogram(name, "", default_buckets, tags)
+        }
+
+        -- Find or create histogram
+        let histograms = this.histograms.get(name)
+
+        if histograms.is_some() {
+            let hists = histograms.unwrap()
+
+            let mut hist: Option[Histogram] = None
+
+            if hists.len() > 0 {
+                hist = Some(hists[hists.len() - 1])
+            }
+
+            if hist.is_none() {
+                hist = Some(Histogram {
+                    buckets: List::new(),
+                    sum: 0.0,
+                    count: 0,
+                })
+            }
+
+            let mut h = hist.unwrap()
+
+            h.count = h.count + 1
+            h.sum = h.sum + value
+
+            -- Update bucket
+            for bucket in h.buckets {
+                if value <= bucket.boundary {
+                    bucket.count = bucket.count + 1
+                }
+            }
+
+            this.histograms[name][hists.len() - 1] = h
+        }
+    }
+
+    fn observe_summary(name: MetricName, value: Float, tags: Tags) {
+        if !this.summaries.get(name).is_some() {
+            this.summary(name, "", tags)
+        }
+
+        let summaries = this.summaries.get(name)
+
+        if summaries.is_some() {
+            let summs = summaries.unwrap()
+
+            let mut summary: Option[Summary] = None
+
+            if summs.len() > 0 {
+                summary = Some(summs[summs.len() - 1])
+            }
+
+            if summary.is_none() {
+                summary = Some(Summary {
+                    count: 0,
+                    sum: 0.0,
+                    quantiles: Map::new(),
+                })
+            }
+
+            let mut s = summary.unwrap()
+
+            s.count = s.count + 1
+            s.sum = s.sum + value
+
+            -- Update quantiles
+            s.quantiles[0.5] = value
+            s.quantiles[0.9] = value
+            s.quantiles[0.99] = value
+
+            this.summaries[name][summs.len() - 1] = s
+        }
+    }
+
+    fn export_prometheus() -> String {
+        let mut output = ""
+
+        -- Export counters
+        for (name, datapoints) in this.counters {
+            output = output + "# TYPE " + name + " counter\n"
+
+            for dp in datapoints {
+                output = output + name + format_tags(dp.tags) + " "
+                output = output + float_to_string(dp.value) + " "
+                output = output + int_to_string(dp.timestamp) + "\n"
+            }
+        }
+
+        -- Export gauges
+        for (name, datapoints) in this.gauges {
+            output = output + "# TYPE " + name + " gauge\n"
+
+            for dp in datapoints {
+                output = output + name + format_tags(dp.tags) + " "
+                output = output + float_to_string(dp.value) + " "
+                output = output + int_to_string(dp.timestamp) + "\n"
+            }
+        }
+
+        -- Export histograms
+        for (name, histograms) in this.histograms {
+            output = output + "# TYPE " + name + " histogram\n"
+
+            for hist in histograms {
+                output = output + name + "_bucket" + " "
+                output = output + float_to_string(hist.sum) + "\n"
+
+                output = output + name + "_count" + " "
+                output = output + int_to_string(hist.count) + "\n"
+            }
+        }
+
+        return output
+    }
+}
+
+-- Distributed Tracing
+type SpanContext = {
+    trace_id: TraceId
+    span_id: SpanId
+    parent_span_id: Option[SpanId]
+}
+
+type SpanEvent = {
+    name: String
+    timestamp: Int
+    attributes: Map[String, Any]
+}
+
+type Span = {
+    span_context: SpanContext
+    operation_name: String
+    start_time: Int
+    end_time: Option[Int]
+    status: SpanStatus
+    attributes: Map[String, Any]
+    events: List[SpanEvent]
+    links: List[SpanContext]
+}
+
+enum SpanStatus {
+    | Unset
+    | Ok
+    | Error
+}
+
+struct Tracer {
+    spans: List[Span]
+    current_span: Option[Span]
+
+    fn new() -> Tracer {
+        return Tracer {
+            spans: List::new(),
+            current_span: None,
+        }
+    }
+
+    fn start_span(operation_name: String, parent_ctx: Option[SpanContext]) -> SpanContext {
+        let trace_id = parent_ctx.map(|ctx| ctx.trace_id).unwrap_or(generate_trace_id())
+
+        let span_id = generate_span_id()
+
+        let parent_span_id = parent_ctx.map(|ctx| ctx.span_id)
+
+        let span_context = SpanContext {
+            trace_id: trace_id,
+            span_id: span_id,
+            parent_span_id: parent_span_id,
+        }
+
+        let span = Span {
+            span_context: span_context,
+            operation_name: operation_name,
+            start_time: now_ms(),
+            end_time: None,
+            status: SpanStatus::Unset,
+            attributes: Map::new(),
+            events: List::new(),
+            links: List::new(),
+        }
+
+        this.spans.push(span)
+        this.current_span = Some(span)
+
+        return span_context
+    }
+
+    fn end_span(ctx: SpanContext) {
+        for span in this.spans {
+            if span.span_context.span_id == ctx.span_id {
+                span.end_time = Some(now_ms())
+                break
+            }
+        }
+    }
+
+    fn set_attribute(ctx: SpanContext, key: String, value: Any) {
+        for span in this.spans {
+            if span.span_context.span_id == ctx.span_id {
+                span.attributes[key] = value
+                break
+            }
+        }
+    }
+
+    fn add_event(ctx: SpanContext, event: SpanEvent) {
+        for span in this.spans {
+            if span.span_context.span_id == ctx.span_id {
+                span.events.push(event)
+                break
+            }
+        }
+    }
+
+    fn set_status(ctx: SpanContext, status: SpanStatus) {
+        for span in this.spans {
+            if span.span_context.span_id == ctx.span_id {
+                span.status = status
+                break
+            }
+        }
+    }
+
+    fn export_jaeger() -> String {
+        let mut output = ""
+
+        for span in this.spans {
+            output = output + "{\n"
+            output = output + "  \"traceID\": \"" + span.span_context.trace_id + "\",\n"
+            output = output + "  \"spanID\": \"" + span.span_context.span_id + "\",\n"
+            output = output + "  \"operationName\": \"" + span.operation_name + "\",\n"
+            output = output + "  \"startTime\": " + int_to_string(span.start_time) + ",\n"
+            output = output + "  \"endTime\": " + int_to_string(span.end_time.unwrap_or(0)) + "\n"
+            output = output + "}\n"
+        }
+
+        return output
+    }
+}
+
+-- Logging
+struct Logger {
+    name: String
+    level: LogLevel
+
+    fn new(name: String, level: LogLevel) -> Logger {
+        return Logger {
+            name: name,
+            level: level,
+        }
+    }
+
+    fn debug(msg: String) {
+        this.log_message(LogLevel::Debug, msg)
+    }
+
+    fn info(msg: String) {
+        this.log_message(LogLevel::Info, msg)
+    }
+
+    fn warn(msg: String) {
+        this.log_message(LogLevel::Warning, msg)
+    }
+
+    fn error(msg: String) {
+        this.log_message(LogLevel::Error, msg)
+    }
+
+    fn log_message(level: LogLevel, msg: String) {
+        let timestamp = now_ms()
+        let log_entry = format_log_entry(this.name, level, msg, timestamp)
+        write_log(log_entry)
+    }
+}
+
+enum LogLevel {
+    | Debug
+    | Info
+    | Warning
+    | Error
+    | Fatal
+}
+
+-- Helper functions
+fn generate_trace_id() -> TraceId {
+    return "trace-" + random_hex(16)
+}
+
+fn generate_span_id() -> SpanId {
+    return "span-" + random_hex(8)
+}
+
+fn format_tags(tags: Tags) -> String {
+    let mut result = "{"
+
+    for (key, value) in tags {
+        result = result + key + "=\"" + value + "\","
+    }
+
+    result = result + "}"
+    return result
+}
+
+fn format_log_entry(name: String, level: LogLevel, msg: String, timestamp: Int) -> String {
+    return "[" + timestamp_to_string(timestamp) + "] [" + name + "] " + msg
+}
+
+fn float_to_string(val: Float) -> String {
+    return ""  -- Placeholder
+}
+
+fn int_to_string(val: Int) -> String {
+    return ""  -- Placeholder
+}
+
+fn timestamp_to_string(timestamp: Int) -> String {
+    return ""  -- Placeholder
+}
+
+fn random_hex(len: Int) -> String {
+    return ""  -- Placeholder
+}
+
+fn write_log(entry: String) {
+    -- Write to log sink
+}
+
+fn now_ms() -> Int {
+    return 0  -- Placeholder
+}
+
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Any = Any

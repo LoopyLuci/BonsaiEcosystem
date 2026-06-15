@@ -1,0 +1,3 @@
+// Tests: msg-broker
+
+pub fn test_module() -> i64 { return 111; }

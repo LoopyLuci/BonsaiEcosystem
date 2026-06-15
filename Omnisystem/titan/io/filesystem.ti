@@ -1,0 +1,451 @@
+// titan/io/filesystem.ti
+// File system operations for Titan
+
+pub enum FileMode {
+    Read,
+    Write,
+    ReadWrite,
+    Append,
+}
+
+pub enum SeekPos {
+    Start,
+    Current,
+    End,
+}
+
+pub struct File {
+    fd: i32,
+    path: String,
+    mode: FileMode,
+}
+
+pub struct FileMetadata {
+    path: String,
+    size: u64,
+    is_dir: bool,
+    is_file: bool,
+    permissions: u32,
+    created_at: u64,
+    modified_at: u64,
+    accessed_at: u64,
+}
+
+pub struct Directory {
+    path: String,
+    entries: Vec<DirectoryEntry>,
+}
+
+pub struct DirectoryEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+    is_file: bool,
+    size: u64,
+}
+
+impl File {
+    pub fn open(path: &str, mode: FileMode) -> Result<File, String> ! {fs} {
+        let fd: i32 = 0;
+
+        asm! {
+            "call open"
+            : "=a"(fd)
+            : "d"(path), "c"(file_mode_to_flags(mode))
+            :
+            : volatile
+        }
+
+        if fd < 0 {
+            return Result::Err("Failed to open file".to_string());
+        }
+
+        return Result::Ok(File {
+            fd: fd,
+            path: path.to_string(),
+            mode: mode,
+        });
+    }
+
+    pub fn create(path: &str) -> Result<File, String> ! {fs} {
+        let fd: i32 = 0;
+
+        asm! {
+            "call create"
+            : "=a"(fd)
+            : "d"(path), "c"(0o644)
+            :
+            : volatile
+        }
+
+        if fd < 0 {
+            return Result::Err("Failed to create file".to_string());
+        }
+
+        return Result::Ok(File {
+            fd: fd,
+            path: path.to_string(),
+            mode: FileMode::Write,
+        });
+    }
+
+    pub fn read(&self, buffer: &mut [u8]) -> Result<usize, String> ! {fs} {
+        let bytes_read: i32 = 0;
+
+        asm! {
+            "call read"
+            : "=a"(bytes_read)
+            : "d"(self.fd), "c"(buffer), "S"(buffer.len())
+            :
+            : volatile
+        }
+
+        if bytes_read < 0 {
+            return Result::Err("Failed to read file".to_string());
+        }
+
+        return Result::Ok(bytes_read as usize);
+    }
+
+    pub fn write(&self, data: &[u8]) -> Result<usize, String> ! {fs} {
+        let bytes_written: i32 = 0;
+
+        asm! {
+            "call write"
+            : "=a"(bytes_written)
+            : "d"(self.fd), "c"(data), "S"(data.len())
+            :
+            : volatile
+        }
+
+        if bytes_written < 0 {
+            return Result::Err("Failed to write file".to_string());
+        }
+
+        return Result::Ok(bytes_written as usize);
+    }
+
+    pub fn read_all(&self) -> Result<Vec<u8>, String> ! {fs} {
+        let mut content: Vec<u8> = Vec::new();
+        let mut buffer = [0u8; 4096];
+
+        loop {
+            match self.read(&mut buffer) {
+                Result::Ok(0) => break,
+                Result::Ok(n) => {
+                    for i in 0..n {
+                        content.push(buffer[i]);
+                    }
+                }
+                Result::Err(e) => {
+                    return Result::Err(e);
+                }
+            }
+        }
+
+        return Result::Ok(content);
+    }
+
+    pub fn write_all(&self, data: &[u8]) -> Result<(), String> ! {fs} {
+        let mut offset = 0;
+
+        while offset < data.len() {
+            let chunk_size = if data.len() - offset > 4096 { 4096 } else { data.len() - offset };
+
+            match self.write(&data[offset..offset + chunk_size]) {
+                Result::Ok(n) => {
+                    offset = offset + n;
+                }
+                Result::Err(e) => {
+                    return Result::Err(e);
+                }
+            }
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn seek(&self, pos: SeekPos, offset: i64) -> Result<u64, String> ! {fs} {
+        let new_pos: i64 = 0;
+
+        asm! {
+            "call lseek"
+            : "=a"(new_pos)
+            : "d"(self.fd), "c"(offset), "S"(seek_pos_to_whence(pos))
+            :
+            : volatile
+        }
+
+        if new_pos < 0 {
+            return Result::Err("Seek failed".to_string());
+        }
+
+        return Result::Ok(new_pos as u64);
+    }
+
+    pub fn flush(&self) -> Result<(), String> ! {fs} {
+        asm! {
+            "call fsync"
+            :
+            : "d"(self.fd)
+            :
+            : volatile
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn close(&self) -> Result<(), String> ! {fs} {
+        let result: i32 = 0;
+
+        asm! {
+            "call close"
+            : "=a"(result)
+            : "d"(self.fd)
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Failed to close file".to_string());
+        }
+
+        return Result::Ok(());
+    }
+}
+
+pub fn read_file(path: &str) -> Result<Vec<u8>, String> ! {fs} {
+    let file = File::open(path, FileMode::Read)?;
+    let content = file.read_all()?;
+    file.close()?;
+
+    return Result::Ok(content);
+}
+
+pub fn write_file(path: &str, data: &[u8]) -> Result<(), String> ! {fs} {
+    let file = File::create(path)?;
+    file.write_all(data)?;
+    file.close()?;
+
+    return Result::Ok(());
+}
+
+pub fn append_file(path: &str, data: &[u8]) -> Result<(), String> ! {fs} {
+    let file = File::open(path, FileMode::Append)?;
+    file.write_all(data)?;
+    file.close()?;
+
+    return Result::Ok(());
+}
+
+pub fn metadata(path: &str) -> Result<FileMetadata, String> ! {fs} {
+    let st_size: u64 = 0;
+    let st_mode: u32 = 0;
+    let st_mtime: u64 = 0;
+
+    asm! {
+        "call stat"
+        : "=a"(st_size), "=d"(st_mode), "=c"(st_mtime)
+        : "S"(path)
+        :
+        : volatile
+    }
+
+    return Result::Ok(FileMetadata {
+        path: path.to_string(),
+        size: st_size,
+        is_dir: (st_mode & 0o40000) != 0,
+        is_file: (st_mode & 0o100000) != 0,
+        permissions: st_mode & 0o777,
+        created_at: 0,
+        modified_at: st_mtime,
+        accessed_at: 0,
+    });
+}
+
+pub fn exists(path: &str) -> bool ! {fs} {
+    let result = metadata(path);
+    return result.is_ok();
+}
+
+pub fn is_file(path: &str) -> bool ! {fs} {
+    match metadata(path) {
+        Result::Ok(m) => return m.is_file,
+        Result::Err(_) => return false,
+    }
+}
+
+pub fn is_dir(path: &str) -> bool ! {fs} {
+    match metadata(path) {
+        Result::Ok(m) => return m.is_dir,
+        Result::Err(_) => return false,
+    }
+}
+
+pub fn create_dir(path: &str) -> Result<(), String> ! {fs} {
+    let result: i32 = 0;
+
+    asm! {
+        "call mkdir"
+        : "=a"(result)
+        : "d"(path), "c"(0o755)
+        :
+        : volatile
+    }
+
+    if result < 0 {
+        return Result::Err("Failed to create directory".to_string());
+    }
+
+    return Result::Ok(());
+}
+
+pub fn create_dir_all(path: &str) -> Result<(), String> ! {fs} {
+    if exists(path) {
+        return Result::Ok(());
+    }
+
+    let parent = get_parent_dir(path);
+
+    if parent.len() > 0 && parent != path {
+        create_dir_all(parent)?;
+    }
+
+    return create_dir(path);
+}
+
+pub fn remove_file(path: &str) -> Result<(), String> ! {fs} {
+    let result: i32 = 0;
+
+    asm! {
+        "call unlink"
+        : "=a"(result)
+        : "d"(path)
+        :
+        : volatile
+    }
+
+    if result < 0 {
+        return Result::Err("Failed to remove file".to_string());
+    }
+
+    return Result::Ok(());
+}
+
+pub fn remove_dir(path: &str) -> Result<(), String> ! {fs} {
+    let result: i32 = 0;
+
+    asm! {
+        "call rmdir"
+        : "=a"(result)
+        : "d"(path)
+        :
+        : volatile
+    }
+
+    if result < 0 {
+        return Result::Err("Failed to remove directory".to_string());
+    }
+
+    return Result::Ok(());
+}
+
+pub fn read_dir(path: &str) -> Result<Directory, String> ! {fs} {
+    let mut entries: Vec<DirectoryEntry> = Vec::new();
+
+    let dir_ptr: *u8 = 0 as *u8;
+
+    asm! {
+        "call opendir"
+        : "=a"(dir_ptr)
+        : "d"(path)
+        :
+        : volatile
+    }
+
+    if dir_ptr as i32 == 0 {
+        return Result::Err("Failed to open directory".to_string());
+    }
+
+    loop {
+        let entry_ptr: *u8 = 0 as *u8;
+
+        asm! {
+            "call readdir"
+            : "=a"(entry_ptr)
+            : "d"(dir_ptr)
+            :
+            : volatile
+        }
+
+        if entry_ptr as i32 == 0 {
+            break;
+        }
+    }
+
+    return Result::Ok(Directory {
+        path: path.to_string(),
+        entries: entries,
+    });
+}
+
+fn file_mode_to_flags(mode: FileMode) -> i32 {
+    match mode {
+        FileMode::Read => 0,
+        FileMode::Write => 1,
+        FileMode::ReadWrite => 2,
+        FileMode::Append => 1024,
+    }
+}
+
+fn seek_pos_to_whence(pos: SeekPos) -> i32 {
+    match pos {
+        SeekPos::Start => 0,
+        SeekPos::Current => 1,
+        SeekPos::End => 2,
+    }
+}
+
+fn get_parent_dir(path: &str) -> &str {
+    return path;
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn len(&self) -> usize { return self.len; }
+}

@@ -1,0 +1,5 @@
+// Tests for advanced-risk-management
+
+pub fn test_module() -> i64 {
+    return 111;
+}

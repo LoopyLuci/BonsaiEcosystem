@@ -1,0 +1,394 @@
+// aether/stdlib/consensus.ae
+// Advanced consensus algorithms for Aether
+
+-- Paxos consensus algorithm
+type ProposalId = Int
+type AcceptorId = String
+
+enum PaxosPhase {
+    | Prepare
+    | Prepare_Response
+    | Accept
+    | Accept_Response
+    | Committed
+}
+
+type PaxosProposal = {
+    id: ProposalId
+    proposer_id: String
+    value: Any
+    phase: PaxosPhase
+}
+
+type PrepareRequest = {
+    proposal_id: ProposalId
+    proposer_id: String
+}
+
+type PrepareResponse = {
+    accepted: Bool
+    proposal_id: ProposalId
+    accepted_id: Option[ProposalId]
+    accepted_value: Option[Any]
+}
+
+type AcceptRequest = {
+    proposal_id: ProposalId
+    value: Any
+}
+
+type AcceptResponse = {
+    accepted: Bool
+    proposal_id: ProposalId
+}
+
+struct PaxosProposer {
+    id: String
+    proposal_id: ProposalId
+    acceptors: List[String]
+    promised_ids: Map[String, ProposalId]
+    accepted_values: Map[String, Any]
+
+    fn new(id: String, acceptors: List[String]) -> PaxosProposer {
+        return PaxosProposer {
+            id: id,
+            proposal_id: 0,
+            acceptors: acceptors,
+            promised_ids: Map::new(),
+            accepted_values: Map::new(),
+        }
+    }
+
+    fn propose(value: Any) -> Option[Any] {
+        this.proposal_id = this.proposal_id + 1
+
+        -- Phase 1: Prepare
+        let prepare_count = 0
+
+        for acceptor_id in this.acceptors {
+            let response = send_prepare(acceptor_id, this.proposal_id, this.id)
+
+            if response.accepted {
+                prepare_count = prepare_count + 1
+
+                if response.accepted_value.is_some() {
+                    this.accepted_values[acceptor_id] = response.accepted_value.unwrap()
+                }
+            }
+        }
+
+        -- Check if majority accepted
+        if prepare_count <= (this.acceptors.len() / 2) {
+            return None
+        }
+
+        -- Phase 2: Accept
+        let accept_count = 0
+
+        for acceptor_id in this.acceptors {
+            let response = send_accept(acceptor_id, this.proposal_id, value)
+
+            if response.accepted {
+                accept_count = accept_count + 1
+            }
+        }
+
+        -- Check if majority accepted
+        if accept_count > (this.acceptors.len() / 2) {
+            return Some(value)
+        }
+
+        return None
+    }
+}
+
+struct PaxosAcceptor {
+    id: String
+    promised_id: ProposalId
+    accepted_id: Option[ProposalId]
+    accepted_value: Option[Any]
+
+    fn new(id: String) -> PaxosAcceptor {
+        return PaxosAcceptor {
+            id: id,
+            promised_id: 0,
+            accepted_id: None,
+            accepted_value: None,
+        }
+    }
+
+    fn handle_prepare(req: PrepareRequest) -> PrepareResponse {
+        if req.proposal_id > this.promised_id {
+            this.promised_id = req.proposal_id
+
+            return PrepareResponse {
+                accepted: true,
+                proposal_id: req.proposal_id,
+                accepted_id: this.accepted_id,
+                accepted_value: this.accepted_value,
+            }
+        }
+
+        return PrepareResponse {
+            accepted: false,
+            proposal_id: req.proposal_id,
+            accepted_id: None,
+            accepted_value: None,
+        }
+    }
+
+    fn handle_accept(req: AcceptRequest) -> AcceptResponse {
+        if req.proposal_id >= this.promised_id {
+            this.promised_id = req.proposal_id
+            this.accepted_id = Some(req.proposal_id)
+            this.accepted_value = Some(req.value)
+
+            return AcceptResponse {
+                accepted: true,
+                proposal_id: req.proposal_id,
+            }
+        }
+
+        return AcceptResponse {
+            accepted: false,
+            proposal_id: req.proposal_id,
+        }
+    }
+}
+
+-- Multi-Paxos with log replication
+struct MultiPaxosReplica {
+    id: String
+    log: List[PaxosProposal]
+    commit_index: Int
+    last_applied: Int
+    state_machine: StateMachine
+
+    fn new(id: String, state_machine: StateMachine) -> MultiPaxosReplica {
+        return MultiPaxosReplica {
+            id: id,
+            log: List::new(),
+            commit_index: 0,
+            last_applied: 0,
+            state_machine: state_machine,
+        }
+    }
+
+    fn apply_commands() {
+        while this.last_applied < this.commit_index {
+            let cmd = this.log[this.last_applied]
+            this.state_machine.execute(cmd.value)
+            this.last_applied = this.last_applied + 1
+        }
+    }
+
+    fn get_state() -> Any {
+        return this.state_machine.get_state()
+    }
+}
+
+-- PBFT (Practical Byzantine Fault Tolerance)
+enum PBFTMessageType {
+    | PrePrepare
+    | Prepare
+    | Commit
+    | ViewChange
+    | NewView
+}
+
+type PBFTMessage = {
+    msg_type: PBFTMessageType
+    view: Int
+    sequence: Int
+    replica_id: String
+    digest: String
+    signature: String
+}
+
+struct PBFTNode {
+    id: String
+    view: Int
+    sequence: Int
+    watermark_low: Int
+    watermark_high: Int
+    pending_requests: Map[String, Any]
+    prepared: Map[String, Bool]
+    committed: Map[String, Bool]
+
+    fn new(id: String, f: Int) -> PBFTNode {
+        return PBFTNode {
+            id: id,
+            view: 0,
+            sequence: 0,
+            watermark_low: 0,
+            watermark_high: f * 3,
+            pending_requests: Map::new(),
+            prepared: Map::new(),
+            committed: Map::new(),
+        }
+    }
+
+    fn execute_request(request_id: String, request: Any) -> Bool {
+        -- Check request not already executed
+        if this.committed.get(request_id).is_some() {
+            return false
+        }
+
+        -- Request replicas to prepare
+        -- Wait for 2f+1 prepare messages
+        -- Request replicas to commit
+        -- Wait for 2f+1 commit messages
+
+        this.committed[request_id] = true
+        return true
+    }
+
+    fn handle_view_change(f: Int) {
+        this.view = this.view + 1
+
+        -- Send view-change message
+        -- Wait for f+1 view-change messages
+        -- Primary sends new-view message
+    }
+
+    fn is_primary() -> Bool {
+        return this.id == get_primary_for_view(this.view)
+    }
+}
+
+-- Raft with snapshotting
+struct RaftNode {
+    id: String
+    state: RaftState
+    current_term: Int
+    voted_for: Option[String]
+    log: List[LogEntry]
+    commit_index: Int
+    last_applied: Int
+    next_index: Map[String, Int]
+    match_index: Map[String, Int]
+    snapshot_index: Int
+    snapshot_term: Int
+
+    fn new(id: String) -> RaftNode {
+        return RaftNode {
+            id: id,
+            state: RaftState::Follower,
+            current_term: 0,
+            voted_for: None,
+            log: List::new(),
+            commit_index: 0,
+            last_applied: 0,
+            next_index: Map::new(),
+            match_index: Map::new(),
+            snapshot_index: 0,
+            snapshot_term: 0,
+        }
+    }
+
+    fn request_vote(term: Int, candidate_id: String) -> Bool {
+        if term < this.current_term {
+            return false
+        }
+
+        if term == this.current_term && this.voted_for.is_some() {
+            return this.voted_for.unwrap() == candidate_id
+        }
+
+        this.current_term = term
+        this.voted_for = Some(candidate_id)
+
+        return true
+    }
+
+    fn append_entries(
+        term: Int,
+        leader_id: String,
+        prev_log_index: Int,
+        entries: List[LogEntry]
+    ) -> Bool {
+        if term < this.current_term {
+            return false
+        }
+
+        -- Update term if needed
+        if term > this.current_term {
+            this.current_term = term
+            this.state = RaftState::Follower
+        }
+
+        -- Check log consistency
+        if prev_log_index >= this.log.len() {
+            return false
+        }
+
+        -- Append entries
+        for entry in entries {
+            this.log.push(entry)
+        }
+
+        return true
+    }
+
+    fn install_snapshot(
+        term: Int,
+        leader_id: String,
+        snapshot_index: Int,
+        snapshot_term: Int,
+        data: Vec[u8]
+    ) -> Bool {
+        if term < this.current_term {
+            return false
+        }
+
+        this.snapshot_index = snapshot_index
+        this.snapshot_term = snapshot_term
+        this.last_applied = snapshot_index
+
+        -- Apply snapshot
+        return true
+    }
+}
+
+enum RaftState {
+    | Follower
+    | Candidate
+    | Leader
+}
+
+type LogEntry = {
+    term: Int
+    index: Int
+    command: Any
+}
+
+type StateMachine = Any
+
+fn send_prepare(acceptor_id: String, proposal_id: Int, proposer_id: String) -> PrepareResponse {
+    return PrepareResponse {
+        accepted: true,
+        proposal_id: proposal_id,
+        accepted_id: None,
+        accepted_value: None,
+    }
+}
+
+fn send_accept(acceptor_id: String, proposal_id: Int, value: Any) -> AcceptResponse {
+    return AcceptResponse {
+        accepted: true,
+        proposal_id: proposal_id,
+    }
+}
+
+fn get_primary_for_view(view: Int) -> String {
+    return "primary"
+}
+
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Any = Any
+type Vec<T> = Any
+
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }

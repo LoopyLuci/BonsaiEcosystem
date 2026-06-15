@@ -1,0 +1,319 @@
+// titan/compiler/inline_asm_parser.ti
+// Parser for Titan inline assembly syntax: asm! { "asm code" : constraints }
+
+pub struct AsmBlock {
+    template: String,           // "mov %0, %%eax" style template
+    outputs: Vec<AsmConstraint>,
+    inputs: Vec<AsmConstraint>,
+    clobbers: Vec<String>,      // Registers modified: "cc", "memory"
+    options: Vec<AsmOption>,    // volatile, alignstack, intel, etc.
+}
+
+pub struct AsmConstraint {
+    constraint: String,         // "=r", "=m", "0", etc.
+    value: String,              // Variable name or expression
+    reg_class: RegClass,        // For constraint checking
+}
+
+pub enum RegClass {
+    GeneralReg,     // r, R (any general register)
+    MemoryRef,      // m (memory reference)
+    Immediate,      // i (immediate constant)
+    Register(i32),  // Specific register 0-15
+}
+
+pub enum AsmOption {
+    Volatile,       // Don't optimize away
+    AlignStack,     // Align stack pointer
+    Intel,          // Intel syntax instead of AT&T
+    NoReturn,       // Function doesn't return
+    PureFunc,       // No side effects
+    NoInput,        // No inputs (only outputs)
+}
+
+pub fn parse_asm_block(source: String, pos: i64) -> (AsmBlock, i64) {
+    let mut asm = AsmBlock {
+        template: String::new(),
+        outputs: Vec::new(),
+        inputs: Vec::new(),
+        clobbers: Vec::new(),
+        options: Vec::new(),
+    };
+
+    let mut current_pos = pos;
+
+    // Skip 'asm! {'
+    while current_pos < source.len() && source_char_at(source, current_pos) != "{" {
+        current_pos = current_pos + 1;
+    }
+    current_pos = current_pos + 1;  // Skip '{'
+
+    // Parse template string
+    let (template, new_pos) = parse_string_literal(source, current_pos);
+    asm.template = template;
+    current_pos = new_pos;
+
+    // Skip whitespace and look for constraints
+    skip_whitespace(source, &mut current_pos);
+
+    if current_pos < source.len() && source_char_at(source, current_pos) == ":" {
+        current_pos = current_pos + 1;  // Skip ':'
+
+        // Parse outputs
+        loop {
+            skip_whitespace(source, &mut current_pos);
+            if current_pos >= source.len() || source_char_at(source, current_pos) != "\"" {
+                break;
+            }
+
+            let (constraint_str, new_pos) = parse_string_literal(source, current_pos);
+            current_pos = new_pos;
+
+            skip_whitespace(source, &mut current_pos);
+            if current_pos >= source.len() || source_char_at(source, current_pos) != "(" {
+                break;
+            }
+            current_pos = current_pos + 1;
+
+            let (var_name, new_pos) = parse_identifier(source, current_pos);
+            current_pos = new_pos;
+
+            skip_whitespace(source, &mut current_pos);
+            if current_pos < source.len() && source_char_at(source, current_pos) == ")" {
+                current_pos = current_pos + 1;
+            }
+
+            let reg_class = parse_reg_class(constraint_str);
+            asm.outputs.push(AsmConstraint {
+                constraint: constraint_str,
+                value: var_name,
+                reg_class: reg_class,
+            });
+
+            skip_whitespace(source, &mut current_pos);
+            if current_pos < source.len() && source_char_at(source, current_pos) == "," {
+                current_pos = current_pos + 1;
+            }
+        }
+
+        // Parse inputs (similar structure)
+        if current_pos < source.len() && source_char_at(source, current_pos) == ":" {
+            current_pos = current_pos + 1;
+
+            loop {
+                skip_whitespace(source, &mut current_pos);
+                if current_pos >= source.len() || source_char_at(source, current_pos) != "\"" {
+                    break;
+                }
+
+                let (constraint_str, new_pos) = parse_string_literal(source, current_pos);
+                current_pos = new_pos;
+
+                skip_whitespace(source, &mut current_pos);
+                if current_pos >= source.len() || source_char_at(source, current_pos) != "(" {
+                    break;
+                }
+                current_pos = current_pos + 1;
+
+                let (var_name, new_pos) = parse_identifier(source, current_pos);
+                current_pos = new_pos;
+
+                skip_whitespace(source, &mut current_pos);
+                if current_pos < source.len() && source_char_at(source, current_pos) == ")" {
+                    current_pos = current_pos + 1;
+                }
+
+                let reg_class = parse_reg_class(constraint_str);
+                asm.inputs.push(AsmConstraint {
+                    constraint: constraint_str,
+                    value: var_name,
+                    reg_class: reg_class,
+                });
+
+                skip_whitespace(source, &mut current_pos);
+                if current_pos < source.len() && source_char_at(source, current_pos) == "," {
+                    current_pos = current_pos + 1;
+                }
+            }
+        }
+
+        // Parse clobbers (registers that are destroyed)
+        if current_pos < source.len() && source_char_at(source, current_pos) == ":" {
+            current_pos = current_pos + 1;
+
+            loop {
+                skip_whitespace(source, &mut current_pos);
+                if current_pos >= source.len() || source_char_at(source, current_pos) != "\"" {
+                    break;
+                }
+
+                let (clobber, new_pos) = parse_string_literal(source, current_pos);
+                current_pos = new_pos;
+                asm.clobbers.push(clobber);
+
+                skip_whitespace(source, &mut current_pos);
+                if current_pos < source.len() && source_char_at(source, current_pos) == "," {
+                    current_pos = current_pos + 1;
+                }
+            }
+        }
+
+        // Parse options
+        if current_pos < source.len() && source_char_at(source, current_pos) == ":" {
+            current_pos = current_pos + 1;
+
+            loop {
+                skip_whitespace(source, &mut current_pos);
+                let (option_name, new_pos) = parse_identifier(source, current_pos);
+                current_pos = new_pos;
+
+                if option_name.len() == 0 {
+                    break;
+                }
+
+                let option = parse_asm_option(option_name);
+                asm.options.push(option);
+
+                skip_whitespace(source, &mut current_pos);
+                if current_pos < source.len() && source_char_at(source, current_pos) == "," {
+                    current_pos = current_pos + 1;
+                }
+            }
+        }
+    }
+
+    // Skip to closing '}'
+    while current_pos < source.len() && source_char_at(source, current_pos) != "}" {
+        current_pos = current_pos + 1;
+    }
+    if current_pos < source.len() {
+        current_pos = current_pos + 1;  // Skip '}'
+    }
+
+    return (asm, current_pos);
+}
+
+fn parse_reg_class(constraint: String) -> RegClass {
+    if constraint.len() == 0 {
+        return RegClass::GeneralReg;
+    }
+
+    let first_char = source_char_at(constraint, 0);
+    if first_char == "r" || first_char == "R" {
+        return RegClass::GeneralReg;
+    } else if first_char == "m" {
+        return RegClass::MemoryRef;
+    } else if first_char == "i" {
+        return RegClass::Immediate;
+    } else if first_char >= "0" && first_char <= "9" {
+        // Register number like "0", "1", etc.
+        return RegClass::Register(parse_i64(constraint, 0));
+    }
+
+    return RegClass::GeneralReg;
+}
+
+fn parse_asm_option(name: String) -> AsmOption {
+    if name == "volatile" {
+        return AsmOption::Volatile;
+    } else if name == "alignstack" {
+        return AsmOption::AlignStack;
+    } else if name == "intel" {
+        return AsmOption::Intel;
+    } else if name == "noreturn" {
+        return AsmOption::NoReturn;
+    } else if name == "pure" {
+        return AsmOption::PureFunc;
+    } else if name == "noinput" {
+        return AsmOption::NoInput;
+    }
+
+    return AsmOption::Volatile;  // Default
+}
+
+fn parse_string_literal(source: String, pos: i64) -> (String, i64) {
+    let mut current_pos = pos;
+    let mut result = String::new();
+
+    if current_pos >= source.len() || source_char_at(source, current_pos) != "\"" {
+        return (result, current_pos);
+    }
+
+    current_pos = current_pos + 1;  // Skip opening quote
+
+    while current_pos < source.len() && source_char_at(source, current_pos) != "\"" {
+        let ch = source_char_at(source, current_pos);
+        if ch == "\\" && current_pos + 1 < source.len() {
+            current_pos = current_pos + 1;
+            let escaped = source_char_at(source, current_pos);
+            if escaped == "n" {
+                result = result + "\n";
+            } else if escaped == "t" {
+                result = result + "\t";
+            } else if escaped == "\"" {
+                result = result + "\"";
+            } else {
+                result = result + escaped;
+            }
+        } else {
+            result = result + ch;
+        }
+        current_pos = current_pos + 1;
+    }
+
+    if current_pos < source.len() {
+        current_pos = current_pos + 1;  // Skip closing quote
+    }
+
+    return (result, current_pos);
+}
+
+fn parse_identifier(source: String, pos: i64) -> (String, i64) {
+    let mut current_pos = pos;
+    let mut result = String::new();
+
+    while current_pos < source.len() {
+        let ch = source_char_at(source, current_pos);
+        if (ch >= "a" && ch <= "z") || (ch >= "A" && ch <= "Z") || (ch >= "0" && ch <= "9") || ch == "_" {
+            result = result + ch;
+            current_pos = current_pos + 1;
+        } else {
+            break;
+        }
+    }
+
+    return (result, current_pos);
+}
+
+fn skip_whitespace(source: String, pos: &mut i64) {
+    while *pos < source.len() {
+        let ch = source_char_at(source, *pos);
+        if ch == " " || ch == "\t" || ch == "\n" || ch == "\r" {
+            *pos = *pos + 1;
+        } else {
+            break;
+        }
+    }
+}
+
+fn source_char_at(source: String, pos: i64) -> String {
+    // In real Titan, this would be a string indexing operation
+    // For now, return a placeholder
+    return " ";
+}
+
+fn parse_i64(s: String, pos: i64) -> i64 {
+    // Simple integer parsing
+    let mut result: i64 = 0;
+    let mut current_pos = pos;
+    while current_pos < s.len() {
+        let ch = source_char_at(s, current_pos);
+        if ch >= "0" && ch <= "9" {
+            result = result * 10 + (ch as i64 - "0" as i64);
+            current_pos = current_pos + 1;
+        } else {
+            break;
+        }
+    }
+    return result;
+}

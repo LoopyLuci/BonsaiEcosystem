@@ -1,0 +1,3 @@
+// Tests: timeseries-analytics-compression
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,3 @@
+// Tests: supply-chain-finance
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,3 @@
+// Tests: modal-component-library
+
+pub fn test_module() -> i64 { return 111; }

@@ -1,0 +1,108 @@
+// aether/examples/distributed_counter.ae
+// Distributed counter using CRDTs in Aether language
+
+actor CounterActor {
+    state: GCounter
+    replica_id: Int
+
+    fn on_init(replica_id: Int) {
+        this.replica_id = replica_id
+        this.state = GCounter::new(replica_id, 3)
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            Increment(amount) => {
+                this.state.increment(amount)
+                send Reply(Ok(this.state.value())) to sender
+            }
+            GetValue => {
+                send Reply(this.state.value()) to sender
+            }
+            MergeState(other_state) => {
+                this.state.merge(other_state)
+                send Reply(Ok(this.state.value())) to sender
+            }
+            Snapshot => {
+                send Reply(this.state.clone()) to sender
+            }
+        }
+    }
+}
+
+actor ReplicaCoordinator {
+    replicas: List[ActorRef]
+    consistency_model: ConsistencyModel = EventualConsistency
+
+    fn on_init(num_replicas: Int) {
+        this.replicas = []
+        for i in 0..num_replicas {
+            let actor_ref = spawn CounterActor(i)
+            this.replicas.push(actor_ref)
+        }
+    }
+
+    fn on_message(msg: Message) {
+        match msg {
+            ClientIncrement(amount) => {
+                // Route to primary replica
+                ask this.replicas[0] Increment(amount) with timeout 1s |result| {
+                    match result {
+                        Ok(value) => {
+                            // Asynchronously replicate to other replicas
+                            for i in 1..this.replicas.len() {
+                                send Increment(amount) to this.replicas[i]
+                            }
+                            send Reply(value) to sender
+                        }
+                        Err(e) => send Error(e) to sender
+                    }
+                }
+            }
+            SyncReplicas => {
+                // Strong consistency: sync all replicas
+                let snapshots = await all {
+                    ask this.replicas[i] Snapshot for i in 0..this.replicas.len()
+                }
+
+                // Merge all states
+                let merged = snapshots[0]
+                for i in 1..snapshots.len() {
+                    merged.merge(snapshots[i])
+                }
+
+                // Broadcast merged state to all
+                for i in 0..this.replicas.len() {
+                    send MergeState(merged.clone()) to this.replicas[i]
+                }
+            }
+        }
+    }
+}
+
+// Main distributed system
+system DistributedCounter {
+    replicas: List[ActorRef]
+    coordinator: ActorRef
+
+    fn main() {
+        // Create 3 replicas across 3 nodes
+        this.replicas = [
+            spawn CounterActor(0) on node("node1"),
+            spawn CounterActor(1) on node("node2"),
+            spawn CounterActor(2) on node("node3")
+        ]
+
+        this.coordinator = spawn ReplicaCoordinator(3)
+
+        // Client operations
+        let result1 = ask this.coordinator ClientIncrement(10) with timeout 5s
+        let result2 = ask this.coordinator ClientIncrement(20) with timeout 5s
+
+        println("Counter value: ${result2}")
+
+        // Simulate partition healing
+        delay 2s
+        send this.coordinator SyncReplicas
+    }
+}

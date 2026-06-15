@@ -1,0 +1,5 @@
+// Tests for rate-limiter
+
+pub fn test_module() -> i64 {
+    return 111;
+}

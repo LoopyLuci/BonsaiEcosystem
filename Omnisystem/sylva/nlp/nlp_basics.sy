@@ -1,0 +1,386 @@
+// sylva/nlp/nlp_basics.sy
+// Natural language processing basics for Sylva
+
+pub struct Token {
+    text: String,
+    lemma: String,
+    pos_tag: String,
+    start_char: i32,
+    end_char: i32,
+}
+
+pub struct Tokenizer {
+    vocabulary: Map<String, i32>,
+    word_count: i32,
+}
+
+impl Tokenizer {
+    pub fn new() -> Tokenizer {
+        return Tokenizer {
+            vocabulary: Map::new(),
+            word_count: 0,
+        };
+    }
+
+    pub fn tokenize(&mut self, text: &str) -> Vec<Token> {
+        let mut tokens: Vec<Token> = Vec::new();
+        let mut current_word = String::new();
+        let mut start_pos = 0;
+        let mut char_index = 0;
+
+        for ch in text.chars() {
+            char_index = char_index + 1;
+
+            if ch == ' ' || ch == '\t' || ch == '\n' {
+                if current_word.len() > 0 {
+                    let token = Token {
+                        text: current_word.clone(),
+                        lemma: this.lemmatize(current_word.as_str()),
+                        pos_tag: this.get_pos_tag(current_word.as_str()),
+                        start_char: start_pos,
+                        end_char: char_index - 1,
+                    };
+                    tokens.push(token);
+                    current_word = String::new();
+                }
+                start_pos = char_index;
+            } else if ch == '.' || ch == ',' || ch == '!' || ch == '?' {
+                if current_word.len() > 0 {
+                    let token = Token {
+                        text: current_word.clone(),
+                        lemma: this.lemmatize(current_word.as_str()),
+                        pos_tag: this.get_pos_tag(current_word.as_str()),
+                        start_char: start_pos,
+                        end_char: char_index - 1,
+                    };
+                    tokens.push(token);
+                    current_word = String::new();
+                }
+
+                // Punctuation as separate token
+                let punc_token = Token {
+                    text: ch.to_string(),
+                    lemma: ch.to_string(),
+                    pos_tag: "PUNCT".to_string(),
+                    start_char: char_index - 1,
+                    end_char: char_index,
+                };
+                tokens.push(punc_token);
+                start_pos = char_index;
+            } else {
+                current_word = current_word + ch.to_string().as_str();
+            }
+        }
+
+        if current_word.len() > 0 {
+            let token = Token {
+                text: current_word.clone(),
+                lemma: this.lemmatize(current_word.as_str()),
+                pos_tag: this.get_pos_tag(current_word.as_str()),
+                start_char: start_pos,
+                end_char: char_index,
+            };
+            tokens.push(token);
+        }
+
+        return tokens;
+    }
+
+    fn lemmatize(&self, word: &str) -> String {
+        // Simple lemmatization rules
+        if word.ends_with("ing") && word.len() > 4 {
+            return word.substring(0, word.len() - 3);
+        }
+
+        if word.ends_with("ed") && word.len() > 3 {
+            return word.substring(0, word.len() - 2);
+        }
+
+        if word.ends_with("s") && word.len() > 2 {
+            if !word.ends_with("ss") && !word.ends_with("us") {
+                return word.substring(0, word.len() - 1);
+            }
+        }
+
+        return word.to_string();
+    }
+
+    fn get_pos_tag(&self, word: &str) -> String {
+        // Simplified POS tagging
+        let word_lower = word.to_lowercase();
+
+        // Common articles
+        if word_lower == "the" || word_lower == "a" || word_lower == "an" {
+            return "DET".to_string();
+        }
+
+        // Common nouns (simplified)
+        if word_lower == "cat" || word_lower == "dog" || word_lower == "person" {
+            return "NOUN".to_string();
+        }
+
+        // Common verbs (simplified)
+        if word_lower == "run" || word_lower == "walk" || word_lower == "think" {
+            return "VERB".to_string();
+        }
+
+        // Common adjectives (simplified)
+        if word_lower == "big" || word_lower == "small" || word_lower == "good" {
+            return "ADJ".to_string();
+        }
+
+        return "NOUN".to_string(); // Default
+    }
+
+    pub fn build_vocabulary(&mut self, tokens: &Vec<Token>) {
+        for token in tokens {
+            if !this.vocabulary.contains_key(token.text.clone()) {
+                this.vocabulary[token.text.clone()] = this.word_count;
+                this.word_count = this.word_count + 1;
+            }
+        }
+    }
+}
+
+pub struct NamedEntityRecognizer {
+    entities: Vec<Entity>,
+    patterns: Vec<(String, String)>,
+}
+
+pub struct Entity {
+    text: String,
+    entity_type: String,
+    start_char: i32,
+    end_char: i32,
+    confidence: f64,
+}
+
+impl NamedEntityRecognizer {
+    pub fn new() -> NamedEntityRecognizer {
+        return NamedEntityRecognizer {
+            entities: Vec::new(),
+            patterns: Vec::new(),
+        };
+    }
+
+    pub fn recognize(&mut self, text: &str) -> Vec<Entity> {
+        let mut recognized: Vec<Entity> = Vec::new();
+
+        // Person names (simple heuristic: capitalized words)
+        let words = text.split(" ");
+        let mut char_pos = 0;
+
+        for word in words {
+            if word.len() > 0 {
+                let first_char = word.chars().next().unwrap();
+                if first_char.is_uppercase() {
+                    let entity = Entity {
+                        text: word.to_string(),
+                        entity_type: "PERSON".to_string(),
+                        start_char: char_pos,
+                        end_char: char_pos + word.len() as i32,
+                        confidence: 0.7,
+                    };
+                    recognized.push(entity);
+                }
+            }
+            char_pos = char_pos + (word.len() as i32) + 1;
+        }
+
+        return recognized;
+    }
+
+    pub fn add_pattern(&mut self, pattern: &str, entity_type: &str) {
+        self.patterns.push((pattern.to_string(), entity_type.to_string()));
+    }
+}
+
+pub struct SentimentAnalyzer {
+    positive_words: Vec<String>,
+    negative_words: Vec<String>,
+}
+
+impl SentimentAnalyzer {
+    pub fn new() -> SentimentAnalyzer {
+        let mut positive = Vec::new();
+        positive.push("good".to_string());
+        positive.push("great".to_string());
+        positive.push("excellent".to_string());
+        positive.push("amazing".to_string());
+        positive.push("wonderful".to_string());
+        positive.push("happy".to_string());
+        positive.push("love".to_string());
+
+        let mut negative = Vec::new();
+        negative.push("bad".to_string());
+        negative.push("terrible".to_string());
+        negative.push("awful".to_string());
+        negative.push("hate".to_string());
+        negative.push("sad".to_string());
+        negative.push("angry".to_string());
+        negative.push("disgusting".to_string());
+
+        return SentimentAnalyzer {
+            positive_words: positive,
+            negative_words: negative,
+        };
+    }
+
+    pub fn analyze(&self, text: &str) -> SentimentScore {
+        let words = text.split(" ");
+        let mut positive_count = 0;
+        let mut negative_count = 0;
+        let mut total_words = 0;
+
+        for word in words {
+            total_words = total_words + 1;
+            let word_lower = word.to_lowercase();
+
+            for pos_word in &self.positive_words {
+                if word_lower == pos_word {
+                    positive_count = positive_count + 1;
+                }
+            }
+
+            for neg_word in &self.negative_words {
+                if word_lower == neg_word {
+                    negative_count = negative_count + 1;
+                }
+            }
+        }
+
+        let positive_ratio = if total_words > 0 {
+            (positive_count as f64) / (total_words as f64)
+        } else {
+            0.0
+        };
+
+        let negative_ratio = if total_words > 0 {
+            (negative_count as f64) / (total_words as f64)
+        } else {
+            0.0
+        };
+
+        let sentiment = if positive_ratio > negative_ratio {
+            "positive"
+        } else if negative_ratio > positive_ratio {
+            "negative"
+        } else {
+            "neutral"
+        };
+
+        let confidence = if positive_count + negative_count > 0 {
+            ((positive_count + negative_count) as f64) / (total_words as f64)
+        } else {
+            0.0
+        };
+
+        return SentimentScore {
+            sentiment: sentiment.to_string(),
+            confidence: confidence,
+            positive_score: positive_ratio,
+            negative_score: negative_ratio,
+        };
+    }
+}
+
+pub struct SentimentScore {
+    sentiment: String,
+    confidence: f64,
+    positive_score: f64,
+    negative_score: f64,
+}
+
+pub struct POS_Tagger {
+    model: Vec<(String, String)>,
+}
+
+impl POS_Tagger {
+    pub fn new() -> POS_Tagger {
+        return POS_Tagger {
+            model: Vec::new(),
+        };
+    }
+
+    pub fn tag(&self, tokens: &Vec<Token>) -> Vec<String> {
+        let mut tags: Vec<String> = Vec::new();
+
+        for token in tokens {
+            let tag = this.predict_tag(token.text.as_str());
+            tags.push(tag);
+        }
+
+        return tags;
+    }
+
+    fn predict_tag(&self, word: &str) -> String {
+        let word_lower = word.to_lowercase();
+
+        // Rule-based tagging (simplified)
+        if word_lower.ends_with("ing") {
+            return "VBG".to_string(); // Verb, gerund
+        }
+
+        if word_lower.ends_with("ed") {
+            return "VBD".to_string(); // Verb, past tense
+        }
+
+        if word_lower.ends_with("ly") {
+            return "RB".to_string(); // Adverb
+        }
+
+        return "NN".to_string(); // Default noun
+    }
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl String {
+    pub fn len(&self) -> usize { return self.len; }
+    pub fn to_lowercase(&self) -> String { return String { data: self.data, len: self.len }; }
+    pub fn chars(&self) -> Vec<char> { return Vec::new(); }
+    pub fn split(&self, delimiter: &str) -> Vec<String> { return Vec::new(); }
+    pub fn ends_with(&self, suffix: &str) -> bool { return false; }
+    pub fn substring(&self, start: usize, end: usize) -> String { return String { data: self.data, len: end - start }; }
+    pub fn clone(&self) -> String { return String { data: self.data, len: self.len }; }
+    pub fn to_string(&self) -> String { return String { data: self.data, len: self.len }; }
+}
+
+pub struct char {
+    value: u32,
+}
+
+impl char {
+    pub fn is_uppercase(&self) -> bool { return false; }
+    pub fn to_string(&self) -> String { return String { data: 0 as *u8, len: 1 }; }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool { return false; }
+}

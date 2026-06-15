@@ -1,0 +1,5 @@
+// Tests for operational-excellence
+
+pub fn test_module() -> i64 {
+    return 111;
+}

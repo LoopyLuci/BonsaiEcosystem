@@ -1,0 +1,573 @@
+// titan/sys/process.ti
+// Process management and IPC for Titan
+
+pub enum ProcessStatus {
+    Running,
+    Paused,
+    Stopped,
+    Zombie,
+    Terminated,
+}
+
+pub struct Process {
+    pid: u32,
+    ppid: u32,
+    status: ProcessStatus,
+    exit_code: Option<i32>,
+    memory_usage: u64,
+    cpu_time: u64,
+}
+
+pub struct ProcessBuilder {
+    command: String,
+    args: Vec<String>,
+    env: Map<String, String>,
+    cwd: String,
+    stdin_pipe: bool,
+    stdout_pipe: bool,
+    stderr_pipe: bool,
+}
+
+impl ProcessBuilder {
+    pub fn new(command: &str) -> ProcessBuilder {
+        return ProcessBuilder {
+            command: command.to_string(),
+            args: Vec::new(),
+            env: Map::new(),
+            cwd: ".".to_string(),
+            stdin_pipe: false,
+            stdout_pipe: false,
+            stderr_pipe: false,
+        };
+    }
+
+    pub fn arg(&mut self, arg: &str) -> &mut ProcessBuilder {
+        self.args.push(arg.to_string());
+        return self;
+    }
+
+    pub fn args(&mut self, args: &[String]) -> &mut ProcessBuilder {
+        for arg in args {
+            self.args.push(arg.clone());
+        }
+        return self;
+    }
+
+    pub fn env(&mut self, key: &str, value: &str) -> &mut ProcessBuilder {
+        self.env[key.to_string()] = value.to_string();
+        return self;
+    }
+
+    pub fn current_dir(&mut self, dir: &str) -> &mut ProcessBuilder {
+        self.cwd = dir.to_string();
+        return self;
+    }
+
+    pub fn stdin(&mut self, pipe: bool) -> &mut ProcessBuilder {
+        self.stdin_pipe = pipe;
+        return self;
+    }
+
+    pub fn stdout(&mut self, pipe: bool) -> &mut ProcessBuilder {
+        self.stdout_pipe = pipe;
+        return self;
+    }
+
+    pub fn stderr(&mut self, pipe: bool) -> &mut ProcessBuilder {
+        self.stderr_pipe = pipe;
+        return self;
+    }
+
+    pub fn spawn(&self) -> Result<Child, String> ! {process} {
+        let pid: u32 = 0;
+
+        asm! {
+            "call fork"
+            : "=a"(pid)
+            :
+            :
+            : volatile
+        }
+
+        if pid < 0 {
+            return Result::Err("Failed to fork process".to_string());
+        }
+
+        if pid == 0 {
+            // Child process
+            self.exec_child();
+        }
+
+        return Result::Ok(Child {
+            pid: pid,
+            status: ProcessStatus::Running,
+        });
+    }
+
+    fn exec_child(&self) {
+        // Change directory
+        // Set environment variables
+        // Execute command
+
+        asm! {
+            "call execve"
+            :
+            : "d"(self.command), "c"(self.args)
+            :
+            : volatile
+        }
+    }
+}
+
+pub struct Child {
+    pid: u32,
+    status: ProcessStatus,
+}
+
+impl Child {
+    pub fn wait(&mut self) -> Result<i32, String> ! {process} {
+        let exit_code: i32 = 0;
+
+        asm! {
+            "call waitpid"
+            : "=a"(exit_code)
+            : "d"(self.pid)
+            :
+            : volatile
+        }
+
+        self.status = ProcessStatus::Terminated;
+        return Result::Ok(exit_code);
+    }
+
+    pub fn kill(&self) -> Result<(), String> ! {process} {
+        let result: i32 = 0;
+
+        asm! {
+            "call kill"
+            : "=a"(result)
+            : "d"(self.pid), "c"(9)
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Failed to kill process".to_string());
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn try_wait(&mut self) -> Result<Option<i32>, String> ! {process} {
+        let exit_code: i32 = 0;
+
+        asm! {
+            "call waitpid"
+            : "=a"(exit_code)
+            : "d"(self.pid), "c"(1)
+            :
+            : volatile
+        }
+
+        if exit_code < 0 {
+            return Result::Ok(Option::None);
+        }
+
+        self.status = ProcessStatus::Terminated;
+        return Result::Ok(Option::Some(exit_code));
+    }
+}
+
+// IPC primitives
+pub struct Pipe {
+    read_fd: i32,
+    write_fd: i32,
+}
+
+impl Pipe {
+    pub fn create() -> Result<Pipe, String> ! {ipc} {
+        let fds: [i32; 2] = [0, 0];
+
+        asm! {
+            "call pipe"
+            :
+            : "d"(&fds)
+            :
+            : volatile
+        }
+
+        if fds[0] < 0 {
+            return Result::Err("Failed to create pipe".to_string());
+        }
+
+        return Result::Ok(Pipe {
+            read_fd: fds[0],
+            write_fd: fds[1],
+        });
+    }
+
+    pub fn read(&self, buffer: &mut [u8]) -> Result<usize, String> ! {ipc} {
+        let bytes_read: i32 = 0;
+
+        asm! {
+            "call read"
+            : "=a"(bytes_read)
+            : "d"(self.read_fd), "c"(buffer), "S"(buffer.len())
+            :
+            : volatile
+        }
+
+        if bytes_read < 0 {
+            return Result::Err("Failed to read from pipe".to_string());
+        }
+
+        return Result::Ok(bytes_read as usize);
+    }
+
+    pub fn write(&self, data: &[u8]) -> Result<usize, String> ! {ipc} {
+        let bytes_written: i32 = 0;
+
+        asm! {
+            "call write"
+            : "=a"(bytes_written)
+            : "d"(self.write_fd), "c"(data), "S"(data.len())
+            :
+            : volatile
+        }
+
+        if bytes_written < 0 {
+            return Result::Err("Failed to write to pipe".to_string());
+        }
+
+        return Result::Ok(bytes_written as usize);
+    }
+
+    pub fn close_read(&self) -> Result<(), String> ! {ipc} {
+        let result: i32 = 0;
+
+        asm! {
+            "call close"
+            : "=a"(result)
+            : "d"(self.read_fd)
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Failed to close read end".to_string());
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn close_write(&self) -> Result<(), String> ! {ipc} {
+        let result: i32 = 0;
+
+        asm! {
+            "call close"
+            : "=a"(result)
+            : "d"(self.write_fd)
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Failed to close write end".to_string());
+        }
+
+        return Result::Ok(());
+    }
+}
+
+// Message queue
+pub struct MessageQueue {
+    queue_id: i32,
+    messages: Vec<Message>,
+}
+
+pub struct Message {
+    msg_type: i64,
+    data: Vec<u8>,
+}
+
+impl MessageQueue {
+    pub fn create(key: i32) -> Result<MessageQueue, String> ! {ipc} {
+        let queue_id: i32 = 0;
+
+        asm! {
+            "call msgget"
+            : "=a"(queue_id)
+            : "d"(key), "c"(0o666)
+            :
+            : volatile
+        }
+
+        if queue_id < 0 {
+            return Result::Err("Failed to create message queue".to_string());
+        }
+
+        return Result::Ok(MessageQueue {
+            queue_id: queue_id,
+            messages: Vec::new(),
+        });
+    }
+
+    pub fn send(&mut self, msg_type: i64, data: &[u8]) -> Result<(), String> ! {ipc} {
+        let result: i32 = 0;
+
+        asm! {
+            "call msgsnd"
+            : "=a"(result)
+            : "d"(self.queue_id), "c"(msg_type), "S"(data), "D"(data.len())
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Failed to send message".to_string());
+        }
+
+        self.messages.push(Message {
+            msg_type: msg_type,
+            data: data.to_vec(),
+        });
+
+        return Result::Ok(());
+    }
+
+    pub fn receive(&mut self, msg_type: i64) -> Result<Message, String> ! {ipc} {
+        for i in 0..self.messages.len() {
+            if self.messages[i].msg_type == msg_type {
+                let msg = self.messages[i].clone();
+                self.messages.remove(i);
+                return Result::Ok(msg);
+            }
+        }
+
+        return Result::Err("No message found".to_string());
+    }
+}
+
+// Shared memory
+pub struct SharedMemory {
+    shmid: i32,
+    addr: *u8,
+    size: usize,
+}
+
+impl SharedMemory {
+    pub fn create(key: i32, size: usize) -> Result<SharedMemory, String> ! {ipc} {
+        let shmid: i32 = 0;
+
+        asm! {
+            "call shmget"
+            : "=a"(shmid)
+            : "d"(key), "c"(size), "S"(0o666)
+            :
+            : volatile
+        }
+
+        if shmid < 0 {
+            return Result::Err("Failed to create shared memory".to_string());
+        }
+
+        let addr: *u8 = 0 as *u8;
+
+        asm! {
+            "call shmat"
+            : "=a"(addr)
+            : "d"(shmid), "c"(0), "S"(0)
+            :
+            : volatile
+        }
+
+        if addr as i32 < 0 {
+            return Result::Err("Failed to attach shared memory".to_string());
+        }
+
+        return Result::Ok(SharedMemory {
+            shmid: shmid,
+            addr: addr,
+            size: size,
+        });
+    }
+
+    pub fn write(&self, offset: usize, data: &[u8]) -> Result<(), String> ! {ipc} {
+        for i in 0..data.len() {
+            if offset + i >= self.size {
+                return Result::Err("Write beyond shared memory bounds".to_string());
+            }
+
+            unsafe {
+                *(self.addr as *u8).add(offset + i) = data[i];
+            }
+        }
+
+        return Result::Ok(());
+    }
+
+    pub fn read(&self, offset: usize, size: usize) -> Result<Vec<u8>, String> ! {ipc} {
+        let mut result: Vec<u8> = Vec::new();
+
+        for i in 0..size {
+            if offset + i >= self.size {
+                return Result::Err("Read beyond shared memory bounds".to_string());
+            }
+
+            unsafe {
+                result.push(*(self.addr as *u8).add(offset + i));
+            }
+        }
+
+        return Result::Ok(result);
+    }
+
+    pub fn detach(&self) -> Result<(), String> ! {ipc} {
+        let result: i32 = 0;
+
+        asm! {
+            "call shmdt"
+            : "=a"(result)
+            : "d"(self.addr)
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Failed to detach shared memory".to_string());
+        }
+
+        return Result::Ok(());
+    }
+}
+
+// Semaphore
+pub struct Semaphore {
+    semid: i32,
+    value: i32,
+}
+
+impl Semaphore {
+    pub fn create(key: i32, initial_value: i32) -> Result<Semaphore, String> ! {ipc} {
+        let semid: i32 = 0;
+
+        asm! {
+            "call semget"
+            : "=a"(semid)
+            : "d"(key), "c"(1), "S"(0o666)
+            :
+            : volatile
+        }
+
+        if semid < 0 {
+            return Result::Err("Failed to create semaphore".to_string());
+        }
+
+        return Result::Ok(Semaphore {
+            semid: semid,
+            value: initial_value,
+        });
+    }
+
+    pub fn wait(&mut self) -> Result<(), String> ! {ipc} {
+        let result: i32 = 0;
+
+        asm! {
+            "call semop"
+            : "=a"(result)
+            : "d"(self.semid), "c"(-1)
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Semaphore wait failed".to_string());
+        }
+
+        self.value = self.value - 1;
+        return Result::Ok(());
+    }
+
+    pub fn signal(&mut self) -> Result<(), String> ! {ipc} {
+        let result: i32 = 0;
+
+        asm! {
+            "call semop"
+            : "=a"(result)
+            : "d"(self.semid), "c"(1)
+            :
+            : volatile
+        }
+
+        if result < 0 {
+            return Result::Err("Semaphore signal failed".to_string());
+        }
+
+        self.value = self.value + 1;
+        return Result::Ok(());
+    }
+
+    pub fn get_value(&self) -> i32 {
+        return self.value;
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+impl<T, E> Result<T, E> {
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Result::Ok(_) => return true,
+            Result::Err(_) => return false,
+        }
+    }
+}
+
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn remove(&mut self, index: usize) {}
+    pub fn len(&self) -> usize { return self.len; }
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+}

@@ -1,0 +1,3 @@
+// Tests: docker-engine-core
+
+pub fn test_module() -> i64 { return 111; }

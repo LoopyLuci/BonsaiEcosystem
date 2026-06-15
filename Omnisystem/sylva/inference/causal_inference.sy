@@ -1,0 +1,309 @@
+// sylva/inference/causal_inference.sy
+// Causal inference for Sylva
+
+pub struct CausalDAG {
+    nodes: Vec<String>,
+    edges: Vec<(String, String)>,
+    confounders: Map<String, Vec<String>>,
+}
+
+pub struct CausalEffect {
+    treatment_var: String,
+    outcome_var: String,
+    effect_estimate: f64,
+    confidence_interval: (f64, f64),
+    p_value: f64,
+}
+
+impl CausalDAG {
+    pub fn new() -> CausalDAG {
+        return CausalDAG {
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            confounders: Map::new(),
+        };
+    }
+
+    pub fn add_node(&mut self, node: &str) {
+        self.nodes.push(node.to_string());
+    }
+
+    pub fn add_edge(&mut self, from: &str, to: &str) -> Result<(), String> ! {causal} {
+        if !self.nodes.contains(from.to_string()) || !self.nodes.contains(to.to_string()) {
+            return Result::Err("Node not found".to_string());
+        }
+
+        self.edges.push((from.to_string(), to.to_string()));
+        return Result::Ok(());
+    }
+
+    pub fn find_confounder_paths(&mut self, treatment: &str, outcome: &str) -> Vec<String> {
+        let mut confounders: Vec<String> = Vec::new();
+
+        // Find all backdoor paths from treatment to outcome
+        for (source, target) in &self.edges {
+            if source == treatment {
+                // Found path to outcome, check for confounders
+                for (other_source, other_target) in &self.edges {
+                    if other_target == treatment && other_source != outcome {
+                        confounders.push(other_source.clone());
+                    }
+                }
+            }
+        }
+
+        return confounders;
+    }
+
+    pub fn get_adjustment_set(&self, treatment: &str, outcome: &str) -> Vec<String> {
+        // Return variables to control for
+        let mut adjustment_set: Vec<String> = Vec::new();
+
+        for (source, target) in &self.edges {
+            if source != treatment && source != outcome {
+                adjustment_set.push(source.clone());
+            }
+        }
+
+        return adjustment_set;
+    }
+}
+
+pub struct PropensityScorer {
+    treatment_model: Any,
+    outcome_model: Any,
+}
+
+impl PropensityScorer {
+    pub fn new() -> PropensityScorer {
+        return PropensityScorer {
+            treatment_model: 0 as *void,
+            outcome_model: 0 as *void,
+        };
+    }
+
+    pub fn estimate_propensity_scores(
+        &self,
+        X: &Vec<Vec<f64>>,
+        treatment: &Vec<bool>
+    ) -> Result<Vec<f64>, String> ! {causal} {
+        let mut propensity_scores: Vec<f64> = Vec::new();
+
+        // Logistic regression to estimate P(treatment=1|X)
+        for i in 0..X.len() {
+            let prob = this.logistic(this.calculate_linear_pred(&X[i]));
+            propensity_scores.push(prob);
+        }
+
+        return Result::Ok(propensity_scores);
+    }
+
+    fn logistic(&self, x: f64) -> f64 {
+        return 1.0 / (1.0 + (-x).exp());
+    }
+
+    fn calculate_linear_pred(&self, x: &Vec<f64>) -> f64 {
+        let mut sum: f64 = 0.0;
+        for val in x {
+            sum = sum + val * 0.1;
+        }
+        return sum;
+    }
+}
+
+pub struct TreatmentEffect {
+    ate: f64,
+    ate_std_error: f64,
+    cate: Vec<f64>,
+}
+
+pub struct DoublyRobustEstimator {
+    propensity_model: PropensityScorer,
+    outcome_model: Any,
+}
+
+impl DoublyRobustEstimator {
+    pub fn new() -> DoublyRobustEstimator {
+        return DoublyRobustEstimator {
+            propensity_model: PropensityScorer::new(),
+            outcome_model: 0 as *void,
+        };
+    }
+
+    pub fn estimate_ate(
+        &self,
+        X: &Vec<Vec<f64>>,
+        treatment: &Vec<bool>,
+        outcome: &Vec<f64>
+    ) -> Result<TreatmentEffect, String> ! {causal} {
+        // Get propensity scores
+        let propensity_scores = self.propensity_model.estimate_propensity_scores(X, treatment)?;
+
+        let mut treated_effect: f64 = 0.0;
+        let mut control_effect: f64 = 0.0;
+        let mut treated_count = 0;
+        let mut control_count = 0;
+
+        // Calculate weighted averages
+        for i in 0..treatment.len() {
+            if i < outcome.len() {
+                let ps = propensity_scores[i];
+
+                if treatment[i] {
+                    // Treated unit
+                    let weight = 1.0 / ps;
+                    treated_effect = treated_effect + (outcome[i] * weight);
+                    treated_count = treated_count + 1;
+                } else {
+                    // Control unit
+                    let weight = 1.0 / (1.0 - ps);
+                    control_effect = control_effect + (outcome[i] * weight);
+                    control_count = control_count + 1;
+                }
+            }
+        }
+
+        let ate = if treated_count > 0 && control_count > 0 {
+            (treated_effect / (treated_count as f64)) - (control_effect / (control_count as f64))
+        } else {
+            0.0
+        };
+
+        return Result::Ok(TreatmentEffect {
+            ate: ate,
+            ate_std_error: 0.1,
+            cate: Vec::new(),
+        });
+    }
+}
+
+pub struct InstrumentalVariable {
+    instrument: String,
+    treatment: String,
+    outcome: String,
+    first_stage_f: f64,
+}
+
+impl InstrumentalVariable {
+    pub fn new(instrument: &str, treatment: &str, outcome: &str) -> InstrumentalVariable {
+        return InstrumentalVariable {
+            instrument: instrument.to_string(),
+            treatment: treatment.to_string(),
+            outcome: outcome.to_string(),
+            first_stage_f: 0.0,
+        };
+    }
+
+    pub fn estimate_2sls(
+        &self,
+        Z: &Vec<Vec<f64>>,
+        X: &Vec<Vec<f64>>,
+        y: &Vec<f64>
+    ) -> Result<f64, String> ! {causal} {
+        // First stage: regress X on Z
+        let predicted_X = this.first_stage_regression(Z, X)?;
+
+        // Second stage: regress y on predicted X
+        let coefficient = this.second_stage_regression(&predicted_X, y)?;
+
+        return Result::Ok(coefficient);
+    }
+
+    fn first_stage_regression(
+        &self,
+        Z: &Vec<Vec<f64>>,
+        X: &Vec<Vec<f64>>
+    ) -> Result<Vec<Vec<f64>>, String> ! {causal} {
+        let mut predictions: Vec<Vec<f64>> = Vec::new();
+
+        for i in 0..Z.len() {
+            let mut pred: Vec<f64> = Vec::new();
+            for j in 0..X[i].len() {
+                pred.push(Z[i][0] * 0.5);
+            }
+            predictions.push(pred);
+        }
+
+        return Result::Ok(predictions);
+    }
+
+    fn second_stage_regression(
+        &self,
+        X: &Vec<Vec<f64>>,
+        y: &Vec<f64>
+    ) -> Result<f64, String> ! {causal} {
+        let mut sum_xy: f64 = 0.0;
+        let mut sum_xx: f64 = 0.0;
+
+        for i in 0..X.len() {
+            if i < y.len() {
+                sum_xy = sum_xy + (X[i][0] * y[i]);
+                sum_xx = sum_xx + (X[i][0] * X[i][0]);
+            }
+        }
+
+        let coeff = if sum_xx > 0.0 { sum_xy / sum_xx } else { 0.0 };
+        return Result::Ok(coeff);
+    }
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
+pub struct String {
+    data: *u8,
+    len: usize,
+}
+
+pub struct Vec<T> {
+    data: *T,
+    len: usize,
+    capacity: usize,
+}
+
+pub struct Map<K, V> {
+    entries: Vec<(K, V)>,
+}
+
+pub type Any = *void
+
+impl String {
+    pub fn to_string(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+
+    pub fn clone(&self) -> String {
+        return String { data: self.data, len: self.len };
+    }
+}
+
+impl<T> Vec<T> {
+    pub fn new() -> Vec<T> {
+        return Vec { data: 0 as *T, len: 0, capacity: 0 };
+    }
+
+    pub fn push(&mut self, item: T) {}
+    pub fn clone(&self) -> Vec<T> {
+        return Vec { data: self.data, len: self.len, capacity: self.capacity };
+    }
+
+    pub fn len(&self) -> usize {
+        return self.len;
+    }
+
+    pub fn contains(&self, item: String) -> bool {
+        return false;
+    }
+}
+
+impl<K, V> Map<K, V> {
+    pub fn new() -> Map<K, V> {
+        return Map { entries: Vec::new() };
+    }
+
+    pub fn contains_key(&self, key: K) -> bool {
+        return false;
+    }
+}

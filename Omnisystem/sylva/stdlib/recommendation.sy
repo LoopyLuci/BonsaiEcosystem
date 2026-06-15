@@ -1,0 +1,441 @@
+// sylva/stdlib/recommendation.sy
+// Recommendation systems for Sylva
+
+struct UserItem {
+    user_id: String
+    item_id: String
+    rating: Float
+    timestamp: i64
+}
+
+struct RecommenderSystem {
+    algorithm: RecommendationAlgorithm
+    trained: Bool
+}
+
+enum RecommendationAlgorithm {
+    | CollaborativeFiltering(CFParams)
+    | ContentBased(CBParams)
+    | Hybrid(HybridParams)
+    | MatrixFactorization(MFParams)
+    | DeepLearning(DLParams)
+}
+
+struct CFParams {
+    n_neighbors: Int
+    similarity_metric: String
+}
+
+struct CBParams {
+    item_features: Tensor[f32]
+    feature_weights: Tensor[f32]
+}
+
+struct HybridParams {
+    cf_weight: Float
+    cb_weight: Float
+}
+
+struct MFParams {
+    n_factors: Int
+    n_epochs: Int
+    learning_rate: Float
+    regularization: Float
+}
+
+struct DLParams {
+    embedding_dim: Int
+    hidden_layers: List[Int]
+    learning_rate: Float
+}
+
+impl RecommenderSystem {
+    fn new(algorithm: RecommendationAlgorithm) -> RecommenderSystem {
+        return RecommenderSystem {
+            algorithm: algorithm,
+            trained: false,
+        }
+    }
+
+    fn fit(interactions: List[UserItem]) -> RecommenderSystem {
+        let mut model = RecommenderSystem::new(this.algorithm)
+
+        match this.algorithm {
+            RecommendationAlgorithm::CollaborativeFiltering(params) => {
+                model = fit_collaborative_filtering(interactions, params)
+            }
+
+            RecommendationAlgorithm::MatrixFactorization(params) => {
+                model = fit_matrix_factorization(interactions, params)
+            }
+
+            RecommendationAlgorithm::ContentBased(params) => {
+                model = fit_content_based(interactions, params)
+            }
+
+            RecommendationAlgorithm::DeepLearning(params) => {
+                model = fit_deep_learning_model(interactions, params)
+            }
+
+            RecommendationAlgorithm::Hybrid(params) => {
+                model = fit_hybrid_model(interactions, params)
+            }
+        }
+
+        model.trained = true
+        return model
+    }
+
+    fn predict(user_id: String, n_recommendations: Int) -> List[Recommendation] {
+        if !this.trained {
+            return List::new()
+        }
+
+        match this.algorithm {
+            RecommendationAlgorithm::CollaborativeFiltering(_) => {
+                return predict_collaborative_filtering(user_id, n_recommendations, this)
+            }
+
+            RecommendationAlgorithm::MatrixFactorization(_) => {
+                return predict_matrix_factorization(user_id, n_recommendations, this)
+            }
+
+            _ => {
+                return List::new()
+            }
+        }
+    }
+
+    fn predict_rating(user_id: String, item_id: String) -> Float {
+        return 0.0
+    }
+}
+
+type Recommendation = {
+    item_id: String
+    score: Float
+    rank: Int
+}
+
+// Collaborative Filtering
+struct CollaborativeFilteringModel {
+    user_embeddings: Map[String, Tensor[f32]]
+    item_embeddings: Map[String, Tensor[f32]]
+    user_similarity: Map[String, List[(String, Float)]]
+}
+
+impl CollaborativeFilteringModel {
+    fn new() -> CollaborativeFilteringModel {
+        return CollaborativeFilteringModel {
+            user_embeddings: Map::new(),
+            item_embeddings: Map::new(),
+            user_similarity: Map::new(),
+        }
+    }
+
+    fn fit(interactions: List[UserItem]) -> CollaborativeFilteringModel {
+        let mut model = CollaborativeFilteringModel::new()
+
+        // Build user-item matrix
+        let user_item_matrix = build_user_item_matrix(interactions)
+
+        // Compute user similarities
+        for user in get_unique_users(interactions) {
+            let user_vec = user_item_matrix[user]
+
+            let mut similarities = List::new()
+
+            for other_user in get_unique_users(interactions) {
+                if user != other_user {
+                    let other_vec = user_item_matrix[other_user]
+                    let similarity = compute_cosine_similarity(user_vec, other_vec)
+
+                    similarities.push((other_user, similarity))
+                }
+            }
+
+            model.user_similarity[user] = similarities
+        }
+
+        return model
+    }
+
+    fn predict(user_id: String, n_recommendations: Int) -> List[Recommendation] {
+        let mut recommendations = List::new()
+
+        let similarities = this.user_similarity.get(user_id)
+
+        if similarities.is_none() {
+            return recommendations
+        }
+
+        let similar_users = similarities.unwrap()
+
+        // Get items rated by similar users
+        let mut item_scores = Map::new()
+
+        for (similar_user, sim) in similar_users {
+            // Get items liked by similar user
+            // Weight by similarity
+        }
+
+        // Sort items by score
+        // Return top N
+
+        return recommendations
+    }
+}
+
+// Matrix Factorization
+struct MatrixFactorization {
+    user_factors: Tensor[f32, "n_users,n_factors"]
+    item_factors: Tensor[f32, "n_items,n_factors"]
+    user_bias: Tensor[f32, "n_users"]
+    item_bias: Tensor[f32, "n_items"]
+    global_mean: Float
+}
+
+impl MatrixFactorization {
+    fn new(n_users: Int, n_items: Int, n_factors: Int) -> MatrixFactorization {
+        return MatrixFactorization {
+            user_factors: randn([n_users, n_factors]),
+            item_factors: randn([n_items, n_factors]),
+            user_bias: zeros([n_users]),
+            item_bias: zeros([n_items]),
+            global_mean: 0.0,
+        }
+    }
+
+    fn fit(
+        interactions: List[UserItem],
+        n_epochs: Int,
+        learning_rate: Float,
+        regularization: Float
+    ) -> MatrixFactorization {
+        for epoch in 0..n_epochs {
+            for interaction in interactions {
+                let user_idx = get_user_idx(interaction.user_id)
+                let item_idx = get_item_idx(interaction.item_id)
+
+                // Predict
+                let pred = predict_rating_mf(
+                    this.user_factors[user_idx],
+                    this.item_factors[item_idx],
+                    this.user_bias[user_idx],
+                    this.item_bias[item_idx],
+                    this.global_mean
+                )
+
+                // Compute error
+                let error = interaction.rating - pred
+
+                // Update factors
+                let user_grad = compute_gradient(this.item_factors[item_idx], regularization)
+                let item_grad = compute_gradient(this.user_factors[user_idx], regularization)
+
+                this.user_factors[user_idx] = this.user_factors[user_idx] + learning_rate * user_grad
+                this.item_factors[item_idx] = this.item_factors[item_idx] + learning_rate * item_grad
+            }
+        }
+
+        return this
+    }
+
+    fn predict(user_id: String, item_id: String) -> Float {
+        let user_idx = get_user_idx(user_id)
+        let item_idx = get_item_idx(item_id)
+
+        return predict_rating_mf(
+            this.user_factors[user_idx],
+            this.item_factors[item_idx],
+            this.user_bias[user_idx],
+            this.item_bias[item_idx],
+            this.global_mean
+        )
+    }
+}
+
+// Content-Based Filtering
+struct ContentBasedModel {
+    item_features: Map[String, Tensor[f32]]
+    user_preferences: Map[String, Tensor[f32]]
+}
+
+impl ContentBasedModel {
+    fn fit(interactions: List[UserItem], item_features: Map[String, Tensor[f32]]) -> ContentBasedModel {
+        let mut model = ContentBasedModel {
+            item_features: item_features,
+            user_preferences: Map::new(),
+        }
+
+        // Learn user preferences from rated items
+        for user in get_unique_users(interactions) {
+            let user_ratings = get_user_ratings(interactions, user)
+
+            let mut preference = zeros([get_feature_dim()])
+
+            for (item, rating) in user_ratings {
+                let features = item_features.get(item)
+
+                if features.is_some() {
+                    let feat = features.unwrap()
+
+                    for i in 0..feat.shape[0] {
+                        preference[i] = preference[i] + rating * feat[i]
+                    }
+                }
+            }
+
+            model.user_preferences[user] = preference
+        }
+
+        return model
+    }
+
+    fn predict(user_id: String, items: List[String]) -> List[Recommendation] {
+        let mut recommendations = List::new()
+
+        let preference = this.user_preferences.get(user_id)
+
+        if preference.is_none() {
+            return recommendations
+        }
+
+        let pref = preference.unwrap()
+
+        for item in items {
+            let features = this.item_features.get(item)
+
+            if features.is_some() {
+                let feat = features.unwrap()
+                let score = compute_dot_product(pref, feat)
+
+                recommendations.push(Recommendation {
+                    item_id: item,
+                    score: score,
+                    rank: 0,
+                })
+            }
+        }
+
+        // Sort and rank
+        return recommendations
+    }
+}
+
+// Hybrid Model
+struct HybridModel {
+    cf_model: CollaborativeFilteringModel
+    cb_model: ContentBasedModel
+    cf_weight: Float
+    cb_weight: Float
+}
+
+impl HybridModel {
+    fn predict(user_id: String, items: List[String]) -> List[Recommendation] {
+        let cf_recs = this.cf_model.predict(user_id, items.len())
+        let cb_recs = this.cb_model.predict(user_id, items)
+
+        let mut hybrid_recs = List::new()
+
+        // Combine scores
+        for item in items {
+            let cf_score = get_score_for_item(cf_recs, item)
+            let cb_score = get_score_for_item(cb_recs, item)
+
+            let combined_score = this.cf_weight * cf_score + this.cb_weight * cb_score
+
+            hybrid_recs.push(Recommendation {
+                item_id: item,
+                score: combined_score,
+                rank: 0,
+            })
+        }
+
+        return hybrid_recs
+    }
+}
+
+// Helper functions
+fn fit_collaborative_filtering(interactions: List[UserItem], params: CFParams) -> RecommenderSystem {
+    return RecommenderSystem::new(RecommendationAlgorithm::CollaborativeFiltering(params))
+}
+
+fn fit_matrix_factorization(interactions: List[UserItem], params: MFParams) -> RecommenderSystem {
+    return RecommenderSystem::new(RecommendationAlgorithm::MatrixFactorization(params))
+}
+
+fn fit_content_based(interactions: List[UserItem], params: CBParams) -> RecommenderSystem {
+    return RecommenderSystem::new(RecommendationAlgorithm::ContentBased(params))
+}
+
+fn fit_deep_learning_model(interactions: List[UserItem], params: DLParams) -> RecommenderSystem {
+    return RecommenderSystem::new(RecommendationAlgorithm::DeepLearning(params))
+}
+
+fn fit_hybrid_model(interactions: List[UserItem], params: HybridParams) -> RecommenderSystem {
+    return RecommenderSystem::new(RecommendationAlgorithm::Hybrid(params))
+}
+
+fn predict_collaborative_filtering(user_id: String, n: Int, model: RecommenderSystem) -> List[Recommendation] {
+    return List::new()
+}
+
+fn predict_matrix_factorization(user_id: String, n: Int, model: RecommenderSystem) -> List[Recommendation] {
+    return List::new()
+}
+
+fn build_user_item_matrix(interactions: List[UserItem]) -> Map[String, Tensor[f32]] {
+    return Map::new()
+}
+
+fn get_unique_users(interactions: List[UserItem]) -> List[String] {
+    return List::new()
+}
+
+fn compute_cosine_similarity(a: Tensor[f32], b: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn get_user_ratings(interactions: List[UserItem], user: String) -> List[(String, Float)] {
+    return List::new()
+}
+
+fn get_feature_dim() -> Int {
+    return 128
+}
+
+fn compute_dot_product(a: Tensor[f32], b: Tensor[f32]) -> Float {
+    return 0.0
+}
+
+fn get_score_for_item(recs: List[Recommendation], item: String) -> Float {
+    return 0.0
+}
+
+fn get_user_idx(user: String) -> Int { return 0; }
+fn get_item_idx(item: String) -> Int { return 0; }
+
+fn predict_rating_mf(
+    user_factors: Tensor[f32],
+    item_factors: Tensor[f32],
+    user_bias: Float,
+    item_bias: Float,
+    global_mean: Float
+) -> Float {
+    return 0.0
+}
+
+fn compute_gradient(factors: Tensor[f32], reg: Float) -> Tensor[f32] {
+    return factors
+}
+
+fn zeros(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn randn(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+fn zeros_tensor(shape: List[Int]) -> Tensor[f32] { return zeros_tensor(shape); }
+
+type Tensor[T, Shape] = Any
+type Tensor[T] = Any
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any

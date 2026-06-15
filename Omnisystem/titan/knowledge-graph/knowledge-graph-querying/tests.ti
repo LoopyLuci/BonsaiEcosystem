@@ -1,0 +1,3 @@
+// Tests: knowledge-graph-querying
+
+pub fn test_module() -> i64 { return 111; }

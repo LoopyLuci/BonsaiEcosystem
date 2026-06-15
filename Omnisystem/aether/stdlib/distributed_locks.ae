@@ -1,0 +1,401 @@
+// aether/stdlib/distributed_locks.ae
+// Distributed locking and resource coordination for Aether
+
+type LockId = String
+type ResourceId = String
+
+enum LockMode {
+    | Shared
+    | Exclusive
+    | Intent_Shared
+    | Intent_Exclusive
+}
+
+type Lock = {
+    lock_id: LockId
+    resource_id: ResourceId
+    owner: String
+    mode: LockMode
+    acquired_at: Int
+    expires_at: Int
+    reentrant: Bool
+}
+
+type LockRequest = {
+    lock_id: LockId
+    resource_id: ResourceId
+    requester: String
+    mode: LockMode
+    timeout_ms: Int
+    reentrant: Bool
+}
+
+type LockGrant = {
+    lock_id: LockId
+    granted_at: Int
+    expires_at: Int
+}
+
+-- Distributed lock manager using consensus
+struct DistributedLockManager {
+    locks: Map[LockId, Lock]
+    lock_queue: Map[ResourceId, List[LockRequest]]
+    deadlock_detector: DeadlockDetector
+    replication: LockReplication
+
+    fn new() -> DistributedLockManager {
+        return DistributedLockManager {
+            locks: Map::new(),
+            lock_queue: Map::new(),
+            deadlock_detector: DeadlockDetector::new(),
+            replication: LockReplication::new(),
+        }
+    }
+
+    fn acquire_lock(request: LockRequest) -> Result[LockGrant] {
+        -- Check for deadlock
+        let would_deadlock = this.deadlock_detector.would_cause_deadlock(request)
+
+        if would_deadlock {
+            return Result::Err("Deadlock detected")
+        }
+
+        -- Check if lock can be acquired immediately
+        if this.can_acquire(request) {
+            let grant = this.grant_lock(request)
+
+            -- Replicate to other nodes
+            this.replication.replicate_lock_grant(grant)
+
+            return Result::Ok(grant)
+        }
+
+        -- Add to queue
+        if !this.lock_queue.get(request.resource_id).is_some() {
+            this.lock_queue[request.resource_id] = List::new()
+        }
+
+        this.lock_queue[request.resource_id].push(request)
+
+        -- Wait for lock
+        return this.wait_for_lock(request)
+    }
+
+    fn release_lock(lock_id: LockId) -> Result[Unit] {
+        let lock = this.locks.get(lock_id)
+
+        if lock.is_none() {
+            return Result::Err("Lock not found")
+        }
+
+        let l = lock.unwrap()
+
+        -- Remove lock
+        this.locks.remove(lock_id)
+
+        -- Replicate removal
+        this.replication.replicate_lock_release(lock_id)
+
+        -- Grant locks from queue
+        let queue = this.lock_queue.get(l.resource_id)
+
+        if queue.is_some() {
+            let q = queue.unwrap()
+
+            while q.len() > 0 {
+                let next_request = q.pop()
+
+                if this.can_acquire(next_request) {
+                    let grant = this.grant_lock(next_request)
+                    this.replication.replicate_lock_grant(grant)
+                    break
+                }
+            }
+        }
+
+        return Result::Ok(Unit {})
+    }
+
+    fn can_acquire(request: LockRequest) -> Bool {
+        let existing_locks = get_locks_on_resource(this.locks, request.resource_id)
+
+        for lock in existing_locks {
+            -- Check lock compatibility
+            if !are_compatible(lock.mode, request.mode) {
+                if lock.owner != request.requester {
+                    return false
+                }
+            }
+        }
+
+        return true
+    }
+
+    fn grant_lock(request: LockRequest) -> LockGrant {
+        let now = current_time_ms()
+        let expires = now + 30000  -- 30 second timeout
+
+        let lock = Lock {
+            lock_id: request.lock_id,
+            resource_id: request.resource_id,
+            owner: request.requester,
+            mode: request.mode,
+            acquired_at: now,
+            expires_at: expires,
+            reentrant: request.reentrant,
+        }
+
+        this.locks[request.lock_id] = lock
+
+        return LockGrant {
+            lock_id: request.lock_id,
+            granted_at: now,
+            expires_at: expires,
+        }
+    }
+
+    fn wait_for_lock(request: LockRequest) -> Result[LockGrant] {
+        let start_time = current_time_ms()
+
+        loop {
+            if this.can_acquire(request) {
+                let grant = this.grant_lock(request)
+                return Result::Ok(grant)
+            }
+
+            if current_time_ms() - start_time > request.timeout_ms {
+                return Result::Err("Lock acquisition timeout")
+            }
+
+            sleep_ms(100)
+        }
+    }
+
+    fn extend_lock(lock_id: LockId, extension_ms: Int) -> Result[Unit] {
+        let lock = this.locks.get(lock_id)
+
+        if lock.is_none() {
+            return Result::Err("Lock not found")
+        }
+
+        let mut l = lock.unwrap()
+        l.expires_at = l.expires_at + extension_ms
+
+        this.locks[lock_id] = l
+        this.replication.replicate_lock_update(l)
+
+        return Result::Ok(Unit {})
+    }
+
+    fn check_expired_locks() {
+        let now = current_time_ms()
+        let mut expired_locks = List::new()
+
+        for (lock_id, lock) in this.locks.entries() {
+            if lock.expires_at < now {
+                expired_locks.push(lock_id)
+            }
+        }
+
+        for lock_id in expired_locks {
+            let _ = this.release_lock(lock_id)
+        }
+    }
+}
+
+-- Deadlock detection using wait-for graph
+struct DeadlockDetector {
+    wait_for_graph: Map[String, List[String]]
+    cycle_detected: Bool
+
+    fn new() -> DeadlockDetector {
+        return DeadlockDetector {
+            wait_for_graph: Map::new(),
+            cycle_detected: false,
+        }
+    }
+
+    fn would_cause_deadlock(request: LockRequest) -> Bool {
+        -- Build wait-for graph
+        -- Add edge: requester -> owner of conflicting lock
+        -- Check for cycles using DFS
+
+        return this.has_cycle(request.requester)
+    }
+
+    fn has_cycle(node: String) -> Bool {
+        return has_cycle_dfs(node, Map::new(), this.wait_for_graph)
+    }
+}
+
+fn has_cycle_dfs(
+    node: String,
+    visited: Map[String, Bool],
+    graph: Map[String, List[String]]
+) -> Bool {
+    visited[node] = true
+
+    let neighbors = graph.get(node)
+
+    if neighbors.is_some() {
+        for neighbor in neighbors.unwrap() {
+            if !visited.get(neighbor).is_some() {
+                if has_cycle_dfs(neighbor, visited, graph) {
+                    return true
+                }
+            } else {
+                if visited[neighbor] {
+                    return true
+                }
+            }
+        }
+    }
+
+    visited[node] = false
+    return false
+}
+
+-- Lock replication across nodes
+struct LockReplication {
+    replicas: List[String]
+
+    fn new() -> LockReplication {
+        return LockReplication { replicas: List::new() }
+    }
+
+    fn replicate_lock_grant(grant: LockGrant) {
+        for replica in this.replicas {
+            send_lock_grant_to_replica(replica, grant)
+        }
+    }
+
+    fn replicate_lock_release(lock_id: LockId) {
+        for replica in this.replicas {
+            send_lock_release_to_replica(replica, lock_id)
+        }
+    }
+
+    fn replicate_lock_update(lock: Lock) {
+        for replica in this.replicas {
+            send_lock_update_to_replica(replica, lock)
+        }
+    }
+}
+
+-- Optimistic locking
+struct OptimisticLockManager {
+    versions: Map[ResourceId, Int]
+
+    fn new() -> OptimisticLockManager {
+        return OptimisticLockManager { versions: Map::new() }
+    }
+
+    fn read_with_version(resource_id: ResourceId) -> (Any, Int) {
+        let version = this.versions.get(resource_id).unwrap_or(0)
+        return (load_resource(resource_id), version)
+    }
+
+    fn write_if_unchanged(resource_id: ResourceId, expected_version: Int, data: Any) -> Result[Unit] {
+        let current_version = this.versions.get(resource_id).unwrap_or(0)
+
+        if current_version != expected_version {
+            return Result::Err("Version mismatch - concurrent modification detected")
+        }
+
+        save_resource(resource_id, data)
+        this.versions[resource_id] = current_version + 1
+
+        return Result::Ok(Unit {})
+    }
+}
+
+-- Pessimistic read-write locks
+struct ReadWriteLock {
+    readers: Int
+    writers: Int
+    waiting_writers: Int
+
+    fn new() -> ReadWriteLock {
+        return ReadWriteLock {
+            readers: 0,
+            writers: 0,
+            waiting_writers: 0,
+        }
+    }
+
+    fn acquire_read() {
+        while this.writers > 0 || this.waiting_writers > 0 {
+            sleep_ms(10)
+        }
+
+        this.readers = this.readers + 1
+    }
+
+    fn release_read() {
+        this.readers = this.readers - 1
+    }
+
+    fn acquire_write() {
+        this.waiting_writers = this.waiting_writers + 1
+
+        while this.readers > 0 || this.writers > 0 {
+            sleep_ms(10)
+        }
+
+        this.waiting_writers = this.waiting_writers - 1
+        this.writers = this.writers + 1
+    }
+
+    fn release_write() {
+        this.writers = this.writers - 1
+    }
+}
+
+-- Helper functions
+fn are_compatible(mode1: LockMode, mode2: LockMode) -> Bool {
+    match (mode1, mode2) {
+        (LockMode::Shared, LockMode::Shared) => return true
+        (LockMode::Shared, LockMode::Intent_Shared) => return true
+        (LockMode::Intent_Shared, LockMode::Intent_Shared) => return true
+        (LockMode::Intent_Shared, LockMode::Intent_Exclusive) => return true
+        _ => return false
+    }
+}
+
+fn get_locks_on_resource(
+    locks: Map[LockId, Lock],
+    resource_id: ResourceId
+) -> List[Lock] {
+    let mut result = List::new()
+
+    for (_, lock) in locks.entries() {
+        if lock.resource_id == resource_id {
+            result.push(lock)
+        }
+    }
+
+    return result
+}
+
+fn current_time_ms() -> Int {
+    return 0
+}
+
+fn sleep_ms(ms: Int) {}
+fn send_lock_grant_to_replica(replica: String, grant: LockGrant) {}
+fn send_lock_release_to_replica(replica: String, lock_id: LockId) {}
+fn send_lock_update_to_replica(replica: String, lock: Lock) {}
+fn load_resource(resource_id: ResourceId) -> Any { return null; }
+fn save_resource(resource_id: ResourceId, data: Any) {}
+
+type Result<T> = Any
+type Unit = {}
+type Map<K, V> = Any
+type List<T> = Any
+type Option<T> = Any
+type Any = Any
+
+fn Ok<T>(val: T) -> Result[T] { return val; }
+fn Err<T>(msg: String) -> Result[T] { return msg; }
+fn Some<T>(val: T) -> Option<T> { return val; }
+fn None<T>() -> Option<T> { return null; }
