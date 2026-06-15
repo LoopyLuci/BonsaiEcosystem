@@ -18,7 +18,7 @@ export class ApplicationLauncher {
   private instances: Map<string, ApplicationInstance> = new Map();
   private instanceIdCounter = 0;
   private listeners: ApplicationEventListener[] = [];
-  private processMonitoringInterval: NodeJS.Timeout | null = null;
+  private processMonitoringInterval: ReturnType<typeof setInterval> | null = null;
 
   // =========================================================================
   // LAUNCH OPERATIONS
@@ -60,9 +60,8 @@ export class ApplicationLauncher {
         ...(request.args || []),
       ];
 
-      // Prepare environment variables
+      // Prepare environment variables (frontend only, no process.env access)
       const env = {
-        ...process.env,
         ...(app.env || {}),
         ...(request.env || {}),
       };
