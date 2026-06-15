@@ -137,9 +137,8 @@ export class ApplicationLauncher {
 
       // In production, use: await invoke('terminate_process', { processId: instance.processId });
 
-      // Update instance status
-      instance.status = 'stopped';
-      this.instances.set(instanceId, instance);
+      // Remove instance from tracking
+      this.instances.delete(instanceId);
 
       // Emit termination event
       this.emit({
