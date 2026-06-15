@@ -68,8 +68,9 @@ export class ApplicationLauncher {
       // Launch the application using Tauri backend
       let processId: number;
       try {
-        // Dynamically import invoke to avoid Vite resolution issues
-        const tauriModule = await import('@tauri-apps/api/tauri' as any);
+        // Dynamically import invoke with string literal to avoid Vite analysis
+        const modulePath = '@tauri-apps/api/tauri'.replace('@', '@');
+        const tauriModule = await import(modulePath) as any;
         const invoke = tauriModule.invoke as any;
 
         processId = await invoke('launch_application', {
@@ -301,7 +302,8 @@ export class ApplicationLauncher {
 
         // Try to get real metrics from Tauri backend
         try {
-          const tauriModule = await import('@tauri-apps/api/tauri' as any);
+          const modulePath = '@tauri-apps/api/tauri'.replace('@', '@');
+          const tauriModule = await import(modulePath) as any;
           const invoke = tauriModule.invoke as any;
 
           const metrics = await invoke(
