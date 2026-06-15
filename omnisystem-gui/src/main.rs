@@ -273,6 +273,37 @@ fn shutdown_application() {
     std::process::exit(0);
 }
 
+#[command]
+fn launch_application(app_id: String, executable: String, args: Vec<String>) -> Result<u32, String> {
+    use std::process::Command;
+
+    match Command::new(&executable)
+        .args(&args)
+        .spawn()
+    {
+        Ok(child) => {
+            let pid = child.id();
+            println!("✅ Launched {}: PID {}", app_id, pid);
+            Ok(pid)
+        }
+        Err(e) => {
+            Err(format!("Failed to launch {}: {}", app_id, e))
+        }
+    }
+}
+
+#[command]
+fn get_process_metrics(process_id: u32) -> Result<std::collections::HashMap<String, f64>, String> {
+    use std::collections::HashMap;
+
+    // Try to get real process metrics using sysinfo crate
+    // For now, return a basic stub
+    let mut metrics = HashMap::new();
+    metrics.insert("cpu".to_string(), 5.0);
+    metrics.insert("memory".to_string(), 256.0);
+    Ok(metrics)
+}
+
 // ============================================================================
 // MAIN APPLICATION
 // ============================================================================
@@ -307,6 +338,8 @@ fn main() {
             get_test_results,
             get_system_logs,
             shutdown_application,
+            launch_application,
+            get_process_metrics,
         ])
         .run(context)
         .expect("error while running tauri application");
