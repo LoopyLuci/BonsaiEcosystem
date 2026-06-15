@@ -24,106 +24,93 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
-# Colors
-$Green = [ConsoleColor]::Green
-$Yellow = [ConsoleColor]::Yellow
-$Cyan = [ConsoleColor]::Cyan
-$Red = [ConsoleColor]::Red
-
-function Write-Header {
-    param([string]$Message)
-    Write-Host ""
-    Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor $Cyan
-    Write-Host "║ $($Message.PadRight(58)) ║" -ForegroundColor $Cyan
-    Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor $Cyan
-    Write-Host ""
-}
-
-function Write-Success {
-    param([string]$Message)
-    Write-Host "✅ $Message" -ForegroundColor $Green
-}
-
-function Write-Info {
-    param([string]$Message)
-    Write-Host "ℹ️  $Message" -ForegroundColor $Cyan
-}
-
-function Write-Warning {
-    param([string]$Message)
-    Write-Host "⚠️  $Message" -ForegroundColor $Yellow
-}
-
-function Write-Error {
-    param([string]$Message)
-    Write-Host "❌ $Message" -ForegroundColor $Red
-}
-
-# Main script
-Write-Header "OMNISYSTEM BUILD - CREATE EXECUTABLE"
-
+# Setup paths
 $ProjectRoot = Split-Path -Parent $PSCommandPath
 $GuiDir = Join-Path $ProjectRoot "omnisystem-gui"
-$OutputDir = Join-Path $ProjectRoot "dist"
 $ExePath = Join-Path $ProjectRoot "Omnisystem.exe"
 
-Write-Info "Project Root: $ProjectRoot"
-Write-Info "GUI Directory: $GuiDir"
-Write-Info "Output Directory: $OutputDir"
-Write-Info "Executable: $ExePath"
+Write-Host ""
+Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║         OMNISYSTEM BUILD SCRIPT - CREATE EXECUTABLE       ║" -ForegroundColor Cyan
+Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
 
-# Check if GUI directory exists
+Write-Host "✓ Project Root: $ProjectRoot" -ForegroundColor Green
+Write-Host "✓ GUI Directory: $GuiDir" -ForegroundColor Green
+Write-Host "✓ Output Executable: $ExePath" -ForegroundColor Green
+Write-Host ""
+
+# Validate paths
 if (-not (Test-Path $GuiDir)) {
-    Write-Error "GUI directory not found: $GuiDir"
+    Write-Host "✗ GUI directory not found: $GuiDir" -ForegroundColor Red
     exit 1
 }
 
 # Change to GUI directory
-Write-Info "Changing to GUI directory..."
 Push-Location $GuiDir
 
 try {
     # Clean if requested
     if ($Clean) {
-        Write-Header "CLEANING BUILD ARTIFACTS"
-        Write-Info "Removing node_modules..."
+        Write-Host ""
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host "CLEANING BUILD ARTIFACTS" -ForegroundColor Cyan
+        Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host ""
+
         if (Test-Path "node_modules") {
+            Write-Host "Removing node_modules..." -ForegroundColor Yellow
             Remove-Item -Recurse -Force "node_modules" -ErrorAction SilentlyContinue
-            Write-Success "node_modules removed"
+            Write-Host "✓ Cleaned" -ForegroundColor Green
         }
 
-        Write-Info "Removing build directories..."
         if (Test-Path "dist") {
+            Write-Host "Removing dist..." -ForegroundColor Yellow
             Remove-Item -Recurse -Force "dist" -ErrorAction SilentlyContinue
         }
+
         if (Test-Path "src-tauri/target") {
+            Write-Host "Removing Rust artifacts..." -ForegroundColor Yellow
             Remove-Item -Recurse -Force "src-tauri/target" -ErrorAction SilentlyContinue
         }
-        Write-Success "Build artifacts cleaned"
+
+        Write-Host "✓ Cleanup complete" -ForegroundColor Green
+        Write-Host ""
     }
 
     # Install dependencies
-    Write-Header "INSTALLING DEPENDENCIES"
-    Write-Info "Running npm install..."
-    npm install 2>&1 | Out-Null
-    Write-Success "Dependencies installed"
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "INSTALLING DEPENDENCIES" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Running npm install..." -ForegroundColor Yellow
 
-    # Build the app
-    Write-Header "BUILDING OMNISYSTEM"
-    Write-Info "Building Tauri application..."
+    npm install 2>&1 | Out-Null
+    Write-Host "✓ Dependencies installed" -ForegroundColor Green
+    Write-Host ""
+
+    # Build the application
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "BUILDING OMNISYSTEM" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
 
     if ($Release) {
-        Write-Info "Building in RELEASE mode..."
-        npm run tauri:build 2>&1 | Tee-Object -FilePath "build.log"
+        Write-Host "Building in RELEASE mode (optimized, smaller)..." -ForegroundColor Yellow
+        npm run tauri:build 2>&1 | Out-Null
     } else {
-        Write-Info "Building in DEV mode..."
-        npm run tauri:dev 2>&1 | Tee-Object -FilePath "build.log"
+        Write-Host "Building in DEV mode..." -ForegroundColor Yellow
+        npm run tauri:dev 2>&1 | Out-Null
     }
 
-    Write-Success "Build completed"
+    Write-Host "✓ Build completed" -ForegroundColor Green
+    Write-Host ""
 
     # Find the executable
-    Write-Header "LOCATING EXECUTABLE"
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "LOCATING EXECUTABLE" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
 
     $PossiblePaths = @(
         (Join-Path $ProjectRoot "omnisystem-gui/src-tauri/target/release/omnisystem-gui.exe"),
@@ -135,57 +122,70 @@ try {
     foreach ($Path in $PossiblePaths) {
         if (Test-Path $Path) {
             $FoundExe = $Path
-            Write-Success "Found executable: $Path"
+            Write-Host "✓ Found: $Path" -ForegroundColor Green
             break
         }
     }
 
     if (-not $FoundExe) {
-        Write-Error "Executable not found in expected locations"
-        Write-Info "Searching for .exe files..."
+        Write-Host "Searching for executable..." -ForegroundColor Yellow
         $ExeFiles = Get-ChildItem -Recurse -Filter "omnisystem*.exe" -ErrorAction SilentlyContinue
         if ($ExeFiles) {
             $FoundExe = $ExeFiles[0].FullName
-            Write-Success "Found: $FoundExe"
+            Write-Host "✓ Found: $FoundExe" -ForegroundColor Green
         } else {
-            Write-Error "No Omnisystem executable found"
+            Write-Host "✗ No Omnisystem executable found" -ForegroundColor Red
             exit 1
         }
     }
 
+    Write-Host ""
+
     # Copy to root
-    Write-Header "CREATING ROOT EXECUTABLE"
-    Write-Info "Copying to: $ExePath"
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "CREATING ROOT EXECUTABLE" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Copying executable to root..." -ForegroundColor Yellow
+
     Copy-Item -Path $FoundExe -Destination $ExePath -Force
-    Write-Success "Omnisystem.exe created in root directory"
+    Write-Host "✓ Omnisystem.exe created" -ForegroundColor Green
 
     # Verify
     if (Test-Path $ExePath) {
-        $FileSize = (Get-Item $ExePath).Length / 1MB
-        Write-Success "Executable verified: $([math]::Round($FileSize, 2)) MB"
+        $FileSize = [math]::Round((Get-Item $ExePath).Length / 1MB, 2)
+        Write-Host "✓ Verified: $FileSize MB" -ForegroundColor Green
     } else {
-        Write-Error "Executable copy failed"
+        Write-Host "✗ Copy failed" -ForegroundColor Red
         exit 1
     }
 
-    Write-Header "BUILD COMPLETE"
     Write-Host ""
-    Write-Host "🚀 LAUNCH OMNISYSTEM:" -ForegroundColor $Green
-    Write-Host "   .\Omnisystem.exe" -ForegroundColor $Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "BUILD COMPLETE" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "📍 Location: $ExePath" -ForegroundColor $Cyan
+    Write-Host "🚀 LAUNCH OMNISYSTEM:" -ForegroundColor Green
+    Write-Host "   .\Omnisystem.exe" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "📍 Location: $ExePath" -ForegroundColor Cyan
     Write-Host ""
 
     # Launch if requested
     if ($Launch) {
-        Write-Info "Launching Omnisystem..."
+        Write-Host "Launching Omnisystem..." -ForegroundColor Yellow
         Start-Process $ExePath
-        Write-Success "Application launched"
+        Write-Host "✓ Application launched" -ForegroundColor Green
     }
 
+} catch {
+    Write-Host ""
+    Write-Host "✗ Error: $_" -ForegroundColor Red
+    exit 1
 } finally {
     Pop-Location
 }
 
-Write-Success "Build script completed successfully"
+Write-Host "✓ Build script completed successfully" -ForegroundColor Green
+Write-Host ""
 exit 0
