@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/tauri";
 import AppMenu from "./components/AppMenu/AppMenu";
 import "./App.css";
 
