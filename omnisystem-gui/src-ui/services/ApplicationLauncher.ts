@@ -292,15 +292,36 @@ export class ApplicationLauncher {
       for (const instance of running) {
         // In production, use: const metrics = await invoke('get_process_metrics', { processId: instance.processId });
 
-        // Simulate metrics
-        const cpuUsage = Math.random() * 50;
-        const memoryUsage =
-          (instance.memoryUsage || 128) +
-          Math.random() * 50 - 25;
+        // Realistic simulated metrics based on app type
+        const app = applicationRegistry.getApplication(instance.appId);
+        let baseCpu = 5;
+        let baseMemory = instance.memoryUsage || 256;
+
+        // Set realistic baselines per app type
+        if (app?.id.includes('compiler') || app?.id.includes('debugger')) {
+          baseCpu = 15;
+          baseMemory = 320;
+        } else if (app?.id.includes('profiler')) {
+          baseCpu = 12;
+          baseMemory = 280;
+        } else if (app?.id.includes('editor')) {
+          baseCpu = 8;
+          baseMemory = 240;
+        } else if (app?.id.includes('terminal')) {
+          baseCpu = 3;
+          baseMemory = 180;
+        }
+
+        // Add slight variation to simulate real behavior
+        const cpuVariation = (Math.sin(Date.now() / 1000) * 3) + (Math.random() * 2);
+        const memoryVariation = (Math.random() * 10) - 5;
+
+        const cpuUsage = Math.max(1, Math.min(45, baseCpu + cpuVariation));
+        const memoryUsage = Math.max(128, Math.min(2048, baseMemory + memoryVariation));
 
         this.updateInstanceMetrics(instance.id, {
-          cpuUsage: Math.max(0, cpuUsage),
-          memoryUsage: Math.max(128, Math.min(2048, memoryUsage)),
+          cpuUsage,
+          memoryUsage,
         });
       }
     } catch (error) {
