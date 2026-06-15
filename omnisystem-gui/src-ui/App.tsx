@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
+import AppMenu from "./components/AppMenu/AppMenu";
 import "./App.css";
 
 // ============================================================================
@@ -239,6 +240,9 @@ export default function App() {
       <div className="quick-access">
         <h3>Quick Access</h3>
         <div className="quick-buttons">
+          <button onClick={() => setActiveTab("apps")} className="quick-btn">
+            🚀 Applications
+          </button>
           <button onClick={() => setActiveTab("dashboard")} className="quick-btn">
             📊 Dashboard
           </button>
@@ -838,6 +842,7 @@ export default function App() {
       <nav className="app-nav">
         {[
           { id: "home", label: "Home", icon: "🏠" },
+          { id: "apps", label: "Applications", icon: "🚀" },
           { id: "dashboard", label: "Dashboard", icon: "📊" },
           { id: "compiler", label: "Compiler", icon: "⚙️" },
           { id: "builder", label: "Builder", icon: "🔨" },
@@ -862,6 +867,7 @@ export default function App() {
 
       <main className="app-main">
         {activeTab === "home" && renderHome()}
+        {activeTab === "apps" && <AppMenu onAppLaunch={(appId) => console.log(`Launched: ${appId}`)} onAppTerminate={(instanceId) => console.log(`Terminated: ${instanceId}`)} />}
         {activeTab === "dashboard" && renderDashboard()}
         {activeTab === "compiler" && renderCompiler()}
         {activeTab === "builder" && renderBuilder()}
