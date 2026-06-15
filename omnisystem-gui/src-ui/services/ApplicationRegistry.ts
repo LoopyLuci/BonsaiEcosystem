@@ -6,9 +6,6 @@
 import {
   ApplicationMetadata,
   ApplicationConfig,
-  RegistryIndex,
-  DiscoveryResult,
-  DiscoveryError,
   RegistryError,
   ApplicationEvent,
   ApplicationEventListener,
