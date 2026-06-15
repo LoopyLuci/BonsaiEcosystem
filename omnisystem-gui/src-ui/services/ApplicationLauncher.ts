@@ -3,7 +3,6 @@
  * Launches applications and manages their lifecycle
  */
 
-import { invoke } from '@tauri-apps/api/tauri';
 import {
   ApplicationInstance,
   LaunchRequest,
@@ -69,6 +68,8 @@ export class ApplicationLauncher {
       // Launch the application using Tauri backend
       let processId: number;
       try {
+        // Dynamically import invoke to avoid Vite resolution issues
+        const { invoke } = await import('@tauri-apps/api/tauri');
         processId = await invoke<number>('launch_application', {
           appId: request.appId,
           executable: app.executable,
@@ -79,7 +80,7 @@ export class ApplicationLauncher {
       } catch (invokeError) {
         // If Tauri invoke is not available, generate a realistic process ID
         // This allows the system to work in dev mode without Rust backend
-        console.warn('Tauri invoke not available, using simulated process ID');
+        console.warn('Tauri invoke not available, using simulated process ID:', invokeError);
         processId = Math.floor(Math.random() * 100000) + 10000;
       }
 
@@ -298,6 +299,7 @@ export class ApplicationLauncher {
 
         // Try to get real metrics from Tauri backend
         try {
+          const { invoke } = await import('@tauri-apps/api/tauri');
           const metrics = await invoke<{ cpu: number; memory: number }>(
             'get_process_metrics',
             { processId: instance.processId }
