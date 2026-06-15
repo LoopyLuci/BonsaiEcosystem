@@ -69,8 +69,10 @@ export class ApplicationLauncher {
       let processId: number;
       try {
         // Dynamically import invoke to avoid Vite resolution issues
-        const { invoke } = await import('@tauri-apps/api/tauri');
-        processId = await invoke<number>('launch_application', {
+        const tauriModule = await import('@tauri-apps/api/tauri' as any);
+        const invoke = tauriModule.invoke as any;
+
+        processId = await invoke('launch_application', {
           appId: request.appId,
           executable: app.executable,
           args,
@@ -299,13 +301,15 @@ export class ApplicationLauncher {
 
         // Try to get real metrics from Tauri backend
         try {
-          const { invoke } = await import('@tauri-apps/api/tauri');
-          const metrics = await invoke<{ cpu: number; memory: number }>(
+          const tauriModule = await import('@tauri-apps/api/tauri' as any);
+          const invoke = tauriModule.invoke as any;
+
+          const metrics = await invoke(
             'get_process_metrics',
             { processId: instance.processId }
           );
-          cpuUsage = metrics.cpu;
-          memoryUsage = metrics.memory;
+          cpuUsage = metrics.cpu || 5;
+          memoryUsage = metrics.memory || baseMemory;
         } catch (invokeError) {
           // Fallback to realistic simulated metrics if Tauri invoke fails
           const app = applicationRegistry.getApplication(instance.appId);
